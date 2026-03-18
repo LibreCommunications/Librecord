@@ -40,12 +40,9 @@ jobs:
           npm run build
 
       - name: Deploy frontend
-        run: rsync -a --delete Librecord.Client/dist/ /home/dev-egg/HostedPrograms/Librecord/Librecord.Client/dist/
+        run: |
+          rm -rf /home/dev-egg/HostedPrograms/Librecord/Librecord.Client/dist
+          cp -r Librecord.Client/dist /home/dev-egg/HostedPrograms/Librecord/Librecord.Client/dist
 
       - name: Deploy backend
-        run: |
-          cp docker-compose.yml /home/dev-egg/HostedPrograms/Librecord/
-          cp livekit.yaml /home/dev-egg/HostedPrograms/Librecord/
-          cp .env /home/dev-egg/HostedPrograms/Librecord/
-          cd /home/dev-egg/HostedPrograms/Librecord
-          docker compose up -d --build --force-recreate
+        run: docker compose up -d --build --force-recreate
