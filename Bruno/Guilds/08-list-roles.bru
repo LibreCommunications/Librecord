@@ -1,0 +1,30 @@
+meta {
+  name: List Roles
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/guilds/{{guildId}}/roles
+  body: none
+  auth: none
+}
+
+headers {
+  Cookie: accessToken={{accessToken}}
+}
+
+tests {
+  test("returns roles", function() {
+    expect(res.status).to.equal(200);
+    const body = res.getBody();
+    expect(body).to.be.an('array');
+  });
+
+  test("has @everyone and Owner roles", function() {
+    const body = res.getBody();
+    const names = body.map(r => r.name);
+    expect(names).to.include("@everyone");
+    expect(names).to.include("Owner");
+  });
+}

@@ -1,0 +1,29 @@
+meta {
+  name: Login (get token)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "emailOrUsername": "brunotest",
+    "password": "Password123!"
+  }
+}
+
+script:post-response {
+  const cookies = res.headers['set-cookie'];
+  if (cookies) {
+    const accessCookie = cookies.find(c => c.startsWith('accessToken='));
+    if (accessCookie) {
+      const token = accessCookie.split('=')[1].split(';')[0];
+      bru.setVar('accessToken', token);
+    }
+  }
+}

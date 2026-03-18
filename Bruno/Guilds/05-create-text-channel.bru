@@ -1,0 +1,47 @@
+meta {
+  name: Create Text Channel
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/channels/guild/{{guildId}}
+  body: json
+  auth: none
+}
+
+headers {
+  Cookie: accessToken={{accessToken}}
+}
+
+body:json {
+  {
+    "name": "general",
+    "type": 0,
+    "position": 0,
+    "topic": "General discussion"
+  }
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    const body = res.getBody();
+    bru.setVar('textChannelId', body.id);
+  }
+}
+
+tests {
+  test("channel created", function() {
+    expect(res.status).to.be.oneOf([200, 201]);
+  });
+
+  test("channel type is Text (0)", function() {
+    const body = res.getBody();
+    expect(body.type).to.equal(0);
+  });
+
+  test("channel has topic", function() {
+    const body = res.getBody();
+    expect(body.topic).to.equal("General discussion");
+  });
+}

@@ -1,0 +1,32 @@
+meta {
+  name: Get Guild Details
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/guilds/{{guildId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Cookie: accessToken={{accessToken}}
+}
+
+tests {
+  test("returns guild details", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("has correct id", function() {
+    const body = res.getBody();
+    expect(body.id).to.equal(bru.getVar('guildId'));
+  });
+
+  test("has name and createdAt", function() {
+    const body = res.getBody();
+    expect(body.name).to.be.a('string');
+    expect(body.createdAt).to.be.a('string');
+  });
+}

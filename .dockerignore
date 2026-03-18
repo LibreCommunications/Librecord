@@ -1,0 +1,15 @@
+Librecord.Client/
+.github/
+.git/
+*.md
+.env
+nginx.conf
+nginx-*.conf
+setup.sh
+start.sh
+librecord.service
+docker-compose*.yml
+Dockerfile
+.dockerignore
+**/bin/
+**/obj/

@@ -1,0 +1,45 @@
+meta {
+  name: Send guild message
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/guild-channels/{{channelId}}/messages
+  body: json
+  auth: none
+}
+
+headers {
+  Cookie: accessToken={{accessToken}}
+}
+
+body:json {
+  {
+    "content": "Hello from Bruno!",
+    "clientMessageId": "bruno-test-001"
+  }
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    const body = res.getBody();
+    bru.setVar('messageId', body.id);
+  }
+}
+
+tests {
+  test("message sent", function() {
+    expect(res.status).to.be.oneOf([200, 201]);
+  });
+
+  test("message has content", function() {
+    const body = res.getBody();
+    expect(body.content).to.include("Hello from Bruno!");
+  });
+
+  test("message has id", function() {
+    const body = res.getBody();
+    expect(body.id).to.be.a('string');
+  });
+}

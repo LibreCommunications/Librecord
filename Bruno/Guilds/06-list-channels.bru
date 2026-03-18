@@ -1,0 +1,30 @@
+meta {
+  name: List Guild Channels
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/channels/guild/{{guildId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Cookie: accessToken={{accessToken}}
+}
+
+tests {
+  test("returns channels", function() {
+    expect(res.status).to.equal(200);
+    const body = res.getBody();
+    expect(body).to.be.an('array');
+    expect(body.length).to.be.greaterThan(0);
+  });
+
+  test("contains text channel", function() {
+    const body = res.getBody();
+    const found = body.find(c => c.type === 0);
+    expect(found).to.be.ok;
+  });
+}

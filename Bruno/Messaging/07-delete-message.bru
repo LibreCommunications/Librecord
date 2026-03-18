@@ -1,0 +1,21 @@
+meta {
+  name: Delete guild message
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/guild-channels/{{channelId}}/messages/{{messageId}}
+  body: none
+  auth: none
+}
+
+headers {
+  Cookie: accessToken={{accessToken}}
+}
+
+tests {
+  test("message deleted", function() {
+    expect(res.status).to.equal(200);
+  });
+}

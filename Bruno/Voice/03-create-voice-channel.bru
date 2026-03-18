@@ -1,0 +1,46 @@
+meta {
+  name: Create Voice Channel
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/channels/guild/{{guildId}}
+  body: json
+  auth: none
+}
+
+headers {
+  Cookie: accessToken={{accessToken}}
+}
+
+body:json {
+  {
+    "name": "voice-chat",
+    "type": 1,
+    "position": 0
+  }
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    const body = res.getBody();
+    bru.setVar('voiceChannelId', body.id);
+  }
+}
+
+tests {
+  test("channel created successfully", function() {
+    expect(res.status).to.be.oneOf([200, 201]);
+  });
+
+  test("channel type is Voice (1)", function() {
+    const body = res.getBody();
+    expect(body.type).to.equal(1);
+  });
+
+  test("channel name matches", function() {
+    const body = res.getBody();
+    expect(body.name).to.equal("voice-chat");
+  });
+}

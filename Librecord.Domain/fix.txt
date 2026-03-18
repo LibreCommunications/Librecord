@@ -1,0 +1,778 @@
+﻿using Librecord.Domain.Identity;
+
+namespace Librecord.Domain.Guilds;
+
+public class GuildBan
+{
+    // Composite key (GuildId + UserId) will be added in EF configuration
+    public Guid GuildId { get; set; }
+    public Guild Guild { get; set; } = null!;
+
+    public Guid UserId { get; set; }
+    public User User { get; set; } = null!;
+
+    // Moderator who issued the ban (cannot be null)
+    public Guid ModeratorId { get; set; }
+    public User Moderator { get; set; } = null!;
+
+    // Optional reason
+    public string? Reason { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}﻿using Librecord.Domain.Messaging;
+using Librecord.Domain.Messaging.Guild;
+
+namespace Librecord.Domain.Guilds;
+
+public class GuildChannel
+{
+    public Guid Id { get; set; }
+
+    public required string Name { get; set; }
+
+    // Text, Voice, Category, Forum, etc.
+    public GuildChannelType Type { get; set; } = GuildChannelType.Text;
+
+    public string? Topic { get; set; }
+
+    // Sidebar ordering
+    public int Position { get; set; }
+
+    public Guid GuildId { get; set; }
+    public Guild Guild { get; set; } = null!;
+
+    // Category / Thread structure
+    public Guid? ParentId { get; set; }
+    public GuildChannel? Parent { get; set; }
+    public List<GuildChannel> Children { get; set; } = [];
+
+    // Per-channel permission overrides
+    public List<GuildChannelPermissionOverride> PermissionOverrides { get; set; } = [];
+
+    // Members who can access this channel
+    public List<GuildChannelMember> Members { get; set; } = [];
+
+    // Messages in this channel
+    public List<GuildChannelMessage> Messages { get; set; } = [];
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}﻿using Librecord.Domain.Identity;
+
+namespace Librecord.Domain.Guilds;
+
+public class GuildChannelMember
+{
+    public Guid UserId { get; set; }
+    public User User { get; set; } = null!;
+
+    public Guid ChannelId { get; set; }
+    public GuildChannel Channel { get; set; } = null!;
+
+    public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
+}﻿using Librecord.Domain.Identity;
+using Librecord.Domain.Permissions;
+
+namespace Librecord.Domain.Guilds;
+
+public class GuildChannelPermissionOverride
+{
+    public Guid Id { get; set; }
+
+    public Guid ChannelId { get; set; }
+    public GuildChannel Channel { get; set; } = null!;
+
+    public Guid? RoleId { get; set; }
+    public GuildRole? Role { get; set; }
+
+    public Guid? UserId { get; set; }
+    public User? User { get; set; }
+
+    public Guid PermissionId { get; set; }
+    public Permission Permission { get; set; } = null!;
+
+    public bool? Allow { get; set; }
+    // true = allow
+    // false = deny
+    // null = inherit
+}﻿namespace Librecord.Domain.Guilds;
+
+public enum GuildChannelType
+{
+    Text = 0,
+    Voice = 1,
+    Category = 2,
+    Forum = 3
+}﻿namespace Librecord.Domain.Guilds;
+
+public class Guild
+{
+    public Guid Id { get; set; }
+    public required string Name { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public string? IconUrl { get; set; }
+
+    public List<GuildChannel> Channels { get; set; } = [];
+    public List<GuildMember> Members { get; set; } = [];
+
+    public List<GuildRole> Roles { get; set; } = [];
+}﻿using Librecord.Domain.Identity;
+
+namespace Librecord.Domain.Guilds;
+
+public class GuildMember
+{
+    public Guid UserId { get; set; }
+    public User User { get; set; } = null!;
+
+    public Guid GuildId { get; set; }
+    public Guild Guild { get; set; } = null!;
+
+    public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
+
+    public List<GuildMemberRole> Roles { get; set; } = [];
+}﻿namespace Librecord.Domain.Guilds;
+
+public class GuildMemberRole
+{
+    public Guid UserId { get; set; }
+    public Guid GuildId { get; set; }
+    public GuildMember GuildMember { get; set; } = null!;
+
+    public Guid RoleId { get; set; }
+    public GuildRole Role { get; set; } = null!;
+}﻿using Librecord.Domain.Permissions;
+
+namespace Librecord.Domain.Guilds;
+
+public class GuildRole
+{
+    public Guid Id { get; set; }
+
+    public Guid GuildId { get; set; }
+    public Guild Guild { get; set; } = null!;
+
+    public required string Name { get; set; }
+
+    // Higher number = higher role
+    public int Position { get; set; }
+
+    // Permissions assigned to this role
+    public List<RolePermission> Permissions { get; set; } = [];
+
+    // Users that have this role
+    public List<GuildMemberRole> Members { get; set; } = [];
+}namespace Librecord.Domain.Guilds;
+
+public interface IChannelRepository
+{
+    Task<GuildChannel?> GetChannelAsync(Guid id);
+    Task<List<GuildChannel>> GetGuildChannelsAsync(Guid guildId);
+
+    void AddChannel(GuildChannel channel);
+    void UpdateChannel(GuildChannel channel);
+    void DeleteChannel(GuildChannel channel);
+
+    Task SaveChangesAsync();
+}﻿using Librecord.Domain.Permissions;
+
+namespace Librecord.Domain.Guilds;
+
+public interface IGuildRepository
+{
+    Task<Guild?> GetGuildAsync(Guid id);
+
+    Task<List<Guild>> GetGuildsForUserAsync(Guid userId);
+
+    Task<GuildMember?> GetGuildMemberAsync(Guid guildId, Guid userId);
+
+    Task AddGuildAsync(Guild guild);
+
+    Task<List<Permission>> GetRolePermissionsAsync(Guid roleId);
+
+    Task<List<GuildChannelPermissionOverride>> GetChannelOverridesAsync(Guid channelId);
+
+    Task<GuildChannel?> GetChannelAsync(Guid channelId);
+
+    Task SaveChangesAsync();
+}namespace Librecord.Domain.Guilds;
+
+public interface IRoleRepository
+{
+    // ---------------------------------------------------------
+    // ROLE
+    // ---------------------------------------------------------
+    Task<GuildRole?> GetRoleAsync(Guid id);
+
+    Task AddRoleAsync(GuildRole role);
+    Task UpdateRoleAsync(GuildRole role);
+    Task DeleteRoleAsync(GuildRole role);
+
+    // ---------------------------------------------------------
+    // PERMISSIONS
+    // ---------------------------------------------------------
+    Task AddPermissionToRoleAsync(
+        Guid roleId,
+        Guid permissionId,
+        bool allow);
+
+    Task RemovePermissionFromRoleAsync(
+        Guid roleId,
+        Guid permissionId);
+
+    // ---------------------------------------------------------
+    // SAVE
+    // ---------------------------------------------------------
+    Task SaveChangesAsync();
+}﻿using Microsoft.AspNetCore.Identity;
+
+namespace Librecord.Domain.Identity;
+
+public interface IAuthRepository
+{
+    Task<User?> GetUserByEmailAsync(string email);
+    Task<User?> GetUserByUserNameAsync(string username);
+    Task<bool> CheckPasswordAsync(User user, string password);
+    Task<IdentityResult> CreateUserAsync(User user, string password);
+
+    // Refresh tokens
+    Task AddRefreshTokenAsync(RefreshToken token);
+    Task<RefreshToken?> GetRefreshTokenAsync(string token);
+    Task RevokeRefreshTokenAsync(RefreshToken token);
+
+    Task<User?> GetUserByIdAsync(Guid id);
+
+    Task SaveChangesAsync();
+}namespace Librecord.Domain.Identity;
+
+public interface IUserRepository
+{
+    Task<User?> GetByIdAsync(Guid id);
+    Task<List<User>> GetByIdsAsync(IEnumerable<Guid> userIds);
+
+    Task<User?> GetUserWithGuildsAsync(Guid id);
+
+    Task<User?> GetByUsernameAsync(string username);
+    Task<User?> GetByEmailAsync(string email);
+
+    Task<bool> UsernameExistsAsync(string username);
+    Task<bool> EmailExistsAsync(string email);
+
+    Task UpdateAsync(User user);
+    Task SaveChangesAsync();
+
+    Task<List<User>> GetSimilarUsernamesAsync(string input, int maxResults = 10);
+}﻿namespace Librecord.Domain.Identity;
+
+public class RefreshToken
+{
+    public Guid Id { get; set; }
+
+    public Guid UserId { get; set; }
+    public User User { get; set; } = null!;
+
+    public string Token { get; set; } = null!;
+
+    public DateTime ExpiresAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public bool IsRevoked { get; set; } = false;
+
+    // Convenience property
+    public bool IsExpired => DateTime.UtcNow >= ExpiresAt;
+}﻿using Microsoft.AspNetCore.Identity;
+
+namespace Librecord.Domain.Identity;
+
+public class UserClaim : IdentityUserClaim<Guid>
+{
+}﻿using Librecord.Domain.Guilds;
+using Librecord.Domain.Messaging;
+using Librecord.Domain.Social;
+using Microsoft.AspNetCore.Identity;
+
+namespace Librecord.Domain.Identity;
+
+public class User : IdentityUser<Guid>
+{
+    // Profile
+    public required string DisplayName { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public string? AvatarUrl { get; set; }
+
+    // Memberships
+    public List<GuildMember> GuildMemberships { get; set; } = [];
+    public List<GuildChannelMember> ChannelMemberships { get; set; } = [];
+
+    // Presence
+    public UserPresence? Presence { get; set; }
+}
+﻿using Microsoft.AspNetCore.Identity;
+
+namespace Librecord.Domain.Identity;
+
+public class UserLogin : IdentityUserLogin<Guid>
+{
+}﻿namespace Librecord.Domain.Identity;
+
+public enum UserStatus
+{
+    Online,
+    DoNotDisturb,
+    Offline
+}﻿using Microsoft.AspNetCore.Identity;
+
+namespace Librecord.Domain.Identity;
+
+public class UserToken : IdentityUserToken<Guid>
+{
+}namespace Librecord.Domain.Messaging.Common;
+
+public class MessageAttachment
+{
+    public Guid Id { get; set; }
+
+    // -------------------------
+    // File metadata
+    // -------------------------
+    public string FileName { get; set; } = "";
+    public string Url { get; set; } = "";
+    public long Size { get; set; }
+    public string ContentType { get; set; } = "";
+
+    // -------------------------
+    // Extra metadata
+    // -------------------------
+    public string? FileExtension { get; set; } // ".png"
+    public bool IsSpoiler { get; set; }
+
+    // -------------------------
+    // Images / Videos
+    // -------------------------
+    public int? Width { get; set; }
+    public int? Height { get; set; }
+
+    // -------------------------
+    // Video / Audio
+    // -------------------------
+    public double? Duration { get; set; } // seconds
+    public string? WaveformJson { get; set; }
+
+    // -------------------------
+    // Integrity / CDN
+    // -------------------------
+    public string? HashSHA256 { get; set; }
+    public string? ProxyUrl { get; set; }
+    public string? PreviewUrl { get; set; }
+
+    // -------------------------
+    // Accessibility / UX
+    // -------------------------
+    public string? Description { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    
+    public Guid MessageId { get; set; }
+    public Message Message { get; set; } = null!;
+}using Librecord.Domain.Identity;
+using Librecord.Domain.Messaging.Direct;
+using Librecord.Domain.Messaging.Guild;
+
+namespace Librecord.Domain.Messaging.Common;
+
+public class Message
+{
+    public Guid Id { get; set; }
+
+    // Core content (plaintext for DM, ciphertext for Guild)
+    public required string Content { get; set; }
+
+    // Audit / ordering
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? EditedAt { get; set; }
+
+    // Author
+    public Guid UserId { get; set; }
+    public User User { get; set; } = null!;
+    
+    // Navigation
+    public List<MessageAttachment> Attachments { get; set; } = [];
+    public List<MessageReaction> Reactions { get; set; } = [];
+    public List<MessageEdit> Edits { get; set; } = [];
+    
+    public DmChannelMessage? DmContext { get; set; }
+    public GuildChannelMessage? GuildContext { get; set; }
+
+}using Librecord.Domain.Identity;
+
+namespace Librecord.Domain.Messaging.Common;
+
+public class MessageEdit
+{
+    public Guid Id { get; set; }
+
+    public Guid EditorUserId { get; set; }
+    public User Editor { get; set; } = null!;
+
+    public string OldContent { get; set; } = "";
+    public DateTime EditedAt { get; set; } = DateTime.UtcNow;
+    
+    public Guid MessageId { get; set; }
+    public Message Message { get; set; } = null!;
+}
+using Librecord.Domain.Identity;
+
+namespace Librecord.Domain.Messaging.Common;
+
+public class MessageReaction
+{
+    // Composite key in EF: (MessageId, UserId, Emoji)
+
+    public Guid MessageId { get; set; }
+    public Message Message { get; set; } = null!;
+
+    public Guid UserId { get; set; }
+    public User User { get; set; } = null!;
+
+    public string Emoji { get; set; } = "";
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}namespace Librecord.Domain.Messaging.Direct;
+
+public class DmChannel
+{
+    public Guid Id { get; set; }
+
+    public string? Name { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public List<DmChannelMember> Members { get; set; } = [];
+    public List<DmChannelMessage> Messages { get; set; } = [];
+}
+using Librecord.Domain.DirectMessaging;
+using Librecord.Domain.Identity;
+using Librecord.Domain.Messaging.Direct;
+
+public class DmChannelMember
+{
+    public Guid ChannelId { get; set; }
+    public DmChannel Channel { get; set; } = null!;
+
+    public Guid UserId { get; set; }
+    public User User { get; set; } = null!;
+
+    public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
+}using Librecord.Domain.Messaging.Common;
+
+namespace Librecord.Domain.Messaging.Direct;
+
+public class DmChannelMessage
+{
+    // FK → Message
+    public Guid MessageId { get; set; }
+    public Message Message { get; set; } = null!;
+
+    // FK → DM channel
+    public Guid ChannelId { get; set; }
+    public DmChannel Channel { get; set; } = null!;
+}using Librecord.Domain.Guilds;
+using Librecord.Domain.Messaging.Common;
+
+namespace Librecord.Domain.Messaging.Guild;
+
+public class GuildChannelMessage
+{
+    // FK → Message
+    public Guid MessageId { get; set; }
+    public Message Message { get; set; } = null!;
+
+    // FK → Guild channel
+    public Guid ChannelId { get; set; }
+    public GuildChannel Channel { get; set; } = null!;
+
+    // Encryption metadata (guild-only)
+    public string? EncryptionSalt { get; set; }
+    public string? EncryptionAlgorithm { get; set; } // e.g. "AES-GCM"
+    public bool IsEncrypted { get; set; } = false;
+}namespace Librecord.Domain.Permissions;
+
+public abstract class ChannelPermission : PermissionCapability
+{
+    public static readonly ChannelPermission ViewChannel =
+        new Impl("ViewChannel");
+
+    public static readonly ChannelPermission ReadMessages =
+        new Impl("ReadMessages");
+
+    public static readonly ChannelPermission SendMessages =
+        new Impl("SendMessages");
+
+    public static readonly ChannelPermission SendAttachments =
+        new Impl("SendAttachments");
+
+    public static readonly ChannelPermission AddReactions =
+        new Impl("AddReactions");
+
+    public static readonly ChannelPermission ManageMessages =
+        new Impl("ManageMessages");
+
+    public static readonly ChannelPermission ManageChannels =
+        new Impl("ManageChannels");
+
+    protected ChannelPermission(string key) : base(key)
+    {
+    }
+
+    private sealed class Impl : ChannelPermission
+    {
+        public Impl(string key) : base(key)
+        {
+        }
+    }
+}namespace Librecord.Domain.Permissions;
+
+public abstract class GuildPermission : PermissionCapability
+{
+    public static readonly GuildPermission ViewGuild =
+        new Impl("ViewGuild");
+
+    public static readonly GuildPermission ReadMessages =
+        new Impl("ReadMessages");
+
+    public static readonly GuildPermission ManageGuild =
+        new Impl("ManageGuild");
+
+    public static readonly GuildPermission ManageChannels =
+        new Impl("ManageChannels");
+
+    public static readonly GuildPermission ManageRoles =
+        new Impl("ManageRoles");
+
+    public static readonly GuildPermission InviteMembers =
+        new Impl("InviteMembers");
+
+    public static readonly GuildPermission KickMembers =
+        new Impl("KickMembers");
+
+    public static readonly GuildPermission BanMembers =
+        new Impl("BanMembers");
+
+    protected GuildPermission(string key) : base(key)
+    {
+    }
+
+    private sealed class Impl : GuildPermission
+    {
+        public Impl(string key) : base(key)
+        {
+        }
+    }
+}namespace Librecord.Domain.Permissions;
+
+public static class KnownPermissions
+{
+    public static readonly IReadOnlyCollection<(PermissionCapability Perm, Guid Id, string Type)> All =
+    [
+        // -------------------------
+        // GUILD
+        // -------------------------
+        (GuildPermission.ViewGuild, PermissionIds.GuildViewGuild, "Guild"),
+        (GuildPermission.ReadMessages, PermissionIds.GuildReadMessages, "Guild"),
+        (GuildPermission.ManageGuild, PermissionIds.GuildManageGuild, "Guild"),
+        (GuildPermission.ManageChannels, PermissionIds.GuildManageChannels, "Guild"),
+        (GuildPermission.ManageRoles, PermissionIds.GuildManageRoles, "Guild"),
+        (GuildPermission.InviteMembers, PermissionIds.GuildInviteMembers, "Guild"),
+        (GuildPermission.KickMembers, PermissionIds.GuildKickMembers, "Guild"),
+        (GuildPermission.BanMembers, PermissionIds.GuildBanMembers, "Guild"),
+
+        // -------------------------
+        // CHANNEL
+        // -------------------------
+        (ChannelPermission.ViewChannel, PermissionIds.ChannelViewChannel, "Channel"),
+        (ChannelPermission.ReadMessages, PermissionIds.ChannelReadMessages, "Channel"),
+        (ChannelPermission.SendMessages, PermissionIds.ChannelSendMessages, "Channel"),
+        (ChannelPermission.SendAttachments, PermissionIds.ChannelSendAttachments, "Channel"),
+        (ChannelPermission.AddReactions, PermissionIds.ChannelAddReactions, "Channel"),
+        (ChannelPermission.ManageMessages, PermissionIds.ChannelManageMessages, "Channel"),
+        (ChannelPermission.ManageChannels, PermissionIds.ChannelManageChannels, "Channel"),
+    ];
+}namespace Librecord.Domain.Permissions;
+
+public abstract class PermissionCapability : IEquatable<PermissionCapability>
+{
+    protected PermissionCapability(string key)
+    {
+        Key = key;
+    }
+
+    public string Key { get; }
+
+    public bool Equals(PermissionCapability? other)
+    {
+        return other is not null && Key == other.Key;
+    }
+
+    public override bool Equals(object? obj)
+    {
+        return obj is PermissionCapability p && Equals(p);
+    }
+
+    public override int GetHashCode()
+    {
+        return Key.GetHashCode();
+    }
+
+    public override string ToString()
+    {
+        return Key;
+    }
+}namespace Librecord.Domain.Permissions;
+
+public static class PermissionIds
+{
+    // ---------------------------------------------------------
+    // GUILD
+    // ---------------------------------------------------------
+    public static readonly Guid GuildViewGuild =
+        Guid.Parse("11111111-1111-1111-1111-111111111101");
+
+    public static readonly Guid GuildReadMessages =
+        Guid.Parse("11111111-1111-1111-1111-111111111102");
+
+    public static readonly Guid GuildManageGuild =
+        Guid.Parse("11111111-1111-1111-1111-111111111103");
+
+    public static readonly Guid GuildManageChannels =
+        Guid.Parse("11111111-1111-1111-1111-111111111104");
+
+    public static readonly Guid GuildManageRoles =
+        Guid.Parse("11111111-1111-1111-1111-111111111105");
+
+    public static readonly Guid GuildInviteMembers =
+        Guid.Parse("11111111-1111-1111-1111-111111111106");
+
+    public static readonly Guid GuildKickMembers =
+        Guid.Parse("11111111-1111-1111-1111-111111111107");
+
+    public static readonly Guid GuildBanMembers =
+        Guid.Parse("11111111-1111-1111-1111-111111111108");
+
+    // ---------------------------------------------------------
+    // CHANNEL
+    // ---------------------------------------------------------
+    public static readonly Guid ChannelViewChannel =
+        Guid.Parse("22222222-2222-2222-2222-222222222201");
+
+    public static readonly Guid ChannelReadMessages =
+        Guid.Parse("22222222-2222-2222-2222-222222222202");
+
+    public static readonly Guid ChannelSendMessages =
+        Guid.Parse("22222222-2222-2222-2222-222222222203");
+
+    public static readonly Guid ChannelSendAttachments =
+        Guid.Parse("22222222-2222-2222-2222-222222222204");
+
+    public static readonly Guid ChannelAddReactions =
+        Guid.Parse("22222222-2222-2222-2222-222222222205");
+
+    public static readonly Guid ChannelManageMessages =
+        Guid.Parse("22222222-2222-2222-2222-222222222206");
+
+    public static readonly Guid ChannelManageChannels =
+        Guid.Parse("22222222-2222-2222-2222-222222222207");
+}﻿namespace Librecord.Domain.Permissions;
+
+public class Permission
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = null!;
+    public string Type { get; set; } = null!;
+}using Librecord.Domain.Guilds;
+
+namespace Librecord.Domain.Permissions;
+
+public class RolePermission
+{
+    public Guid RoleId { get; set; }
+    public GuildRole Role { get; set; } = null!;
+
+    public Guid PermissionId { get; set; }
+    public Permission Permission { get; set; } = null!;
+
+    public bool Allow { get; set; }
+}﻿using Librecord.Domain.Identity;
+
+namespace Librecord.Domain.Security;
+
+public interface IJwtTokenGenerator
+{
+    string GenerateAccessToken(User user);
+    string GenerateRefreshToken();
+}﻿namespace Librecord.Domain.Security;
+
+public class JwtOptions
+{
+    public string Issuer { get; set; } = null!;
+    public string Audience { get; set; } = null!;
+    public string SigningKey { get; set; } = null!;
+
+    public int AccessTokenMinutes { get; set; } = 15; // Standard
+    public int RefreshTokenDays { get; set; } = 14; // Standard
+}using Librecord.Domain.Identity;
+
+namespace Librecord.Domain.Social;
+
+public class Friendship
+{
+    public Guid Id { get; set; }
+
+    public Guid RequesterId { get; set; }
+    public User Requester { get; set; }
+
+    public Guid TargetId { get; set; }
+    public User Target { get; set; }
+
+    public FriendshipStatus Status { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}namespace Librecord.Domain.Social;
+
+public enum FriendshipStatus
+{
+    Pending = 0,
+    Accepted = 1,
+    Declined = 2,
+    Blocked = 3
+}namespace Librecord.Domain.Social;
+
+public interface IFriendshipRepository
+{
+    Task<Friendship?> GetFriendshipAsync(Guid requesterId, Guid targetId);
+    Task<List<Friendship>> GetFriendshipsForUserAsync(Guid userId);
+    Task<List<Friendship>> GetIncomingRequestsAsync(Guid userId);
+    Task<List<Friendship>> GetOutgoingRequestsAsync(Guid userId);
+
+    Task<HashSet<Guid>> GetRelatedUserIdsAsync(Guid userId);
+
+    Task AddAsync(Friendship friendship);
+    Task UpdateAsync(Friendship friendship);
+    Task DeleteAsync(Friendship friendship);
+
+    Task SaveChangesAsync();
+    Task<bool> UsersAreConfirmedFriendsAsync(Guid userA, Guid userB);
+}﻿using Librecord.Domain.Identity;
+
+namespace Librecord.Domain.Social;
+
+public class UserPresence
+{
+    public Guid UserId { get; set; }
+
+    public string Activity { get; set; } = "";
+    public UserStatus Status { get; set; } = UserStatus.Online;
+
+    public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
+
+    public User User { get; set; } = null!;
+}

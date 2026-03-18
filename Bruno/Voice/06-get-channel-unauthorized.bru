@@ -1,0 +1,20 @@
+meta {
+  name: Get non-existent channel
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/channels/00000000-0000-0000-0000-000000000000
+  auth: none
+}
+
+headers {
+  Cookie: accessToken={{accessToken}}
+}
+
+tests {
+  test("returns 404 for non-existent channel", function() {
+    expect(res.status).to.equal(404);
+  });
+}

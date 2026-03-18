@@ -1,0 +1,46 @@
+meta {
+  name: Create Invite
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/guilds/{{guildId}}/invites
+  body: json
+  auth: none
+}
+
+headers {
+  Cookie: accessToken={{accessToken}}
+}
+
+body:json {
+  {
+    "maxUses": 10
+  }
+}
+
+script:post-response {
+  if (res.status === 200 || res.status === 201) {
+    const body = res.getBody();
+    bru.setVar('inviteCode', body.code);
+    bru.setVar('inviteId', body.id);
+  }
+}
+
+tests {
+  test("invite created", function() {
+    expect(res.status).to.be.oneOf([200, 201]);
+  });
+
+  test("invite has code", function() {
+    const body = res.getBody();
+    expect(body.code).to.be.a('string');
+    expect(body.code.length).to.equal(8);
+  });
+
+  test("invite has maxUses", function() {
+    const body = res.getBody();
+    expect(body.maxUses).to.equal(10);
+  });
+}

@@ -1,0 +1,29 @@
+meta {
+  name: Get Guild Channels (includes voice)
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/channels/guild/{{guildId}}
+  auth: none
+}
+
+headers {
+  Cookie: accessToken={{accessToken}}
+}
+
+tests {
+  test("returns channels", function() {
+    expect(res.status).to.equal(200);
+    const body = res.getBody();
+    expect(body).to.be.an('array');
+  });
+
+  test("contains voice channel", function() {
+    const body = res.getBody();
+    const voice = body.find(c => c.type === 1);
+    expect(voice).to.not.be.undefined;
+    expect(voice.name).to.equal("voice-chat");
+  });
+}

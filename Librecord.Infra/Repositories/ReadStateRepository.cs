@@ -1,0 +1,113 @@
+using Librecord.Domain.Messaging.Common;
+using Librecord.Infra.Database;
+using Microsoft.EntityFrameworkCore;
+
+namespace Librecord.Infra.Repositories;
+
+public class ReadStateRepository : IReadStateRepository
+{
+    private readonly LibrecordContext _db;
+
+    public ReadStateRepository(LibrecordContext db)
+    {
+        _db = db;
+    }
+
+    public Task<ChannelReadState?> GetAsync(Guid userId, Guid channelId)
+    {
+        return _db.ChannelReadStates
+            .FirstOrDefaultAsync(r => r.UserId == userId && r.ChannelId == channelId);
+    }
+
+    public Task<List<ChannelReadState>> GetForUserAsync(Guid userId)
+    {
+        return _db.ChannelReadStates
+            .Where(r => r.UserId == userId)
+            .ToListAsync();
+    }
+
+    public async Task UpsertAsync(Guid userId, Guid channelId, Guid messageId)
+    {
+        var state = await GetAsync(userId, channelId);
+
+        if (state == null)
+        {
+            _db.ChannelReadStates.Add(new ChannelReadState
+            {
+                UserId = userId,
+                ChannelId = channelId,
+                LastReadMessageId = messageId,
+                LastReadAt = DateTime.UtcNow
+            });
+        }
+        else
+        {
+            state.LastReadMessageId = messageId;
+            state.LastReadAt = DateTime.UtcNow;
+        }
+    }
+
+    public async Task<Dictionary<Guid, int>> GetUnreadCountsAsync(Guid userId, List<Guid> channelIds)
+    {
+        var result = new Dictionary<Guid, int>();
+
+        var readStates = await _db.ChannelReadStates
+            .Where(r => r.UserId == userId && channelIds.Contains(r.ChannelId))
+            .ToListAsync();
+
+        var readMap = readStates.ToDictionary(r => r.ChannelId, r => r.LastReadMessageId);
+
+        foreach (var channelId in channelIds)
+        {
+            var lastRead = readMap.GetValueOrDefault(channelId);
+
+            int count;
+            if (lastRead == null)
+            {
+                // Count all messages in both DM and guild channels
+                var dmCount = await _db.DmChannelMessages
+                    .Where(m => m.ChannelId == channelId)
+                    .Join(_db.Messages, dm => dm.MessageId, msg => msg.Id, (dm, msg) => msg)
+                    .Where(msg => msg.UserId != userId)
+                    .CountAsync();
+
+                var guildCount = await _db.GuildChannelMessages
+                    .Where(m => m.ChannelId == channelId)
+                    .Join(_db.Messages, gm => gm.MessageId, msg => msg.Id, (gm, msg) => msg)
+                    .Where(msg => msg.UserId != userId)
+                    .CountAsync();
+
+                count = dmCount + guildCount;
+            }
+            else
+            {
+                // Get the creation time of the last read message
+                var lastReadMsg = await _db.Messages.FindAsync(lastRead);
+                if (lastReadMsg == null) { result[channelId] = 0; continue; }
+
+                var dmCount = await _db.DmChannelMessages
+                    .Where(m => m.ChannelId == channelId)
+                    .Join(_db.Messages, dm => dm.MessageId, msg => msg.Id, (dm, msg) => msg)
+                    .Where(msg => msg.CreatedAt > lastReadMsg.CreatedAt && msg.UserId != userId)
+                    .CountAsync();
+
+                var guildCount = await _db.GuildChannelMessages
+                    .Where(m => m.ChannelId == channelId)
+                    .Join(_db.Messages, gm => gm.MessageId, msg => msg.Id, (gm, msg) => msg)
+                    .Where(msg => msg.CreatedAt > lastReadMsg.CreatedAt && msg.UserId != userId)
+                    .CountAsync();
+
+                count = dmCount + guildCount;
+            }
+
+            result[channelId] = count;
+        }
+
+        return result;
+    }
+
+    public Task SaveChangesAsync()
+    {
+        return _db.SaveChangesAsync();
+    }
+}

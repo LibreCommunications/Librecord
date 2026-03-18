@@ -1,0 +1,192 @@
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useAuth } from "../../context/AuthContext";
+import { useGuilds, type GuildSummary } from "../../hooks/useGuilds";
+import CreateGuildModal from "../../pages/guild/CreateGuildModal";
+import { JoinGuildModal } from "../../components/guild/JoinGuildModal";
+import { StatusDot } from "../../components/user/StatusDot";
+import { usePresence } from "../../context/PresenceContext";
+
+const API_URL = import.meta.env.VITE_API_URL;
+
+function SidebarIcon({
+    children,
+    active,
+    tooltip,
+    className = "",
+    onClick,
+    to,
+}: {
+    children: React.ReactNode;
+    active?: boolean;
+    tooltip?: string;
+    className?: string;
+    onClick?: () => void;
+    to?: string;
+}) {
+    const inner = (
+        <div className="relative group flex items-center">
+            {/* Active indicator pill */}
+            <span
+                className={`
+                    absolute -left-3 w-1 rounded-r-full bg-white transition-all
+                    ${active ? "h-10" : "h-0 group-hover:h-5"}
+                `}
+            />
+
+            <div
+                onClick={onClick}
+                className={`
+                    w-12 h-12 flex items-center justify-center
+                    transition-all duration-200 cursor-pointer
+                    ${active ? "rounded-2xl" : "rounded-full hover:rounded-2xl"}
+                    ${className}
+                `}
+            >
+                {children}
+            </div>
+
+            {/* Tooltip */}
+            {tooltip && (
+                <div className="absolute left-[60px] px-3 py-1.5 bg-[#111214] text-white text-sm font-medium rounded-md shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                    {tooltip}
+                </div>
+            )}
+        </div>
+    );
+
+    if (to) return <Link to={to}>{inner}</Link>;
+    return inner;
+}
+
+export default function GlobalSidebar() {
+    const { user } = useAuth();
+    const { getGuilds, createGuild } = useGuilds();
+    const navigate = useNavigate();
+    const { guildId } = useParams();
+
+    const [guilds, setGuilds] = useState<GuildSummary[]>([]);
+    const [showCreate, setShowCreate] = useState(false);
+    const [showJoin, setShowJoin] = useState(false);
+    const { myStatus } = usePresence();
+
+    const isDmPage = !guildId && location.pathname.startsWith("/app/dm");
+
+    useEffect(() => {
+        getGuilds().then(setGuilds);
+    }, []);
+
+    const avatarSrc =
+        user?.avatarUrl
+            ? `${API_URL}${user.avatarUrl}`
+            : "/default-avatar.png";
+
+    async function handleCreateGuild(name: string) {
+        const guild = await createGuild(name);
+        if (!guild) return;
+
+        setGuilds(prev => [...prev, guild]);
+        setShowCreate(false);
+        navigate(`/app/guild/${guild.id}`);
+    }
+
+    return (
+        <>
+            <aside className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 gap-2 overflow-y-auto dark-scrollbar">
+
+                {/* DM */}
+                <SidebarIcon to="/app/dm" active={isDmPage} tooltip="Direct Messages" className="bg-[#313338] hover:bg-[#5865F2] text-white">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                </SidebarIcon>
+
+                {/* Divider */}
+                <div className="w-8 h-0.5 bg-[#35373c] rounded-full" />
+
+                {/* GUILDS */}
+                {guilds.map(g => (
+                    <SidebarIcon
+                        key={g.id}
+                        to={`/app/guild/${g.id}`}
+                        active={guildId === g.id}
+                        tooltip={g.name}
+                        className="bg-[#313338] hover:bg-[#5865F2] text-white"
+                    >
+                        {g.iconUrl ? (
+                            <img
+                                src={`${API_URL}${g.iconUrl}`}
+                                className="w-full h-full rounded-[inherit] object-cover"
+                                alt=""
+                            />
+                        ) : (
+                            <span className="text-lg font-medium">
+                                {g.name[0].toUpperCase()}
+                            </span>
+                        )}
+                    </SidebarIcon>
+                ))}
+
+                {/* ADD GUILD */}
+                <SidebarIcon
+                    onClick={() => setShowCreate(true)}
+                    tooltip="Create a Server"
+                    className="bg-[#313338] hover:bg-[#248046] text-[#248046] hover:text-white"
+                >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                </SidebarIcon>
+
+                {/* JOIN GUILD */}
+                <SidebarIcon
+                    onClick={() => setShowJoin(true)}
+                    tooltip="Join a Server"
+                    className="bg-[#313338] hover:bg-[#5865F2] text-[#248046] hover:text-white"
+                >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4" />
+                        <polyline points="10 17 15 12 10 7" />
+                        <line x1="15" y1="12" x2="3" y2="12" />
+                    </svg>
+                </SidebarIcon>
+
+                <div className="flex-1" />
+
+                {/* SETTINGS / USER AVATAR */}
+                <Link to="/app/settings/user/profile">
+                    <div className="relative group flex items-center">
+                        <img
+                            src={avatarSrc}
+                            alt="Settings"
+                            className="w-12 h-12 rounded-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                        />
+                        <span className="absolute -bottom-0.5 -right-0.5">
+                            <StatusDot status={myStatus} size="md" />
+                        </span>
+                        <div className="absolute left-[60px] px-3 py-1.5 bg-[#111214] text-white text-sm font-medium rounded-md shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                            User Settings
+                        </div>
+                    </div>
+                </Link>
+            </aside>
+
+            <CreateGuildModal
+                open={showCreate}
+                onClose={() => setShowCreate(false)}
+                onCreate={handleCreateGuild}
+            />
+
+            {showJoin && (
+                <JoinGuildModal
+                    onClose={() => setShowJoin(false)}
+                    onJoined={(guild) => {
+                        setGuilds(prev => [...prev, guild as GuildSummary]);
+                        navigate(`/app/guild/${guild.id}`);
+                    }}
+                />
+            )}
+        </>
+    );
+}

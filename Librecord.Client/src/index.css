@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95) translateY(8px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(16px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+
+.dark-scrollbar::-webkit-scrollbar {
+    width: 14px;
+}
+
+.dark-scrollbar::-webkit-scrollbar-track {
+    background: #2b2d31;
+}
+
+.dark-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #1e1f22;
+    border-radius: 10px;
+
+    /* creates inner padding illusion */
+    border: 3px solid #2b2d31;
+}
+
+.dark-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: #3a3c43;
+}
+
+/* Firefox */
+.dark-scrollbar {
+    scrollbar-width: auto;
+    scrollbar-color: #1e1f22 #2b2d31;
+}

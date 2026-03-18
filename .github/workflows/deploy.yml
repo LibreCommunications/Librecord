@@ -1,0 +1,43 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write .env
+        run: |
+          cat > .env <<EOF
+          DOMAIN=${{ secrets.DOMAIN }}
+          POSTGRES_DB=librecord
+          POSTGRES_USER=librecord
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          MINIO_ACCESS_KEY=${{ secrets.MINIO_ACCESS_KEY }}
+          MINIO_SECRET_KEY=${{ secrets.MINIO_SECRET_KEY }}
+          MINIO_BUCKET=librecord-attachments
+          JWT_SIGNING_KEY=${{ secrets.JWT_SIGNING_KEY }}
+          MESSAGE_ENCRYPTION_KEY=${{ secrets.MESSAGE_ENCRYPTION_KEY }}
+          LIVEKIT_API_KEY=${{ secrets.LIVEKIT_API_KEY }}
+          LIVEKIT_API_SECRET=${{ secrets.LIVEKIT_API_SECRET }}
+          EOF
+          chmod 600 .env
+
+      - name: Write frontend .env
+        run: echo "VITE_API_URL=https://${{ secrets.DOMAIN }}/api" > Librecord.Client/.env
+
+      - name: Install and build frontend
+        run: |
+          cd Librecord.Client
+          npm ci
+          npm run build
+
+      - name: Build and start all services
+        run: docker compose up -d --build

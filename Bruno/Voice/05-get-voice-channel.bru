@@ -1,0 +1,30 @@
+meta {
+  name: Get Voice Channel by ID
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/channels/{{voiceChannelId}}
+  auth: none
+}
+
+headers {
+  Cookie: accessToken={{accessToken}}
+}
+
+tests {
+  test("returns voice channel", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("type is Voice", function() {
+    const body = res.getBody();
+    expect(body.type).to.equal(1);
+  });
+
+  test("has correct id", function() {
+    const body = res.getBody();
+    expect(body.id).to.equal(bru.getVar('voiceChannelId'));
+  });
+}
