@@ -108,6 +108,12 @@ public class GuildService : IGuildService
                     UserId = ownerId,
                     GuildId = guild.Id,
                     RoleId = ownerRole.Id
+                },
+                new GuildMemberRole
+                {
+                    UserId = ownerId,
+                    GuildId = guild.Id,
+                    RoleId = everyoneRole.Id
                 }
             }
         });

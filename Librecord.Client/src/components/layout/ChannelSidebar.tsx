@@ -8,6 +8,10 @@ import CreateChannelModal from "../../pages/guild/CreateChannelModal";
 import type { GuildEventMap } from "../../realtime/guild/guildEvents";
 import { useAuth } from "../../context/AuthContext";
 import { useUserProfile } from "../../hooks/useUserProfile";
+import { fetchWithAuth } from "../../api/fetchWithAuth";
+
+const API_URL = import.meta.env.VITE_API_URL;
+const MANAGE_CHANNELS_PERMISSION_ID = "11111111-1111-1111-1111-111111111104";
 
 interface Props {
     guildId: string;
@@ -19,13 +23,15 @@ export default function ChannelSidebar({ guildId }: Props) {
     const { getGuildChannels, createChannel } = useChannels();
     const { getUnreadCounts } = useReadState();
     const { voiceState, joinVoice } = useVoice();
-    const { user } = useAuth();
+    const auth = useAuth();
+    const { user } = auth;
     const { getAvatarUrl } = useUserProfile();
 
     const [channels, setChannels] = useState<GuildChannel[]>([]);
     const [unreads, setUnreads] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
+    const [canManageChannels, setCanManageChannels] = useState(false);
 
     async function loadChannels() {
         setLoading(true);
@@ -36,6 +42,28 @@ export default function ChannelSidebar({ guildId }: Props) {
         if (list.length > 0) {
             const counts = await getUnreadCounts(list.map(c => c.id));
             setUnreads(counts);
+        }
+
+        // Check if current user can manage channels
+        try {
+            const [membersRes, rolesRes] = await Promise.all([
+                fetchWithAuth(`${API_URL}/guilds/${guildId}/members`, {}, auth),
+                fetchWithAuth(`${API_URL}/guilds/${guildId}/roles`, {}, auth),
+            ]);
+            if (membersRes.ok && rolesRes.ok) {
+                const members = await membersRes.json();
+                const roles = await rolesRes.json();
+                const me = members.find((m: { userId: string }) => m.userId === user?.userId);
+                const myRoleIds = new Set((me?.roles ?? []).map((r: { id: string }) => r.id));
+                const hasManage = roles
+                    .filter((r: { id: string }) => myRoleIds.has(r.id))
+                    .some((r: { permissions: { permissionId: string; allow: boolean }[] }) =>
+                        r.permissions.some(p => p.permissionId === MANAGE_CHANNELS_PERMISSION_ID && p.allow)
+                    );
+                setCanManageChannels(hasManage);
+            }
+        } catch {
+            setCanManageChannels(false);
         }
     }
 
@@ -94,13 +122,15 @@ export default function ChannelSidebar({ guildId }: Props) {
                         <>
                             <div className="flex items-center justify-between px-3 pb-0.5 pt-4 first:pt-0">
                                 <h2 className="text-[#949ba4] uppercase text-[11px] font-bold tracking-wide">Text Channels</h2>
-                                <button
-                                    onClick={() => setShowCreate(true)}
-                                    className="text-[#949ba4] hover:text-[#dbdee1] text-base leading-none"
-                                    title="Create channel"
-                                >
-                                    +
-                                </button>
+                                {canManageChannels && (
+                                    <button
+                                        onClick={() => setShowCreate(true)}
+                                        className="text-[#949ba4] hover:text-[#dbdee1] text-base leading-none"
+                                        title="Create channel"
+                                    >
+                                        +
+                                    </button>
+                                )}
                             </div>
                             {textChannels.map(ch => {
                                 const unreadCount = unreads[ch.id] ?? 0;
@@ -137,13 +167,15 @@ export default function ChannelSidebar({ guildId }: Props) {
 
                             <div className="flex items-center justify-between px-3 pb-0.5 pt-4">
                                 <h2 className="text-[#949ba4] uppercase text-[11px] font-bold tracking-wide">Voice Channels</h2>
-                                <button
-                                    onClick={() => setShowCreate(true)}
-                                    className="text-[#949ba4] hover:text-[#dbdee1] text-base leading-none"
-                                    title="Create channel"
-                                >
-                                    +
-                                </button>
+                                {canManageChannels && (
+                                    <button
+                                        onClick={() => setShowCreate(true)}
+                                        className="text-[#949ba4] hover:text-[#dbdee1] text-base leading-none"
+                                        title="Create channel"
+                                    >
+                                        +
+                                    </button>
+                                )}
                             </div>
                             {voiceChannels.map(ch => {
                                 const isInVoiceChannel = voiceState.isConnected && voiceState.channelId === ch.id;

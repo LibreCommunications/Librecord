@@ -27,8 +27,7 @@ public class PrivateCdnController : ControllerBase
         Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     /// <summary>
-    /// Validates access then redirects to a presigned MinIO URL (1h expiry).
-    /// The browser follows the redirect and loads the file directly from MinIO.
+    /// Validates access then streams the file directly from MinIO through the backend.
     /// </summary>
     [HttpGet("{**key}")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
@@ -42,13 +41,34 @@ public class PrivateCdnController : ControllerBase
 
         try
         {
-            var presignedUrl = await _storage.GetPresignedUrl(key, expirySeconds: 3600); // 1h
-            return Redirect(presignedUrl);
+            var stream = await _storage.DownloadAsync(key);
+            var contentType = GetContentType(key);
+            return File(stream, contentType);
         }
         catch
         {
             return NotFound();
         }
+    }
+
+    private static string GetContentType(string key)
+    {
+        var ext = Path.GetExtension(key).ToLowerInvariant();
+        return ext switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".gif" => "image/gif",
+            ".webp" => "image/webp",
+            ".svg" => "image/svg+xml",
+            ".mp4" => "video/mp4",
+            ".webm" => "video/webm",
+            ".mp3" => "audio/mpeg",
+            ".ogg" => "audio/ogg",
+            ".wav" => "audio/wav",
+            ".pdf" => "application/pdf",
+            _ => "application/octet-stream",
+        };
     }
 
     private async Task<bool> UserCanAccessKeyAsync(string key)

@@ -85,11 +85,23 @@ public class GuildInviteService : IGuildInviteService
         var guild = await _guilds.GetGuildAsync(invite.GuildId)
             ?? throw new InvalidOperationException("Guild not found.");
 
+        var everyoneRole = guild.Roles.FirstOrDefault(r => r.Name == "@everyone")
+            ?? throw new InvalidOperationException("Guild is missing @everyone role.");
+
         guild.Members.Add(new GuildMember
         {
             UserId = userId,
             GuildId = guild.Id,
-            JoinedAt = DateTime.UtcNow
+            JoinedAt = DateTime.UtcNow,
+            Roles =
+            {
+                new GuildMemberRole
+                {
+                    UserId = userId,
+                    GuildId = guild.Id,
+                    RoleId = everyoneRole.Id
+                }
+            }
         });
 
         invite.UsesCount++;

@@ -219,6 +219,7 @@ export function MessageItem({
 
             {menuOpen && (
                 <MessageMenu
+                    isAuthor={isAuthor}
                     onEdit={onStartEdit}
                     onDelete={onDelete}
                     onAddReaction={(emoji) => {
