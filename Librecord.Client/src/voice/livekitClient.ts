@@ -128,6 +128,44 @@ function pollSpeaking() {
     animFrameId = requestAnimationFrame(pollSpeaking);
 }
 
+// ─── AUDIO PLAYBACK ────────────────────────────────────────────────────
+// Explicitly attach remote audio tracks to <audio> elements.
+// LiveKit's auto-attach relies on room.startAudio() which can fail
+// if called outside a user gesture context. This guarantees playback.
+
+const audioElements = new Map<string, HTMLAudioElement>();
+
+function attachAudioTrack(identity: string, track: MediaStreamTrack) {
+    detachAudioTrack(identity); // clean up any existing element
+
+    const audio = document.createElement("audio");
+    audio.srcObject = new MediaStream([track]);
+    audio.autoplay = true;
+    audio.playsInline = true;
+    // Hidden but must be in the DOM for some browsers to play
+    audio.style.display = "none";
+    document.body.appendChild(audio);
+    audio.play().catch((e) => console.warn("[Voice] Audio play failed:", e));
+
+    audioElements.set(identity, audio);
+}
+
+function detachAudioTrack(identity: string) {
+    const audio = audioElements.get(identity);
+    if (audio) {
+        audio.pause();
+        audio.srcObject = null;
+        audio.remove();
+        audioElements.delete(identity);
+    }
+}
+
+function detachAllAudio() {
+    for (const [id] of audioElements) {
+        detachAudioTrack(id);
+    }
+}
+
 // ─── ROOM SETUP ────────────────────────────────────────────────────────
 
 function bindRemoteAudioTrack(participant: RemoteParticipant) {
@@ -163,11 +201,15 @@ export async function connectToVoice(token: string, wsUrl: string) {
         window.dispatchEvent(new CustomEvent("voice:track:changed", {
             detail: { identity: p.identity, source: pub.source },
         }));
-        // Start analysing audio tracks for speaking detection
         if (track.kind === "audio") {
             const msTrack = track.mediaStreamTrack;
             if (msTrack) {
+                // Speaking detection
                 startAnalysingTrack(p.identity, msTrack);
+                // Explicitly attach to an <audio> element for playback.
+                // LiveKit's auto-attach can fail if room.startAudio() is called
+                // outside a user gesture context (deep in an async chain).
+                attachAudioTrack(p.identity, msTrack);
             }
         }
     });
@@ -178,6 +220,7 @@ export async function connectToVoice(token: string, wsUrl: string) {
         }));
         if (pub.kind === "audio") {
             stopAnalysingTrack(p.identity);
+            detachAudioTrack(p.identity);
         }
     });
 
@@ -221,6 +264,7 @@ export async function connectToVoice(token: string, wsUrl: string) {
 
 export async function disconnect() {
     stopAllAnalysers();
+    detachAllAudio();
     if (!room) return;
     await room.disconnect(true);
     room = null;
