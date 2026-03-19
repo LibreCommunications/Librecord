@@ -87,6 +87,11 @@ export async function connectToVoice(token: string, wsUrl: string) {
     await room.connect(wsUrl, token);
     await room.localParticipant.setMicrophoneEnabled(true);
 
+    // Unlock browser audio playback for remote participants' audio tracks.
+    // Browsers block autoplay until a user gesture + explicit unlock via AudioContext.
+    // Without this, you can see others but never hear them.
+    await room.startAudio();
+
     bindSpeaking(room.localParticipant);
     room.remoteParticipants.forEach(bindSpeaking);
 }
