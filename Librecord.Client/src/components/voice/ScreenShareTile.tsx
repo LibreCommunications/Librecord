@@ -23,9 +23,16 @@ export function ScreenShareTile({ participant }: Props) {
         }
 
         tryAttach();
-        const timer = setTimeout(tryAttach, 300);
-        const timer2 = setTimeout(tryAttach, 1000);
-        return () => { clearTimeout(timer); clearTimeout(timer2); };
+
+        // Re-attach whenever a track is subscribed/published for this participant
+        const onTrackChanged = (e: Event) => {
+            const detail = (e as CustomEvent<{ identity: string }>).detail;
+            if (detail?.identity === participant.userId) {
+                tryAttach();
+            }
+        };
+        window.addEventListener("voice:track:changed", onTrackChanged);
+        return () => window.removeEventListener("voice:track:changed", onTrackChanged);
     }, [participant.userId, participant.isScreenSharing]);
 
     return (

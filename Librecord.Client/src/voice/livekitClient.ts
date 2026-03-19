@@ -38,7 +38,14 @@ function bindSpeaking(participant: Participant) {
 export async function connectToVoice(token: string, wsUrl: string) {
     if (room) await disconnect();
 
-    room = new Room();
+    room = new Room({
+        // dynacast: only encode video layers that subscribers actually need,
+        // saving bandwidth when viewers have small viewports or are absent.
+        dynacast: true,
+        // adaptiveStream: receiver automatically signals the SFU which video
+        // quality it needs based on the subscribing element's viewport size.
+        adaptiveStream: true,
+    });
 
     room.on(RoomEvent.ParticipantConnected, (p: RemoteParticipant) => {
         cbs.onParticipantConnected?.(p.identity);
@@ -49,12 +56,32 @@ export async function connectToVoice(token: string, wsUrl: string) {
         cbs.onParticipantDisconnected?.(p.identity);
     });
 
-    room.on(RoomEvent.TrackSubscribed, (_t, _pub: RemoteTrackPublication, _p: RemoteParticipant) => {
+    room.on(RoomEvent.TrackSubscribed, (_t, pub: RemoteTrackPublication, p: RemoteParticipant) => {
         cbs.onTrackSubscribed?.();
+        // Notify UI components so they can attach the new track immediately
+        window.dispatchEvent(new CustomEvent("voice:track:changed", {
+            detail: { identity: p.identity, source: pub.source },
+        }));
     });
 
-    room.on(RoomEvent.TrackUnsubscribed, (_t, _pub: RemoteTrackPublication, _p: RemoteParticipant) => {
+    room.on(RoomEvent.TrackUnsubscribed, (_t, pub: RemoteTrackPublication, p: RemoteParticipant) => {
         cbs.onTrackUnsubscribed?.();
+        window.dispatchEvent(new CustomEvent("voice:track:changed", {
+            detail: { identity: p.identity, source: pub.source },
+        }));
+    });
+
+    // Also notify when the local participant publishes a track (for self-view)
+    room.on(RoomEvent.LocalTrackPublished, (pub) => {
+        window.dispatchEvent(new CustomEvent("voice:track:changed", {
+            detail: { identity: room!.localParticipant.identity, source: pub.source },
+        }));
+    });
+
+    room.on(RoomEvent.LocalTrackUnpublished, (pub) => {
+        window.dispatchEvent(new CustomEvent("voice:track:changed", {
+            detail: { identity: room!.localParticipant.identity, source: pub.source },
+        }));
     });
 
     await room.connect(wsUrl, token);
