@@ -141,7 +141,7 @@ function attachAudioTrack(identity: string, track: MediaStreamTrack) {
     const audio = document.createElement("audio");
     audio.srcObject = new MediaStream([track]);
     audio.autoplay = true;
-    audio.playsInline = true;
+    audio.setAttribute("playsinline", "");
     // Hidden but must be in the DOM for some browsers to play
     audio.style.display = "none";
     document.body.appendChild(audio);
