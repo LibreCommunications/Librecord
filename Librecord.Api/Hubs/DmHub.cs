@@ -150,7 +150,8 @@ public class DmHub : Hub
             {
                 channelId,
                 userId = UserId,
-                username = Context.User!.Identity?.Name ?? ""
+                username = Context.User!.Identity?.Name ?? "",
+                displayName = Context.User!.FindFirst("displayName")?.Value ?? Context.User!.Identity?.Name ?? ""
             });
     }
 

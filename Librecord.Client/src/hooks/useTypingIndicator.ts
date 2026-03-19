@@ -8,6 +8,7 @@ const TYPING_EXPIRE_MS = 5000;
 type TypingUser = {
     userId: string;
     username: string;
+    displayName: string;
     expiresAt: number;
 };
 
@@ -32,15 +33,15 @@ export function useTypingIndicator(
     useEffect(() => {
         if (!channelId) return;
 
-        const onTyping = (e: CustomEvent<{ channelId: string; userId: string; username: string }>) => {
-            const { channelId: evtChannel, userId, username } = e.detail;
+        const onTyping = (e: CustomEvent<{ channelId: string; userId: string; username: string; displayName?: string }>) => {
+            const { channelId: evtChannel, userId, username, displayName } = e.detail;
             if (evtChannel !== channelId) return;
             if (userId === currentUserId) return;
 
             setTypingUsers(prev => {
                 const now = Date.now();
                 const filtered = prev.filter(t => t.expiresAt > now && t.userId !== userId);
-                return [...filtered, { userId, username, expiresAt: now + TYPING_EXPIRE_MS }];
+                return [...filtered, { userId, username, displayName: displayName ?? username, expiresAt: now + TYPING_EXPIRE_MS }];
             });
         };
 
@@ -90,7 +91,7 @@ export function useTypingIndicator(
         connection.invoke("StartTyping", channelId).catch(() => {});
     }, [channelId, hub]);
 
-    const typingNames = typingUsers.map(t => t.username);
+    const typingNames = typingUsers.map(t => t.displayName);
 
     return { typingNames, sendTyping };
 }

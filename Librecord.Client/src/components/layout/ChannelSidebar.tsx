@@ -115,7 +115,7 @@ export default function ChannelSidebar({ guildId }: Props) {
     return (
         <>
             <aside className="w-60 bg-[#2b2d31] border-r border-black/20 flex-1 flex flex-col">
-                <div className="flex-1 overflow-auto pt-3">
+                <div className="flex-1 overflow-y-auto dark-scrollbar pt-3">
                     {loading && <div className="text-xs text-gray-500 px-4 py-2">Loading channels…</div>}
 
                     {!loading && (
