@@ -24,6 +24,7 @@ export default defineConfig({
         video: "retain-on-failure",
         screenshot: "only-on-failure",
         trace: "retain-on-failure",
+        viewport: { width: 1920, height: 1080 },
     },
 
     projects: [
@@ -38,6 +39,7 @@ export default defineConfig({
                         "--auto-select-desktop-capture-source=Entire screen",
                         "--disable-web-security",
                         "--allow-running-insecure-content",
+                        "--autoplay-policy=no-user-gesture-required",
                     ],
                 },
                 permissions: ["camera", "microphone"],
