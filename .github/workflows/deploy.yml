@@ -82,9 +82,8 @@ jobs:
 
       - name: Deploy frontend
         run: |
-          sudo mkdir -p /var/www/${{ steps.config.outputs.site }}
-          sudo rm -rf /var/www/${{ steps.config.outputs.site }}/dist
-          sudo cp -r Librecord.Client/dist /var/www/${{ steps.config.outputs.site }}/dist
+          rm -rf /var/www/${{ steps.config.outputs.site }}/dist
+          cp -r Librecord.Client/dist /var/www/${{ steps.config.outputs.site }}/dist
 
       - name: Blue-green deploy backend
         run: |

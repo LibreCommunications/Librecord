@@ -68,8 +68,8 @@ done
 
 # Switch nginx upstream to new slot
 echo "Switching nginx upstream to $NEW_SLOT (port $NEW_PORT)..."
-echo "upstream ${PROJECT}-backend { server 127.0.0.1:$NEW_PORT; }" | sudo tee "$UPSTREAM_FILE" > /dev/null
-sudo nginx -t && sudo nginx -s reload
+echo "upstream ${PROJECT}-backend { server 127.0.0.1:$NEW_PORT; }" > "$UPSTREAM_FILE"
+nginx -t && nginx -s reload
 
 # Stop old slot
 if [ "$ACTIVE" != "none" ]; then
