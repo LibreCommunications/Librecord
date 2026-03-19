@@ -41,9 +41,13 @@ echo "Active: $ACTIVE -> Deploying: $NEW_SLOT (port $NEW_PORT)"
 export BLUE_PORT GREEN_PORT
 export COMPOSE_PROJECT_NAME="$PROJECT"
 
-# Ensure infra services are running
+# Ensure infra services are running (livekit is shared, only start with prod)
 echo "Ensuring infra services are up..."
-docker compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" up -d postgres minio livekit
+if [ "$ENV" = "prod" ]; then
+  docker compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" --profile livekit up -d postgres minio livekit
+else
+  docker compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" up -d postgres minio
+fi
 
 # Build and start new backend slot
 echo "Starting backend-$NEW_SLOT on port $NEW_PORT..."
@@ -69,7 +73,7 @@ done
 # Switch nginx upstream to new slot
 echo "Switching nginx upstream to $NEW_SLOT (port $NEW_PORT)..."
 echo "upstream ${PROJECT}-backend { server 127.0.0.1:$NEW_PORT; }" > "$UPSTREAM_FILE"
-nginx -t && nginx -s reload
+sudo /usr/sbin/nginx -t && sudo /usr/sbin/nginx -s reload
 
 # Stop old slot
 if [ "$ACTIVE" != "none" ]; then
