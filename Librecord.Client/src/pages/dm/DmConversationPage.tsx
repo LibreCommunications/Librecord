@@ -284,6 +284,10 @@ export default function DmConversationPage() {
                     setMessages(prev => prev.map(m =>
                         m.clientMessageId === clientMessageId ? { ...serverMsg, clientMessageId } : m
                     ));
+                } else {
+                    setMessages(prev =>
+                        prev.filter(m => m.clientMessageId !== clientMessageId)
+                    );
                 }
             } else {
                 await sendMessage(dmId, text, clientMessageId);

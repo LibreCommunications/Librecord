@@ -12,6 +12,10 @@ let currentUserId: string | null = null;
 // Notification sound — short blip
 const notificationSound = new Audio("data:audio/wav;base64,UklGRl9vT19teleWQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQ==");
 
+// Track listener references so we can remove them before re-adding
+let dmListener: EventListener | null = null;
+let guildListener: EventListener | null = null;
+
 export function initNotifications(userId: string) {
     currentUserId = userId;
 
@@ -23,8 +27,16 @@ export function initNotifications(userId: string) {
         permissionGranted = Notification.permission === "granted";
     }
 
+    // Remove previous listeners to prevent duplicates on re-init
+    if (dmListener) {
+        window.removeEventListener("dm:message:new", dmListener);
+    }
+    if (guildListener) {
+        window.removeEventListener("guild:message:new", guildListener);
+    }
+
     // DM messages
-    window.addEventListener("dm:message:new", ((e: CustomEvent) => {
+    dmListener = ((e: CustomEvent) => {
         const { message } = e.detail;
         if (message.author.id === currentUserId) return;
         if (document.hasFocus()) return;
@@ -33,10 +45,11 @@ export function initNotifications(userId: string) {
             message.author.displayName,
             message.content,
         );
-    }) as EventListener);
+    }) as EventListener;
+    window.addEventListener("dm:message:new", dmListener);
 
     // Guild messages
-    window.addEventListener("guild:message:new", ((e: CustomEvent) => {
+    guildListener = ((e: CustomEvent) => {
         const { message } = e.detail;
         if (message.author.id === currentUserId) return;
         if (document.hasFocus()) return;
@@ -45,7 +58,8 @@ export function initNotifications(userId: string) {
             message.author.displayName,
             message.content,
         );
-    }) as EventListener);
+    }) as EventListener;
+    window.addEventListener("guild:message:new", guildListener);
 }
 
 function showNotification(title: string, body: string) {

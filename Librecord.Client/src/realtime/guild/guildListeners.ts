@@ -114,10 +114,10 @@ export function registerGuildListeners() {
                 username: payload.username,
                 displayName: payload.displayName,
                 avatarUrl: payload.avatarUrl,
-                isMuted: false,
-                isDeafened: false,
-                isCameraOn: false,
-                isScreenSharing: false,
+                isMuted: payload.isMuted,
+                isDeafened: payload.isDeafened,
+                isCameraOn: payload.isCameraOn,
+                isScreenSharing: payload.isScreenSharing,
                 joinedAt: new Date().toISOString(),
             });
             dispatchGuildEvent("voice:user:joined", payload);

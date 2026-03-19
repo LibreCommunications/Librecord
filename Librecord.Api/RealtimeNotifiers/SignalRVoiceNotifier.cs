@@ -29,7 +29,11 @@ public sealed class SignalRVoiceRealtimeNotifier : IVoiceRealtimeNotifier
                         userId = joined.UserId,
                         username = joined.Username,
                         displayName = joined.DisplayName,
-                        avatarUrl = joined.AvatarUrl
+                        avatarUrl = joined.AvatarUrl,
+                        isMuted = joined.IsMuted,
+                        isDeafened = joined.IsDeafened,
+                        isCameraOn = joined.IsCameraOn,
+                        isScreenSharing = joined.IsScreenSharing
                     }),
 
             VoiceUserLeft left =>

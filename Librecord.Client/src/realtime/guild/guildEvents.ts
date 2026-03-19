@@ -49,6 +49,10 @@ export interface GuildEventMap {
         username: string;
         displayName: string;
         avatarUrl: string | null;
+        isMuted: boolean;
+        isDeafened: boolean;
+        isCameraOn: boolean;
+        isScreenSharing: boolean;
     };
 
     "voice:user:left": {

@@ -101,7 +101,7 @@ export function useTypingIndicator(
         lastSentRef.current = now;
 
         const connection = hub === "dm" ? dmConnection : guildConnection;
-        connection.invoke("StartTyping", channelId).catch(() => {});
+        connection.invoke("StartTyping", channelId).catch((e) => console.warn("[Typing] SignalR invoke failed:", e));
     }, [channelId, hub]);
 
     // Send stop typing event (called when input is cleared or message is sent)
@@ -112,7 +112,7 @@ export function useTypingIndicator(
         lastSentRef.current = 0; // reset throttle so next keystroke sends immediately
 
         const connection = hub === "dm" ? dmConnection : guildConnection;
-        connection.invoke("StopTyping", channelId).catch(() => {});
+        connection.invoke("StopTyping", channelId).catch((e) => console.warn("[Typing] SignalR invoke failed:", e));
     }, [channelId, hub]);
 
     const typingNames = typingUsers.map(t => t.displayName);

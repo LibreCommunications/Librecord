@@ -83,7 +83,11 @@ public class VoiceService : IVoiceService
             UserId = userId,
             Username = user.UserName!,
             DisplayName = displayName,
-            AvatarUrl = user.AvatarUrl
+            AvatarUrl = user.AvatarUrl,
+            IsMuted = voiceState.IsMuted,
+            IsDeafened = voiceState.IsDeafened,
+            IsCameraOn = voiceState.IsCameraOn,
+            IsScreenSharing = voiceState.IsScreenSharing
         });
 
         var participants = await GetChannelParticipantsAsync(channelId);

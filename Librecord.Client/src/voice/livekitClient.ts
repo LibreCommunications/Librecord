@@ -5,33 +5,137 @@ import {
     type RemoteParticipant,
     type RemoteTrackPublication,
     type LocalParticipant,
-    type Participant,
-    ParticipantEvent,
 } from "livekit-client";
 
 let room: Room | null = null;
 
-type SpeakingCb = (identity: string, speaking: boolean) => void;
-type IdentityCb = (identity: string) => void;
-type VoidCb = () => void;
+// ─── CLIENT-SIDE SPEAKING DETECTION ────────────────────────────────────
+// Uses the Web Audio API to analyze received audio levels locally.
+// Zero round-trip to the SFU — the green border appears the instant
+// audio is loud enough, not 1s later when the server tells us.
 
-interface Callbacks {
-    onParticipantConnected?: IdentityCb;
-    onParticipantDisconnected?: IdentityCb;
-    onTrackSubscribed?: VoidCb;
-    onTrackUnsubscribed?: VoidCb;
-    onSpeakingChanged?: SpeakingCb;
+const SPEAKING_THRESHOLD = 0.015; // RMS threshold (0-1)
+const SPEAKING_OFF_DELAY = 300;   // ms of silence before "not speaking"
+
+const audioCtxRef: { ctx: AudioContext | null } = { ctx: null };
+const analysers = new Map<string, {
+    analyser: AnalyserNode;
+    source: MediaStreamAudioSourceNode;
+    speaking: boolean;
+    silentSince: number;
+}>();
+let animFrameId: number | null = null;
+
+function getAudioCtx(): AudioContext | null {
+    if (!audioCtxRef.ctx) {
+        try {
+            audioCtxRef.ctx = new AudioContext();
+        } catch {
+            console.warn("[Voice] AudioContext creation failed — speaking detection disabled");
+            return null;
+        }
+    }
+    return audioCtxRef.ctx;
 }
 
-let cbs: Callbacks = {};
+function startAnalysingTrack(identity: string, track: MediaStreamTrack) {
+    // Don't double-attach
+    if (analysers.has(identity)) {
+        const existing = analysers.get(identity)!;
+        existing.source.disconnect();
+        existing.analyser.disconnect();
+        analysers.delete(identity);
+    }
 
-export function setCallbacks(newCbs: Callbacks) {
-    cbs = newCbs;
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const stream = new MediaStream([track]);
+    const source = ctx.createMediaStreamSource(stream);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+    // Don't connect to destination — we don't want to double-play audio
+
+    analysers.set(identity, { analyser, source, speaking: false, silentSince: 0 });
+
+    // Start the polling loop if not already running
+    if (animFrameId === null) {
+        pollSpeaking();
+    }
 }
 
-function bindSpeaking(participant: Participant) {
-    participant.on(ParticipantEvent.IsSpeakingChanged, (speaking: boolean) => {
-        cbs.onSpeakingChanged?.(participant.identity, speaking);
+function stopAnalysingTrack(identity: string) {
+    const entry = analysers.get(identity);
+    if (entry) {
+        entry.source.disconnect();
+        entry.analyser.disconnect();
+        analysers.delete(identity);
+    }
+    if (analysers.size === 0 && animFrameId !== null) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+    }
+}
+
+function stopAllAnalysers() {
+    for (const [id] of analysers) {
+        stopAnalysingTrack(id);
+    }
+    if (animFrameId !== null) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+    }
+}
+
+function pollSpeaking() {
+    const now = Date.now();
+    const buf = new Uint8Array(128);
+
+    for (const [identity, entry] of analysers) {
+        entry.analyser.getByteTimeDomainData(buf);
+
+        // Compute RMS
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) {
+            const v = (buf[i] - 128) / 128;
+            sum += v * v;
+        }
+        const rms = Math.sqrt(sum / buf.length);
+
+        const wasSpeaking = entry.speaking;
+
+        if (rms > SPEAKING_THRESHOLD) {
+            entry.speaking = true;
+            entry.silentSince = 0;
+        } else {
+            if (entry.speaking) {
+                if (entry.silentSince === 0) {
+                    entry.silentSince = now;
+                } else if (now - entry.silentSince > SPEAKING_OFF_DELAY) {
+                    entry.speaking = false;
+                    entry.silentSince = 0;
+                }
+            }
+        }
+
+        if (entry.speaking !== wasSpeaking) {
+            window.dispatchEvent(new CustomEvent("voice:speaking:changed", {
+                detail: { identity, speaking: entry.speaking },
+            }));
+        }
+    }
+
+    animFrameId = requestAnimationFrame(pollSpeaking);
+}
+
+// ─── ROOM SETUP ────────────────────────────────────────────────────────
+
+function bindRemoteAudioTrack(participant: RemoteParticipant) {
+    participant.audioTrackPublications.forEach(pub => {
+        const msTrack = pub.track?.mediaStreamTrack;
+        if (msTrack) {
+            startAnalysingTrack(participant.identity, msTrack);
+        }
     });
 }
 
@@ -39,64 +143,84 @@ export async function connectToVoice(token: string, wsUrl: string) {
     if (room) await disconnect();
 
     room = new Room({
-        // dynacast: only encode video layers that subscribers actually need,
-        // saving bandwidth when viewers have small viewports or are absent.
         dynacast: true,
-        // adaptiveStream: receiver automatically signals the SFU which video
-        // quality it needs based on the subscribing element's viewport size.
         adaptiveStream: true,
+        audioCaptureDefaults: {
+            autoGainControl: true,
+            noiseSuppression: true,
+            echoCancellation: true,
+        },
     });
 
     room.on(RoomEvent.ParticipantConnected, (p: RemoteParticipant) => {
-        cbs.onParticipantConnected?.(p.identity);
-        bindSpeaking(p);
     });
 
     room.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
-        cbs.onParticipantDisconnected?.(p.identity);
+        stopAnalysingTrack(p.identity);
     });
 
-    room.on(RoomEvent.TrackSubscribed, (_t, pub: RemoteTrackPublication, p: RemoteParticipant) => {
-        cbs.onTrackSubscribed?.();
-        // Notify UI components so they can attach the new track immediately
+    room.on(RoomEvent.TrackSubscribed, (track, pub: RemoteTrackPublication, p: RemoteParticipant) => {
         window.dispatchEvent(new CustomEvent("voice:track:changed", {
             detail: { identity: p.identity, source: pub.source },
         }));
+        // Start analysing audio tracks for speaking detection
+        if (track.kind === "audio") {
+            const msTrack = track.mediaStreamTrack;
+            if (msTrack) {
+                startAnalysingTrack(p.identity, msTrack);
+            }
+        }
     });
 
     room.on(RoomEvent.TrackUnsubscribed, (_t, pub: RemoteTrackPublication, p: RemoteParticipant) => {
-        cbs.onTrackUnsubscribed?.();
         window.dispatchEvent(new CustomEvent("voice:track:changed", {
             detail: { identity: p.identity, source: pub.source },
         }));
+        if (pub.kind === "audio") {
+            stopAnalysingTrack(p.identity);
+        }
     });
 
-    // Also notify when the local participant publishes a track (for self-view)
     room.on(RoomEvent.LocalTrackPublished, (pub) => {
         window.dispatchEvent(new CustomEvent("voice:track:changed", {
             detail: { identity: room!.localParticipant.identity, source: pub.source },
         }));
+        // Analyse own mic for self speaking indicator
+        if (pub.kind === "audio") {
+            const msTrack = pub.track?.mediaStreamTrack;
+            if (msTrack) {
+                startAnalysingTrack(room!.localParticipant.identity, msTrack);
+            }
+        }
     });
 
     room.on(RoomEvent.LocalTrackUnpublished, (pub) => {
         window.dispatchEvent(new CustomEvent("voice:track:changed", {
             detail: { identity: room!.localParticipant.identity, source: pub.source },
         }));
+        if (pub.kind === "audio") {
+            stopAnalysingTrack(room!.localParticipant.identity);
+        }
     });
 
     await room.connect(wsUrl, token);
     await room.localParticipant.setMicrophoneEnabled(true);
 
     // Unlock browser audio playback for remote participants' audio tracks.
-    // Browsers block autoplay until a user gesture + explicit unlock via AudioContext.
-    // Without this, you can see others but never hear them.
     await room.startAudio();
 
-    bindSpeaking(room.localParticipant);
-    room.remoteParticipants.forEach(bindSpeaking);
+    // Start analysing audio for any participants already in the room
+    room.remoteParticipants.forEach(bindRemoteAudioTrack);
+
+    // Analyse own mic
+    const localAudioPub = room.localParticipant.audioTrackPublications.values().next().value;
+    if (localAudioPub?.track?.mediaStreamTrack) {
+        startAnalysingTrack(room.localParticipant.identity, localAudioPub.track.mediaStreamTrack);
+    }
 }
 
 export async function disconnect() {
+    stopAllAnalysers();
     if (!room) return;
     await room.disconnect(true);
     room = null;

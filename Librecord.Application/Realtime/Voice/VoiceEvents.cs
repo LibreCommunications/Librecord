@@ -18,6 +18,10 @@ public sealed class VoiceUserJoined : VoiceEvent
     public string Username { get; init; } = null!;
     public string DisplayName { get; init; } = null!;
     public string? AvatarUrl { get; init; }
+    public bool IsMuted { get; init; }
+    public bool IsDeafened { get; init; }
+    public bool IsCameraOn { get; init; }
+    public bool IsScreenSharing { get; init; }
 }
 
 // ---------------------------------------------------------
