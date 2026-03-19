@@ -1,10 +1,14 @@
 import { useState, useEffect } from "react";
 import { useVoice } from "../../hooks/useVoice";
 import { useUserProfile } from "../../hooks/useUserProfile";
+import { useAuth } from "../../context/AuthContext";
+import { fetchWithAuth } from "../../api/fetchWithAuth";
 import { ParticipantTile } from "./ParticipantTile";
 import { ScreenShareTile } from "./ScreenShareTile";
 import { SpeakerIcon } from "./VoiceIcons";
 import type { VoiceParticipant } from "../../voice/voiceStore";
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface Props {
     channelId: string;
@@ -94,7 +98,9 @@ function getGridClass(count: number): string {
 export function VoiceChannelView({ channelId }: Props) {
     const { voiceState } = useVoice();
     const { getAvatarUrl } = useUserProfile();
+    const auth = useAuth();
     const [speakingMap, setSpeakingMap] = useState<Record<string, boolean>>({});
+    const [previewParticipants, setPreviewParticipants] = useState<VoiceParticipant[]>([]);
 
     useEffect(() => {
         const handler = (e: Event) => {
@@ -107,8 +113,59 @@ export function VoiceChannelView({ channelId }: Props) {
         return () => window.removeEventListener("voice:speaking:changed", handler);
     }, []);
 
+    // When not connected to this channel, fetch participants from the API
+    // so users can see who's in the call before joining.
     const isInThisChannel = voiceState.isConnected && voiceState.channelId === channelId;
-    const participants = voiceState.participants;
+
+    useEffect(() => {
+        if (isInThisChannel) {
+            setPreviewParticipants([]);
+            return;
+        }
+
+        let cancelled = false;
+
+        async function fetchParticipants() {
+            try {
+                const res = await fetchWithAuth(
+                    `${API_URL}/voice/channels/${channelId}/participants`,
+                    {},
+                    auth,
+                );
+                if (!res.ok || cancelled) return;
+                const data = await res.json();
+                if (!cancelled) {
+                    setPreviewParticipants(data.map((p: any) => ({
+                        userId: p.userId,
+                        username: p.username,
+                        displayName: p.displayName,
+                        avatarUrl: p.avatarUrl,
+                        isMuted: p.isMuted,
+                        isDeafened: p.isDeafened,
+                        isCameraOn: p.isCameraOn,
+                        isScreenSharing: p.isScreenSharing,
+                        joinedAt: p.joinedAt,
+                    })));
+                }
+            } catch {
+                // Silently fail — preview is best-effort
+            }
+        }
+
+        fetchParticipants();
+
+        // Refresh when voice events arrive (someone joins/leaves)
+        const onVoiceChange = () => { if (!cancelled) fetchParticipants(); };
+        window.addEventListener("voice:user:joined", onVoiceChange);
+        window.addEventListener("voice:user:left", onVoiceChange);
+        return () => {
+            cancelled = true;
+            window.removeEventListener("voice:user:joined", onVoiceChange);
+            window.removeEventListener("voice:user:left", onVoiceChange);
+        };
+    }, [channelId, isInThisChannel]);
+
+    const participants = isInThisChannel ? voiceState.participants : previewParticipants;
     const screenSharers = participants.filter(p => p.isScreenSharing);
     const totalTiles = participants.length + (isInThisChannel ? screenSharers.length : 0);
 

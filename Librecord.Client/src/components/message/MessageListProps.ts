@@ -22,6 +22,9 @@ export interface MessageListProps {
 
     deleteMessage: (messageId: string) => Promise<void>;
 
+    onPinMessage?: (messageId: string) => void;
+    pinnedMessageIds?: Set<string>;
+
     onAddReaction: (messageId: string, emoji: string) => void;
     onRemoveReaction: (messageId: string, emoji: string) => void;
 

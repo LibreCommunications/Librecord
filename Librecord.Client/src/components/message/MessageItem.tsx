@@ -34,10 +34,12 @@ export function MessageItem({
                                 isEditing,
                                 menuOpen,
                                 currentUserId,
+                                isPinned,
                                 onToggleMenu,
                                 onStartEdit,
                                 onCancelEdit,
                                 onDelete,
+                                onPin,
                                 onAddReaction,
                                 onRemoveReaction,
                                 editMessage,
@@ -219,13 +221,12 @@ export function MessageItem({
 
             {menuOpen && (
                 <MessageMenu
-                    isAuthor={isAuthor}
-                    onEdit={onStartEdit}
-                    onDelete={onDelete}
                     onAddReaction={(emoji) => {
                         onAddReaction(msg.id, emoji);
                         onToggleMenu();
                     }}
+                    onPin={onPin ? () => { onPin(); onToggleMenu(); } : undefined}
+                    isPinned={isPinned}
                 />
             )}
 

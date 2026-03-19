@@ -17,6 +17,7 @@ import { SearchBar } from "../../components/messages/SearchBar";
 import { PinnedMessagesPanel } from "../../components/messages/PinnedMessagesPanel";
 import { AttachmentUpload } from "../../components/messages/AttachmentUpload";
 import { useAttachmentUpload } from "../../hooks/useAttachmentUpload";
+import { usePins } from "../../hooks/usePins";
 import { VoiceChannelView } from "../../components/voice/VoiceChannelView";
 
 import type { Message } from "../../types/message";
@@ -44,6 +45,7 @@ export default function GuildChannelPage() {
     const { addReaction, removeReaction } = useReactions();
     const { markAsRead } = useReadState();
     const { sendGuildMessageWithAttachments } = useAttachmentUpload();
+    const { pinMessage, unpinMessage, getPins } = usePins();
 
     const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
@@ -60,6 +62,7 @@ export default function GuildChannelPage() {
     const [showInvite, setShowInvite] = useState(false);
     const [showMembers, setShowMembers] = useState(true);
     const [showPins, setShowPins] = useState(false);
+    const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
 
@@ -221,14 +224,16 @@ export default function GuildChannelPage() {
         Promise.all([
             getChannel(channelId),
             getChannelMessages(channelId),
+            getPins(channelId),
         ])
-            .then(([channel, msgs]) => {
+            .then(([channel, msgs, pins]) => {
                 setChannelName(channel?.name ?? null);
                 setChannelTopic(channel?.topic ?? null);
                 setChannelType(channel?.type ?? 0);
                 const reversed = msgs.slice().reverse();
                 setMessages(reversed);
                 setHasMore(msgs.length >= 50);
+                setPinnedIds(new Set(pins.map(p => p.messageId)));
 
                 // Mark channel as read
                 if (reversed.length > 0 && channelId) {
@@ -311,6 +316,18 @@ export default function GuildChannelPage() {
         try {
             await deleteMessage(channelId!, messageId);
         } catch {}
+    };
+
+    const handlePin = async (messageId: string) => {
+        if (!channelId) return;
+        const isPinned = pinnedIds.has(messageId);
+        if (isPinned) {
+            await unpinMessage(channelId, messageId);
+            setPinnedIds(prev => { const next = new Set(prev); next.delete(messageId); return next; });
+        } else {
+            await pinMessage(channelId, messageId);
+            setPinnedIds(prev => new Set(prev).add(messageId));
+        }
     };
 
     const handleEdit = async (messageId: string, dto: { content: string }) => {
@@ -468,7 +485,7 @@ export default function GuildChannelPage() {
                             </Link>
                         )}
 
-                        {!isVoice && <SearchBar channelId={channelId} guildId={guildId} />}
+                        {!isVoice && !showPins && <SearchBar channelId={channelId} guildId={guildId} />}
                     </div>
                 </div>
 
@@ -490,6 +507,8 @@ export default function GuildChannelPage() {
                             setEditingId={setEditingId}
                             editMessage={handleEdit}
                             deleteMessage={handleDelete}
+                            onPinMessage={handlePin}
+                            pinnedMessageIds={pinnedIds}
                             onAddReaction={handleAddReaction}
                             onRemoveReaction={handleRemoveReaction}
                             getAvatarUrl={getAvatarUrl}

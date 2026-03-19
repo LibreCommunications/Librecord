@@ -15,6 +15,8 @@ export function MessageList({
                                 setEditingId,
                                 editMessage,
                                 deleteMessage,
+                                onPinMessage,
+                                pinnedMessageIds,
                                 onAddReaction,
                                 onRemoveReaction,
                                 getAvatarUrl,
@@ -165,6 +167,8 @@ export function MessageList({
                             onStartEdit={() => setEditingId(msg.id)}
                             onCancelEdit={() => setEditingId(null)}
                             onDelete={() => setDeleteTargetId(msg.id)}
+                            onPin={onPinMessage ? () => onPinMessage(msg.id) : undefined}
+                            isPinned={pinnedMessageIds?.has(msg.id)}
                             onAddReaction={onAddReaction}
                             onRemoveReaction={onRemoveReaction}
                             editMessage={editMessage}
