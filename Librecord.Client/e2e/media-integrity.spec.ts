@@ -124,7 +124,10 @@ test.describe.serial("Media integrity — sender/receiver data consistency", () 
             .locator("..").locator("..").locator("span.truncate");
         voiceChannelName = (await spans.first().textContent())!.trim();
 
-        await pageB.reload();
+        // Use full page navigations to ensure SignalR reconnects cleanly
+        // (reload() on prod can leave SignalR in a partially connected state)
+        await pageB.goto(pageA.url());
+        await pageB.waitForLoadState("networkidle");
         await pageB.waitForSelector("text=Voice Channels", { timeout: 10_000 });
         await injectWebRtcTracker(pageB);
 
