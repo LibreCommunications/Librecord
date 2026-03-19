@@ -24,6 +24,11 @@ export interface GuildEventMap {
         username: string;
     };
 
+    "guild:user:stop-typing": {
+        channelId: string;
+        userId: string;
+    };
+
     "guild:user:presence": {
         userId: string;
         status: string;

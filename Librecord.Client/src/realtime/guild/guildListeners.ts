@@ -20,6 +20,7 @@ export function registerGuildListeners() {
     guildConnection.off("guild:message:edited");
     guildConnection.off("guild:message:deleted");
     guildConnection.off("guild:user:typing");
+    guildConnection.off("guild:user:stop-typing");
     guildConnection.off("guild:user:presence");
     guildConnection.off("guild:channel:created");
     guildConnection.off("voice:user:joined");
@@ -66,6 +67,13 @@ export function registerGuildListeners() {
         "guild:user:typing",
         (payload: { channelId: string; userId: string; username: string }) => {
             dispatchGuildEvent("guild:user:typing", payload);
+        }
+    );
+
+    guildConnection.on(
+        "guild:user:stop-typing",
+        (payload: { channelId: string; userId: string }) => {
+            dispatchGuildEvent("guild:user:stop-typing", payload);
         }
     );
 

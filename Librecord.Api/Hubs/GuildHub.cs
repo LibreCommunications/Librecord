@@ -131,6 +131,9 @@ public class GuildHub : Hub
         var canAccess = await _guilds.CanAccessChannelAsync(channelId, UserId);
         if (!canAccess) return;
 
+        // Ensure this connection is in the channel's SignalR group
+        await Groups.AddToGroupAsync(Context.ConnectionId, ChannelGroup(channelId));
+
         var group = ChannelGroup(channelId);
 
         await Clients.OthersInGroup(group).SendAsync(
@@ -144,6 +147,16 @@ public class GuildHub : Hub
             });
     }
 
+    public async Task StopTyping(Guid channelId)
+    {
+        var canAccess = await _guilds.CanAccessChannelAsync(channelId, UserId);
+        if (!canAccess) return;
+
+        await Clients.OthersInGroup(ChannelGroup(channelId)).SendAsync(
+            "guild:user:stop-typing",
+            new { channelId, userId = UserId });
+    }
+
     // -----------------------------------------
     // VOICE: JOIN
     // -----------------------------------------
@@ -152,6 +165,10 @@ public class GuildHub : Hub
         _logger.LogInformation(
             "[GUILD HUB] JoinVoiceChannel | UserId={UserId} | ChannelId={ChannelId}",
             UserId, channelId);
+
+        // Ensure this connection is in the channel's SignalR group
+        // (may not be if the channel was created after this connection started)
+        await Groups.AddToGroupAsync(Context.ConnectionId, ChannelGroup(channelId));
 
         return await _voice.JoinVoiceChannelAsync(channelId, UserId);
     }

@@ -273,13 +273,22 @@ test.describe.serial("Guild messaging — send, receive, edit, delete, notificat
             pageB.locator(`text=${userA.displayName} is typing...`),
         ).toBeVisible({ timeout: 10_000 });
 
-        // Clear without sending
-        await pageA.locator(selector).fill("");
+        // Clear the input — triggers stopTyping, indicator should vanish fast
+        await pageA.evaluate(({ sel }) => {
+            const el = document.querySelector(sel) as HTMLTextAreaElement;
+            if (!el) return;
+            el.focus();
+            const setter = Object.getOwnPropertyDescriptor(
+                window.HTMLTextAreaElement.prototype, "value"
+            )!.set!;
+            setter.call(el, "");
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+        }, { sel: selector });
 
-        // Typing indicator should eventually disappear (5s expiry)
+        // Should disappear within ~1s (StopTyping event), not 5s
         await expect(
             pageB.locator(`text=${userA.displayName} is typing...`),
-        ).not.toBeVisible({ timeout: 10_000 });
+        ).not.toBeVisible({ timeout: 3_000 });
     });
 
     // ─── UNREAD BADGE (GUILD) ────────────────────────────────────────
@@ -584,11 +593,22 @@ test.describe.serial("DM messaging — friend request, send, receive, edit, dele
             dmPageB.locator(`text=${dmUserA.displayName} is typing...`),
         ).toBeVisible({ timeout: 10_000 });
 
-        await dmPageA.locator(selector).fill("");
+        // Clear — triggers stopTyping
+        await dmPageA.evaluate(({ sel }) => {
+            const el = document.querySelector(sel) as HTMLTextAreaElement;
+            if (!el) return;
+            el.focus();
+            const setter = Object.getOwnPropertyDescriptor(
+                window.HTMLTextAreaElement.prototype, "value"
+            )!.set!;
+            setter.call(el, "");
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+        }, { sel: selector });
 
+        // Should disappear within ~1s, not 5s
         await expect(
             dmPageB.locator(`text=${dmUserA.displayName} is typing...`),
-        ).not.toBeVisible({ timeout: 10_000 });
+        ).not.toBeVisible({ timeout: 3_000 });
     });
 
     // ─── DM UNREAD BADGE ────────────────────────────────────────────

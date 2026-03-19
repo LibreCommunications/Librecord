@@ -26,10 +26,12 @@ export function useTypingIndicator(
 ) {
     const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
     const lastSentRef = useRef(0);
+    const isTypingRef = useRef(false);
 
-    const eventName = hub === "dm" ? "dm:user:typing" : "guild:user:typing";
+    const typingEvent = hub === "dm" ? "dm:user:typing" : "guild:user:typing";
+    const stopTypingEvent = hub === "dm" ? "dm:user:stop-typing" : "guild:user:stop-typing";
 
-    // Listen for typing events
+    // Listen for typing / stop-typing events
     useEffect(() => {
         if (!channelId) return;
 
@@ -45,6 +47,13 @@ export function useTypingIndicator(
             });
         };
 
+        const onStopTyping = (e: CustomEvent<{ channelId: string; userId: string }>) => {
+            const { channelId: evtChannel, userId } = e.detail;
+            if (evtChannel !== channelId) return;
+
+            setTypingUsers(prev => prev.filter(t => t.userId !== userId));
+        };
+
         // Clear typing when a message arrives from that user
         const messageEvent = hub === "dm" ? "dm:message:new" : "guild:message:new";
         const onMessage = (e: CustomEvent<{ message: { channelId: string; author: { id: string } } }>) => {
@@ -54,13 +63,15 @@ export function useTypingIndicator(
             setTypingUsers(prev => prev.filter(t => t.userId !== message.author.id));
         };
 
-        window.addEventListener(eventName, onTyping as EventListener);
+        window.addEventListener(typingEvent, onTyping as EventListener);
+        window.addEventListener(stopTypingEvent, onStopTyping as EventListener);
         window.addEventListener(messageEvent, onMessage as EventListener);
         return () => {
-            window.removeEventListener(eventName, onTyping as EventListener);
+            window.removeEventListener(typingEvent, onTyping as EventListener);
+            window.removeEventListener(stopTypingEvent, onStopTyping as EventListener);
             window.removeEventListener(messageEvent, onMessage as EventListener);
         };
-    }, [channelId, currentUserId, eventName, hub]);
+    }, [channelId, currentUserId, typingEvent, stopTypingEvent, hub]);
 
     // Expire stale typing entries
     useEffect(() => {
@@ -84,6 +95,8 @@ export function useTypingIndicator(
         if (!channelId) return;
 
         const now = Date.now();
+        isTypingRef.current = true;
+
         if (now - lastSentRef.current < TYPING_THROTTLE_MS) return;
         lastSentRef.current = now;
 
@@ -91,7 +104,18 @@ export function useTypingIndicator(
         connection.invoke("StartTyping", channelId).catch(() => {});
     }, [channelId, hub]);
 
+    // Send stop typing event (called when input is cleared or message is sent)
+    const stopTyping = useCallback(() => {
+        if (!channelId || !isTypingRef.current) return;
+
+        isTypingRef.current = false;
+        lastSentRef.current = 0; // reset throttle so next keystroke sends immediately
+
+        const connection = hub === "dm" ? dmConnection : guildConnection;
+        connection.invoke("StopTyping", channelId).catch(() => {});
+    }, [channelId, hub]);
+
     const typingNames = typingUsers.map(t => t.displayName);
 
-    return { typingNames, sendTyping };
+    return { typingNames, sendTyping, stopTyping };
 }

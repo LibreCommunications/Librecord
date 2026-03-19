@@ -24,6 +24,11 @@ export interface DmEventMap {
         username: string;
     };
 
+    "dm:user:stop-typing": {
+        channelId: string;
+        userId: string;
+    };
+
     "dm:user:presence": {
         userId: string;
         status: string;

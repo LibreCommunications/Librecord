@@ -18,6 +18,7 @@ export function registerDmListeners() {
     dmConnection.off("dm:message:edited");
     dmConnection.off("dm:message:deleted");
     dmConnection.off("dm:user:typing");
+    dmConnection.off("dm:user:stop-typing");
     dmConnection.off("dm:user:presence");
     dmConnection.off("dm:readstate:updated");
 
@@ -70,6 +71,13 @@ export function registerDmListeners() {
         "dm:user:typing",
         (payload: { channelId: string; userId: string; username: string }) => {
             dispatchDmEvent("dm:user:typing", payload);
+        }
+    );
+
+    dmConnection.on(
+        "dm:user:stop-typing",
+        (payload: { channelId: string; userId: string }) => {
+            dispatchDmEvent("dm:user:stop-typing", payload);
         }
     );
 

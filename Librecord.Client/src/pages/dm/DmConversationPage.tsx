@@ -61,7 +61,7 @@ export default function DmConversationPage() {
     const shouldAutoScrollRef = useRef(false);
     const attachTriggerRef = useRef<{ open: () => void }>(null);
 
-    const { typingNames, sendTyping } = useTypingIndicator(dmId, "dm", user?.userId);
+    const { typingNames, sendTyping, stopTyping } = useTypingIndicator(dmId, "dm", user?.userId);
 
     /* ------------------------------------------------------------------ */
     /* Realtime helpers                                                    */
@@ -246,6 +246,7 @@ export default function DmConversationPage() {
 
     const handleSend = async () => {
         if (!dmId || (!content.trim() && pendingFiles.length === 0) || !user || sending) return;
+        stopTyping();
 
         const clientMessageId = createClientMessageId();
         const text = content.trim();
@@ -414,7 +415,8 @@ export default function DmConversationPage() {
                         rows={1}
                         onChange={e => {
                             setContent(e.target.value);
-                            sendTyping();
+                            if (e.target.value) sendTyping();
+                            else stopTyping();
                         }}
                         onKeyDown={e => {
                             if (e.key === "Enter" && !e.shiftKey) {

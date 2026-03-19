@@ -142,6 +142,10 @@ public class DmHub : Hub
         var isMember = await _channels.IsMemberAsync(channelId, UserId);
         if (!isMember) return;
 
+        // Ensure this connection is in the channel's SignalR group
+        // (may not be if the DM was created after this connection started)
+        await Groups.AddToGroupAsync(Context.ConnectionId, ChannelGroup(channelId));
+
         var group = ChannelGroup(channelId);
 
         await Clients.OthersInGroup(group).SendAsync(
@@ -153,6 +157,16 @@ public class DmHub : Hub
                 username = Context.User!.Identity?.Name ?? "",
                 displayName = Context.User!.FindFirst("displayName")?.Value ?? Context.User!.Identity?.Name ?? ""
             });
+    }
+
+    public async Task StopTyping(Guid channelId)
+    {
+        var isMember = await _channels.IsMemberAsync(channelId, UserId);
+        if (!isMember) return;
+
+        await Clients.OthersInGroup(ChannelGroup(channelId)).SendAsync(
+            "dm:user:stop-typing",
+            new { channelId, userId = UserId });
     }
 
     // -----------------------------------------
