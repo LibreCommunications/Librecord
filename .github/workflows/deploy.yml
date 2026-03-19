@@ -1,15 +1,51 @@
-name: Deploy to Production
+name: Deploy
 
 on:
   push:
-    branches: [master]
+    branches: [master, test]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options: [production, test]
 
 jobs:
   deploy:
     runs-on: self-hosted
-    environment: production
+
+    env:
+      IS_PROD: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/master') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'production') }}
+
+    environment: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/master') && 'production' || (github.event_name == 'workflow_dispatch' && inputs.environment) || 'test' }}
 
     steps:
+      - name: Set environment config
+        id: config
+        run: |
+          if [ "$IS_PROD" = "true" ]; then
+            echo "slug=prod"             >> "$GITHUB_OUTPUT"
+            echo "site=librecord"        >> "$GITHUB_OUTPUT"
+            echo "db=librecord"          >> "$GITHUB_OUTPUT"
+            echo "blue_port=5111"        >> "$GITHUB_OUTPUT"
+            echo "green_port=5112"       >> "$GITHUB_OUTPUT"
+            echo "postgres_port=5432"    >> "$GITHUB_OUTPUT"
+            echo "minio_port=9000"       >> "$GITHUB_OUTPUT"
+            echo "minio_console=9001"    >> "$GITHUB_OUTPUT"
+            echo "bucket=librecord-attachments" >> "$GITHUB_OUTPUT"
+          else
+            echo "slug=test"             >> "$GITHUB_OUTPUT"
+            echo "site=librecord-test"   >> "$GITHUB_OUTPUT"
+            echo "db=librecord_test"     >> "$GITHUB_OUTPUT"
+            echo "blue_port=5121"        >> "$GITHUB_OUTPUT"
+            echo "green_port=5122"       >> "$GITHUB_OUTPUT"
+            echo "postgres_port=5433"    >> "$GITHUB_OUTPUT"
+            echo "minio_port=9010"       >> "$GITHUB_OUTPUT"
+            echo "minio_console=9011"    >> "$GITHUB_OUTPUT"
+            echo "bucket=librecord-test-attachments" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -17,16 +53,21 @@ jobs:
         run: |
           cat > .env <<EOF
           DOMAIN=${{ secrets.DOMAIN }}
-          POSTGRES_DB=librecord
-          POSTGRES_USER=librecord
+          POSTGRES_DB=${{ steps.config.outputs.db }}
+          POSTGRES_USER=${{ steps.config.outputs.db }}
           POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_PORT=${{ steps.config.outputs.postgres_port }}
           MINIO_ACCESS_KEY=${{ secrets.MINIO_ACCESS_KEY }}
           MINIO_SECRET_KEY=${{ secrets.MINIO_SECRET_KEY }}
-          MINIO_BUCKET=librecord-attachments
+          MINIO_BUCKET=${{ steps.config.outputs.bucket }}
+          MINIO_PORT=${{ steps.config.outputs.minio_port }}
+          MINIO_CONSOLE_PORT=${{ steps.config.outputs.minio_console }}
           JWT_SIGNING_KEY=${{ secrets.JWT_SIGNING_KEY }}
           MESSAGE_ENCRYPTION_KEY=${{ secrets.MESSAGE_ENCRYPTION_KEY }}
           LIVEKIT_API_KEY=${{ secrets.LIVEKIT_API_KEY }}
           LIVEKIT_API_SECRET=${{ secrets.LIVEKIT_API_SECRET }}
+          BLUE_PORT=${{ steps.config.outputs.blue_port }}
+          GREEN_PORT=${{ steps.config.outputs.green_port }}
           EOF
           chmod 600 .env
 
@@ -41,8 +82,11 @@ jobs:
 
       - name: Deploy frontend
         run: |
-          rm -rf /home/dev-egg/HostedPrograms/Librecord/Librecord.Client/dist
-          cp -r Librecord.Client/dist /home/dev-egg/HostedPrograms/Librecord/Librecord.Client/dist
+          sudo mkdir -p /var/www/${{ steps.config.outputs.site }}
+          sudo rm -rf /var/www/${{ steps.config.outputs.site }}/dist
+          sudo cp -r Librecord.Client/dist /var/www/${{ steps.config.outputs.site }}/dist
 
-      - name: Deploy backend
-        run: docker compose up -d --build --force-recreate
+      - name: Blue-green deploy backend
+        run: |
+          chmod +x .github/scripts/deploy.sh
+          .github/scripts/deploy.sh ${{ steps.config.outputs.slug }}

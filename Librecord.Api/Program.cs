@@ -60,6 +60,7 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<DmHub>("/hubs/dms");
 app.MapHub<GuildHub>("/hubs/guilds");
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 // --------------------------------------------------
 // DATABASE MIGRATIONS & SEEDING
