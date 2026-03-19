@@ -29,6 +29,14 @@ export interface GuildEventMap {
         status: string;
     };
 
+    "guild:channel:created": {
+        channelId: string;
+        guildId: string;
+        name: string;
+        type: number;
+        position: number;
+    };
+
     "voice:user:joined": {
         channelId: string;
         guildId: string;

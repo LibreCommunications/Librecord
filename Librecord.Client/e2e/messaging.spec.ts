@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { makeUser, registerUser, type TestUser } from "./helpers";
+import { makeUser, registerUser, BASE, API_URL, type TestUser } from "./helpers";
 import type { BrowserContext, Page } from "@playwright/test";
 
 /**
@@ -23,7 +23,7 @@ import type { BrowserContext, Page } from "@playwright/test";
  *   - Bob receives notification for DM while on a different page
  */
 
-const API_URL = "https://localhost:5111";
+// API_URL imported from helpers
 
 let userA: TestUser;
 let userB: TestUser;
@@ -299,20 +299,20 @@ test.describe.serial("Guild messaging — send, receive, edit, delete, notificat
             { apiUrl: API_URL, guildId },
         );
 
-        // Reload both to see new channel and rejoin SignalR groups
-        await pageA.reload();
-        await pageA.waitForSelector("text=Text Channels", { timeout: 10_000 });
-        await pageB.reload();
-        await pageB.waitForSelector("text=Text Channels", { timeout: 10_000 });
+        // Reload both to see new channel and rejoin SignalR groups.
+        // Navigate directly to specific channels so the full page load
+        // triggers OnConnectedAsync which joins all channel groups.
+        await pageB.goto(`${BASE}/app/guild/${guildId}/${textChannelId}`);
+        await pageB.waitForLoadState("networkidle");
+        await expect(pageB.locator(`textarea[placeholder*="Message #"]`)).toBeVisible({ timeout: 10_000 });
+        // Verify second-channel appears in Bob's sidebar
+        await expect(
+            pageB.locator('span.truncate:has-text("second-channel")'),
+        ).toBeVisible({ timeout: 10_000 });
 
-        // Bob stays on the first channel — click and wait for message input
-        await pageB.locator(`a[href="/app/guild/${guildId}/${textChannelId}"]`).click();
-        await expect(pageB.locator(`textarea[placeholder*="Message #"]`)).toBeVisible({ timeout: 5_000 });
-
-        // Alice navigates to the second channel — wait for message input
-        await pageA.locator('a:has(span.truncate:has-text("second-channel"))').first().click();
-        await pageA.waitForURL(new RegExp(channel2.id), { timeout: 5_000 });
-        await expect(pageA.locator(`textarea[placeholder*="Message #"]`)).toBeVisible({ timeout: 5_000 });
+        await pageA.goto(`${BASE}/app/guild/${guildId}/${channel2.id}`);
+        await pageA.waitForLoadState("networkidle");
+        await expect(pageA.locator(`textarea[placeholder*="Message #"]`)).toBeVisible({ timeout: 10_000 });
 
         // Alice sends a message in second-channel
         const msg = `Unread test ${Date.now()}`;
@@ -450,14 +450,14 @@ test.describe.serial("DM messaging — friend request, send, receive, edit, dele
         dmChannelId = result.channelId;
 
         // Navigate A to the DM
-        await dmPageA.goto(`https://localhost:5173/app/dm/${dmChannelId}`);
+        await dmPageA.goto(`${BASE}/app/dm/${dmChannelId}`);
         await dmPageA.waitForLoadState("networkidle");
     });
 
     test("User B navigates to DMs and sees the conversation", async () => {
         // Navigate directly to the DM conversation so the page load triggers
         // a fresh SignalR connection that joins the DM channel group.
-        await dmPageB.goto(`https://localhost:5173/app/dm/${dmChannelId}`);
+        await dmPageB.goto(`${BASE}/app/dm/${dmChannelId}`);
         await dmPageB.waitForLoadState("networkidle");
 
         // B should see A's name in the DM sidebar
@@ -471,7 +471,7 @@ test.describe.serial("DM messaging — friend request, send, receive, edit, dele
         ).toBeVisible({ timeout: 10_000 });
 
         // Also reload Alice's DM page to ensure her SignalR connection is fresh
-        await dmPageA.goto(`https://localhost:5173/app/dm/${dmChannelId}`);
+        await dmPageA.goto(`${BASE}/app/dm/${dmChannelId}`);
         await dmPageA.waitForLoadState("networkidle");
         await expect(
             dmPageA.locator(`textarea[placeholder*="Message"]`),
@@ -595,7 +595,7 @@ test.describe.serial("DM messaging — friend request, send, receive, edit, dele
 
     test("User B gets unread badge when User A sends a DM while B is elsewhere", async () => {
         // B navigates away from the DM to the friends page
-        await dmPageB.goto("https://localhost:5173/app/dm/friends/list");
+        await dmPageB.goto(`${BASE}/app/dm/friends/list`);
         await dmPageB.waitForLoadState("networkidle");
 
         // A sends a message

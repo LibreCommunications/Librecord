@@ -10,6 +10,7 @@ import {
     expectAudioReceiving,
     expectVideoPlaying,
     countActiveVideos,
+    API_URL,
     type TestUser,
 } from "./helpers";
 import type { BrowserContext, Page } from "@playwright/test";
@@ -75,7 +76,7 @@ test.describe.serial("Media integrity — sender/receiver data consistency", () 
         guildId = url.match(/\/app\/guild\/([^/]+)/)![1];
 
         // A creates invite
-        const apiUrl = "https://localhost:5111";
+        const apiUrl = API_URL;
         const response = await pageA.evaluate(
             async ({ apiUrl, guildId }) => {
                 const res = await fetch(`${apiUrl}/guilds/${guildId}/invites`, {
@@ -101,7 +102,7 @@ test.describe.serial("Media integrity — sender/receiver data consistency", () 
 
         const voiceIcons = pageA.locator("polygon[points='11 5 6 9 2 9 2 15 6 15 11 19 11 5']");
         if ((await voiceIcons.count()) === 0) {
-            const apiUrl = "https://localhost:5111";
+            const apiUrl = API_URL;
             await pageA.evaluate(
                 async ({ apiUrl, guildId }) => {
                     await fetch(`${apiUrl}/channels/guild/${guildId}`, {

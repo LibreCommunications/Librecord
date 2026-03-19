@@ -21,6 +21,7 @@ export function registerGuildListeners() {
     guildConnection.off("guild:message:deleted");
     guildConnection.off("guild:user:typing");
     guildConnection.off("guild:user:presence");
+    guildConnection.off("guild:channel:created");
     guildConnection.off("voice:user:joined");
     guildConnection.off("voice:user:left");
     guildConnection.off("voice:user:state");
@@ -75,6 +76,21 @@ export function registerGuildListeners() {
         "guild:user:presence",
         (payload: { userId: string; status: string }) => {
             dispatchGuildEvent("guild:user:presence", payload);
+        }
+    );
+
+    /* ------------------------------------------------------------------ */
+    /* CHANNEL CREATED — auto-join the new channel's SignalR group          */
+    /* ------------------------------------------------------------------ */
+    guildConnection.on(
+        "guild:channel:created",
+        (payload: { channelId: string; guildId: string; name: string; type: number; position: number }) => {
+            console.log("[SignalR] guild:channel:created", payload);
+            // Join the new channel group so we receive real-time events for it
+            guildConnection.invoke("JoinChannel", payload.channelId).catch((err) => {
+                console.warn("[SignalR] Failed to join new channel group", err);
+            });
+            dispatchGuildEvent("guild:channel:created", payload);
         }
     );
 

@@ -1,5 +1,15 @@
 import { defineConfig } from "@playwright/test";
 
+/**
+ * Environment-driven config:
+ *   E2E_BASE_URL  — frontend URL  (default: https://localhost:5173)
+ *   E2E_API_URL   — backend URL   (default: https://localhost:5111)
+ *
+ * Run against production:
+ *   E2E_BASE_URL=https://librecord.gros-sans-dessein.com \
+ *   E2E_API_URL=https://librecord.gros-sans-dessein.com/api \
+ *   npm run test:e2e
+ */
 export default defineConfig({
     testDir: "./e2e",
     fullyParallel: false,
@@ -9,7 +19,7 @@ export default defineConfig({
     expect: { timeout: 15_000 },
 
     use: {
-        baseURL: "https://localhost:5173",
+        baseURL: process.env.E2E_BASE_URL ?? "https://localhost:5173",
         ignoreHTTPSErrors: true,
         video: "retain-on-failure",
         screenshot: "only-on-failure",

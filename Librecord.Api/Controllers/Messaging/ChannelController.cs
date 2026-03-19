@@ -1,5 +1,7 @@
 using System.Security.Claims;
+using Librecord.Api.Hubs;
 using Librecord.Api.Requests;
+using Librecord.Application.Guilds;
 using Librecord.Application.Interfaces;
 using Librecord.Application.Messaging;
 using Librecord.Application.Permissions;
@@ -7,6 +9,7 @@ using Librecord.Domain.Guilds;
 using Librecord.Domain.Permissions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 
 namespace Librecord.Api.Controllers;
 
@@ -17,13 +20,19 @@ public class ChannelController : ControllerBase
 {
     private readonly IChannelService _channels;
     private readonly IPermissionService _permissions;
+    private readonly IHubContext<GuildHub> _guildHub;
+    private readonly IGuildService _guilds;
 
     public ChannelController(
         IChannelService channels,
-        IPermissionService permissions)
+        IPermissionService permissions,
+        IHubContext<GuildHub> guildHub,
+        IGuildService guilds)
     {
         _channels = channels;
         _permissions = permissions;
+        _guildHub = guildHub;
+        _guilds = guilds;
     }
 
     private Guid UserId =>
@@ -128,6 +137,27 @@ public class ChannelController : ControllerBase
         };
 
         await _channels.CreateChannelAsync(channel);
+
+        // Broadcast channel creation to all existing guild channel groups so
+        // connected clients can call JoinChannel for the new channel.
+        // We broadcast to every existing channel group because all guild
+        // members are already in those groups from OnConnectedAsync.
+        var existingChannels = await _channels.GetGuildChannelsAsync(guildId);
+        foreach (var ch in existingChannels)
+        {
+            if (ch.Id == channel.Id) continue; // skip the just-created channel
+            await _guildHub.Clients.Group(GuildHub.ChannelGroup(ch.Id)).SendAsync(
+                "guild:channel:created",
+                new
+                {
+                    channelId = channel.Id,
+                    guildId,
+                    name = channel.Name,
+                    type = (int)channel.Type,
+                    position = channel.Position
+                });
+        }
+
         return Ok(channel);
     }
 

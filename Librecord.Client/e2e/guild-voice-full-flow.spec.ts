@@ -8,6 +8,7 @@ import {
     expectVideoPlaying,
     expectSpecificVideoPlaying,
     countActiveVideos,
+    API_URL,
     type TestUser,
 } from "./helpers";
 import type { BrowserContext, Page } from "@playwright/test";
@@ -79,7 +80,7 @@ test.describe.serial("Full guild + WebRTC voice flow with media verification", (
     // ─── 3. USER A CREATES AN INVITE ──────────────────────────────────
 
     test("User A creates an invite", async () => {
-        const apiUrl = "https://localhost:5111";
+        const apiUrl = API_URL;
         const response = await pageA.evaluate(
             async ({ apiUrl, guildId }) => {
                 const res = await fetch(`${apiUrl}/guilds/${guildId}/invites`, {
@@ -119,7 +120,7 @@ test.describe.serial("Full guild + WebRTC voice flow with media verification", (
 
         if (count === 0) {
             // Create one via API
-            const apiUrl = "https://localhost:5111";
+            const apiUrl = API_URL;
             const channel = await pageA.evaluate(
                 async ({ apiUrl, guildId }) => {
                     const res = await fetch(`${apiUrl}/channels/guild/${guildId}`, {

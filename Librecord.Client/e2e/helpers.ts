@@ -1,6 +1,7 @@
 import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
-const BASE = "https://localhost:5173";
+export const BASE = process.env.E2E_BASE_URL ?? "https://localhost:5173";
+export const API_URL = process.env.E2E_API_URL ?? "https://localhost:5111";
 
 /** Unique suffix to avoid collisions across test runs. */
 export function uid(): string {
