@@ -44,7 +44,7 @@ export COMPOSE_PROJECT_NAME="$PROJECT"
 # Ensure infra services are running (livekit is shared, only start with prod)
 echo "Ensuring infra services are up..."
 if [ "$ENV" = "prod" ]; then
-  docker compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" up -d postgres minio livekit
+  docker compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" --profile livekit up -d postgres minio livekit
 else
   docker compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" up -d postgres minio
 fi
