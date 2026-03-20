@@ -32,6 +32,7 @@ export default function ChannelSidebar({ guildId }: Props) {
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
     const [canManageChannels, setCanManageChannels] = useState(false);
+    const [channelParticipants, setChannelParticipants] = useState<Record<string, { userId: string; username: string; displayName: string; avatarUrl: string | null; isMuted: boolean; isDeafened: boolean }[]>>({});
 
     async function loadChannels() {
         setLoading(true);
@@ -71,6 +72,47 @@ export default function ChannelSidebar({ guildId }: Props) {
         if (!guildId) return;
         loadChannels();
     }, [guildId]);
+
+    // Fetch voice participants for all voice channels
+    useEffect(() => {
+        const voiceChs = channels.filter(c => c.type === 1);
+        if (voiceChs.length === 0) return;
+        Promise.all(
+            voiceChs.map(ch =>
+                fetchWithAuth(`${API_URL}/voice/channels/${ch.id}/participants`, {}, auth)
+                    .then(r => r.ok ? r.json() : [])
+                    .then(participants => [ch.id, participants] as const)
+            )
+        ).then(results => {
+            const map: typeof channelParticipants = {};
+            for (const [id, p] of results) map[id] = p;
+            setChannelParticipants(map);
+        });
+    }, [channels]);
+
+    // Update participant list on voice join/leave/state events
+    useEffect(() => {
+        const onJoin = (e: CustomEvent<GuildEventMap["voice:user:joined"]>) => {
+            const p = e.detail;
+            setChannelParticipants(prev => ({
+                ...prev,
+                [p.channelId]: [...(prev[p.channelId] ?? []).filter(x => x.userId !== p.userId), p],
+            }));
+        };
+        const onLeave = (e: CustomEvent<GuildEventMap["voice:user:left"]>) => {
+            const { channelId: chId, userId } = e.detail;
+            setChannelParticipants(prev => ({
+                ...prev,
+                [chId]: (prev[chId] ?? []).filter(x => x.userId !== userId),
+            }));
+        };
+        window.addEventListener("voice:user:joined", onJoin as EventListener);
+        window.addEventListener("voice:user:left", onLeave as EventListener);
+        return () => {
+            window.removeEventListener("voice:user:joined", onJoin as EventListener);
+            window.removeEventListener("voice:user:left", onLeave as EventListener);
+        };
+    }, []);
 
     // Increment unread when a new guild message arrives for a non-active channel
     useEffect(() => {
@@ -179,7 +221,7 @@ export default function ChannelSidebar({ guildId }: Props) {
                             </div>
                             {voiceChannels.map(ch => {
                                 const isInVoiceChannel = voiceState.isConnected && voiceState.channelId === ch.id;
-                                const voiceParticipants = isInVoiceChannel ? voiceState.participants : [];
+                                const voiceParticipants = channelParticipants[ch.id] ?? [];
 
                                 return (
                                     <div key={ch.id}>
