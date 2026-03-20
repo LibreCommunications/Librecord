@@ -13,4 +13,6 @@ public sealed class GuildRealtimeMessageCreatedTransport
     public GuildAuthorSnapshot Author { get; init; } = null!;
 
     public string? ClientMessageId { get; init; }
+
+    public IReadOnlyList<MessageAttachmentSnapshot> Attachments { get; init; } = [];
 }

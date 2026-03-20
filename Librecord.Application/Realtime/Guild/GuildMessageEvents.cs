@@ -1,4 +1,5 @@
 using Librecord.Application.Messaging;
+using Librecord.Domain.Messaging.Common;
 
 namespace Librecord.Application.Realtime.Guild;
 
@@ -24,6 +25,8 @@ public sealed class GuildMessageCreated : GuildMessageEvent
     public DateTime CreatedAt { get; init; }
 
     public GuildAuthorSnapshot Author { get; init; } = null!;
+
+    public IReadOnlyList<MessageAttachmentSnapshot> Attachments { get; init; } = [];
 }
 
 // ---------------------------------------------------------

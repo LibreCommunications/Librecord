@@ -42,7 +42,8 @@ public sealed class SignalRGuildRealtimeNotifier : IGuildRealtimeNotifier
                             Content = created.Content,
                             CreatedAt = created.CreatedAt,
                             Author = created.Author,
-                            ClientMessageId = created.ClientMessageId
+                            ClientMessageId = created.ClientMessageId,
+                            Attachments = created.Attachments
                         })
                 ),
 

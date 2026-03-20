@@ -32,7 +32,8 @@ public sealed class DirectMessageService : IDirectMessageService
         Guid userId,
         string content,
         string? clientMessageId = null,
-        bool hasAttachments = false)
+        bool hasAttachments = false,
+        bool skipNotification = false)
     {
         if (string.IsNullOrWhiteSpace(content) && !hasAttachments)
             throw new ArgumentException("Message content or attachments required.");
@@ -73,24 +74,35 @@ public sealed class DirectMessageService : IDirectMessageService
         var hydrated = await _messages.GetMessageAsync(message.Id)
             ?? throw new InvalidOperationException("Message load failed.");
 
-        await _realtime.NotifyAsync(new DmMessageCreated
+        if (!skipNotification)
         {
-            ClientMessageId = clientMessageId,
-            ChannelId = channelId,
-            MessageId = hydrated.Id,
-            AuthorId = hydrated.UserId,
-            Content = hydrated.ContentText!,
-            CreatedAt = hydrated.CreatedAt,
-            Author = new DmAuthorSnapshot
+            await _realtime.NotifyAsync(new DmMessageCreated
             {
-                Id = hydrated.User.Id,
-                Username = hydrated.User.UserName!,
-                DisplayName = hydrated.User.DisplayName,
-                AvatarUrl = hydrated.User.AvatarUrl
-            }
-        });
+                ClientMessageId = clientMessageId,
+                ChannelId = channelId,
+                MessageId = hydrated.Id,
+                AuthorId = hydrated.UserId,
+                Content = hydrated.ContentText!,
+                CreatedAt = hydrated.CreatedAt,
+                Author = new DmAuthorSnapshot
+                {
+                    Id = hydrated.User.Id,
+                    Username = hydrated.User.UserName!,
+                    DisplayName = hydrated.User.DisplayName,
+                    AvatarUrl = hydrated.User.AvatarUrl
+                }
+            });
+        }
 
         return hydrated;
+    }
+
+    // ---------------------------------------------------------
+    // GET SINGLE MESSAGE
+    // ---------------------------------------------------------
+    public async Task<Message?> GetMessageAsync(Guid messageId)
+    {
+        return await _messages.GetMessageAsync(messageId);
     }
 
     // ---------------------------------------------------------

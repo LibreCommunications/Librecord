@@ -7,6 +7,8 @@ public interface IDirectMessageService
     // ---------------------------------------------------------
     // Reads
     // ---------------------------------------------------------
+    Task<Message?> GetMessageAsync(Guid messageId);
+
     Task<IReadOnlyList<Message>> GetMessagesAsync(
         Guid channelId,
         Guid userId,
@@ -21,7 +23,8 @@ public interface IDirectMessageService
         Guid userId,
         string content,
         string? clientMessageId = null,
-        bool hasAttachments = false);
+        bool hasAttachments = false,
+        bool skipNotification = false);
 
     Task<Message?> EditMessageAsync(
         Guid messageId,

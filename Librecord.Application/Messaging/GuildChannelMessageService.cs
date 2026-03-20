@@ -44,7 +44,8 @@ public class GuildChannelMessageService : IGuildChannelMessageService
         Guid userId,
         string content,
         string? clientMessageId = null,
-        bool hasAttachments = false)
+        bool hasAttachments = false,
+        bool skipNotification = false)
     {
         if (string.IsNullOrWhiteSpace(content) && !hasAttachments)
             throw new ArgumentException("Message content or attachments required.");
@@ -65,22 +66,25 @@ public class GuildChannelMessageService : IGuildChannelMessageService
 
         var hydrated = (await _guildMessages.GetMessageAsync(message.Id))!;
 
-        await _realtime.NotifyAsync(new GuildMessageCreated
+        if (!skipNotification)
         {
-            ClientMessageId = clientMessageId,
-            ChannelId = channelId,
-            MessageId = hydrated.Id,
-            AuthorId = hydrated.UserId,
-            Content = hydrated.ContentText!,
-            CreatedAt = hydrated.CreatedAt,
-            Author = new GuildAuthorSnapshot
+            await _realtime.NotifyAsync(new GuildMessageCreated
             {
-                Id = hydrated.User.Id,
-                Username = hydrated.User.UserName!,
-                DisplayName = hydrated.User.DisplayName,
-                AvatarUrl = hydrated.User.AvatarUrl
-            }
-        });
+                ClientMessageId = clientMessageId,
+                ChannelId = channelId,
+                MessageId = hydrated.Id,
+                AuthorId = hydrated.UserId,
+                Content = hydrated.ContentText!,
+                CreatedAt = hydrated.CreatedAt,
+                Author = new GuildAuthorSnapshot
+                {
+                    Id = hydrated.User.Id,
+                    Username = hydrated.User.UserName!,
+                    DisplayName = hydrated.User.DisplayName,
+                    AvatarUrl = hydrated.User.AvatarUrl
+                }
+            });
+        }
 
         return hydrated;
     }

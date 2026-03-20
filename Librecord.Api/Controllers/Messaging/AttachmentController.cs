@@ -2,6 +2,8 @@ using System.Security.Claims;
 using Librecord.Api.Dtos.Messages;
 using Librecord.Application.Messaging;
 using Librecord.Application.Permissions;
+using Librecord.Application.Realtime.DMs;
+using Librecord.Application.Realtime.Guild;
 using Librecord.Domain.Messaging.Common;
 using Librecord.Domain.Permissions;
 using Librecord.Domain.Storage;
@@ -19,17 +21,20 @@ public class GuildMessageWithAttachmentController : ControllerBase
     private readonly IGuildChannelMessageService _messages;
     private readonly IPermissionService _permissions;
     private readonly IAttachmentStorageService _storage;
+    private readonly IGuildRealtimeNotifier _realtime;
     private readonly LibrecordContext _db;
 
     public GuildMessageWithAttachmentController(
         IGuildChannelMessageService messages,
         IPermissionService permissions,
         IAttachmentStorageService storage,
+        IGuildRealtimeNotifier realtime,
         LibrecordContext db)
     {
         _messages = messages;
         _permissions = permissions;
         _storage = storage;
+        _realtime = realtime;
         _db = db;
     }
 
@@ -54,13 +59,14 @@ public class GuildMessageWithAttachmentController : ControllerBase
             UserId, channelId, ChannelPermission.SendMessages);
         if (!access.Allowed) return Forbid();
 
-        // Create message (content can be empty if only attachments)
+        // Create message — skip SignalR so we can notify after attachments are saved
         var message = await _messages.CreateMessageAsync(
             channelId,
             UserId,
             content?.Trim() ?? "",
             clientMessageId,
-            hasAttachments: files is { Count: > 0 });
+            hasAttachments: files is { Count: > 0 },
+            skipNotification: true);
 
         // Upload and attach files
         if (files != null)
@@ -91,12 +97,38 @@ public class GuildMessageWithAttachmentController : ControllerBase
             }
 
             await _db.SaveChangesAsync();
-
-            // Re-fetch to include attachments
-            message = (await _messages.GetMessageAsync(message.Id))!;
         }
 
-        return Ok(MessageDto.From(message));
+        // Re-fetch to include attachments
+        message = (await _messages.GetMessageAsync(message.Id))!;
+
+        // Notify after attachments are persisted
+        await _realtime.NotifyAsync(new GuildMessageCreated
+        {
+            ClientMessageId = clientMessageId,
+            ChannelId = channelId,
+            MessageId = message.Id,
+            AuthorId = message.UserId,
+            Content = message.ContentText ?? "",
+            CreatedAt = message.CreatedAt,
+            Author = new GuildAuthorSnapshot
+            {
+                Id = message.User.Id,
+                Username = message.User.UserName!,
+                DisplayName = message.User.DisplayName,
+                AvatarUrl = message.User.AvatarUrl
+            },
+            Attachments = message.Attachments.Select(a => new MessageAttachmentSnapshot
+            {
+                Id = a.Id,
+                FileName = a.FileName,
+                ContentType = a.ContentType,
+                Size = a.Size,
+                Url = a.Url
+            }).ToList()
+        });
+
+        return Ok(MessageDto.From(message, clientMessageId));
     }
 }
 
@@ -108,15 +140,18 @@ public class DmMessageWithAttachmentController : ControllerBase
 {
     private readonly IDirectMessageService _dms;
     private readonly IAttachmentStorageService _storage;
+    private readonly IDmRealtimeNotifier _realtime;
     private readonly LibrecordContext _db;
 
     public DmMessageWithAttachmentController(
         IDirectMessageService dms,
         IAttachmentStorageService storage,
+        IDmRealtimeNotifier realtime,
         LibrecordContext db)
     {
         _dms = dms;
         _storage = storage;
+        _realtime = realtime;
         _db = db;
     }
 
@@ -134,12 +169,14 @@ public class DmMessageWithAttachmentController : ControllerBase
         if (string.IsNullOrWhiteSpace(content) && (files == null || files.Count == 0))
             return BadRequest("Message content or attachments required.");
 
+        // Create message — skip SignalR so we can notify after attachments are saved
         var message = await _dms.SendMessageAsync(
             channelId,
             UserId,
             content?.Trim() ?? "",
             clientMessageId,
-            hasAttachments: files is { Count: > 0 });
+            hasAttachments: files is { Count: > 0 },
+            skipNotification: true);
 
         if (files != null)
         {
@@ -169,6 +206,35 @@ public class DmMessageWithAttachmentController : ControllerBase
             await _db.SaveChangesAsync();
         }
 
-        return Ok(MessageDto.From(message, clientMessageId));
+        // Re-fetch to include attachments
+        var hydrated = (await _dms.GetMessageAsync(message.Id))!;
+
+        // Notify after attachments are persisted
+        await _realtime.NotifyAsync(new DmMessageCreated
+        {
+            ClientMessageId = clientMessageId,
+            ChannelId = channelId,
+            MessageId = hydrated.Id,
+            AuthorId = hydrated.UserId,
+            Content = hydrated.ContentText ?? "",
+            CreatedAt = hydrated.CreatedAt,
+            Author = new DmAuthorSnapshot
+            {
+                Id = hydrated.User.Id,
+                Username = hydrated.User.UserName!,
+                DisplayName = hydrated.User.DisplayName,
+                AvatarUrl = hydrated.User.AvatarUrl
+            },
+            Attachments = hydrated.Attachments.Select(a => new MessageAttachmentSnapshot
+            {
+                Id = a.Id,
+                FileName = a.FileName,
+                ContentType = a.ContentType,
+                Size = a.Size,
+                Url = a.Url
+            }).ToList()
+        });
+
+        return Ok(MessageDto.From(hydrated, clientMessageId));
     }
 }
