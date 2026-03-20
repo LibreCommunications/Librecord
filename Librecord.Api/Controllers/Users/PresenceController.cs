@@ -37,20 +37,23 @@ public class PresenceController : ControllerBase
     [HttpPut]
     public async Task<IActionResult> SetStatus([FromBody] SetStatusRequest request)
     {
-        // Frontend sends "offline" for invisible
-        var statusStr = request.Status.Equals("offline", StringComparison.OrdinalIgnoreCase)
-            ? "Invisible"
-            : request.Status;
+        // Map frontend names to enum values
+        var status = request.Status.ToLowerInvariant() switch
+        {
+            "online" => UserStatus.Default,
+            "offline" => UserStatus.Invisible,
+            "idle" => UserStatus.Idle,
+            "donotdisturb" => UserStatus.DoNotDisturb,
+            _ => (UserStatus?)null
+        };
 
-        if (!Enum.TryParse<UserStatus>(statusStr, true, out var status))
+        if (status is null)
             return BadRequest("Invalid status.");
 
-        await _presence.SetStatusAsync(UserId, status);
+        await _presence.SetStatusAsync(UserId, status.Value);
 
         // Broadcast to DM channels — invisible users appear as "offline" to others
-        var broadcastStatus = status == UserStatus.Invisible
-            ? "offline"
-            : status.ToString().ToLowerInvariant();
+        var broadcastStatus = StatusToFrontend(status.Value, isForOthers: true);
 
         var channels = await _dmChannels.GetUserChannelsAsync(UserId);
         foreach (var channel in channels)
@@ -60,8 +63,7 @@ public class PresenceController : ControllerBase
                 .SendAsync("dm:user:presence", new { userId = UserId, status = broadcastStatus });
         }
 
-        var returnStatus = status == UserStatus.Invisible ? "offline" : status.ToString().ToLowerInvariant();
-        return Ok(new { status = returnStatus });
+        return Ok(new { status = StatusToFrontend(status.Value, isForOthers: false) });
     }
 
     // ---------------------------------------------------------
@@ -71,13 +73,7 @@ public class PresenceController : ControllerBase
     public async Task<IActionResult> GetMyPresence()
     {
         var presence = await _presence.GetPresenceAsync(UserId);
-
-        var status = presence?.Status switch
-        {
-            UserStatus.Invisible => "offline",
-            null => "online",
-            _ => presence.Status.ToString().ToLowerInvariant()
-        };
+        var status = StatusToFrontend(presence?.Status ?? UserStatus.Default, isForOthers: false);
         return Ok(new { status });
     }
 
@@ -94,11 +90,25 @@ public class PresenceController : ControllerBase
 
         var result = presences.ToDictionary(
             kv => kv.Key.ToString(),
-            kv => kv.Value == UserStatus.Invisible ? "offline" : kv.Value.ToString().ToLowerInvariant()
+            kv => StatusToFrontend(kv.Value, isForOthers: true)
         );
 
         return Ok(result);
     }
+
+    /// <summary>
+    /// Maps UserStatus to frontend string.
+    /// isForOthers: true = how others see this user; false = how the user sees their own status.
+    /// </summary>
+    private static string StatusToFrontend(UserStatus status, bool isForOthers) => status switch
+    {
+        UserStatus.Default => "online",
+        UserStatus.Idle => "idle",
+        UserStatus.DoNotDisturb => "donotdisturb",
+        UserStatus.Invisible when isForOthers => "offline",
+        UserStatus.Invisible => "offline", // user sees their own choice as "offline" (mapped to "Invisible" label)
+        _ => "online"
+    };
 }
 
 public class SetStatusRequest

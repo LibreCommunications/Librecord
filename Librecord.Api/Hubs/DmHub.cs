@@ -60,20 +60,24 @@ public class DmHub : Hub
                 group);
         }
 
-        // Set online presence (only if not invisible)
+        // Broadcast online presence (unless invisible)
         var currentPresence = await _presence.GetPresenceAsync(UserId);
         var isInvisible = currentPresence?.Status == Domain.Identity.UserStatus.Invisible;
 
         if (!isInvisible)
         {
-            await _presence.SetOnlineAsync(UserId);
+            var broadcastStatus = currentPresence?.Status switch
+            {
+                Domain.Identity.UserStatus.Idle => "idle",
+                Domain.Identity.UserStatus.DoNotDisturb => "donotdisturb",
+                _ => "online"
+            };
 
-            // Broadcast presence to all DM channels
             foreach (var channel in channels)
             {
                 await Clients.OthersInGroup(ChannelGroup(channel.Id)).SendAsync(
                     "dm:user:presence",
-                    new { userId = UserId, status = "online" });
+                    new { userId = UserId, status = broadcastStatus });
             }
         }
 
@@ -190,16 +194,12 @@ public class DmHub : Hub
                 UserId);
         }
 
-        // Only set offline and broadcast if user wasn't invisible
-        // Invisible users already have Status=Offline, so we leave it as-is
+        // Broadcast offline to others (invisible users already appear offline, no broadcast needed)
         var currentPresence = await _presence.GetPresenceAsync(UserId);
         var wasInvisible = currentPresence?.Status == Domain.Identity.UserStatus.Invisible;
 
         if (!wasInvisible)
         {
-            await _presence.SetOfflineAsync(UserId);
-
-            // Broadcast offline to DM channels
             var channels = await _channels.GetUserChannelsAsync(UserId);
             foreach (var channel in channels)
             {
