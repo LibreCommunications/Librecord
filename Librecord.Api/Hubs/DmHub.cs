@@ -12,15 +12,18 @@ public class DmHub : Hub
 {
     private readonly IDirectMessageChannelService _channels;
     private readonly IPresenceService _presence;
+    private readonly IConnectionTracker _connections;
     private readonly ILogger<DmHub> _logger;
 
     public DmHub(
         IDirectMessageChannelService channels,
         IPresenceService presence,
+        IConnectionTracker connections,
         ILogger<DmHub> logger)
     {
         _channels = channels;
         _presence = presence;
+        _connections = connections;
         _logger = logger;
     }
 
@@ -59,6 +62,8 @@ public class DmHub : Hub
                 Context.ConnectionId,
                 group);
         }
+
+        _connections.Connect(UserId);
 
         // Broadcast online presence (unless invisible)
         var currentPresence = await _presence.GetPresenceAsync(UserId);
@@ -194,18 +199,23 @@ public class DmHub : Hub
                 UserId);
         }
 
-        // Broadcast offline to others (invisible users already appear offline, no broadcast needed)
-        var currentPresence = await _presence.GetPresenceAsync(UserId);
-        var wasInvisible = currentPresence?.Status == Domain.Identity.UserStatus.Invisible;
+        _connections.Disconnect(UserId);
 
-        if (!wasInvisible)
+        // Only broadcast offline if user has no remaining connections and isn't invisible
+        if (!_connections.IsOnline(UserId))
         {
-            var channels = await _channels.GetUserChannelsAsync(UserId);
-            foreach (var channel in channels)
+            var currentPresence = await _presence.GetPresenceAsync(UserId);
+            var wasInvisible = currentPresence?.Status == Domain.Identity.UserStatus.Invisible;
+
+            if (!wasInvisible)
             {
-                await Clients.OthersInGroup(ChannelGroup(channel.Id)).SendAsync(
-                    "dm:user:presence",
-                    new { userId = UserId, status = "offline" });
+                var channels = await _channels.GetUserChannelsAsync(UserId);
+                foreach (var channel in channels)
+                {
+                    await Clients.OthersInGroup(ChannelGroup(channel.Id)).SendAsync(
+                        "dm:user:presence",
+                        new { userId = UserId, status = "offline" });
+                }
             }
         }
 

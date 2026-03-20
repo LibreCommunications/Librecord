@@ -15,15 +15,18 @@ namespace Librecord.Api.Controllers.Users;
 public class PresenceController : ControllerBase
 {
     private readonly IPresenceService _presence;
+    private readonly IConnectionTracker _connections;
     private readonly IDirectMessageChannelService _dmChannels;
     private readonly IHubContext<DmHub> _dmHub;
 
     public PresenceController(
         IPresenceService presence,
+        IConnectionTracker connections,
         IDirectMessageChannelService dmChannels,
         IHubContext<DmHub> dmHub)
     {
         _presence = presence;
+        _connections = connections;
         _dmChannels = dmChannels;
         _dmHub = dmHub;
     }
@@ -53,7 +56,7 @@ public class PresenceController : ControllerBase
         await _presence.SetStatusAsync(UserId, status.Value);
 
         // Broadcast to DM channels — invisible users appear as "offline" to others
-        var broadcastStatus = StatusToFrontend(status.Value, isForOthers: true);
+        var broadcastStatus = ResolveAppearance(status.Value, isConnected: true);
 
         var channels = await _dmChannels.GetUserChannelsAsync(UserId);
         foreach (var channel in channels)
@@ -63,7 +66,7 @@ public class PresenceController : ControllerBase
                 .SendAsync("dm:user:presence", new { userId = UserId, status = broadcastStatus });
         }
 
-        return Ok(new { status = StatusToFrontend(status.Value, isForOthers: false) });
+        return Ok(new { status = StatusToSelf(status.Value) });
     }
 
     // ---------------------------------------------------------
@@ -73,7 +76,7 @@ public class PresenceController : ControllerBase
     public async Task<IActionResult> GetMyPresence()
     {
         var presence = await _presence.GetPresenceAsync(UserId);
-        var status = StatusToFrontend(presence?.Status ?? UserStatus.Default, isForOthers: false);
+        var status = StatusToSelf(presence?.Status ?? UserStatus.Default);
         return Ok(new { status });
     }
 
@@ -87,26 +90,40 @@ public class PresenceController : ControllerBase
             return Ok(new { });
 
         var presences = await _presence.GetBulkPresenceAsync(request.UserIds);
+        var onlineUsers = _connections.GetOnlineUsers(request.UserIds);
 
-        var result = presences.ToDictionary(
-            kv => kv.Key.ToString(),
-            kv => StatusToFrontend(kv.Value, isForOthers: true)
-        );
+        var result = new Dictionary<string, string>();
+        foreach (var userId in request.UserIds)
+        {
+            var isConnected = onlineUsers.Contains(userId);
+            presences.TryGetValue(userId, out var storedStatus);
+            result[userId.ToString()] = ResolveAppearance(storedStatus, isConnected);
+        }
 
         return Ok(result);
     }
 
     /// <summary>
-    /// Maps UserStatus to frontend string.
-    /// isForOthers: true = how others see this user; false = how the user sees their own status.
+    /// Resolves what status to show to other users based on stored preference and connection state.
     /// </summary>
-    private static string StatusToFrontend(UserStatus status, bool isForOthers) => status switch
+    private static string ResolveAppearance(UserStatus storedStatus, bool isConnected) => storedStatus switch
+    {
+        UserStatus.Invisible => "offline",
+        UserStatus.Idle when isConnected => "idle",
+        UserStatus.DoNotDisturb when isConnected => "donotdisturb",
+        _ when isConnected => "online",
+        _ => "offline"
+    };
+
+    /// <summary>
+    /// Maps stored status to what the user sees as their own chosen status.
+    /// </summary>
+    private static string StatusToSelf(UserStatus status) => status switch
     {
         UserStatus.Default => "online",
         UserStatus.Idle => "idle",
         UserStatus.DoNotDisturb => "donotdisturb",
-        UserStatus.Invisible when isForOthers => "offline",
-        UserStatus.Invisible => "offline", // user sees their own choice as "offline" (mapped to "Invisible" label)
+        UserStatus.Invisible => "offline",
         _ => "online"
     };
 }
