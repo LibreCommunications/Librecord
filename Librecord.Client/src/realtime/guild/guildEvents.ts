@@ -1,6 +1,13 @@
 import type { Message } from "../../types/message";
 
 export interface GuildEventMap {
+    "guild:message:ping": {
+        channelId: string;
+        messageId: string;
+        authorId: string;
+        authorName: string;
+    };
+
     "guild:message:new": {
         message: Message;
         clientMessageId?: string;

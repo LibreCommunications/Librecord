@@ -1,6 +1,13 @@
 import type { Message } from "../../types/message";
 
 export interface DmEventMap {
+    "dm:message:ping": {
+        channelId: string;
+        messageId: string;
+        authorId: string;
+        authorName: string;
+    };
+
     "dm:message:new": {
         message: Message;
         clientMessageId?: string;

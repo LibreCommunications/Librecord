@@ -14,6 +14,7 @@ export function registerDmListeners() {
     /* ------------------------------------------------------------------ */
     /* CLEAN UP (important for StrictMode & reconnects)                    */
     /* ------------------------------------------------------------------ */
+    dmConnection.off("dm:message:ping");
     dmConnection.off("dm:message:new");
     dmConnection.off("dm:message:edited");
     dmConnection.off("dm:message:deleted");
@@ -23,7 +24,17 @@ export function registerDmListeners() {
     dmConnection.off("dm:readstate:updated");
 
     /* ------------------------------------------------------------------ */
-    /* MESSAGE CREATED                                                     */
+    /* MESSAGE PING (lightweight — for unread badges + notifications)      */
+    /* ------------------------------------------------------------------ */
+    dmConnection.on(
+        "dm:message:ping",
+        (payload: { channelId: string; messageId: string; authorId: string; authorName: string }) => {
+            dispatchDmEvent("dm:message:ping", payload);
+        }
+    );
+
+    /* ------------------------------------------------------------------ */
+    /* MESSAGE CREATED (full payload — consumed by active channel view)    */
     /* ------------------------------------------------------------------ */
     dmConnection.on(
         "dm:message:new",

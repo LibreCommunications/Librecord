@@ -21,17 +21,30 @@ public sealed class SignalRGuildRealtimeNotifier : IGuildRealtimeNotifier
         return evt switch
         {
             GuildMessageCreated created =>
-                _hub.Clients.Group(group).SendAsync(
-                    "guild:message:new",
-                    new GuildRealtimeMessageCreatedTransport
-                    {
-                        ChannelId = created.ChannelId,
-                        MessageId = created.MessageId,
-                        Content = created.Content,
-                        CreatedAt = created.CreatedAt,
-                        Author = created.Author,
-                        ClientMessageId = created.ClientMessageId
-                    }),
+                Task.WhenAll(
+                    // Lightweight ping for unread badges + notifications
+                    _hub.Clients.Group(group).SendAsync(
+                        "guild:message:ping",
+                        new
+                        {
+                            channelId = created.ChannelId,
+                            messageId = created.MessageId,
+                            authorId = created.AuthorId,
+                            authorName = created.Author.DisplayName,
+                        }),
+                    // Full payload for active channel view
+                    _hub.Clients.Group(group).SendAsync(
+                        "guild:message:new",
+                        new GuildRealtimeMessageCreatedTransport
+                        {
+                            ChannelId = created.ChannelId,
+                            MessageId = created.MessageId,
+                            Content = created.Content,
+                            CreatedAt = created.CreatedAt,
+                            Author = created.Author,
+                            ClientMessageId = created.ClientMessageId
+                        })
+                ),
 
             GuildMessageEdited edited =>
                 _hub.Clients.Group(group).SendAsync(
