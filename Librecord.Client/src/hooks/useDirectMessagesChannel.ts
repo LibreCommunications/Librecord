@@ -16,6 +16,7 @@ export interface DmUser {
 export interface DmChannel {
     id: string;
     name?: string | null;
+    isGroup: boolean;
     members: DmUser[];
 }
 
@@ -84,11 +85,28 @@ export function useDirectMessagesChannel() {
         return res.ok;
     }
 
+    async function createGroup(memberIds: string[]): Promise<string | null> {
+        const res = await fetchWithAuth(
+            `${API_URL}/dms/group`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ memberIds }),
+            },
+            auth
+        );
+
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.channelId;
+    }
+
     return {
         getMyDms,
         startDm,
         getDmChannel,
         addParticipant,
         leaveChannel,
+        createGroup,
     };
 }

@@ -1,4 +1,4 @@
-import { Link, useParams, useLocation } from "react-router-dom";
+import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
     useDirectMessagesChannel,
@@ -11,13 +11,15 @@ import { UnreadBadge } from "../ui/UnreadBadge";
 import { StatusDot } from "../user/StatusDot";
 import { fetchWithAuth } from "../../api/fetchWithAuth";
 import type { DmEventMap } from "../../realtime/dm/dmEvents";
+import { CreateGroupModal } from "../dm/CreateGroupModal";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 export default function DmSidebar() {
     const { dmId } = useParams();
     const location = useLocation();
-    const { getMyDms } = useDirectMessagesChannel();
+    const navigate = useNavigate();
+    const { getMyDms, leaveChannel } = useDirectMessagesChannel();
     const auth = useAuth();
     const { user } = auth;
     const { getAvatarUrl } = useUserProfile();
@@ -26,6 +28,8 @@ export default function DmSidebar() {
     const [dms, setDms] = useState<DmChannel[]>([]);
     const [unreads, setUnreads] = useState<Record<string, number>>({});
     const [presenceMap, setPresenceMap] = useState<Record<string, string>>({});
+    const [showCreateGroup, setShowCreateGroup] = useState(false);
+    const [leaveConfirmId, setLeaveConfirmId] = useState<string | null>(null);
 
     const isFriendsPage = location.pathname.startsWith("/app/dm/friends");
 
@@ -106,10 +110,20 @@ export default function DmSidebar() {
     }, [dmId]);
 
     return (
+        <>
         <aside className="w-60 bg-[#2b2d31] p-2 border-r border-black/20 flex-1">
-            <h2 className="text-[#949ba4] uppercase text-[11px] font-bold tracking-wide px-2 mb-2">
-                Direct Messages
-            </h2>
+            <div className="flex items-center justify-between px-2 mb-2">
+                <h2 className="text-[#949ba4] uppercase text-[11px] font-bold tracking-wide">
+                    Direct Messages
+                </h2>
+                <button
+                    onClick={() => setShowCreateGroup(true)}
+                    className="text-[#949ba4] hover:text-[#dbdee1] text-base leading-none"
+                    title="Create Group DM"
+                >
+                    +
+                </button>
+            </div>
 
             <Link to="/app/dm/friends/list">
                 <div
@@ -142,38 +156,103 @@ export default function DmSidebar() {
                     const otherStatus = showAvatar ? (presenceMap[others[0].id] ?? "offline") : undefined;
 
                     return (
-                        <Link key={dm.id} to={`/app/dm/${dm.id}`}>
-                            <div
-                                className={`
-                                    flex items-center gap-2.5 px-2.5 py-1.5 rounded cursor-pointer transition-colors
-                                    hover:bg-[#35373c]
-                                    ${dmId === dm.id ? "bg-[#404249] text-white" : "text-[#949ba4] hover:text-[#dbdee1]"}
-                                    ${unreadCount > 0 && dmId !== dm.id ? "font-semibold text-white" : ""}
-                                `}
-                            >
-                                {showAvatar && (
-                                    <div className="relative shrink-0">
-                                        <img
-                                            src={avatar}
-                                            className="w-8 h-8 rounded-full object-cover"
-                                            alt=""
-                                        />
-                                        <span className="absolute -bottom-0.5 -right-0.5">
-                                            <StatusDot status={otherStatus ?? "offline"} />
-                                        </span>
-                                    </div>
-                                )}
+                        <div key={dm.id} className="group relative">
+                            <Link to={`/app/dm/${dm.id}`}>
+                                <div
+                                    className={`
+                                        flex items-center gap-2.5 px-2.5 py-1.5 rounded cursor-pointer transition-colors
+                                        hover:bg-[#35373c]
+                                        ${dmId === dm.id ? "bg-[#404249] text-white" : "text-[#949ba4] hover:text-[#dbdee1]"}
+                                        ${unreadCount > 0 && dmId !== dm.id ? "font-semibold text-white" : ""}
+                                    `}
+                                >
+                                    {showAvatar && (
+                                        <div className="relative shrink-0">
+                                            <img
+                                                src={avatar}
+                                                className="w-8 h-8 rounded-full object-cover"
+                                                alt=""
+                                            />
+                                            <span className="absolute -bottom-0.5 -right-0.5">
+                                                <StatusDot status={otherStatus ?? "offline"} />
+                                            </span>
+                                        </div>
+                                    )}
 
-                                <span className="truncate flex-1 text-sm">{name}</span>
+                                    <span className="truncate flex-1 text-sm">{name}</span>
 
-                                {unreadCount > 0 && dmId !== dm.id && (
-                                    <UnreadBadge count={unreadCount} />
-                                )}
-                            </div>
-                        </Link>
+                                    {unreadCount > 0 && dmId !== dm.id && (
+                                        <UnreadBadge count={unreadCount} />
+                                    )}
+                                </div>
+                            </Link>
+                            {dm.isGroup && (
+                                <button
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setLeaveConfirmId(dm.id);
+                                    }}
+                                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-[#949ba4] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                    title="Leave group"
+                                >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18" />
+                                        <line x1="6" y1="6" x2="18" y2="18" />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
                     );
                 })}
             </div>
         </aside>
+
+        {leaveConfirmId && (() => {
+            const leaveDm = dms.find(d => d.id === leaveConfirmId);
+            const isLast = leaveDm && leaveDm.members.length <= 1;
+            return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setLeaveConfirmId(null)}>
+                <div className="bg-[#313338] rounded-lg w-[400px] p-5" onClick={e => e.stopPropagation()}>
+                    <h3 className="text-white text-lg font-semibold mb-2">Leave Group</h3>
+                    <p className="text-[#949ba4] text-sm mb-5">
+                        {isLast
+                            ? "You are the last member. Leaving will permanently delete this group and all its messages and attachments."
+                            : "Are you sure you want to leave this group? You won't be able to rejoin unless someone adds you back."}
+                    </p>
+                    <div className="flex justify-end gap-3">
+                        <button onClick={() => setLeaveConfirmId(null)} className="px-4 py-2 text-sm text-[#dbdee1] hover:underline">
+                            Cancel
+                        </button>
+                        <button
+                            onClick={async () => {
+                                if (await leaveChannel(leaveConfirmId)) {
+                                    setDms(prev => prev.filter(d => d.id !== leaveConfirmId));
+                                    if (dmId === leaveConfirmId) navigate("/app/dm");
+                                }
+                                setLeaveConfirmId(null);
+                            }}
+                            className="px-4 py-2 text-sm bg-[#da373c] text-white rounded hover:bg-[#a12828] transition-colors"
+                        >
+                            Leave Group
+                        </button>
+                    </div>
+                </div>
+            </div>
+            );
+        })()}
+
+        {showCreateGroup && (
+            <CreateGroupModal
+                onClose={() => setShowCreateGroup(false)}
+                onCreated={(channelId) => {
+                    setShowCreateGroup(false);
+                    navigate(`/app/dm/${channelId}`);
+                    // Refresh DM list
+                    getMyDms().then(setDms);
+                }}
+            />
+        )}
+        </>
     );
 }

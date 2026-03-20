@@ -13,17 +13,20 @@ public class GuildHub : Hub
     private readonly IGuildService _guilds;
     private readonly IPresenceService _presence;
     private readonly IVoiceService _voice;
+    private readonly IConnectionTracker _connections;
     private readonly ILogger<GuildHub> _logger;
 
     public GuildHub(
         IGuildService guilds,
         IPresenceService presence,
         IVoiceService voice,
+        IConnectionTracker connections,
         ILogger<GuildHub> logger)
     {
         _guilds = guilds;
         _presence = presence;
         _voice = voice;
+        _connections = connections;
         _logger = logger;
     }
 
@@ -66,14 +69,27 @@ public class GuildHub : Hub
             UserId,
             guilds.Count);
 
-        // Broadcast online presence to all guild channels
-        foreach (var guild in guilds)
+        // Broadcast presence to all guild channels (unless invisible)
+        var currentPresence = await _presence.GetPresenceAsync(UserId);
+        var isInvisible = currentPresence?.Status == Domain.Identity.UserStatus.Invisible;
+
+        if (!isInvisible)
         {
-            foreach (var channel in guild.Channels)
+            var broadcastStatus = currentPresence?.Status switch
             {
-                await Clients.OthersInGroup(ChannelGroup(channel.Id)).SendAsync(
-                    "guild:user:presence",
-                    new { userId = UserId, status = "online" });
+                Domain.Identity.UserStatus.Idle => "idle",
+                Domain.Identity.UserStatus.DoNotDisturb => "donotdisturb",
+                _ => "online"
+            };
+
+            foreach (var guild in guilds)
+            {
+                foreach (var channel in guild.Channels)
+                {
+                    await Clients.OthersInGroup(ChannelGroup(channel.Id)).SendAsync(
+                        "guild:user:presence",
+                        new { userId = UserId, status = broadcastStatus });
+                }
             }
         }
 
@@ -224,14 +240,24 @@ public class GuildHub : Hub
                 UserId);
         }
 
-        var guilds = await _guilds.GetGuildsForUserAsync(UserId);
-        foreach (var guild in guilds)
+        // Only broadcast offline if no remaining connections and not invisible
+        if (!_connections.IsOnline(UserId))
         {
-            foreach (var channel in guild.Channels)
+            var currentPresence = await _presence.GetPresenceAsync(UserId);
+            var wasInvisible = currentPresence?.Status == Domain.Identity.UserStatus.Invisible;
+
+            if (!wasInvisible)
             {
-                await Clients.OthersInGroup(ChannelGroup(channel.Id)).SendAsync(
-                    "guild:user:presence",
-                    new { userId = UserId, status = "offline" });
+                var guilds = await _guilds.GetGuildsForUserAsync(UserId);
+                foreach (var guild in guilds)
+                {
+                    foreach (var channel in guild.Channels)
+                    {
+                        await Clients.OthersInGroup(ChannelGroup(channel.Id)).SendAsync(
+                            "guild:user:presence",
+                            new { userId = UserId, status = "offline" });
+                    }
+                }
             }
         }
 

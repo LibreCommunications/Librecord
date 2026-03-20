@@ -7,7 +7,7 @@ public class UserPresence
     public Guid UserId { get; set; }
 
     public string Activity { get; set; } = "";
-    public UserStatus Status { get; set; } = UserStatus.Online;
+    public UserStatus Status { get; set; } = UserStatus.Default;
 
     public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
 

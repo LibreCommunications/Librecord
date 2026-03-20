@@ -15,15 +15,18 @@ namespace Librecord.Api.Controllers.Users;
 public class PresenceController : ControllerBase
 {
     private readonly IPresenceService _presence;
+    private readonly IConnectionTracker _connections;
     private readonly IDirectMessageChannelService _dmChannels;
     private readonly IHubContext<DmHub> _dmHub;
 
     public PresenceController(
         IPresenceService presence,
+        IConnectionTracker connections,
         IDirectMessageChannelService dmChannels,
         IHubContext<DmHub> dmHub)
     {
         _presence = presence;
+        _connections = connections;
         _dmChannels = dmChannels;
         _dmHub = dmHub;
     }
@@ -37,15 +40,23 @@ public class PresenceController : ControllerBase
     [HttpPut]
     public async Task<IActionResult> SetStatus([FromBody] SetStatusRequest request)
     {
-        if (!Enum.TryParse<UserStatus>(request.Status, true, out var status))
+        // Map frontend names to enum values
+        var status = request.Status.ToLowerInvariant() switch
+        {
+            "online" => UserStatus.Default,
+            "offline" => UserStatus.Invisible,
+            "idle" => UserStatus.Idle,
+            "donotdisturb" => UserStatus.DoNotDisturb,
+            _ => (UserStatus?)null
+        };
+
+        if (status is null)
             return BadRequest("Invalid status.");
 
-        await _presence.SetStatusAsync(UserId, status);
+        await _presence.SetStatusAsync(UserId, status.Value);
 
         // Broadcast to DM channels — invisible users appear as "offline" to others
-        var broadcastStatus = status == UserStatus.Offline
-            ? "offline"
-            : status.ToString().ToLowerInvariant();
+        var broadcastStatus = ResolveAppearance(status.Value, isConnected: true);
 
         var channels = await _dmChannels.GetUserChannelsAsync(UserId);
         foreach (var channel in channels)
@@ -55,7 +66,7 @@ public class PresenceController : ControllerBase
                 .SendAsync("dm:user:presence", new { userId = UserId, status = broadcastStatus });
         }
 
-        return Ok(new { status = status.ToString().ToLowerInvariant() });
+        return Ok(new { status = StatusToSelf(status.Value) });
     }
 
     // ---------------------------------------------------------
@@ -65,11 +76,8 @@ public class PresenceController : ControllerBase
     public async Task<IActionResult> GetMyPresence()
     {
         var presence = await _presence.GetPresenceAsync(UserId);
-
-        return Ok(new
-        {
-            status = presence?.Status.ToString().ToLowerInvariant() ?? "offline"
-        });
+        var status = StatusToSelf(presence?.Status ?? UserStatus.Default);
+        return Ok(new { status });
     }
 
     // ---------------------------------------------------------
@@ -82,14 +90,42 @@ public class PresenceController : ControllerBase
             return Ok(new { });
 
         var presences = await _presence.GetBulkPresenceAsync(request.UserIds);
+        var onlineUsers = _connections.GetOnlineUsers(request.UserIds);
 
-        var result = presences.ToDictionary(
-            kv => kv.Key.ToString(),
-            kv => kv.Value.ToString().ToLowerInvariant()
-        );
+        var result = new Dictionary<string, string>();
+        foreach (var userId in request.UserIds)
+        {
+            var isConnected = onlineUsers.Contains(userId);
+            presences.TryGetValue(userId, out var storedStatus);
+            result[userId.ToString()] = ResolveAppearance(storedStatus, isConnected);
+        }
 
         return Ok(result);
     }
+
+    /// <summary>
+    /// Resolves what status to show to other users based on stored preference and connection state.
+    /// </summary>
+    private static string ResolveAppearance(UserStatus storedStatus, bool isConnected) => storedStatus switch
+    {
+        UserStatus.Invisible => "offline",
+        UserStatus.Idle when isConnected => "idle",
+        UserStatus.DoNotDisturb when isConnected => "donotdisturb",
+        _ when isConnected => "online",
+        _ => "offline"
+    };
+
+    /// <summary>
+    /// Maps stored status to what the user sees as their own chosen status.
+    /// </summary>
+    private static string StatusToSelf(UserStatus status) => status switch
+    {
+        UserStatus.Default => "online",
+        UserStatus.Idle => "idle",
+        UserStatus.DoNotDisturb => "donotdisturb",
+        UserStatus.Invisible => "offline",
+        _ => "online"
+    };
 }
 
 public class SetStatusRequest

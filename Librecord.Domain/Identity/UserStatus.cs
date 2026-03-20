@@ -2,8 +2,8 @@
 
 public enum UserStatus
 {
-    Online,
+    Default,
     Idle,
     DoNotDisturb,
-    Offline
+    Invisible
 }

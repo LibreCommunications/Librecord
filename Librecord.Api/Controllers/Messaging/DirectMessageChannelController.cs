@@ -44,6 +44,7 @@ public class DirectMessageChannelController : ControllerBase
             {
                 id = c.Id,
                 name,
+                isGroup = c.IsGroup,
                 members = c.Members.Select(m => new
                 {
                     id = m.UserId,
@@ -83,6 +84,7 @@ public class DirectMessageChannelController : ControllerBase
         {
             id = channel.Id,
             name,
+            isGroup = channel.IsGroup,
             members = channel.Members.Select(m => new
             {
                 id = m.UserId,
@@ -109,6 +111,24 @@ public class DirectMessageChannelController : ControllerBase
     }
 
     // ---------------------------------------------------------
+    // CREATE GROUP DM
+    // ---------------------------------------------------------
+    [HttpPost("group")]
+    public async Task<IActionResult> CreateGroup([FromBody] CreateGroupRequest request)
+    {
+        if (request.MemberIds == null || request.MemberIds.Count == 0)
+            return BadRequest("At least one member is required.");
+
+        var channel = await _dms.CreateGroupAsync(UserId, request.MemberIds);
+
+        return Ok(new
+        {
+            channelId = channel.Id,
+            isGroup = true
+        });
+    }
+
+    // ---------------------------------------------------------
     // ADD PARTICIPANT
     // ---------------------------------------------------------
     [HttpPost("{channelId:guid}/participants/{userId:guid}")]
@@ -130,4 +150,9 @@ public class DirectMessageChannelController : ControllerBase
         await _dms.LeaveChannelAsync(channelId, UserId);
         return Ok();
     }
+}
+
+public class CreateGroupRequest
+{
+    public List<Guid> MemberIds { get; set; } = [];
 }
