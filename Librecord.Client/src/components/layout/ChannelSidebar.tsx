@@ -114,21 +114,21 @@ export default function ChannelSidebar({ guildId }: Props) {
         };
     }, []);
 
-    // Increment unread when a new guild message arrives for a non-active channel
+    // Increment unread when a message ping arrives for a non-active channel
     useEffect(() => {
-        const onNewMessage = (e: CustomEvent<GuildEventMap["guild:message:new"]>) => {
-            const { message } = e.detail;
-            if (message.channelId === channelId) return;
-            if (message.author.id === user?.userId) return;
+        const onPing = (e: CustomEvent<GuildEventMap["guild:message:ping"]>) => {
+            const { channelId: pingChannel, authorId } = e.detail;
+            if (pingChannel === channelId) return;
+            if (authorId === user?.userId) return;
 
             setUnreads(prev => ({
                 ...prev,
-                [message.channelId]: (prev[message.channelId] ?? 0) + 1,
+                [pingChannel]: (prev[pingChannel] ?? 0) + 1,
             }));
         };
 
-        window.addEventListener("guild:message:new", onNewMessage as EventListener);
-        return () => window.removeEventListener("guild:message:new", onNewMessage as EventListener);
+        window.addEventListener("guild:message:ping", onPing as EventListener);
+        return () => window.removeEventListener("guild:message:ping", onPing as EventListener);
     }, [channelId, user?.userId]);
 
     // Clear unread when navigating into a channel

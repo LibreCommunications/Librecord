@@ -3,51 +3,62 @@ import { dmConnection } from "./dm/dmConnection";
 import { registerDmListeners } from "./dm/dmListeners";
 import { guildConnection } from "./guild/guildConnection";
 import { registerGuildListeners } from "./guild/guildListeners";
-import { initNotifications } from "./notifications";
+import { initNotifications, cleanupNotifications } from "./notifications";
+import { resetVoiceState } from "../voice/voiceStore";
+import * as livekitClient from "../voice/livekitClient";
 import { useAuth } from "../context/AuthContext";
 
-/**
- * Global realtime bootstrap
- *
- * Mounted ONCE for the entire app.
- * Handles:
- *  - DM realtime
- *  - Guild realtime
- *  - Browser notifications + sound
- */
+// Module-level flag — survives React StrictMode double-mount
+let started = false;
+
 export function RealtimeRoot() {
-    const started = useRef(false);
     const { user } = useAuth();
+    const userIdRef = useRef<string | null>(null);
 
+    // Start connections once when user is available
     useEffect(() => {
-        if (started.current) return;
-        started.current = true;
+        if (!user?.userId || started) return;
+        started = true;
+        userIdRef.current = user.userId;
 
-        // Initialize browser notifications
-        if (user?.userId) {
-            initNotifications(user.userId);
-        }
+        initNotifications(user.userId);
 
-        dmConnection
-            .start()
-            .then(() => {
+        Promise.all([
+            dmConnection.start().then(() => {
                 console.log("[Realtime] DM connected");
                 registerDmListeners();
-            })
-            .catch(err => {
-                console.error("[Realtime] DM connection failed", err);
-            });
+            }).catch(err => console.error("[Realtime] DM connection failed", err)),
 
-        guildConnection
-            .start()
-            .then(() => {
+            guildConnection.start().then(() => {
                 console.log("[Realtime] Guild connected");
                 registerGuildListeners();
-            })
-            .catch(err => {
-                console.error("[Realtime] Guild connection failed", err);
-            });
-    }, []);
+            }).catch(err => console.error("[Realtime] Guild connection failed", err)),
+        ]).then(() => {
+            (window as any).__realtimeReady = true;
+            window.dispatchEvent(new Event("realtime:ready"));
+        });
+    });
+
+    // Detect logout — user was set, now null
+    useEffect(() => {
+        if (user?.userId) {
+            userIdRef.current = user.userId;
+            return;
+        }
+        if (!user && userIdRef.current) {
+            // User logged out
+            userIdRef.current = null;
+            started = false;
+            (window as any).__realtimeReady = false;
+
+            cleanupNotifications();
+            livekitClient.disconnect().catch(() => {});
+            resetVoiceState();
+            dmConnection.stop().catch(() => {});
+            guildConnection.stop().catch(() => {});
+            console.log("[Realtime] Connections stopped (logout)");
+        }
+    }, [user]);
 
     return null;
 }

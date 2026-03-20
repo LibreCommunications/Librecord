@@ -211,12 +211,16 @@ export default function DmConversationPage() {
 
     useEffect(() => {
         if (!dmId) return;
+        let stale = false;
 
         setLoading(true);
+        setMessages([]);
+        setChannel(null);
+        setChannelName(null);
 
         Promise.all([getDmChannel(dmId), getChannelMessages(dmId)])
             .then(([channel, msgs]) => {
-                if (!channel) return;
+                if (stale || !channel) return;
 
                 setChannel(channel);
 
@@ -238,7 +242,9 @@ export default function DmConversationPage() {
                     markAsRead(dmId, reversed[reversed.length - 1].id);
                 }
             })
-            .finally(() => setLoading(false));
+            .finally(() => { if (!stale) setLoading(false); });
+
+        return () => { stale = true; };
     }, [dmId]);
 
     /* ------------------------------------------------------------------ */

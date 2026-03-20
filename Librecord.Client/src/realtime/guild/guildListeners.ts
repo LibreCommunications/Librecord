@@ -16,6 +16,7 @@ import type { GuildEventMap } from "./guildEvents";
 export function registerGuildListeners() {
     console.log("[Guild] registering guild listeners");
 
+    guildConnection.off("guild:message:ping");
     guildConnection.off("guild:message:new");
     guildConnection.off("guild:message:edited");
     guildConnection.off("guild:message:deleted");
@@ -27,6 +28,19 @@ export function registerGuildListeners() {
     guildConnection.off("voice:user:left");
     guildConnection.off("voice:user:state");
 
+    /* ------------------------------------------------------------------ */
+    /* MESSAGE PING (lightweight — for unread badges + notifications)      */
+    /* ------------------------------------------------------------------ */
+    guildConnection.on(
+        "guild:message:ping",
+        (payload: { channelId: string; messageId: string; authorId: string; authorName: string }) => {
+            dispatchGuildEvent("guild:message:ping", payload);
+        }
+    );
+
+    /* ------------------------------------------------------------------ */
+    /* MESSAGE CREATED (full payload — consumed by active channel view)    */
+    /* ------------------------------------------------------------------ */
     guildConnection.on(
         "guild:message:new",
         (payload: GuildRealtimeMessageTransport) => {

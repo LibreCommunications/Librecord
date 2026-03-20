@@ -1,17 +1,21 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useGuilds, type GuildSummary } from "../../hooks/useGuilds";
+import { useChannels } from "../../hooks/useChannels";
 import CreateGuildModal from "../../pages/guild/CreateGuildModal";
 import { JoinGuildModal } from "../../components/guild/JoinGuildModal";
 import { StatusDot } from "../../components/user/StatusDot";
 import { usePresence } from "../../context/PresenceContext";
+import type { GuildEventMap } from "../../realtime/guild/guildEvents";
+import type { DmEventMap } from "../../realtime/dm/dmEvents";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 function SidebarIcon({
     children,
     active,
+    unread,
     tooltip,
     className = "",
     onClick,
@@ -19,6 +23,7 @@ function SidebarIcon({
 }: {
     children: React.ReactNode;
     active?: boolean;
+    unread?: boolean;
     tooltip?: string;
     className?: string;
     onClick?: () => void;
@@ -26,24 +31,27 @@ function SidebarIcon({
 }) {
     const inner = (
         <div className="relative group flex items-center">
-            {/* Active indicator pill */}
+            {/* Active / unread indicator pill */}
             <span
                 className={`
                     absolute -left-3 w-1 rounded-r-full bg-white transition-all
-                    ${active ? "h-10" : "h-0 group-hover:h-5"}
+                    ${active ? "h-10" : unread ? "h-2" : "h-0 group-hover:h-5"}
                 `}
             />
 
             <div
                 onClick={onClick}
                 className={`
-                    w-12 h-12 flex items-center justify-center
+                    w-12 h-12 flex items-center justify-center relative
                     transition-all duration-200 cursor-pointer
                     ${active ? "rounded-2xl" : "rounded-full hover:rounded-2xl"}
                     ${className}
                 `}
             >
                 {children}
+                {unread && !active && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-[#f23f43] rounded-full border-2 border-[#1e1f22]" />
+                )}
             </div>
 
             {/* Tooltip */}
@@ -65,16 +73,76 @@ export default function GlobalSidebar() {
     const navigate = useNavigate();
     const { guildId } = useParams();
 
+    const location = useLocation();
+    const { getGuildChannels } = useChannels();
+
     const [guilds, setGuilds] = useState<GuildSummary[]>([]);
     const [showCreate, setShowCreate] = useState(false);
     const [showJoin, setShowJoin] = useState(false);
     const { myStatus } = usePresence();
 
+    // Unread tracking
+    const [guildUnreads, setGuildUnreads] = useState<Record<string, number>>({});
+    const [dmUnread, setDmUnread] = useState(false);
+    const channelToGuildRef = useRef<Record<string, string>>({});
+
     const isDmPage = !guildId && location.pathname.startsWith("/app/dm");
 
     useEffect(() => {
-        getGuilds().then(setGuilds);
+        getGuilds().then(async (list) => {
+            setGuilds(list);
+            // Build channelId → guildId map
+            const map: Record<string, string> = {};
+            for (const g of list) {
+                const channels = await getGuildChannels(g.id);
+                for (const ch of channels) map[ch.id] = g.id;
+            }
+            channelToGuildRef.current = map;
+        });
     }, []);
+
+    // Listen for guild message pings → increment guild unread
+    useEffect(() => {
+        const onGuildPing = (e: CustomEvent<GuildEventMap["guild:message:ping"]>) => {
+            const { channelId: pingCh, authorId } = e.detail;
+            if (authorId === user?.userId) return;
+            const pingGuildId = channelToGuildRef.current[pingCh];
+            if (!pingGuildId) return;
+            // Don't count if we're currently viewing this guild
+            if (guildId === pingGuildId) return;
+            setGuildUnreads(prev => ({ ...prev, [pingGuildId]: (prev[pingGuildId] ?? 0) + 1 }));
+        };
+        window.addEventListener("guild:message:ping", onGuildPing as EventListener);
+        return () => window.removeEventListener("guild:message:ping", onGuildPing as EventListener);
+    }, [guildId, user?.userId]);
+
+    // Listen for DM pings → set DM unread
+    useEffect(() => {
+        const onDmPing = (e: CustomEvent<DmEventMap["dm:message:ping"]>) => {
+            if (e.detail.authorId === user?.userId) return;
+            if (isDmPage) return;
+            setDmUnread(true);
+        };
+        window.addEventListener("dm:message:ping", onDmPing as EventListener);
+        return () => window.removeEventListener("dm:message:ping", onDmPing as EventListener);
+    }, [isDmPage, user?.userId]);
+
+    // Clear guild unread when navigating into that guild
+    useEffect(() => {
+        if (guildId) {
+            setGuildUnreads(prev => {
+                if (!prev[guildId]) return prev;
+                const next = { ...prev };
+                delete next[guildId];
+                return next;
+            });
+        }
+    }, [guildId]);
+
+    // Clear DM unread when navigating to DMs
+    useEffect(() => {
+        if (isDmPage) setDmUnread(false);
+    }, [isDmPage]);
 
     const avatarSrc =
         user?.avatarUrl
@@ -95,7 +163,7 @@ export default function GlobalSidebar() {
             <aside className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 gap-2 overflow-y-auto dark-scrollbar">
 
                 {/* DM */}
-                <SidebarIcon to="/app/dm" active={isDmPage} tooltip="Direct Messages" className="bg-[#313338] hover:bg-[#5865F2] text-white">
+                <SidebarIcon to="/app/dm" active={isDmPage} unread={dmUnread} tooltip="Direct Messages" className="bg-[#313338] hover:bg-[#5865F2] text-white">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                     </svg>
@@ -110,6 +178,7 @@ export default function GlobalSidebar() {
                         key={g.id}
                         to={`/app/guild/${g.id}`}
                         active={guildId === g.id}
+                        unread={(guildUnreads[g.id] ?? 0) > 0}
                         tooltip={g.name}
                         className="bg-[#313338] hover:bg-[#5865F2] text-white"
                     >

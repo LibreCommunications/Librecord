@@ -22,30 +22,43 @@ public sealed class SignalRDmRealtimeNotifier : IDmRealtimeNotifier
         return evt switch
         {
             DmMessageCreated created =>
-                _hub.Clients.Group(group).SendAsync(
-                    "dm:message:new",
-                    new DmRealtimeMessageCreatedTransport
-                    {
-                        ChannelId = created.ChannelId,
-                        MessageId = created.MessageId,
-                        Content = created.Content,
-                        CreatedAt = created.CreatedAt,
-                        Author = created.Author,
+                Task.WhenAll(
+                    // Lightweight ping for unread badges + notifications
+                    _hub.Clients.Group(group).SendAsync(
+                        "dm:message:ping",
+                        new
+                        {
+                            channelId = created.ChannelId,
+                            messageId = created.MessageId,
+                            authorId = created.AuthorId,
+                            authorName = created.Author.DisplayName,
+                        }),
+                    // Full payload for active channel view
+                    _hub.Clients.Group(group).SendAsync(
+                        "dm:message:new",
+                        new DmRealtimeMessageCreatedTransport
+                        {
+                            ChannelId = created.ChannelId,
+                            MessageId = created.MessageId,
+                            Content = created.Content,
+                            CreatedAt = created.CreatedAt,
+                            Author = created.Author,
 
-                        Attachments = created.Attachments
-                            .Select(MessageAttachmentDto.From)
-                            .ToList(),
+                            Attachments = created.Attachments
+                                .Select(MessageAttachmentDto.From)
+                                .ToList(),
 
-                        Reactions = created.Reactions
-                            .Select(MessageReactionDto.From)
-                            .ToList(),
+                            Reactions = created.Reactions
+                                .Select(MessageReactionDto.From)
+                                .ToList(),
 
-                        Edits = created.Edits
-                            .Select(MessageEditDto.From)
-                            .ToList(),
+                            Edits = created.Edits
+                                .Select(MessageEditDto.From)
+                                .ToList(),
 
-                        ClientMessageId = created.ClientMessageId
-                    }),
+                            ClientMessageId = created.ClientMessageId
+                        })
+                ),
 
 
             DmMessageEdited edited =>

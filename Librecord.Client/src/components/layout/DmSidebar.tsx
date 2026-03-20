@@ -81,21 +81,21 @@ export default function DmSidebar() {
         return () => window.removeEventListener("dm:user:presence", onPresence as EventListener);
     }, []);
 
-    // Increment unread when a new message arrives for a non-active channel
+    // Increment unread when a message ping arrives for a non-active channel
     useEffect(() => {
-        const onNewMessage = (e: CustomEvent<DmEventMap["dm:message:new"]>) => {
-            const { message } = e.detail;
-            if (message.channelId === dmId) return;
-            if (message.author.id === user?.userId) return;
+        const onPing = (e: CustomEvent<DmEventMap["dm:message:ping"]>) => {
+            const { channelId: pingChannel, authorId } = e.detail;
+            if (pingChannel === dmId) return;
+            if (authorId === user?.userId) return;
 
             setUnreads(prev => ({
                 ...prev,
-                [message.channelId]: (prev[message.channelId] ?? 0) + 1,
+                [pingChannel]: (prev[pingChannel] ?? 0) + 1,
             }));
         };
 
-        window.addEventListener("dm:message:new", onNewMessage as EventListener);
-        return () => window.removeEventListener("dm:message:new", onNewMessage as EventListener);
+        window.addEventListener("dm:message:ping", onPing as EventListener);
+        return () => window.removeEventListener("dm:message:ping", onPing as EventListener);
     }, [dmId, user?.userId]);
 
     // Clear unread when we navigate into a channel
