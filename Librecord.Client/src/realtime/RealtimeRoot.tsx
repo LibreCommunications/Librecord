@@ -7,7 +7,6 @@ import { initNotifications, cleanupNotifications } from "./notifications";
 import { resetVoiceState } from "../voice/voiceStore";
 import * as livekitClient from "../voice/livekitClient";
 import { useAuth } from "../context/AuthContext";
-import * as signalR from "@microsoft/signalr";
 
 // Module-level flag — survives React StrictMode double-mount
 let started = false;
