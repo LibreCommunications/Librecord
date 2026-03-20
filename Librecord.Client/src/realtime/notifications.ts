@@ -9,8 +9,61 @@
 let permissionGranted = false;
 let currentUserId: string | null = null;
 
-// Notification sound — short blip
-const notificationSound = new Audio("data:audio/wav;base64,UklGRl9vT19teleWQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQ==");
+// Notification sound — short blip (440Hz sine, 150ms)
+const notificationSound = (() => {
+    const ctx = new OfflineAudioContext(1, 7200, 48000);
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = 440;
+    osc.type = "sine";
+    gain.gain.setValueAtTime(0.3, 0);
+    gain.gain.exponentialRampToValueAtTime(0.001, 0.15);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(0);
+    osc.stop(0.15);
+    const audio = new Audio();
+    ctx.startRendering().then(buffer => {
+        const wav = audioBufferToWav(buffer);
+        audio.src = URL.createObjectURL(new Blob([wav], { type: "audio/wav" }));
+    });
+    return audio;
+})();
+
+function audioBufferToWav(buffer: AudioBuffer): ArrayBuffer {
+    const numChannels = 1;
+    const sampleRate = buffer.sampleRate;
+    const samples = buffer.getChannelData(0);
+    const byteRate = sampleRate * numChannels * 2;
+    const dataSize = samples.length * 2;
+    const headerSize = 44;
+    const buf = new ArrayBuffer(headerSize + dataSize);
+    const view = new DataView(buf);
+
+    function writeString(offset: number, str: string) {
+        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+    }
+
+    writeString(0, "RIFF");
+    view.setUint32(4, 36 + dataSize, true);
+    writeString(8, "WAVE");
+    writeString(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, numChannels * 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, "data");
+    view.setUint32(40, dataSize, true);
+
+    for (let i = 0; i < samples.length; i++) {
+        const s = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(headerSize + i * 2, s * 0x7FFF, true);
+    }
+
+    return buf;
+}
 
 // Track listener references so we can remove them
 let dmListener: EventListener | null = null;
