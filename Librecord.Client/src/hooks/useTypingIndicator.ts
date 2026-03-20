@@ -85,10 +85,17 @@ export function useTypingIndicator(
         return () => clearInterval(interval);
     }, [typingUsers.length]);
 
-    // Reset when channel changes
+    // Reset when channel changes + stop typing on unmount/channel switch
     useEffect(() => {
         setTypingUsers([]);
-    }, [channelId]);
+        return () => {
+            if (isTypingRef.current && channelId) {
+                isTypingRef.current = false;
+                const connection = hub === "dm" ? dmConnection : guildConnection;
+                connection.invoke("StopTyping", channelId).catch(() => {});
+            }
+        };
+    }, [channelId, hub]);
 
     // Send typing event (throttled)
     const sendTyping = useCallback(() => {

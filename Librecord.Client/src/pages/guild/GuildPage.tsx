@@ -218,8 +218,12 @@ export default function GuildChannelPage() {
 
     useEffect(() => {
         if (!channelId) return;
+        let stale = false;
 
         setLoading(true);
+        setMessages([]);
+        setChannelName(null);
+        setChannelTopic(null);
 
         Promise.all([
             getChannel(channelId),
@@ -227,6 +231,7 @@ export default function GuildChannelPage() {
             getPins(channelId),
         ])
             .then(([channel, msgs, pins]) => {
+                if (stale) return;
                 setChannelName(channel?.name ?? null);
                 setChannelTopic(channel?.topic ?? null);
                 setChannelType(channel?.type ?? 0);
@@ -235,12 +240,13 @@ export default function GuildChannelPage() {
                 setHasMore(msgs.length >= 50);
                 setPinnedIds(new Set(pins.map(p => p.messageId)));
 
-                // Mark channel as read
                 if (reversed.length > 0 && channelId) {
                     markAsRead(channelId, reversed[reversed.length - 1].id);
                 }
             })
-            .finally(() => setLoading(false));
+            .finally(() => { if (!stale) setLoading(false); });
+
+        return () => { stale = true; };
     }, [channelId]);
 
     /* ------------------------------------------------------------------ */

@@ -137,13 +137,7 @@ static void ConfigureAuthentication(
                     return Task.CompletedTask;
                 },
 
-                OnAuthenticationFailed = ctx =>
-                {
-                    Console.WriteLine(
-                        "JWT ERROR: " + ctx.Exception.Message
-                    );
-                    return Task.CompletedTask;
-                }
+                OnAuthenticationFailed = _ => Task.CompletedTask
             };
         });
 }

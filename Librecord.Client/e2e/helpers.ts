@@ -25,6 +25,16 @@ export function makeUser(tag: string): TestUser {
     };
 }
 
+/** Wait for SignalR connections to be established. */
+export async function waitForRealtime(page: Page, timeout = 10_000): Promise<void> {
+    await expect
+        .poll(
+            () => page.evaluate(() => (window as any).__realtimeReady === true),
+            { message: "Waiting for SignalR connections to be ready", timeout },
+        )
+        .toBe(true);
+}
+
 /** Register a new user and return the authenticated page (already at /app). */
 export async function registerUser(
     browser: Browser,
@@ -52,6 +62,9 @@ export async function registerUser(
     // Wait for redirect to /app
     await page.waitForURL(/\/app/, { timeout: 15_000 });
 
+    // Wait for SignalR connections
+    await waitForRealtime(page);
+
     return { context, page };
 }
 
@@ -75,6 +88,9 @@ export async function loginUser(
 
     await page.getByRole("button", { name: /log in/i }).click();
     await page.waitForURL(/\/app/, { timeout: 15_000 });
+
+    // Wait for SignalR connections
+    await waitForRealtime(page);
 
     return { context, page };
 }

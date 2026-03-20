@@ -12,11 +12,14 @@ let currentUserId: string | null = null;
 // Notification sound — short blip
 const notificationSound = new Audio("data:audio/wav;base64,UklGRl9vT19teleWQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQ==");
 
-// Track listener references so we can remove them before re-adding
+// Track listener references so we can remove them
 let dmListener: EventListener | null = null;
 let guildListener: EventListener | null = null;
 
 export function initNotifications(userId: string) {
+    // Clean up any previous listeners first
+    cleanupNotifications();
+
     currentUserId = userId;
 
     if ("Notification" in window && Notification.permission === "default") {
@@ -25,14 +28,6 @@ export function initNotifications(userId: string) {
         });
     } else {
         permissionGranted = Notification.permission === "granted";
-    }
-
-    // Remove previous listeners to prevent duplicates on re-init
-    if (dmListener) {
-        window.removeEventListener("dm:message:new", dmListener);
-    }
-    if (guildListener) {
-        window.removeEventListener("guild:message:new", guildListener);
     }
 
     // DM messages
@@ -60,6 +55,18 @@ export function initNotifications(userId: string) {
         );
     }) as EventListener;
     window.addEventListener("guild:message:new", guildListener);
+}
+
+export function cleanupNotifications() {
+    if (dmListener) {
+        window.removeEventListener("dm:message:new", dmListener);
+        dmListener = null;
+    }
+    if (guildListener) {
+        window.removeEventListener("guild:message:new", guildListener);
+        guildListener = null;
+    }
+    currentUserId = null;
 }
 
 function showNotification(title: string, body: string) {
