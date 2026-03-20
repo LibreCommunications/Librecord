@@ -73,18 +73,26 @@ export function initNotifications(userId: string) {
     }
 
     dmListener = ((e: CustomEvent) => {
-        const { authorId, authorName } = e.detail;
+        const { channelId, authorId, authorName } = e.detail;
         if (authorId === currentUserId) return;
-        if (document.hasFocus()) return;
-        showNotification(authorName, "sent you a message");
+        // Skip if we're focused on this exact channel
+        if (document.hasFocus() && isViewingChannel(channelId)) return;
+        playNotificationSound();
+        if (!document.hasFocus()) {
+            showDesktopNotification(authorName, "sent you a message");
+        }
     }) as EventListener;
     window.addEventListener("dm:message:ping", dmListener);
 
     guildListener = ((e: CustomEvent) => {
-        const { authorId, authorName } = e.detail;
+        const { channelId, authorId, authorName } = e.detail;
         if (authorId === currentUserId) return;
-        if (document.hasFocus()) return;
-        showNotification(authorName, "sent a message");
+        // Skip if we're focused on this exact channel
+        if (document.hasFocus() && isViewingChannel(channelId)) return;
+        playNotificationSound();
+        if (!document.hasFocus()) {
+            showDesktopNotification(authorName, "sent a message");
+        }
     }) as EventListener;
     window.addEventListener("guild:message:ping", guildListener);
 }
@@ -101,9 +109,13 @@ export function cleanupNotifications() {
     currentUserId = null;
 }
 
-function showNotification(title: string, body: string) {
-    playNotificationSound();
+/** Check if the user is currently viewing a specific channel. */
+function isViewingChannel(channelId: string): boolean {
+    const path = window.location.pathname;
+    return path.includes(channelId);
+}
 
+function showDesktopNotification(title: string, body: string) {
     if (!permissionGranted) return;
 
     try {
