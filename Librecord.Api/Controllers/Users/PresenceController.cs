@@ -37,13 +37,18 @@ public class PresenceController : ControllerBase
     [HttpPut]
     public async Task<IActionResult> SetStatus([FromBody] SetStatusRequest request)
     {
-        if (!Enum.TryParse<UserStatus>(request.Status, true, out var status))
+        // Frontend sends "offline" for invisible
+        var statusStr = request.Status.Equals("offline", StringComparison.OrdinalIgnoreCase)
+            ? "Invisible"
+            : request.Status;
+
+        if (!Enum.TryParse<UserStatus>(statusStr, true, out var status))
             return BadRequest("Invalid status.");
 
         await _presence.SetStatusAsync(UserId, status);
 
         // Broadcast to DM channels — invisible users appear as "offline" to others
-        var broadcastStatus = status == UserStatus.Offline
+        var broadcastStatus = status == UserStatus.Invisible
             ? "offline"
             : status.ToString().ToLowerInvariant();
 
@@ -55,7 +60,8 @@ public class PresenceController : ControllerBase
                 .SendAsync("dm:user:presence", new { userId = UserId, status = broadcastStatus });
         }
 
-        return Ok(new { status = status.ToString().ToLowerInvariant() });
+        var returnStatus = status == UserStatus.Invisible ? "offline" : status.ToString().ToLowerInvariant();
+        return Ok(new { status = returnStatus });
     }
 
     // ---------------------------------------------------------
@@ -66,10 +72,13 @@ public class PresenceController : ControllerBase
     {
         var presence = await _presence.GetPresenceAsync(UserId);
 
-        return Ok(new
+        var status = presence?.Status switch
         {
-            status = presence?.Status.ToString().ToLowerInvariant() ?? "offline"
-        });
+            UserStatus.Invisible => "offline",
+            null => "online",
+            _ => presence.Status.ToString().ToLowerInvariant()
+        };
+        return Ok(new { status });
     }
 
     // ---------------------------------------------------------
@@ -85,7 +94,7 @@ public class PresenceController : ControllerBase
 
         var result = presences.ToDictionary(
             kv => kv.Key.ToString(),
-            kv => kv.Value.ToString().ToLowerInvariant()
+            kv => kv.Value == UserStatus.Invisible ? "offline" : kv.Value.ToString().ToLowerInvariant()
         );
 
         return Ok(result);

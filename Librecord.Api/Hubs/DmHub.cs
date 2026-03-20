@@ -62,7 +62,7 @@ public class DmHub : Hub
 
         // Set online presence (only if not invisible)
         var currentPresence = await _presence.GetPresenceAsync(UserId);
-        var isInvisible = currentPresence?.Status == Domain.Identity.UserStatus.Offline;
+        var isInvisible = currentPresence?.Status == Domain.Identity.UserStatus.Invisible;
 
         if (!isInvisible)
         {
@@ -190,14 +190,15 @@ public class DmHub : Hub
                 UserId);
         }
 
-        // Only broadcast disconnect if user wasn't already invisible
+        // Only set offline and broadcast if user wasn't invisible
+        // Invisible users already have Status=Offline, so we leave it as-is
         var currentPresence = await _presence.GetPresenceAsync(UserId);
-        var wasInvisible = currentPresence?.Status == Domain.Identity.UserStatus.Offline;
-
-        await _presence.SetOfflineAsync(UserId);
+        var wasInvisible = currentPresence?.Status == Domain.Identity.UserStatus.Invisible;
 
         if (!wasInvisible)
         {
+            await _presence.SetOfflineAsync(UserId);
+
             // Broadcast offline to DM channels
             var channels = await _channels.GetUserChannelsAsync(UserId);
             foreach (var channel in channels)
