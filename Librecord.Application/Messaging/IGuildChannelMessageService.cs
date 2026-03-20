@@ -15,7 +15,8 @@ public interface IGuildChannelMessageService
         Guid channelId,
         Guid userId,
         string content,
-        string? clientMessageId = null);
+        string? clientMessageId = null,
+        bool hasAttachments = false);
 
     Task<Message> EditMessageAsync(
         Guid messageId,

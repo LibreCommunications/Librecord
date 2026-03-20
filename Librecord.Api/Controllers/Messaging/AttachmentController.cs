@@ -59,7 +59,8 @@ public class GuildMessageWithAttachmentController : ControllerBase
             channelId,
             UserId,
             content?.Trim() ?? "",
-            clientMessageId);
+            clientMessageId,
+            hasAttachments: files is { Count: > 0 });
 
         // Upload and attach files
         if (files != null)
@@ -137,7 +138,8 @@ public class DmMessageWithAttachmentController : ControllerBase
             channelId,
             UserId,
             content?.Trim() ?? "",
-            clientMessageId);
+            clientMessageId,
+            hasAttachments: files is { Count: > 0 });
 
         if (files != null)
         {

@@ -31,10 +31,11 @@ public sealed class DirectMessageService : IDirectMessageService
         Guid channelId,
         Guid userId,
         string content,
-        string? clientMessageId = null)
+        string? clientMessageId = null,
+        bool hasAttachments = false)
     {
-        if (string.IsNullOrWhiteSpace(content))
-            throw new ArgumentException("Message content required.");
+        if (string.IsNullOrWhiteSpace(content) && !hasAttachments)
+            throw new ArgumentException("Message content or attachments required.");
 
         if (content.Length > 4000)
             throw new ArgumentException("Message content must not exceed 4000 characters.");
