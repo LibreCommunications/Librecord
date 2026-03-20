@@ -41,3 +41,10 @@
     scrollbar-width: auto;
     scrollbar-color: #1e1f22 #2b2d31;
 }
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    scrollbar-width: none;
+}

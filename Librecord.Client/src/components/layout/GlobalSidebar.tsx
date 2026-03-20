@@ -160,7 +160,7 @@ export default function GlobalSidebar() {
 
     return (
         <>
-            <aside className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 gap-2 overflow-y-auto scrollbar-none">
+            <aside className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 gap-2 overflow-y-auto no-scrollbar">
 
                 {/* DM */}
                 <SidebarIcon to="/app/dm" active={isDmPage} unread={dmUnread} tooltip="Direct Messages" className="bg-[#313338] hover:bg-[#5865F2] text-white">
