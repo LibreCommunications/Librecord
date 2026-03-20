@@ -21,7 +21,7 @@ x-backend: &backend-base
     Minio__Bucket: ${MINIO_BUCKET:-librecord-attachments}
     Minio__UseSSL: false
     Security__MessageEncryptionKey: ${MESSAGE_ENCRYPTION_KEY}
-    LiveKit__Host: wss://livekit.${DOMAIN}
+    LiveKit__Host: ${LIVEKIT_HOST:-wss://livekit.gros-sans-dessein.com}
     LiveKit__ApiKey: ${LIVEKIT_API_KEY}
     LiveKit__ApiSecret: ${LIVEKIT_API_SECRET}
     Cors__Origins__0: https://${DOMAIN}
