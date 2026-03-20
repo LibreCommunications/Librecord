@@ -4,6 +4,7 @@ using Librecord.Domain.Identity;
 using Librecord.Domain.Messaging.Common;
 using Librecord.Domain.Messaging.Direct;
 using Librecord.Domain.Social;
+using Librecord.Domain.Storage;
 using Moq;
 
 namespace Librecord.Tests.Messaging;
@@ -20,12 +21,13 @@ public class DmDualUserScenarioTests
     private readonly Mock<IDmRealtimeNotifier> _realtime = new();
     private readonly Mock<IBlockRepository> _blocks = new();
     private readonly Mock<IFriendshipRepository> _friendships = new();
+    private readonly Mock<IAttachmentStorageService> _storage = new();
 
     private DirectMessageService CreateMessageService() =>
         new(_messages.Object, _channels.Object, _realtime.Object, _blocks.Object);
 
     private DirectMessageChannelService CreateChannelService() =>
-        new(_channels.Object, _friendships.Object, _blocks.Object);
+        new(_channels.Object, _friendships.Object, _blocks.Object, _storage.Object);
 
     private static User MakeUser(Guid id, string name) => new()
     {

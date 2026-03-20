@@ -6,6 +6,8 @@ public class DmChannel
 
     public string? Name { get; set; }
 
+    public bool IsGroup { get; set; } = false;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public List<DmChannelMember> Members { get; set; } = [];

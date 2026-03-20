@@ -1,5 +1,6 @@
 using Librecord.Domain.Messaging.Direct;
 using Librecord.Domain.Social;
+using Librecord.Domain.Storage;
 
 namespace Librecord.Application.Messaging;
 
@@ -8,15 +9,18 @@ public class DirectMessageChannelService : IDirectMessageChannelService
     private readonly IDirectMessageChannelRepository _dms;
     private readonly IFriendshipRepository _friendships;
     private readonly IBlockRepository _blocks;
+    private readonly IAttachmentStorageService _storage;
 
     public DirectMessageChannelService(
         IDirectMessageChannelRepository dms,
         IFriendshipRepository friendships,
-        IBlockRepository blocks)
+        IBlockRepository blocks,
+        IAttachmentStorageService storage)
     {
         _dms = dms;
         _friendships = friendships;
         _blocks = blocks;
+        _storage = storage;
     }
 
     // ---------------------------------------------------------
@@ -31,7 +35,7 @@ public class DirectMessageChannelService : IDirectMessageChannelService
     {
         return _dms.GetUserDmChannelsAsync(userId);
     }
-    
+
     public async Task<bool> IsMemberAsync(Guid channelId, Guid userId)
     {
         var channel = await _dms.GetChannelAsync(channelId);
@@ -40,7 +44,6 @@ public class DirectMessageChannelService : IDirectMessageChannelService
 
         return channel.Members.Any(m => m.UserId == userId);
     }
-
 
     // ---------------------------------------------------------
     // START OR REUSE 1–1 DM
@@ -55,8 +58,9 @@ public class DirectMessageChannelService : IDirectMessageChannelService
 
         var channels = await _dms.GetUserDmChannelsAsync(requesterId);
 
+        // Find existing 1-on-1 (not group) with the target
         var existing = channels.FirstOrDefault(c =>
-            c.Members.Count == 2 &&
+            !c.IsGroup &&
             c.Members.Any(m => m.UserId == targetUserId));
 
         if (existing != null)
@@ -64,7 +68,8 @@ public class DirectMessageChannelService : IDirectMessageChannelService
 
         var channel = new DmChannel
         {
-            Id = Guid.NewGuid()
+            Id = Guid.NewGuid(),
+            IsGroup = false
         };
 
         channel.Members.Add(new DmChannelMember
@@ -88,7 +93,50 @@ public class DirectMessageChannelService : IDirectMessageChannelService
     }
 
     // ---------------------------------------------------------
-    // ADD PARTICIPANT (ANY MEMBER)
+    // CREATE GROUP DM
+    // ---------------------------------------------------------
+    public async Task<DmChannel> CreateGroupAsync(Guid creatorId, List<Guid> memberIds)
+    {
+        if (memberIds.Count < 1)
+            throw new ArgumentException("Group DM requires at least one other member.");
+
+        var allUserIds = new HashSet<Guid>(memberIds) { creatorId };
+        if (allUserIds.Count < 2)
+            throw new ArgumentException("Group DM requires at least two members.");
+
+        foreach (var userId in memberIds)
+        {
+            if (await _blocks.IsEitherBlockedAsync(creatorId, userId))
+                throw new InvalidOperationException("Cannot add a blocked user to a group.");
+
+            if (!await _friendships.UsersAreConfirmedFriendsAsync(creatorId, userId))
+                throw new UnauthorizedAccessException("All members must be friends with the creator.");
+        }
+
+        var channel = new DmChannel
+        {
+            Id = Guid.NewGuid(),
+            IsGroup = true
+        };
+
+        foreach (var userId in allUserIds)
+        {
+            channel.Members.Add(new DmChannelMember
+            {
+                ChannelId = channel.Id,
+                UserId = userId,
+                JoinedAt = DateTime.UtcNow
+            });
+        }
+
+        await _dms.AddChannelAsync(channel);
+        await _dms.SaveChangesAsync();
+
+        return channel;
+    }
+
+    // ---------------------------------------------------------
+    // ADD PARTICIPANT (GROUP ONLY)
     // ---------------------------------------------------------
     public async Task AddParticipantAsync(
         Guid channelId,
@@ -97,6 +145,9 @@ public class DirectMessageChannelService : IDirectMessageChannelService
     {
         var channel = await _dms.GetChannelAsync(channelId)
                       ?? throw new InvalidOperationException("DM not found.");
+
+        if (!channel.IsGroup)
+            throw new InvalidOperationException("Cannot add participants to a 1-on-1 DM.");
 
         if (channel.Members.All(m => m.UserId != requesterId))
             throw new UnauthorizedAccessException();
@@ -122,12 +173,15 @@ public class DirectMessageChannelService : IDirectMessageChannelService
     }
 
     // ---------------------------------------------------------
-    // LEAVE CHANNEL
+    // LEAVE GROUP DM
     // ---------------------------------------------------------
     public async Task LeaveChannelAsync(Guid channelId, Guid userId)
     {
         var channel = await _dms.GetChannelAsync(channelId)
                       ?? throw new InvalidOperationException("DM not found.");
+
+        if (!channel.IsGroup)
+            throw new InvalidOperationException("Cannot leave a 1-on-1 DM.");
 
         var member = channel.Members.FirstOrDefault(m => m.UserId == userId);
         if (member == null)
@@ -135,9 +189,31 @@ public class DirectMessageChannelService : IDirectMessageChannelService
 
         channel.Members.Remove(member);
 
-        // Delete channel if empty
-        if (channel.Members.Count == 0) await _dms.DeleteChannelAsync(channel);
+        // Delete channel, messages, and stored files when last member leaves
+        if (channel.Members.Count == 0)
+        {
+            // Delete attachment files from storage
+            foreach (var dm in channel.Messages)
+            {
+                foreach (var att in dm.Message.Attachments)
+                {
+                    try { await _storage.DeleteAsync(att.Url); }
+                    catch { /* best effort */ }
+                }
+            }
+
+            await _dms.DeleteChannelAsync(channel);
+        }
 
         await _dms.SaveChangesAsync();
+    }
+
+    // ---------------------------------------------------------
+    // GET REMAINING MEMBER COUNT (for leave confirmation UI)
+    // ---------------------------------------------------------
+    public async Task<int> GetMemberCountAsync(Guid channelId)
+    {
+        var channel = await _dms.GetChannelAsync(channelId);
+        return channel?.Members.Count ?? 0;
     }
 }
