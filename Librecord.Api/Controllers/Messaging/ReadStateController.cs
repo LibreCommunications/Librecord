@@ -45,7 +45,7 @@ public class ReadStateController : AuthenticatedController
     [HttpPost("unread")]
     public async Task<IActionResult> GetUnreadCounts([FromBody] UnreadRequest request)
     {
-        if (request.ChannelIds == null || request.ChannelIds.Count == 0)
+        if (request.ChannelIds.Count == 0)
             return Ok(new { });
 
         var counts = await _readStates.GetUnreadCountsAsync(UserId, request.ChannelIds);
