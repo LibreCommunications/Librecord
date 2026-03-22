@@ -192,31 +192,69 @@ static void ConfigureRateLimiting(IServiceCollection services)
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
+        options.OnRejected = async (context, cancellationToken) =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+                .CreateLogger("RateLimiting");
+            logger.LogWarning(
+                "Rate limit exceeded | IP={IP} | Path={Path} | Policy={Policy}",
+                context.HttpContext.Connection.RemoteIpAddress,
+                context.HttpContext.Request.Path,
+                context.Lease.TryGetMetadata(System.Threading.RateLimiting.MetadataName.RetryAfter, out var retryAfter)
+                    ? $"retry after {retryAfter.TotalSeconds}s" : "n/a");
+
+            context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+            await context.HttpContext.Response.WriteAsync("Too many requests. Please try again later.", cancellationToken);
+        };
+
         // Global default: 60 requests per minute per IP
+        // Skip rate limiting for loopback (localhost dev/testing)
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
-            RateLimitPartition.GetFixedWindowLimiter(
-                ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        {
+            var ip = ctx.Connection.RemoteIpAddress;
+            if (ip != null && System.Net.IPAddress.IsLoopback(ip))
+                return RateLimitPartition.GetNoLimiter("loopback");
+
+            return RateLimitPartition.GetFixedWindowLimiter(
+                ip?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = 60,
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
-                }));
+                });
+        });
 
         // Stricter policy for auth endpoints (login/register brute force protection)
-        options.AddFixedWindowLimiter("auth", o =>
+        options.AddPolicy("auth", ctx =>
         {
-            o.PermitLimit = 10;
-            o.Window = TimeSpan.FromMinutes(1);
-            o.QueueLimit = 0;
+            var ip = ctx.Connection.RemoteIpAddress;
+            if (ip != null && System.Net.IPAddress.IsLoopback(ip))
+                return RateLimitPartition.GetNoLimiter("loopback");
+            return RateLimitPartition.GetFixedWindowLimiter(
+                ip?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                });
         });
 
         // Stricter policy for file uploads
-        options.AddFixedWindowLimiter("upload", o =>
+        options.AddPolicy("upload", ctx =>
         {
-            o.PermitLimit = 10;
-            o.Window = TimeSpan.FromMinutes(1);
-            o.QueueLimit = 0;
+            var ip = ctx.Connection.RemoteIpAddress;
+            if (ip != null && System.Net.IPAddress.IsLoopback(ip))
+                return RateLimitPartition.GetNoLimiter("loopback");
+            return RateLimitPartition.GetFixedWindowLimiter(
+                ip?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                });
         });
     });
 }

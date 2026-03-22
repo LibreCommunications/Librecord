@@ -10,9 +10,7 @@
     "preview": "vite preview",
     "test:e2e": "npx playwright test",
     "test:e2e:headed": "npx playwright test --headed",
-    "test:e2e:debug": "npx playwright test --debug",
-    "test:e2e:staging": "E2E_BASE_URL=https://librecord-testing.gros-sans-dessein.com E2E_API_URL=https://librecord-testing.gros-sans-dessein.com/api npx playwright test",
-    "test:e2e:staging:headed": "E2E_BASE_URL=https://librecord-testing.gros-sans-dessein.com E2E_API_URL=https://librecord-testing.gros-sans-dessein.com/api npx playwright test --headed"
+    "test:e2e:debug": "npx playwright test --debug"
   },
   "dependencies": {
     "@microsoft/signalr": "^10.0.0",
