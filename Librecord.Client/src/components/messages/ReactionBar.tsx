@@ -66,7 +66,7 @@ export function ReactionBar({ reactions, messageId, currentUserId, onAdd, onRemo
                 </button>
 
                 {showPicker && (
-                    <div className="absolute bottom-full left-0 mb-1 bg-[#111214] rounded-lg shadow-xl p-2 flex gap-1 flex-wrap w-48 z-50 border border-[#2b2d31] animate-[scaleIn_0.1s_ease-out]">
+                    <div className="absolute bottom-full left-0 mb-1 bg-[#111214] rounded-lg shadow-xl p-2 flex gap-1 flex-wrap w-48 z-[100] border border-[#2b2d31] animate-[scaleIn_0.1s_ease-out]">
                         {QUICK_EMOJIS.map(emoji => (
                             <button
                                 key={emoji}

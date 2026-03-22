@@ -116,12 +116,23 @@ export function useFriends() {
         ).ok;
     }, [auth]);
 
+    const cancelRequest = useCallback(async (targetId: string) => {
+        return (
+            await fetchWithAuth(
+                `${API_URL}/friends/cancel/${targetId}`,
+                { method: "POST" },
+                auth
+            )
+        ).ok;
+    }, [auth]);
+
     return {
         getFriends,
         getRequests,
         sendRequest,
         acceptRequest,
         declineRequest,
+        cancelRequest,
         removeFriend,
         suggestUsernames,
     };

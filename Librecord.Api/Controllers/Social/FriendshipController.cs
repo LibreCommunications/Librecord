@@ -104,6 +104,24 @@ public class FriendshipController : AuthenticatedController
     }
 
     // -------------------------------
+    // CANCEL OUTGOING REQUEST
+    // -------------------------------
+    [HttpPost("cancel/{targetId:guid}")]
+    public async Task<ActionResult<FriendshipActionDto>> Cancel(Guid targetId)
+    {
+        // Reuse decline logic — the repo checks both directions
+        var result = await _friends.DeclineRequestAsync(targetId, UserId);
+
+        return result.Success
+            ? Ok(new FriendshipActionDto { Success = true })
+            : BadRequest(new FriendshipActionDto
+            {
+                Success = false,
+                Error = result.Error
+            });
+    }
+
+    // -------------------------------
     // REMOVE
     // -------------------------------
     [HttpDelete("remove/{friendId:guid}")]
