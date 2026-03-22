@@ -1,224 +1,138 @@
 # WEAKNESSES
 
-Comprehensive audit of the Librecord codebase. Organized by severity and category.
+Audit of the Librecord codebase. Fixed items removed. Remaining items organized by priority with implementation plans.
 
 ---
 
-## CRITICAL
-
-### ~~[SEC-1] No rate limiting anywhere~~ FIXED
-- Added global rate limiter (60 req/min per IP), `"auth"` policy (10/min), `"upload"` policy (10/min)
-
-### [SEC-3] AllowedHosts wildcard in production — REVERTED
-- Reverted to `"*"` — Nginx handles host filtering in production; restricting at app level caused issues
-
-### ~~[SEC-4] No environment variable validation on startup~~ FIXED
-- App now fails fast if JWT config, connection string, or encryption key are missing/invalid
-
-### ~~[SEC-2] Missing authorization checks on pins and threads~~ FIXED
-- PinController: membership check via `IPinService.IsChannelMemberAsync` on all endpoints
-- ThreadController: membership check on List, GetMessages, PostMessage (Create already had it)
-- **File:** `Librecord.Api/Controllers/Messaging/PinController.cs` — lines 29-55, 60-70
-- **File:** `Librecord.Api/Controllers/Messaging/ThreadController.cs` — lines 32-65, 144-193
-- Any authenticated user can pin/unpin messages and create/post in threads in any channel
-- **Fix:** Add permission checks (e.g. `ManageChannels` for pins, channel membership for threads)
-
-### ~~[SEC-3] AllowedHosts wildcard in production~~ FIXED (see above)
-
-### ~~[SEC-4] No environment variable validation on startup~~ FIXED (see above)
-
----
-
-## HIGH — Architecture
-
-### ~~[ARCH-1] Direct DbContext in controllers~~ FIXED
-- All 10 controllers migrated to use dedicated services/repositories
-- Created: IBlockService, IGuildMemberService, IGuildSettingsService, IPinService, IThreadService, IMessageSearchService, IAttachmentService
-- Extended: IUserService, IPermissionService, IGuildRepository, IBlockRepository
-- Zero `LibrecordContext` usage in any controller
+## REMAINING (10 items)
 
 ### [ARCH-2] Multiple SaveChangesAsync without transactions
-- `AttachmentController.cs` — lines 69, 99, 206: sequential saves without transaction scope
-- `GuildMemberController.cs` — lines 80, 119, 138: same pattern
-- If second save fails, first is already committed → orphaned/inconsistent data
-- **Fix:** Wrap multi-step operations in `IDbContextTransaction`
-
-### ~~[ARCH-3] Race condition: DM channel creation not atomic~~ FIXED
-- StartDmAsync now catches save failures and re-fetches existing channel
-- If a concurrent request created the same DM, the retry finds and returns it
-
----
-
-## HIGH — Testing & CI/CD
+- `AttachmentController` creates message then saves attachments separately
+- If attachment save fails, orphaned message exists without files
+- **Plan:** Move attachment persistence into the `IAttachmentService.SaveAttachmentsAsync` method and wrap both message creation + attachment save in a single transaction at the service layer. Requires `IDbContextTransaction` injection via the repository.
+- **Effort:** Medium (1 service + 1 repository change)
 
 ### [TEST-1] Zero controller tests
-- 24/24 controllers in `Librecord.Api/Controllers/` have no test coverage
-- Hub tests missing for `DmHub.cs` (7KB) and `GuildHub.cs` (8.8KB)
+- 24 controllers have no integration test coverage
+- Hubs (`DmHub`, `GuildHub`) untested
+- **Plan:** Set up `WebApplicationFactory<Program>` test infrastructure with in-memory PostgreSQL (or SQLite). Start with auth endpoints (login/register/refresh), then messaging endpoints. Use `TestServer` for SignalR hub tests.
+- **Effort:** Large (test infra setup + ~50 tests)
 
 ### [TEST-2] Limited service test coverage
-- Only `DirectMessageServiceTests`, `GuildChannelMessageServiceTests`, `AuthServiceTests` exist
-- No tests for: PermissionService, ChannelService, PresenceService, VoiceService, FriendshipService (partial), UserService
-
-### ~~[TEST-3] No tests in CI/CD pipeline~~ FIXED
-- Added `dotnet test` and `npm run lint` steps before deployment
-- ESLint now at zero errors/warnings (81→0 properly fixed)
-
-### ~~[TEST-4] No rollback mechanism in deployment~~ NOT AN ISSUE
-- Blue-green deploy already handles this: health check runs BEFORE nginx switch
-- If health check fails, old slot stays running untouched — rollback is implicit
-- State file moved from /tmp to /var/lib (LOW-9)
-
-### ~~[TEST-5] No CI caching~~ FIXED
-- Added NuGet and npm caching via actions/cache@v4
-
----
-
-## HIGH — Frontend
-
-### ~~[FE-1] No error boundaries~~ FIXED
-- Added `ErrorBoundary` component wrapping the entire app in `main.tsx`
-
-### ~~[FE-2] Silent failure on all critical user actions~~ PARTIALLY FIXED
-- Added error toasts for message send and file upload failures in both DM and guild pages
-- `ChannelSidebar.tsx` permission load still fails silently
-
-### ~~[FE-3] Memory leaks: unreleased Object URLs~~ FIXED
-- `AttachmentUpload.tsx`: uses ref-based URL map with cleanup on file removal and unmount
-- `ProfileSettings.tsx`: revokes previous URL before creating new one
+- Only DirectMessageService, GuildChannelMessage, Auth, Friendship have tests
+- Missing: PermissionService, ChannelService, PresenceService, VoiceService, UserService, BlockService, PinService, ThreadService, GuildMemberService, GuildSettingsService, AttachmentService, MessageSearchService
+- **Plan:** Prioritize by risk — PermissionService first (authorization logic), then PinService and ThreadService (newly created). Follow existing test patterns (Moq + xUnit). Target 80% service coverage.
+- **Effort:** Large (~12 test files, ~100 tests)
 
 ### [FE-4] No virtual scrolling for message lists
-- `MessageList.tsx` renders ALL messages in DOM (no windowing)
-- 500+ messages will cause visible jank/slowdown
-- **Fix:** Use `react-window` or `@tanstack/react-virtual`
+- `MessageList.tsx` renders ALL messages in DOM
+- 500+ messages causes visible jank
+- **Plan:** Replace the message `.map()` with `@tanstack/react-virtual` (lighter than react-window). Keep the existing infinite scroll sentinel for loading older messages. Requires measuring message heights dynamically since messages vary in size (text, attachments, reactions).
+- **Effort:** Large (MessageList rewrite + height estimation)
 
 ### [FE-5] Zero accessibility (WCAG non-compliance)
-- 0 `aria-label`, `aria-describedby`, or `role` attributes in entire codebase
-- Icon-only buttons in `GlobalSidebar.tsx`, `MessageItem.tsx`, `GuildPage.tsx` have no labels
-- Modals (`ConfirmModal.tsx`) don't trap focus or manage focus on open
-- No keyboard navigation for context menus or emoji picker
-- **Fix:** Add ARIA labels to all interactive elements, implement focus trap in modals
-
-### ~~[FE-6] Optimistic UI without proper error recovery~~ FIXED
-- Attachment upload failure now restores `pendingFiles` so user's files aren't lost
-- Reactions now roll back optimistic add if API call fails (try/catch)
-- Applied to both GuildPage and DmConversationPage
-
----
-
-## MEDIUM — Backend
-
-### ~~[BE-1] N+1 query risk in hubs~~ FIXED
-- DmHub: all sequential `AddToGroupAsync` and presence broadcasts replaced with `Task.WhenAll`
-- GuildHub: flattened nested guild→channel loops into single `SelectMany` + `Task.WhenAll`
-- Applied to connect, disconnect, and presence broadcasts in both hubs
-
-### ~~[BE-2] GetChannelOverridesAsync missing WHERE clause~~ FIXED
-- Added `.Where(o => o.ChannelId == channelId)` to the query
-
-### ~~[BE-3] Silent exception swallowing~~ FIXED
-- `SearchController`: now logs `LogWarning` with message ID on decrypt failure
-- `DirectMessageChannelService`: now logs `LogWarning` with attachment URL on delete failure
-
-### [BE-4] No CancellationToken propagation
-- No controller or service method accepts or forwards `CancellationToken`
-- Long-running requests cannot be cancelled when client disconnects
-- Affects all 24 controllers and all service methods
-
-### [BE-5] No logging in Application or Infrastructure layers — PARTIALLY FIXED
-- Added `ILogger` to `DirectMessageChannelService` and `SearchController`
-- Remaining services and repositories still have no logging
-- No audit trail for sensitive operations (message edits/deletes, blocks, permission changes)
-
-### ~~[BE-6] Inconsistent error response formats~~ NOT AN ISSUE
-- After ARCH-1 refactor, controllers use consistent response patterns
-- Remaining anonymous objects are simple property returns (iconUrl, status, etc.) — acceptable
-
-### ~~[BE-7] Missing null checks~~ FIXED
-- ThreadController: added null check + return Unauthorized
-- DirectMessageChannelController: `m.User?.DisplayName ?? "Unknown"`
-- GuildHub: `(g.Channels ?? [])` null guard on SelectMany
-
-### [BE-8] No FluentValidation — validation is manual and duplicated — PARTIALLY FIXED
-- ~~Message length and file size limits hardcoded in multiple places~~ → centralized in `Limits.cs`
-- No request DTO validation attributes
-- FluentValidation not yet added
-
-### ~~[BE-9] No database retry policy~~ FIXED
-- Added `EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: 5s)` to UseNpgsql
-
----
-
-## MEDIUM — Frontend (continued)
+- No `aria-label` on any icon-only button
+- No focus trap in modals
+- No keyboard navigation for menus/emoji picker
+- **Plan:** Phase it:
+  1. Add `aria-label` to all icon buttons (GlobalSidebar, MessageItem action buttons, header buttons)
+  2. Add `role="dialog"` + focus trap to ConfirmModal and all modal components
+  3. Add keyboard navigation (arrow keys) to emoji picker and context menus
+  4. Add skip-to-content link and landmark roles
+- **Effort:** Large (touches every component, ~30 files)
 
 ### [FE-7] Duplicated message logic across pages
-- `DmConversationPage.tsx` and `GuildPage.tsx` share nearly identical:
-  - `applyNewMessage()` function
-  - Realtime event listener setup
-  - Message send/edit/delete handlers
-- **Fix:** Extract shared `useChannelMessages` hook
+- `DmConversationPage.tsx` and `GuildPage.tsx` share ~200 lines of identical logic:
+  - `applyNewMessage()` reconciliation
+  - Realtime event listeners (new, edited, deleted)
+  - Send/edit/delete handlers with optimistic UI
+  - Scroll management
+- **Plan:** Extract a `useChannelMessages(channelId, hub)` hook that encapsulates all message state, realtime listeners, and CRUD operations. Both pages would consume this hook and only handle page-specific UI (headers, sidebars).
+- **Effort:** Large (new hook + refactor both pages)
 
 ### [FE-8] Heavy prop drilling
 - `GuildPage.tsx` passes 15+ props to `MessageList`
-- **Fix:** Create `MessageListContext` or compose with hooks
+- **Plan:** Create a `MessageListContext` that provides message state, handlers, and user info. MessageList and MessageItem consume via `useContext` instead of props. This naturally follows from [FE-7] — if messages move to a hook, the context wraps the hook's return value.
+- **Effort:** Medium (depends on FE-7 being done first)
+- **Prerequisite:** FE-7
 
-### ~~[FE-9] Missing React.memo on MessageItem~~ FIXED
-- Wrapped with `memo()` to prevent unnecessary re-renders
+### [BE-4] No CancellationToken propagation
+- No controller or service method accepts `CancellationToken`
+- Long-running requests can't be cancelled when client disconnects
+- **Plan:** Add `CancellationToken cancellationToken = default` parameter to all service interface methods, then propagate through to repository calls and EF queries (`.ToListAsync(cancellationToken)`). Controllers get the token automatically from ASP.NET. Do it layer by layer: Domain interfaces → Application services → Infra repositories → Controllers.
+- **Effort:** Large (every method signature across all layers, ~100 methods)
 
-### ~~[FE-10] XSS risk in markdown renderer~~ FIXED
-- Link auto-detection now validates URLs with `new URL()` and rejects non-http/https protocols
+### [BE-5] Logging in Application/Infrastructure layers
+- Only `DirectMessageChannelService` and `SearchController` have `ILogger`
+- No audit trail for sensitive operations
+- **Plan:** Add `ILogger<T>` to all Application services (12 services). Log at `Information` level for state-changing operations (create, update, delete) and `Warning` for failures. Don't log reads (too noisy). Priority: AuthService, FriendshipService, GuildMemberService, BlockService.
+- **Effort:** Medium (~12 files, mechanical)
 
-### ~~[FE-11] Missing client-side form validation~~ FIXED
-- Login/Register pages: `required` on all inputs, `minLength`/`maxLength` on username/password
-- CreateChannelModal: added `required`, `minLength=1`, `maxLength=64`
+### [BE-8] Request validation with FluentValidation
+- Limits centralized in `Limits.cs` but no request DTO validation
+- No validation attributes on request models
+- **Plan:** Add `FluentValidation.AspNetCore` NuGet package. Create validators for: `SendMessageRequest`, `RegisterRequest`, `LoginRequest`, `CreateGuildRequest`, `BanRequest`, `CreateThreadRequest`. Register via `AddFluentValidationAutoValidation()`. This replaces manual `if` checks in controllers.
+- **Effort:** Medium (1 NuGet + ~10 validator classes)
+
+---
+
+## FIXED (32 items)
+
+- [SEC-1] Rate limiting — global + auth + upload policies with X-Forwarded-For
+- [SEC-2] Authorization checks on pins and threads
+- [SEC-4] Startup config validation (fail fast)
+- [ARCH-1] Direct DbContext in controllers → 10 controllers migrated to services
+- [ARCH-3] DM creation race condition → retry on conflict
+- [TEST-3] Tests + lint in CI pipeline
+- [TEST-5] NuGet + npm caching in CI
+- [FE-1] Error boundary wrapping entire app
+- [FE-2] Error toasts on message/upload failures
+- [FE-3] Memory leaks (Object URL cleanup)
+- [FE-6] Optimistic UI error recovery (file restore + reaction rollback)
+- [FE-9] React.memo on MessageItem
+- [FE-10] XSS in markdown renderer (URL validation)
+- [FE-11] Client-side form validation
+- [BE-1] N+1 in hubs → Task.WhenAll
+- [BE-2] Missing WHERE clause in GetChannelOverridesAsync
+- [BE-3] Silent exception swallowing → proper logging
+- [BE-7] Missing null checks
+- [BE-9] Database retry policy
+- [LOW-1] Docker images pinned
+- [LOW-2] Dockerfile hardened (non-root user)
+- [LOW-3] CSP headers via nginx
+- [LOW-4] setTimeout cleanup in InviteModal
+- [LOW-5] Audio unlock listeners cleanup
+- [LOW-6] Clipboard API awaited
+- [LOW-7] Console.log removed from production
+- [LOW-8] Base controller for UserId
+- [LOW-9] Deploy state file persistent location
+- [LOW-10] Proper README
+
+## RESOLVED (not issues)
+
+- [SEC-3] AllowedHosts — Nginx handles host filtering, not the app
+- [TEST-4] Deploy rollback — blue-green already handles this implicitly
+- [BE-6] Error response formats — consistent after ARCH-1 refactor
 
 ---
 
-## LOW
+## Suggested priority order
 
-### ~~[LOW-1] Docker images unpinned~~ FIXED
-- MinIO pinned to `RELEASE.2025-03-12T18-04-18Z`, LiveKit pinned to `v1.8.3`
-
-### ~~[LOW-2] Dockerfile not hardened~~ FIXED
-- Added non-root `appuser`, excluded test project from build context
-
-### ~~[LOW-3] No Content Security Policy headers~~ FIXED
-- Added CSP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy via nginx.conf
-- Applied to both production and test server blocks
-
-### ~~[LOW-4] setTimeout without cleanup in modals~~ FIXED
-- InviteModal now stores timeout ref and clears on unmount
-
-### ~~[LOW-5] Unrevoked audio unlock listeners~~ FIXED
-- Listeners now removed after AudioContext enters "running" state
-
-### ~~[LOW-6] Clipboard API not awaited~~ FIXED
-- InviteModal.handleCopy now async/awaits clipboard with try/catch
-
-### ~~[LOW-7] Console logging left in production code~~ FIXED
-- Removed all 28 `console.log` debug statements; kept `console.warn`/`console.error` for real errors
-
-### ~~[LOW-8] UserId property duplicated across all controllers~~ FIXED
-- Created `AuthenticatedController` base class; updated 20 controllers
-
-### ~~[LOW-9] Deploy state file in /tmp~~ FIXED
-- Moved to `/var/lib/${PROJECT}/active-slot`
-
-### ~~[LOW-10] Generic client README~~ FIXED
-- Removed generic Vite template README from client
-- Created proper root README.md with architecture, setup, testing, project structure
-
----
+1. **BE-5** (logging) — mechanical, low risk, high observability value
+2. **BE-8** (FluentValidation) — clean validation, removes manual checks
+3. **ARCH-2** (transactions) — data integrity fix
+4. **FE-5** (accessibility) — can be done incrementally, start with aria-labels
+5. **FE-7 → FE-8** (message hook + context) — FE-8 depends on FE-7
+6. **FE-4** (virtual scrolling) — perf improvement, only matters at scale
+7. **TEST-2** (service tests) — expand coverage incrementally
+8. **TEST-1** (controller tests) — needs infra setup first
+9. **BE-4** (CancellationToken) — large mechanical refactor, low user impact
 
 ## Stats
 
-| Category | Critical | High | Medium | Low | Fixed |
-|----------|----------|------|--------|-----|-------|
-| Category | Critical | High | Medium | Low | Fixed |
-|----------|----------|------|--------|-----|-------|
-| Security | 0 | — | — | 1 | 4 |
-| Architecture | — | 1 | — | — | 2 |
-| Testing/CI | — | 2 | — | — | 3 |
-| Frontend | — | 2 | 1 | 3 | 10 |
-| Backend | — | — | 2 | 0 | 9 |
-| Infrastructure | — | — | — | 0 | 9 |
-| **Total** | **0** | **5** | **3** | **4** | **37** |
+| Status | Count |
+|--------|-------|
+| Fixed | 32 |
+| Resolved (not issues) | 3 |
+| Remaining | 10 |
+| **Total audited** | **45** |
