@@ -46,7 +46,7 @@ export default function ChannelPermissionsPage() {
             }
             setLoading(false);
         });
-    }, [channelId, guildId]);
+    }, [channelId, guildId, getChannel, getOverrides, getRoles, selectedRoleId]);
 
     function getOverrideState(roleId: string, permId: string): TriState {
         const o = overrides.find(

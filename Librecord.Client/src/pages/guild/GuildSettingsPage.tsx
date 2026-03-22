@@ -24,7 +24,7 @@ export default function GuildSettingsPage() {
         getGuild(guildId).then(g => {
             if (g) setName(g.name);
         });
-    }, [guildId]);
+    }, [guildId, getGuild]);
 
     async function handleSave() {
         if (!guildId || !name.trim()) return;

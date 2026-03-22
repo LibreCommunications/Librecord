@@ -23,7 +23,7 @@ export function CreateGroupModal({ onClose, onCreated }: Props) {
             setFriends(list);
             setLoading(false);
         });
-    }, []);
+    }, [getFriends]);
 
     function toggle(userId: string) {
         setSelected(prev => {

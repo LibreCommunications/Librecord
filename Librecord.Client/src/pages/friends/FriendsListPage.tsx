@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     useFriends,
     type FriendshipListDto
@@ -33,7 +33,7 @@ export default function FriendsListPage() {
     const [removeTarget, setRemoveTarget] =
         useState<FriendshipListDto | null>(null);
 
-    async function loadData() {
+    const loadData = useCallback(async function loadData() {
         setLoading(true);
 
         const friendsList = await getFriends();
@@ -44,11 +44,11 @@ export default function FriendsListPage() {
         setOutgoing(requestData?.outgoing ?? []);
 
         setLoading(false);
-    }
+    }, [getFriends, getRequests]);
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [loadData]);
 
     // Refresh friend list on realtime friendship events
     useEffect(() => {
@@ -65,7 +65,7 @@ export default function FriendsListPage() {
             window.removeEventListener("friend:request:declined", refresh as EventListener);
             window.removeEventListener("friend:removed", refresh as EventListener);
         };
-    }, []);
+    }, [loadData]);
 
     function avatar(url: string | null) {
         return url ? `${API_URL}${url}` : "/default-avatar.png";

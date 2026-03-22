@@ -133,7 +133,7 @@ export default function DmConversationPage() {
                 "dm:message:new",
                 onNewMessage as EventListener
             );
-    }, [dmId]);
+    }, [dmId, markAsRead]);
 
     /* ------------------------------------------------------------------ */
     /* MARK AS READ WHEN TAB REGAINS FOCUS                                 */
@@ -153,7 +153,7 @@ export default function DmConversationPage() {
 
         window.addEventListener("focus", onFocus);
         return () => window.removeEventListener("focus", onFocus);
-    }, [dmId]);
+    }, [dmId, markAsRead]);
 
     /* ------------------------------------------------------------------ */
     /* REALTIME: MESSAGE EDITED                                            */
@@ -255,7 +255,7 @@ export default function DmConversationPage() {
             .finally(() => { if (!stale) setLoading(false); });
 
         return () => { stale = true; };
-    }, [dmId]);
+    }, [dmId, getChannelMessages, getDmChannel, markAsRead, user]);
 
     /* ------------------------------------------------------------------ */
     /* SEND MESSAGE (OPTIMISTIC)                                           */

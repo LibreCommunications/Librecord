@@ -27,7 +27,7 @@ export default function FriendsAddPage() {
         }, 250);
 
         return () => clearTimeout(timeout);
-    }, [username]);
+    }, [username, suggestUsernames]);
 
     function handleSelect(name: string) {
         setUsername(name);

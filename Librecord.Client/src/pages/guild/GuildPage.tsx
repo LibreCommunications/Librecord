@@ -140,7 +140,7 @@ export default function GuildChannelPage() {
                 "guild:message:new",
                 onNewMessage as EventListener
             );
-    }, [channelId]);
+    }, [channelId, markAsRead]);
 
     /* ------------------------------------------------------------------ */
     /* MARK AS READ WHEN TAB REGAINS FOCUS                                 */
@@ -160,7 +160,7 @@ export default function GuildChannelPage() {
 
         window.addEventListener("focus", onFocus);
         return () => window.removeEventListener("focus", onFocus);
-    }, [channelId]);
+    }, [channelId, markAsRead]);
 
     /* ------------------------------------------------------------------ */
     /* REALTIME: MESSAGE EDITED                                            */
@@ -286,7 +286,7 @@ export default function GuildChannelPage() {
             .finally(() => { if (!stale) setLoading(false); });
 
         return () => { stale = true; };
-    }, [channelId]);
+    }, [channelId, getChannel, getChannelMessages, getPins, markAsRead]);
 
     /* ------------------------------------------------------------------ */
     /* SEND MESSAGE (OPTIMISTIC)                                           */

@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useChannels, type GuildChannel } from "../../hooks/useChannels";
 import { useReadState } from "../../hooks/useReadState";
 import { useVoice } from "../../hooks/useVoice";
@@ -34,7 +34,7 @@ export default function ChannelSidebar({ guildId }: Props) {
     const [canManageChannels, setCanManageChannels] = useState(false);
     const [channelParticipants, setChannelParticipants] = useState<Record<string, { userId: string; username: string; displayName: string; avatarUrl: string | null; isMuted: boolean; isDeafened: boolean }[]>>({});
 
-    async function loadChannels() {
+    const loadChannels = useCallback(async function loadChannels() {
         setLoading(true);
         const list = await getGuildChannels(guildId);
         setChannels(list);
@@ -66,12 +66,12 @@ export default function ChannelSidebar({ guildId }: Props) {
         } catch {
             setCanManageChannels(false);
         }
-    }
+    }, [guildId, getGuildChannels, getUnreadCounts, auth, user?.userId]);
 
     useEffect(() => {
         if (!guildId) return;
         loadChannels();
-    }, [guildId]);
+    }, [guildId, loadChannels]);
 
     // Fetch voice participants for all voice channels
     useEffect(() => {
@@ -88,7 +88,7 @@ export default function ChannelSidebar({ guildId }: Props) {
             for (const [id, p] of results) map[id] = p;
             setChannelParticipants(map);
         });
-    }, [channels]);
+    }, [channels, auth]);
 
     // Update participant list on voice join/leave/state events
     useEffect(() => {

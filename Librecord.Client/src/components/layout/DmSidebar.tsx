@@ -1,5 +1,5 @@
 import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     useDirectMessagesChannel,
     type DmChannel
@@ -33,7 +33,7 @@ export default function DmSidebar() {
 
     const isFriendsPage = location.pathname.startsWith("/app/dm/friends");
 
-    async function loadDms() {
+    const loadDms = useCallback(async function loadDms() {
         const list = await getMyDms();
         setDms(list);
 
@@ -62,11 +62,11 @@ export default function DmSidebar() {
                 }
             }
         }
-    }
+    }, [getMyDms, getUnreadCounts, user?.userId, auth]);
 
     useEffect(() => {
         loadDms();
-    }, []);
+    }, [loadDms]);
 
     // Refresh DM list when a friend is removed or a new DM channel is created
     useEffect(() => {
@@ -77,7 +77,7 @@ export default function DmSidebar() {
             window.removeEventListener("friend:removed", refresh as EventListener);
             window.removeEventListener("dm:channel:created", refresh as EventListener);
         };
-    }, []);
+    }, [loadDms]);
 
     // Update DM list when a member leaves a group DM
     useEffect(() => {
@@ -98,7 +98,7 @@ export default function DmSidebar() {
         };
         window.addEventListener("dm:member:left", onMemberLeft as EventListener);
         return () => window.removeEventListener("dm:member:left", onMemberLeft as EventListener);
-    }, [dmId, user?.userId]);
+    }, [dmId, user?.userId, navigate]);
 
     // Update presence from real-time events
     useEffect(() => {

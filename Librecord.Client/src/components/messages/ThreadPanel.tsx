@@ -21,7 +21,7 @@ export function ThreadPanel({ channelId, threadId, threadName, onClose }: Props)
             setMessages(msgs.reverse());
             setLoading(false);
         });
-    }, [threadId]);
+    }, [threadId, channelId, getThreadMessages]);
 
     async function handleSend() {
         if (!content.trim() || sending) return;

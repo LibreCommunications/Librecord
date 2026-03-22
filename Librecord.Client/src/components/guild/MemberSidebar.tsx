@@ -40,7 +40,7 @@ export function MemberSidebar({ guildId }: Props) {
                 setPresenceMap(data);
             }
         });
-    }, [guildId]);
+    }, [guildId, auth, getMembers]);
 
     // Listen for realtime presence changes
     useEffect(() => {

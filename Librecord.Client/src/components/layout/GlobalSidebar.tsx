@@ -101,7 +101,7 @@ export default function GlobalSidebar() {
             }
             channelToGuildRef.current = map;
         });
-    }, []);
+    }, [getGuilds, getGuildChannels]);
 
     // Handle guild deletion in realtime — remove from sidebar and redirect if viewing
     useEffect(() => {

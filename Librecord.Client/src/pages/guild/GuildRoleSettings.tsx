@@ -37,13 +37,13 @@ export function GuildRoleSettings({ guildId }: Props) {
             setRoles(r);
             if (r.length > 0 && !selectedId) setSelectedId(r[0].id);
         });
-    }, [guildId]);
+    }, [guildId, getRoles, selectedId]);
 
     const selected = roles.find(r => r.id === selectedId);
 
     useEffect(() => {
         if (selected) setEditName(selected.name);
-    }, [selectedId]);
+    }, [selectedId, selected]);
 
     async function handleCreate() {
         const role = await createRole(guildId, "New Role");
