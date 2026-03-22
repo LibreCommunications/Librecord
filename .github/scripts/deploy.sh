@@ -21,7 +21,9 @@ case "$ENV" in
     ;;
 esac
 
-STATE_FILE="/tmp/${PROJECT}-active-slot"
+STATE_DIR="/var/lib/${PROJECT}"
+mkdir -p "$STATE_DIR" 2>/dev/null || true
+STATE_FILE="${STATE_DIR}/active-slot"
 UPSTREAM_FILE="/etc/nginx/conf.d/${PROJECT}-upstream.conf"
 
 # Determine current active slot

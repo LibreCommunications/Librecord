@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGuildInvites } from "../../hooks/useGuildInvites";
 
 interface Props {
@@ -11,6 +11,12 @@ export function InviteModal({ guildId, onClose }: Props) {
     const [inviteCode, setInviteCode] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [loading, setLoading] = useState(false);
+    const copyTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+    // Clear timeout on unmount
+    useEffect(() => {
+        return () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current); };
+    }, []);
 
     async function handleCreate() {
         setLoading(true);
@@ -19,11 +25,16 @@ export function InviteModal({ guildId, onClose }: Props) {
         setLoading(false);
     }
 
-    function handleCopy() {
+    async function handleCopy() {
         if (!inviteCode) return;
-        navigator.clipboard.writeText(inviteCode);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        try {
+            await navigator.clipboard.writeText(inviteCode);
+            setCopied(true);
+            if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+            copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
+        } catch {
+            // Clipboard API may fail without HTTPS
+        }
     }
 
     return (

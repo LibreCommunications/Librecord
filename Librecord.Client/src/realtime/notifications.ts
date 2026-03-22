@@ -21,16 +21,23 @@ function getAudioContext(): AudioContext {
 }
 
 // Resume AudioContext on first user interaction (browser requirement)
+const unlockEvents = ["click", "keydown", "touchstart"] as const;
+
 function unlockAudio() {
     const ctx = getAudioContext();
     if (ctx.state === "suspended") {
         ctx.resume();
     }
+    // Remove listeners once unlocked
+    if (ctx.state === "running") {
+        for (const evt of unlockEvents) {
+            document.removeEventListener(evt, unlockAudio);
+        }
+    }
 }
 
-// Unlock on any user gesture — only needs to succeed once
-for (const evt of ["click", "keydown", "touchstart"] as const) {
-    document.addEventListener(evt, unlockAudio, { once: false, passive: true });
+for (const evt of unlockEvents) {
+    document.addEventListener(evt, unlockAudio, { passive: true });
 }
 
 function playNotificationSound() {

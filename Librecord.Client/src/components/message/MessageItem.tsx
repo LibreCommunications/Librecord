@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { MessageMenu } from "./MessageMenu";
 import { ReactionBar } from "../messages/ReactionBar";
 import { ImageLightbox } from "../ui/ImageLightbox";
@@ -28,7 +28,7 @@ function formatTimestamp(iso: string): string {
     return `${date.toLocaleDateString()} ${time}`;
 }
 
-export function MessageItem({
+export const MessageItem = memo(function MessageItem({
                                 msg,
                                 isAuthor,
                                 isEditing,
@@ -243,4 +243,4 @@ export function MessageItem({
             )}
         </div>
     );
-}
+});

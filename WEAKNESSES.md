@@ -173,10 +173,8 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 - `GuildPage.tsx` passes 15+ props to `MessageList`
 - **Fix:** Create `MessageListContext` or compose with hooks
 
-### [FE-9] Missing React.memo on MessageItem
-- `MessageItem.tsx` is a plain function export (not memoized)
-- Every parent re-render re-renders ALL messages in the list
-- **Fix:** Wrap with `React.memo` and stabilize callback props
+### ~~[FE-9] Missing React.memo on MessageItem~~ FIXED
+- Wrapped with `memo()` to prevent unnecessary re-renders
 
 ### ~~[FE-10] XSS risk in markdown renderer~~ FIXED
 - Link auto-detection now validates URLs with `new URL()` and rejects non-http/https protocols
@@ -190,33 +188,25 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 
 ## LOW
 
-### [LOW-1] Docker images unpinned
-- `docker-compose.yml` line 63: MinIO uses `:latest` tag
-- `docker-compose.yml` line 77: LiveKit uses `:latest` tag
-- **Fix:** Pin to specific versions
+### ~~[LOW-1] Docker images unpinned~~ FIXED
+- MinIO pinned to `RELEASE.2025-03-12T18-04-18Z`, LiveKit pinned to `v1.8.3`
 
-### [LOW-2] Dockerfile not hardened
-- No `USER` directive — runs as root
-- Test project copied into build context but never used (line 9)
-- **Fix:** Add non-root user, exclude test project from COPY
+### ~~[LOW-2] Dockerfile not hardened~~ FIXED
+- Added non-root `appuser`, excluded test project from build context
 
 ### [LOW-3] No Content Security Policy headers
 - No CSP middleware or headers configured
 - Combined with `dangerouslySetInnerHTML` usage, this increases XSS impact
 - **Fix:** Add CSP headers via middleware or Nginx
 
-### [LOW-4] setTimeout without cleanup in modals
-- `InviteModal.tsx` line 26: `setTimeout(() => setCopied(false), 2000)` — no cleanup on unmount
-- **Fix:** Store timeout ID, clear in useEffect cleanup
+### ~~[LOW-4] setTimeout without cleanup in modals~~ FIXED
+- InviteModal now stores timeout ref and clears on unmount
 
-### [LOW-5] Unrevoked audio unlock listeners
-- `realtime/notifications.ts` lines 32-34: `click`, `keydown`, `touchstart` listeners added globally, never removed
-- **Fix:** Remove after first unlock
+### ~~[LOW-5] Unrevoked audio unlock listeners~~ FIXED
+- Listeners now removed after AudioContext enters "running" state
 
-### [LOW-6] Clipboard API not awaited
-- `InviteModal.tsx` line 24: `navigator.clipboard.writeText()` promise not awaited or caught
-- Fails silently on non-HTTPS contexts
-- **Fix:** Await and show error toast on failure
+### ~~[LOW-6] Clipboard API not awaited~~ FIXED
+- InviteModal.handleCopy now async/awaits clipboard with try/catch
 
 ### ~~[LOW-7] Console logging left in production code~~ FIXED
 - Removed all 28 `console.log` debug statements; kept `console.warn`/`console.error` for real errors
@@ -224,10 +214,8 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 ### ~~[LOW-8] UserId property duplicated across all controllers~~ FIXED
 - Created `AuthenticatedController` base class; updated 20 controllers
 
-### [LOW-9] Deploy state file in /tmp
-- `.github/scripts/deploy.sh` line 24: `/tmp/${PROJECT}-active-slot`
-- Cleared on reboot — deployment state lost
-- **Fix:** Store in persistent location (e.g., `/var/lib/librecord/`)
+### ~~[LOW-9] Deploy state file in /tmp~~ FIXED
+- Moved to `/var/lib/${PROJECT}/active-slot`
 
 ### [LOW-10] Generic client README
 - `Librecord.Client/README.md` is the default Vite template README
@@ -240,10 +228,10 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 
 | Category | Critical | High | Medium | Low | Fixed |
 |----------|----------|------|--------|-----|-------|
-| Security | 1 | — | — | 1 | 3 (SEC-1, SEC-3, SEC-4) |
+| Security | 1 | — | — | 1 | 3 |
 | Architecture | — | 3 | — | — | — |
 | Testing/CI | — | 5 | — | — | — |
-| Frontend | — | 3 | 3 | 4 | 5 (FE-1, FE-2 partial, FE-3, FE-10, FE-11 partial) |
-| Backend | — | — | 5 | 0 | 6 (BE-2, BE-3, BE-5 partial, BE-7 partial, BE-8 partial, BE-9) |
-| Infrastructure | — | — | — | 3 | 2 (LOW-7, LOW-8) |
-| **Total** | **1** | **11** | **8** | **8** | **16** |
+| Frontend | — | 3 | 2 | 4 | 7 |
+| Backend | — | — | 5 | 0 | 6 |
+| Infrastructure | — | — | — | 1 | 7 |
+| **Total** | **1** | **11** | **7** | **6** | **23** |
