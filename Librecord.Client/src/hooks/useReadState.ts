@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
@@ -6,7 +7,7 @@ const API_URL = import.meta.env.VITE_API_URL;
 export function useReadState() {
     const auth = useAuth();
 
-    async function markAsRead(channelId: string, messageId: string): Promise<boolean> {
+    const markAsRead = useCallback(async (channelId: string, messageId: string): Promise<boolean> => {
         const res = await fetchWithAuth(
             `${API_URL}/channels/${channelId}/ack`,
             {
@@ -17,9 +18,9 @@ export function useReadState() {
             auth
         );
         return res.ok;
-    }
+    }, [auth]);
 
-    async function getUnreadCounts(channelIds: string[]): Promise<Record<string, number>> {
+    const getUnreadCounts = useCallback(async (channelIds: string[]): Promise<Record<string, number>> => {
         if (channelIds.length === 0) return {};
 
         const res = await fetchWithAuth(
@@ -34,7 +35,7 @@ export function useReadState() {
 
         if (!res.ok) return {};
         return res.json();
-    }
+    }, [auth]);
 
     return { markAsRead, getUnreadCounts };
 }
