@@ -68,11 +68,14 @@ export function MessageList({
             return;
         }
 
-        if (isAtBottomRef.current) {
-            el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-        } else if (messages.length > prevMsgCountRef.current) {
-            // New messages arrived while scrolled up
-            setNewMsgCount(prev => prev + (messages.length - prevMsgCountRef.current));
+        // Only auto-scroll when new messages arrive (count increased),
+        // not when existing messages are mutated (reactions, edits)
+        if (messages.length > prevMsgCountRef.current) {
+            if (isAtBottomRef.current) {
+                el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+            } else {
+                setNewMsgCount(prev => prev + (messages.length - prevMsgCountRef.current));
+            }
         }
 
         prevMsgCountRef.current = messages.length;

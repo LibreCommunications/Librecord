@@ -16,6 +16,8 @@ import { useReadState } from "../../hooks/useReadState";
 import { AttachmentUpload } from "../../components/messages/AttachmentUpload";
 import { useAttachmentUpload } from "../../hooks/useAttachmentUpload";
 import { useToast } from "../../hooks/useToast";
+import { usePins } from "../../hooks/usePins";
+import { PinnedMessagesPanel } from "../../components/messages/PinnedMessagesPanel";
 
 import type { Message } from "../../types/message";
 import type { DmEventMap } from "../../realtime/dm/dmEvents";
@@ -45,6 +47,7 @@ export default function DmConversationPage() {
     const { addReaction, removeReaction } = useReactions();
     const { markAsRead } = useReadState();
     const { sendDmMessageWithAttachments } = useAttachmentUpload();
+    const { pinMessage, unpinMessage, getPins } = usePins();
 
     const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
@@ -56,6 +59,8 @@ export default function DmConversationPage() {
     const [sending, setSending] = useState(false);
     const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [showPins, setShowPins] = useState(false);
+    const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
     const [showAddModal, setShowAddModal] = useState(false);
     const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
     const [hasMore, setHasMore] = useState(true);
@@ -216,6 +221,35 @@ export default function DmConversationPage() {
     }, [dmId]);
 
     /* ------------------------------------------------------------------ */
+    /* REALTIME: PIN / UNPIN                                                */
+    /* ------------------------------------------------------------------ */
+
+    useEffect(() => {
+        if (!dmId) return;
+
+        const onPinned = (event: CustomEvent<DmEventMap["channel:message:pinned"]>) => {
+            if (event.detail.channelId !== dmId) return;
+            setPinnedIds(prev => new Set(prev).add(event.detail.messageId));
+        };
+
+        const onUnpinned = (event: CustomEvent<DmEventMap["channel:message:unpinned"]>) => {
+            if (event.detail.channelId !== dmId) return;
+            setPinnedIds(prev => {
+                const next = new Set(prev);
+                next.delete(event.detail.messageId);
+                return next;
+            });
+        };
+
+        window.addEventListener("channel:message:pinned", onPinned as EventListener);
+        window.addEventListener("channel:message:unpinned", onUnpinned as EventListener);
+        return () => {
+            window.removeEventListener("channel:message:pinned", onPinned as EventListener);
+            window.removeEventListener("channel:message:unpinned", onUnpinned as EventListener);
+        };
+    }, [dmId]);
+
+    /* ------------------------------------------------------------------ */
     /* LOAD CHANNEL + INITIAL MESSAGES                                     */
     /* ------------------------------------------------------------------ */
 
@@ -228,8 +262,8 @@ export default function DmConversationPage() {
         setChannel(null);
         setChannelName(null);
 
-        Promise.all([getDmChannel(dmId), getChannelMessages(dmId)])
-            .then(([channel, msgs]) => {
+        Promise.all([getDmChannel(dmId), getChannelMessages(dmId), getPins(dmId)])
+            .then(([channel, msgs, pins]) => {
                 if (stale || !channel) return;
 
                 setChannel(channel);
@@ -247,6 +281,7 @@ export default function DmConversationPage() {
                 const reversed = msgs.slice().reverse();
                 setMessages(reversed);
                 setHasMore(msgs.length >= 50);
+                setPinnedIds(new Set(pins.map(p => p.messageId)));
 
                 if (reversed.length > 0 && dmId) {
                     markAsRead(dmId, reversed[reversed.length - 1].id);
@@ -255,14 +290,15 @@ export default function DmConversationPage() {
             .finally(() => { if (!stale) setLoading(false); });
 
         return () => { stale = true; };
-    }, [dmId, getChannelMessages, getDmChannel, markAsRead, user]);
+    }, [dmId, getChannelMessages, getDmChannel, getPins, markAsRead, user]);
 
     /* ------------------------------------------------------------------ */
     /* SEND MESSAGE (OPTIMISTIC)                                           */
     /* ------------------------------------------------------------------ */
 
     const handleSend = async () => {
-        if (!dmId || (!content.trim() && pendingFiles.length === 0) || !user || sending) return;
+        if (!dmId || (!content.trim() && pendingFiles.length === 0) || !user) return;
+        if (sending && pendingFiles.length > 0) return; // Only block file uploads while sending
         stopTyping();
 
         const clientMessageId = createClientMessageId();
@@ -399,16 +435,42 @@ export default function DmConversationPage() {
         await removeReaction(messageId, emoji);
     };
 
+    const handlePin = async (messageId: string) => {
+        if (!dmId) return;
+        const isPinned = pinnedIds.has(messageId);
+        if (isPinned) {
+            await unpinMessage(dmId, messageId);
+            setPinnedIds(prev => { const next = new Set(prev); next.delete(messageId); return next; });
+        } else {
+            await pinMessage(dmId, messageId);
+            setPinnedIds(prev => new Set(prev).add(messageId));
+        }
+    };
+
     if (!dmId) return null;
 
     return (
         <div className="flex-1 flex flex-col bg-[#313338] min-h-0 overflow-hidden">
-            <DmHeader
-                channelName={channelName}
-                isGroup={channel?.isGroup ?? false}
-                onAddMember={() => setShowAddModal(true)}
-                onLeave={() => setShowLeaveConfirm(true)}
-            />
+            <div className="flex items-center border-b border-black/20">
+                <div className="flex-1">
+                    <DmHeader
+                        channelName={channelName}
+                        isGroup={channel?.isGroup ?? false}
+                        onAddMember={() => setShowAddModal(true)}
+                        onLeave={() => setShowLeaveConfirm(true)}
+                    />
+                </div>
+                <button
+                    onClick={() => setShowPins(v => !v)}
+                    className={`p-2 mr-2 rounded hover:bg-white/10 ${showPins ? "text-white" : "text-gray-400 hover:text-white"}`}
+                    title="Pinned Messages"
+                >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="17" x2="12" y2="22" />
+                        <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+                    </svg>
+                </button>
+            </div>
 
             <MessageList
                 messages={messages}
@@ -427,6 +489,8 @@ export default function DmConversationPage() {
                 onLoadMore={handleLoadMore}
                 hasMore={hasMore}
                 loadingMore={loadingMore}
+                onPinMessage={handlePin}
+                pinnedMessageIds={pinnedIds}
             />
 
             <TypingIndicator typingNames={typingNames} />
@@ -518,6 +582,10 @@ export default function DmConversationPage() {
                 </div>
                 );
             })()}
+
+            {showPins && dmId && (
+                <PinnedMessagesPanel channelId={dmId} onClose={() => setShowPins(false)} />
+            )}
         </div>
     );
 }

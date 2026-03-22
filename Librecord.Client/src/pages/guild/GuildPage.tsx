@@ -293,7 +293,8 @@ export default function GuildChannelPage() {
     /* ------------------------------------------------------------------ */
 
     const handleSend = async () => {
-        if (!channelId || (!content.trim() && pendingFiles.length === 0) || !user || sending) return;
+        if (!channelId || (!content.trim() && pendingFiles.length === 0) || !user) return;
+        if (sending && pendingFiles.length > 0) return; // Only block file uploads while sending
         stopTyping();
 
         const clientMessageId = createClientMessageId();
