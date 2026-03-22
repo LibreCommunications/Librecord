@@ -29,17 +29,11 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 
 ## HIGH — Architecture
 
-### [ARCH-1] Direct DbContext in controllers (bypasses service layer)
-8 controllers inject `LibrecordContext` directly, violating clean architecture:
-- `GuildMemberController.cs` — lines 73-80, 97-119, 132-157
-- `ChannelPermissionController.cs` — lines 82-116
-- `BlockController.cs` — lines 34-55
-- `SearchController.cs` — lines 42-70 (also does encryption in controller)
-- `PinController.cs` — lines 32-51
-- `ThreadController.cs` — lines 38-55, 72-138 (encrypts in controller at line 156)
-- `UserProfileController.cs` — lines 41-48, 83-101
-- `GuildSettingsController.cs` — lines 56-65, 88-95, 121-126
-- **Fix:** Create dedicated services for each (BlockService, PinService, ThreadService, etc.)
+### ~~[ARCH-1] Direct DbContext in controllers~~ FIXED
+- All 10 controllers migrated to use dedicated services/repositories
+- Created: IBlockService, IGuildMemberService, IGuildSettingsService, IPinService, IThreadService, IMessageSearchService, IAttachmentService
+- Extended: IUserService, IPermissionService, IGuildRepository, IBlockRepository
+- Zero `LibrecordContext` usage in any controller
 
 ### [ARCH-2] Multiple SaveChangesAsync without transactions
 - `AttachmentController.cs` — lines 69, 99, 206: sequential saves without transaction scope
@@ -229,9 +223,9 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 | Category | Critical | High | Medium | Low | Fixed |
 |----------|----------|------|--------|-----|-------|
 | Security | 1 | — | — | 1 | 3 |
-| Architecture | — | 3 | — | — | — |
+| Architecture | — | 2 | — | — | 1 (ARCH-1) |
 | Testing/CI | — | 5 | — | — | — |
 | Frontend | — | 3 | 2 | 4 | 7 |
 | Backend | — | — | 5 | 0 | 6 |
 | Infrastructure | — | — | — | 1 | 7 |
-| **Total** | **1** | **11** | **7** | **6** | **23** |
+| **Total** | **1** | **10** | **7** | **6** | **24** |
