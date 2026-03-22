@@ -9,8 +9,8 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 ### ~~[SEC-1] No rate limiting anywhere~~ FIXED
 - Added global rate limiter (60 req/min per IP), `"auth"` policy (10/min), `"upload"` policy (10/min)
 
-### ~~[SEC-3] AllowedHosts wildcard in production~~ FIXED
-- Changed from `"*"` to `"localhost"` in base appsettings.json
+### [SEC-3] AllowedHosts wildcard in production — REVERTED
+- Reverted to `"*"` — Nginx handles host filtering in production; restricting at app level caused issues
 
 ### ~~[SEC-4] No environment variable validation on startup~~ FIXED
 - App now fails fast if JWT config, connection string, or encryption key are missing/invalid
