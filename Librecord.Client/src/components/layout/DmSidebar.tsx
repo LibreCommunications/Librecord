@@ -68,12 +68,33 @@ export default function DmSidebar() {
         loadDms();
     }, []);
 
-    // Refresh DM list when a friend is removed (conversation should disappear)
+    // Refresh DM list when a friend is removed
     useEffect(() => {
         const onFriendRemoved = () => { loadDms(); };
         window.addEventListener("friend:removed", onFriendRemoved as EventListener);
         return () => window.removeEventListener("friend:removed", onFriendRemoved as EventListener);
     }, []);
+
+    // Update DM list when a member leaves a group DM
+    useEffect(() => {
+        const onMemberLeft = (e: CustomEvent<DmEventMap["dm:member:left"]>) => {
+            const { channelId, userId } = e.detail;
+            if (userId === user?.userId) {
+                // Current user left — remove the DM from sidebar
+                setDms(prev => prev.filter(d => d.id !== channelId));
+                if (dmId === channelId) navigate("/app/dm");
+            } else {
+                // Another member left — update the member list
+                setDms(prev => prev.map(d =>
+                    d.id === channelId
+                        ? { ...d, members: d.members.filter(m => m.id !== userId) }
+                        : d
+                ));
+            }
+        };
+        window.addEventListener("dm:member:left", onMemberLeft as EventListener);
+        return () => window.removeEventListener("dm:member:left", onMemberLeft as EventListener);
+    }, [dmId, user?.userId]);
 
     // Update presence from real-time events
     useEffect(() => {

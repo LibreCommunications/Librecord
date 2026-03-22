@@ -79,4 +79,9 @@ export interface DmEventMap {
         channelId: string;
         messageId: string;
     };
+
+    "dm:member:left": {
+        channelId: string;
+        userId: string;
+    };
 }

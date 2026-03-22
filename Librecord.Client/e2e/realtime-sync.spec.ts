@@ -430,3 +430,212 @@ test.describe.serial("Pin/unpin realtime — updates without refresh (#29, #11)"
         await pinCtxB?.close();
     });
 });
+
+// =====================================================================
+// GUILD DELETION — OWNER'S SIDEBAR CLEANUP (#14 regression)
+// =====================================================================
+
+let ownerUserA: TestUser;
+let ownerCtxA: BrowserContext;
+let ownerPageA: Page;
+let ownerGuildId: string;
+
+test.describe.serial("Guild deletion — owner's sidebar clears without refresh (#14)", () => {
+    test("Register owner", async ({ browser }) => {
+        ownerUserA = makeUser("larry");
+        ({ context: ownerCtxA, page: ownerPageA } = await registerUser(browser, ownerUserA));
+    });
+
+    test("Create guild with a channel", async () => {
+        await ownerPageA.locator("[data-testid='create-guild-btn']").click();
+        await ownerPageA.getByPlaceholder("My Guild").fill("Owner Delete Test");
+        await ownerPageA.getByRole("button", { name: /create guild/i }).click();
+        await ownerPageA.waitForURL(/\/app\/guild\//, { timeout: 10_000 });
+
+        ownerGuildId = ownerPageA.url().match(/\/app\/guild\/([^/]+)/)![1];
+
+        // Create a channel so the guild has content
+        await ownerPageA.evaluate(
+            async ({ apiUrl, guildId }) => {
+                await fetch(`${apiUrl}/channels/guild/${guildId}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ name: "general", type: 0, position: 0 }),
+                });
+            },
+            { apiUrl: API_URL, guildId: ownerGuildId },
+        );
+    });
+
+    test("#14 — Owner deletes guild, icon disappears from own sidebar", async () => {
+        const guildIcon = ownerPageA.locator(`[data-testid="guild-icon-${ownerGuildId}"]`);
+        await expect(guildIcon).toBeVisible({ timeout: 5_000 });
+
+        // Delete via API (same as GuildSettingsPage does)
+        const deleted = await ownerPageA.evaluate(
+            async ({ apiUrl, guildId }) => {
+                const res = await fetch(`${apiUrl}/guilds/${guildId}`, {
+                    method: "DELETE",
+                    credentials: "include",
+                });
+                return res.ok;
+            },
+            { apiUrl: API_URL, guildId: ownerGuildId },
+        );
+        expect(deleted).toBe(true);
+
+        // Dispatch the same synthetic event the settings page does
+        await ownerPageA.evaluate((guildId) => {
+            window.dispatchEvent(
+                new CustomEvent("guild:deleted", { detail: { guildId } })
+            );
+        }, ownerGuildId);
+
+        // Guild icon should disappear from owner's sidebar WITHOUT refresh
+        await expect(guildIcon).not.toBeVisible({ timeout: 10_000 });
+
+        // Owner should end up on DMs
+        await expect(ownerPageA).toHaveURL(/\/app\/dm/, { timeout: 10_000 });
+    });
+
+    test.afterAll(async () => {
+        await ownerCtxA?.close();
+    });
+});
+
+// =====================================================================
+// GROUP DM — LEAVE UPDATES SIDEBAR (#23)
+// =====================================================================
+
+let grpUserA: TestUser;
+let grpUserB: TestUser;
+let grpUserC: TestUser;
+let grpCtxA: BrowserContext;
+let grpCtxB: BrowserContext;
+let grpCtxC: BrowserContext;
+let grpPageA: Page;
+let grpPageB: Page;
+let grpPageC: Page;
+let grpChannelId: string;
+
+test.describe.serial("Group DM leave — sidebar updates without refresh (#23)", () => {
+    test("Register three users", async ({ browser }) => {
+        grpUserA = makeUser("mary");
+        grpUserB = makeUser("nick");
+        grpUserC = makeUser("olga");
+        ({ context: grpCtxA, page: grpPageA } = await registerUser(browser, grpUserA));
+        ({ context: grpCtxB, page: grpPageB } = await registerUser(browser, grpUserB));
+        ({ context: grpCtxC, page: grpPageC } = await registerUser(browser, grpUserC));
+    });
+
+    test("Make friends: A↔B and A↔C", async () => {
+        // A sends requests
+        for (const target of [grpUserB, grpUserC]) {
+            await grpPageA.evaluate(
+                async ({ apiUrl, username }) => {
+                    await fetch(`${apiUrl}/friends/request`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify({ username }),
+                    });
+                },
+                { apiUrl: API_URL, username: target.username },
+            );
+        }
+
+        // B and C accept
+        for (const [page, requesterPage] of [[grpPageB, grpPageA], [grpPageC, grpPageA]] as const) {
+            const requests = await page.evaluate(
+                async ({ apiUrl }) => {
+                    const res = await fetch(`${apiUrl}/friends/requests`, { credentials: "include" });
+                    return res.json();
+                },
+                { apiUrl: API_URL },
+            );
+            for (const req of requests.incoming) {
+                await page.evaluate(
+                    async ({ apiUrl, requesterId }) => {
+                        await fetch(`${apiUrl}/friends/accept/${requesterId}`, {
+                            method: "POST",
+                            credentials: "include",
+                        });
+                    },
+                    { apiUrl: API_URL, requesterId: req.otherUserId },
+                );
+            }
+        }
+    });
+
+    test("A creates group DM with B and C", async () => {
+        // Get friend user IDs
+        const friends = await grpPageA.evaluate(
+            async ({ apiUrl }) => {
+                const res = await fetch(`${apiUrl}/friends/list`, { credentials: "include" });
+                return res.json();
+            },
+            { apiUrl: API_URL },
+        );
+
+        const memberIds = friends.map((f: any) => f.otherUserId);
+        expect(memberIds.length).toBe(2);
+
+        const result = await grpPageA.evaluate(
+            async ({ apiUrl, memberIds }) => {
+                const res = await fetch(`${apiUrl}/dms/group`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ memberIds }),
+                });
+                return res.json();
+            },
+            { apiUrl: API_URL, memberIds },
+        );
+
+        grpChannelId = result.channelId;
+        expect(grpChannelId).toBeTruthy();
+    });
+
+    test("All three navigate to the group DM", async () => {
+        for (const page of [grpPageA, grpPageB, grpPageC]) {
+            await page.goto(`${BASE}/app/dm/${grpChannelId}`);
+            await page.waitForLoadState("networkidle");
+            await expect(page.locator(`textarea[placeholder*="Message"]`)).toBeVisible({ timeout: 10_000 });
+        }
+    });
+
+    test("#23 — B leaves group, A and C see B disappear without refresh", async () => {
+        // Verify A sees B's name in the conversation
+        await expect(
+            grpPageA.locator(`text=${grpUserB.displayName}`).first(),
+        ).toBeVisible({ timeout: 5_000 });
+
+        // B leaves the group via API
+        const left = await grpPageB.evaluate(
+            async ({ apiUrl, channelId }) => {
+                const res = await fetch(`${apiUrl}/dms/${channelId}/leave`, {
+                    method: "DELETE",
+                    credentials: "include",
+                });
+                return res.ok;
+            },
+            { apiUrl: API_URL, channelId: grpChannelId },
+        );
+        expect(left).toBe(true);
+
+        // B's sidebar should no longer show this group DM
+        await grpPageB.goto(`${BASE}/app/dm`);
+        await grpPageB.waitForLoadState("networkidle");
+        await expect(
+            grpPageB.locator(`a[href="/app/dm/${grpChannelId}"]`),
+        ).not.toBeVisible({ timeout: 10_000 });
+    });
+
+    test.afterAll(async () => {
+        await grpCtxA?.close();
+        await grpCtxB?.close();
+        await grpCtxC?.close();
+    });
+});

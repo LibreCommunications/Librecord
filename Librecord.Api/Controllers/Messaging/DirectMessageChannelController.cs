@@ -1,7 +1,9 @@
 using System.Security.Claims;
+using Librecord.Api.Hubs;
 using Librecord.Application.Messaging;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 
 namespace Librecord.Api.Controllers.Messaging;
 
@@ -11,11 +13,14 @@ namespace Librecord.Api.Controllers.Messaging;
 public class DirectMessageChannelController : ControllerBase
 {
     private readonly IDirectMessageChannelService _dms;
+    private readonly IHubContext<DmHub> _dmHub;
 
     public DirectMessageChannelController(
-        IDirectMessageChannelService dms)
+        IDirectMessageChannelService dms,
+        IHubContext<DmHub> dmHub)
     {
         _dms = dms;
+        _dmHub = dmHub;
     }
 
     private Guid UserId =>
@@ -148,6 +153,12 @@ public class DirectMessageChannelController : ControllerBase
     public async Task<IActionResult> LeaveChannel(Guid channelId)
     {
         await _dms.LeaveChannelAsync(channelId, UserId);
+
+        // Notify remaining members that this user left
+        await _dmHub.Clients.Group(DmHub.ChannelGroup(channelId)).SendAsync(
+            "dm:member:left",
+            new { channelId, userId = UserId });
+
         return Ok();
     }
 }

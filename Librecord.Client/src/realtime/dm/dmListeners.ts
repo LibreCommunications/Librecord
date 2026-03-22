@@ -28,6 +28,7 @@ export function registerDmListeners() {
     dmConnection.off("friend:removed");
     dmConnection.off("channel:message:pinned");
     dmConnection.off("channel:message:unpinned");
+    dmConnection.off("dm:member:left");
 
     /* ------------------------------------------------------------------ */
     /* MESSAGE PING (lightweight — for unread badges + notifications)      */
@@ -170,6 +171,17 @@ export function registerDmListeners() {
         (payload: { channelId: string; messageId: string }) => {
             console.log("[SignalR] channel:message:unpinned", payload);
             dispatchDmEvent("channel:message:unpinned", payload);
+        }
+    );
+
+    /* ------------------------------------------------------------------ */
+    /* DM MEMBER LEFT (group DM membership change)                          */
+    /* ------------------------------------------------------------------ */
+    dmConnection.on(
+        "dm:member:left",
+        (payload: { channelId: string; userId: string }) => {
+            console.log("[SignalR] dm:member:left", payload);
+            dispatchDmEvent("dm:member:left", payload);
         }
     );
 }

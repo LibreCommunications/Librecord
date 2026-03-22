@@ -106,6 +106,11 @@ export default function GuildSettingsPage() {
                 confirmVariant="danger"
                 onConfirm={async () => {
                     if (await deleteGuild(guildId)) {
+                        // Dispatch locally so GlobalSidebar removes the icon immediately
+                        // (the SignalR event may arrive after navigation)
+                        window.dispatchEvent(
+                            new CustomEvent("guild:deleted", { detail: { guildId } })
+                        );
                         toast("Server deleted.", "info");
                         navigate("/app/dm");
                     }
