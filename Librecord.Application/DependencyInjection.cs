@@ -35,10 +35,10 @@ public static class DependencyInjection
         services.AddScoped<IBlockService, BlockService>();
         services.AddScoped<IGuildMemberService, GuildMemberService>();
         services.AddScoped<IGuildSettingsService, GuildSettingsService>();
-
-        // Add more application services later:
-        // services.AddScoped<IGuildService, GuildService>();
-        // services.AddScoped<IMessageService, MessageService>();
+        services.AddScoped<IPinService, PinService>();
+        services.AddScoped<IMessageSearchService, MessageSearchService>();
+        services.AddScoped<IAttachmentService, AttachmentService>();
+        services.AddScoped<IThreadService, ThreadService>();
 
         return services;
     }

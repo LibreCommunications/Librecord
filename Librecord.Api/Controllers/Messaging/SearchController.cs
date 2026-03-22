@@ -1,9 +1,6 @@
-using System.Security.Claims;
-using Librecord.Domain.Security;
-using Librecord.Infra.Database;
+using Librecord.Application.Messaging;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace Librecord.Api.Controllers.Messaging;
 
@@ -12,22 +9,13 @@ namespace Librecord.Api.Controllers.Messaging;
 [Route("search")]
 public class SearchController : AuthenticatedController
 {
-    private readonly LibrecordContext _db;
-    private readonly IMessageEncryptionService _encryption;
-    private readonly ILogger<SearchController> _logger;
+    private readonly IMessageSearchService _search;
 
-    public SearchController(
-        LibrecordContext db,
-        IMessageEncryptionService encryption,
-        ILogger<SearchController> logger)
+    public SearchController(IMessageSearchService search)
     {
-        _db = db;
-        _encryption = encryption;
-        _logger = logger;
+        _search = search;
     }
-    // ---------------------------------------------------------
-    // SEARCH MESSAGES
-    // ---------------------------------------------------------
+
     [HttpGet]
     public async Task<IActionResult> Search(
         [FromQuery] string q,
@@ -40,89 +28,21 @@ public class SearchController : AuthenticatedController
 
         limit = Math.Clamp(limit, 1, 50);
 
-        var query = _db.Messages
-            .Include(m => m.User)
-            .Include(m => m.DmContext)
-            .Include(m => m.GuildContext)
-            .AsQueryable();
+        var results = await _search.SearchAsync(q, channelId, guildId, limit);
 
-        if (channelId.HasValue)
+        return Ok(results.Select(r => new
         {
-            query = query.Where(m =>
-                (m.DmContext != null && m.DmContext.ChannelId == channelId.Value) ||
-                (m.GuildContext != null && m.GuildContext.ChannelId == channelId.Value));
-        }
-
-        if (guildId.HasValue)
-        {
-            var guildChannelIds = await _db.GuildChannels
-                .Where(c => c.GuildId == guildId.Value)
-                .Select(c => c.Id)
-                .ToListAsync();
-
-            query = query.Where(m =>
-                m.GuildContext != null && guildChannelIds.Contains(m.GuildContext.ChannelId));
-        }
-
-        var messages = await query
-            .OrderByDescending(m => m.CreatedAt)
-            .Take(limit * 3)
-            .ToListAsync();
-
-        var results = new List<object>();
-        var term = q.ToLowerInvariant();
-
-        foreach (var msg in messages)
-        {
-            if (msg.Content == null || msg.Content.Length == 0) continue;
-
-            try
+            id = r.Id,
+            channelId = r.ChannelId,
+            content = r.Content,
+            createdAt = r.CreatedAt,
+            author = new
             {
-                // Get encryption metadata from the context table
-                byte[] salt;
-                string algorithm;
-
-                if (msg.DmContext != null)
-                {
-                    salt = msg.DmContext.EncryptionSalt;
-                    algorithm = msg.DmContext.EncryptionAlgorithm;
-                }
-                else if (msg.GuildContext != null)
-                {
-                    salt = msg.GuildContext.EncryptionSalt;
-                    algorithm = msg.GuildContext.EncryptionAlgorithm;
-                }
-                else continue;
-
-                var plaintext = _encryption.Decrypt(msg.Content, salt, algorithm);
-                if (!plaintext.Contains(term, StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                var channelIdResult = msg.DmContext?.ChannelId ?? msg.GuildContext?.ChannelId;
-
-                results.Add(new
-                {
-                    id = msg.Id,
-                    channelId = channelIdResult,
-                    content = plaintext,
-                    createdAt = msg.CreatedAt,
-                    author = new
-                    {
-                        id = msg.User.Id,
-                        username = msg.User.UserName,
-                        displayName = msg.User.DisplayName,
-                        avatarUrl = msg.User.AvatarUrl
-                    }
-                });
-
-                if (results.Count >= limit) break;
+                id = r.Author.Id,
+                username = r.Author.Username,
+                displayName = r.Author.DisplayName,
+                avatarUrl = r.Author.AvatarUrl
             }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to decrypt message {MessageId} during search", msg.Id);
-            }
-        }
-
-        return Ok(results);
+        }));
     }
 }

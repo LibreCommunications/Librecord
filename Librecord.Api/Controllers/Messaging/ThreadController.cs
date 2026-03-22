@@ -1,10 +1,6 @@
-using System.Security.Claims;
-using Librecord.Domain.Messaging.Common;
-using Librecord.Domain.Security;
-using Librecord.Infra.Database;
+using Librecord.Application.Messaging;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace Librecord.Api.Controllers.Messaging;
 
@@ -13,51 +9,24 @@ namespace Librecord.Api.Controllers.Messaging;
 [Route("channels/{channelId:guid}/threads")]
 public class ThreadController : AuthenticatedController
 {
-    private readonly LibrecordContext _db;
-    private readonly IMessageEncryptionService _encryption;
+    private readonly IThreadService _threads;
 
-    public ThreadController(LibrecordContext db, IMessageEncryptionService encryption)
+    public ThreadController(IThreadService threads)
     {
-        _db = db;
-        _encryption = encryption;
+        _threads = threads;
     }
-    // ---------------------------------------------------------
-    // CREATE THREAD FROM MESSAGE
-    // ---------------------------------------------------------
+
     [HttpPost]
     public async Task<IActionResult> Create(Guid channelId, [FromBody] CreateThreadRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest("Thread name is required.");
 
-        // Verify the user is a member of this channel
-        var isMember = await _db.DmChannelMembers
-            .AnyAsync(m => m.ChannelId == channelId && m.UserId == UserId)
-            || await _db.GuildChannels
-            .AnyAsync(c => c.Id == channelId && c.Guild.Members.Any(m => m.UserId == UserId));
+        if (!await _threads.IsChannelMemberAsync(channelId, UserId))
+            return Forbid();
 
-        if (!isMember) return Forbid();
-
-        // Verify parent message is in this channel
-        var inChannel = await _db.DmChannelMessages
-            .AnyAsync(m => m.ChannelId == channelId && m.MessageId == request.ParentMessageId)
-            || await _db.GuildChannelMessages
-            .AnyAsync(m => m.ChannelId == channelId && m.MessageId == request.ParentMessageId);
-
-        if (!inChannel) return NotFound("Parent message not in this channel.");
-
-        var thread = new MessageThread
-        {
-            Id = Guid.NewGuid(),
-            ParentMessageId = request.ParentMessageId,
-            ChannelId = channelId,
-            Name = request.Name.Trim(),
-            CreatorId = UserId,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        _db.Set<MessageThread>().Add(thread);
-        await _db.SaveChangesAsync();
+        var thread = await _threads.CreateThreadAsync(channelId, request.ParentMessageId, request.Name, UserId);
+        if (thread == null) return NotFound("Parent message not in this channel.");
 
         return Ok(new
         {
@@ -69,64 +38,33 @@ public class ThreadController : AuthenticatedController
         });
     }
 
-    // ---------------------------------------------------------
-    // LIST THREADS IN CHANNEL
-    // ---------------------------------------------------------
     [HttpGet]
     public async Task<IActionResult> List(Guid channelId)
     {
-        var threads = await _db.Set<MessageThread>()
-            .Where(t => t.ChannelId == channelId)
-            .Include(t => t.Creator)
-            .OrderByDescending(t => t.LastMessageAt ?? t.CreatedAt)
-            .ToListAsync();
+        var threads = await _threads.GetThreadsAsync(channelId);
 
         return Ok(threads.Select(t => new
         {
             id = t.Id,
             name = t.Name,
             parentMessageId = t.ParentMessageId,
-            creator = new
-            {
-                id = t.Creator.Id,
-                displayName = t.Creator.DisplayName
-            },
+            creator = new { id = t.Creator.Id, displayName = t.Creator.DisplayName },
             messageCount = t.MessageCount,
             lastMessageAt = t.LastMessageAt,
             createdAt = t.CreatedAt
         }));
     }
 
-    // ---------------------------------------------------------
-    // GET THREAD MESSAGES
-    // ---------------------------------------------------------
     [HttpGet("{threadId:guid}/messages")]
     public async Task<IActionResult> GetMessages(
         Guid channelId, Guid threadId,
         [FromQuery] int limit = 50,
         [FromQuery] Guid? before = null)
     {
-        var thread = await _db.Set<MessageThread>().FindAsync(threadId);
-        if (thread == null || thread.ChannelId != channelId)
-            return NotFound();
+        var (thread, messages) = await _threads.GetThreadMessagesAsync(threadId, channelId, limit, before);
+        if (thread == null) return NotFound();
 
-        var query = _db.Set<ThreadMessage>()
-            .Where(tm => tm.ThreadId == threadId)
-            .Include(tm => tm.Message)
-                .ThenInclude(m => m.User)
-            .OrderByDescending(tm => tm.Message.CreatedAt)
-            .AsQueryable();
-
-        if (before.HasValue)
-        {
-            var beforeMsg = await _db.Messages.FindAsync(before);
-            if (beforeMsg != null)
-                query = query.Where(tm => tm.Message.CreatedAt < beforeMsg.CreatedAt);
-        }
-
-        var threadMessages = await query.Take(limit).ToListAsync();
-
-        return Ok(threadMessages.Select(tm => new
+        return Ok(messages.Select(tm => new
         {
             id = tm.Message.Id,
             content = tm.Message.ContentText ?? "",
@@ -142,9 +80,6 @@ public class ThreadController : AuthenticatedController
         }));
     }
 
-    // ---------------------------------------------------------
-    // POST MESSAGE TO THREAD
-    // ---------------------------------------------------------
     [HttpPost("{threadId:guid}/messages")]
     public async Task<IActionResult> PostMessage(
         Guid channelId, Guid threadId,
@@ -153,47 +88,20 @@ public class ThreadController : AuthenticatedController
         if (string.IsNullOrWhiteSpace(request.Content))
             return BadRequest("Content is required.");
 
-        var thread = await _db.Set<MessageThread>().FindAsync(threadId);
-        if (thread == null || thread.ChannelId != channelId)
-            return NotFound();
-
-        var encrypted = _encryption.Encrypt(request.Content.Trim());
-
-        var message = new Message
-        {
-            Id = Guid.NewGuid(),
-            UserId = UserId,
-            Content = encrypted.Ciphertext,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        _db.Messages.Add(message);
-
-        _db.Set<ThreadMessage>().Add(new ThreadMessage
-        {
-            MessageId = message.Id,
-            ThreadId = threadId
-        });
-
-        thread.MessageCount++;
-        thread.LastMessageAt = message.CreatedAt;
-
-        await _db.SaveChangesAsync();
-
-        var user = await _db.Users.FindAsync(UserId);
-        if (user == null) return Unauthorized();
+        var result = await _threads.PostMessageAsync(threadId, channelId, UserId, request.Content);
+        if (result == null) return NotFound();
 
         return Ok(new
         {
-            id = message.Id,
-            content = request.Content.Trim(),
-            createdAt = message.CreatedAt,
+            id = result.MessageId,
+            content = result.Content,
+            createdAt = result.CreatedAt,
             author = new
             {
-                id = user.Id,
-                username = user.UserName,
-                displayName = user.DisplayName,
-                avatarUrl = user.AvatarUrl
+                id = result.Author.Id,
+                username = result.Author.Username,
+                displayName = result.Author.DisplayName,
+                avatarUrl = result.Author.AvatarUrl
             }
         });
     }
