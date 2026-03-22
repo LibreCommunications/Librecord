@@ -128,9 +128,17 @@ public class FriendshipService : IFriendshipService
         await _repo.DeleteAsync(fs);
         await _repo.SaveChangesAsync();
 
+        // Notify the original requester that their request was declined/cancelled
         await _notifier.NotifyAsync(new FriendRequestDeclined
         {
-            UserId = requesterId,
+            UserId = fs.RequesterId,
+            DeclinedByUserId = userId
+        });
+
+        // Also notify the target so their incoming requests list updates
+        await _notifier.NotifyAsync(new FriendRequestDeclined
+        {
+            UserId = fs.TargetId,
             DeclinedByUserId = userId
         });
 
