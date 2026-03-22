@@ -74,11 +74,19 @@ jobs:
       - name: Write frontend .env
         run: echo "VITE_API_URL=https://${{ secrets.DOMAIN }}/api" > Librecord.Client/.env
 
+      - name: Run backend tests
+        run: dotnet test Librecord.Tests/Librecord.Tests.csproj --verbosity minimal
+
       - name: Install and build frontend
         run: |
           cd Librecord.Client
           npm ci
           npm run build
+
+      - name: Lint frontend
+        run: |
+          cd Librecord.Client
+          npm run lint
 
       - name: Deploy frontend
         run: |

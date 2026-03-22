@@ -15,7 +15,9 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 ### ~~[SEC-4] No environment variable validation on startup~~ FIXED
 - App now fails fast if JWT config, connection string, or encryption key are missing/invalid
 
-### [SEC-2] Missing authorization checks on pins and threads
+### ~~[SEC-2] Missing authorization checks on pins and threads~~ FIXED
+- PinController: membership check via `IPinService.IsChannelMemberAsync` on all endpoints
+- ThreadController: membership check on List, GetMessages, PostMessage (Create already had it)
 - **File:** `Librecord.Api/Controllers/Messaging/PinController.cs` — lines 29-55, 60-70
 - **File:** `Librecord.Api/Controllers/Messaging/ThreadController.cs` — lines 32-65, 144-193
 - Any authenticated user can pin/unpin messages and create/post in threads in any channel
@@ -61,9 +63,9 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 
 ### [TEST-3] No tests in CI/CD pipeline
 - **File:** `.github/workflows/deploy.yml`
-- No `dotnet test` step before deployment
-- No `npm run lint` for frontend
-- Broken tests ship to production undetected
+- ~~No `dotnet test` step before deployment~~ → FIXED: added `dotnet test` step
+- ~~No `npm run lint` for frontend~~ → FIXED: added `npm run lint` step
+- Broken tests/lint errors now block deployment
 
 ### [TEST-4] No rollback mechanism in deployment
 - **File:** `.github/scripts/deploy.sh` lines 56-71
@@ -188,10 +190,9 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 ### ~~[LOW-2] Dockerfile not hardened~~ FIXED
 - Added non-root `appuser`, excluded test project from build context
 
-### [LOW-3] No Content Security Policy headers
-- No CSP middleware or headers configured
-- Combined with `dangerouslySetInnerHTML` usage, this increases XSS impact
-- **Fix:** Add CSP headers via middleware or Nginx
+### ~~[LOW-3] No Content Security Policy headers~~ FIXED
+- Added CSP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy via nginx.conf
+- Applied to both production and test server blocks
 
 ### ~~[LOW-4] setTimeout without cleanup in modals~~ FIXED
 - InviteModal now stores timeout ref and clears on unmount
@@ -221,10 +222,12 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 
 | Category | Critical | High | Medium | Low | Fixed |
 |----------|----------|------|--------|-----|-------|
-| Security | 1 | — | — | 1 | 3 |
+| Category | Critical | High | Medium | Low | Fixed |
+|----------|----------|------|--------|-----|-------|
+| Security | 0 | — | — | 1 | 4 (SEC-1, SEC-2, SEC-4, SEC-3 reverted) |
 | Architecture | — | 2 | — | — | 1 (ARCH-1) |
-| Testing/CI | — | 5 | — | — | — |
+| Testing/CI | — | 4 | — | — | 1 (TEST-3) |
 | Frontend | — | 3 | 2 | 4 | 7 |
 | Backend | — | — | 5 | 0 | 6 |
-| Infrastructure | — | — | — | 0 | 8 |
-| **Total** | **1** | **10** | **7** | **5** | **25** |
+| Infrastructure | — | — | — | 0 | 9 |
+| **Total** | **0** | **9** | **7** | **5** | **28** |

@@ -41,6 +41,9 @@ public class ThreadController : AuthenticatedController
     [HttpGet]
     public async Task<IActionResult> List(Guid channelId)
     {
+        if (!await _threads.IsChannelMemberAsync(channelId, UserId))
+            return Forbid();
+
         var threads = await _threads.GetThreadsAsync(channelId);
 
         return Ok(threads.Select(t => new
@@ -61,6 +64,9 @@ public class ThreadController : AuthenticatedController
         [FromQuery] int limit = 50,
         [FromQuery] Guid? before = null)
     {
+        if (!await _threads.IsChannelMemberAsync(channelId, UserId))
+            return Forbid();
+
         var (thread, messages) = await _threads.GetThreadMessagesAsync(threadId, channelId, limit, before);
         if (thread == null) return NotFound();
 
@@ -87,6 +93,9 @@ public class ThreadController : AuthenticatedController
     {
         if (string.IsNullOrWhiteSpace(request.Content))
             return BadRequest("Content is required.");
+
+        if (!await _threads.IsChannelMemberAsync(channelId, UserId))
+            return Forbid();
 
         var result = await _threads.PostMessageAsync(threadId, channelId, UserId, request.Content);
         if (result == null) return NotFound();
