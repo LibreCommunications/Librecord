@@ -63,6 +63,7 @@ export function MessageList({
 
         if (forceScrollOnNextUpdate?.current) {
             el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+            // eslint-disable-next-line react-hooks/immutability
             forceScrollOnNextUpdate.current = false;
             prevMsgCountRef.current = messages.length;
             return;

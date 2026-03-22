@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -46,24 +46,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const isAuthenticated = !!user?.userId;
 
-    useEffect(() => {
-        if (initialized.current) return;
-        initialized.current = true;
-        init();
+    const refreshAccessToken = useCallback(async (): Promise<boolean> => {
+        const res = await fetch(`${API_URL}/auth/refresh`, {
+            method: "POST",
+            credentials: "include",
+        });
+        return res.ok;
     }, []);
 
-    async function init() {
-        try {
-            await loadUser();
-        } finally {
-            setAuthLoading(false);
-        }
-    }
-
-    // ------------------------
-    // LOAD USER
-    // ------------------------
-    async function loadUser() {
+    const loadUser = useCallback(async () => {
         let res = await fetch(`${API_URL}/users/me`, {
             credentials: "include",
         });
@@ -100,27 +91,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             avatarUrl: data.avatarUrl,
             guilds: data.guilds,
         });
-    }
+    }, [refreshAccessToken]);
 
-    // ------------------------
-    // REFRESH TOKEN
-    // ------------------------
-    async function refreshAccessToken(): Promise<boolean> {
-        const res = await fetch(`${API_URL}/auth/refresh`, {
-            method: "POST",
-            credentials: "include",
-        });
+    useEffect(() => {
+        if (initialized.current) return;
+        initialized.current = true;
 
-        return res.ok;
-    }
+        loadUser().finally(() => setAuthLoading(false));
+    }, [loadUser]);
 
-    // ------------------------
-    // LOGIN
-    // ------------------------
-    async function login(
+    const login = useCallback(async (
         emailOrUsername: string,
         password: string
-    ): Promise<string | null> {
+    ): Promise<string | null> => {
         const res = await fetch(`${API_URL}/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -136,18 +119,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         await loadUser();
         return null;
-    }
+    }, [loadUser]);
 
-
-    // ------------------------
-    // REGISTER
-    // ------------------------
-    async function register(
+    const register = useCallback(async (
         email: string,
         username: string,
         displayName: string,
         password: string
-    ): Promise<string | null> {
+    ): Promise<string | null> => {
         const res = await fetch(`${API_URL}/auth/register`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -163,33 +142,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         await loadUser();
         return null;
-    }
+    }, [loadUser]);
 
-    // ------------------------
-    // LOGOUT
-    // ------------------------
-    async function logout() {
+    const logout = useCallback(async () => {
         await fetch(`${API_URL}/auth/logout`, {
             method: "POST",
             credentials: "include",
         });
 
         setUser(null);
-    }
+    }, []);
+
+    const value = useMemo<AuthContextType>(() => ({
+        user,
+        isAuthenticated,
+        authLoading,
+        login,
+        register,
+        logout,
+        loadUser,
+        refreshAccessToken,
+    }), [user, isAuthenticated, authLoading, login, register, logout, loadUser, refreshAccessToken]);
 
     return (
-        <AuthContext.Provider
-            value={{
-                user,
-                isAuthenticated,
-                authLoading,
-                login,
-                register,
-                logout,
-                loadUser,
-                refreshAccessToken,
-            }}
-        >
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );

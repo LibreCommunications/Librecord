@@ -39,6 +39,7 @@ export function useGuildSettings() {
         return res.ok;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async function getBans(guildId: string): Promise<any[]> {
         const res = await fetchWithAuth(`${API_URL}/guilds/${guildId}/bans`, {}, auth);
         if (!res.ok) return [];

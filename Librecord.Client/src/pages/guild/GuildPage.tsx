@@ -140,6 +140,7 @@ export default function GuildChannelPage() {
                 "guild:message:new",
                 onNewMessage as EventListener
             );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [channelId]);
 
     /* ------------------------------------------------------------------ */
@@ -160,6 +161,7 @@ export default function GuildChannelPage() {
 
         window.addEventListener("focus", onFocus);
         return () => window.removeEventListener("focus", onFocus);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [channelId]);
 
     /* ------------------------------------------------------------------ */
@@ -286,6 +288,7 @@ export default function GuildChannelPage() {
             .finally(() => { if (!stale) setLoading(false); });
 
         return () => { stale = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [channelId]);
 
     /* ------------------------------------------------------------------ */
@@ -364,7 +367,9 @@ export default function GuildChannelPage() {
 
         try {
             await deleteMessage(channelId!, messageId);
-        } catch {}
+        } catch {
+            // Optimistic delete — ignore server errors
+        }
     };
 
     const handlePin = async (messageId: string) => {

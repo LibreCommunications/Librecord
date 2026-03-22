@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
 export const BASE = process.env.E2E_BASE_URL ?? "https://localhost:5173";

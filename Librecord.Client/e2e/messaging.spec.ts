@@ -444,6 +444,7 @@ test.describe.serial("DM messaging — friend request, send, receive, edit, dele
             { apiUrl: API_URL },
         );
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const bobFriend = friends.find((f: any) => f.otherUsername === dmUserB.username);
         expect(bobFriend).toBeTruthy();
 

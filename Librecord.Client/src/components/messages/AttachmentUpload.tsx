@@ -32,9 +32,10 @@ export function AttachmentUpload({ files, onFilesChange, triggerRef }: Props) {
 
     // Revoke all on unmount
     useEffect(() => {
+        const map = urlMapRef.current;
         return () => {
-            for (const url of urlMapRef.current.values()) URL.revokeObjectURL(url);
-            urlMapRef.current.clear();
+            for (const url of map.values()) URL.revokeObjectURL(url);
+            map.clear();
         };
     }, []);
 
@@ -58,6 +59,7 @@ export function AttachmentUpload({ files, onFilesChange, triggerRef }: Props) {
 
     // Expose open() to parent via ref
     if (triggerRef && typeof triggerRef === "object" && triggerRef !== null) {
+        // eslint-disable-next-line react-hooks/immutability
         (triggerRef as React.MutableRefObject<{ open: () => void }>).current = { open };
     }
 

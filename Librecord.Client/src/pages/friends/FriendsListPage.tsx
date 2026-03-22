@@ -33,8 +33,22 @@ export default function FriendsListPage() {
     const [removeTarget, setRemoveTarget] =
         useState<FriendshipListDto | null>(null);
 
+    async function loadData() {
+        setLoading(true);
+
+        const friendsList = await getFriends();
+        const requestData = await getRequests();
+
+        setFriends(friendsList ?? []);
+        setIncoming(requestData?.incoming ?? []);
+        setOutgoing(requestData?.outgoing ?? []);
+
+        setLoading(false);
+    }
+
     useEffect(() => {
         loadData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Refresh friend list on realtime friendship events
@@ -52,20 +66,8 @@ export default function FriendsListPage() {
             window.removeEventListener("friend:request:declined", refresh as EventListener);
             window.removeEventListener("friend:removed", refresh as EventListener);
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-
-    async function loadData() {
-        setLoading(true);
-
-        const friendsList = await getFriends();
-        const requestData = await getRequests();
-
-        setFriends(friendsList ?? []);
-        setIncoming(requestData?.incoming ?? []);
-        setOutgoing(requestData?.outgoing ?? []);
-
-        setLoading(false);
-    }
 
     function avatar(url: string | null) {
         return url ? `${API_URL}${url}` : "/default-avatar.png";

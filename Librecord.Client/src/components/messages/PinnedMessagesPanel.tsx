@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePins, type PinnedMessage } from "../../hooks/usePins";
 
 interface Props {
@@ -11,17 +11,17 @@ export function PinnedMessagesPanel({ channelId, onClose }: Props) {
     const [pins, setPins] = useState<PinnedMessage[]>([]);
     const [loading, setLoading] = useState(true);
 
-    function loadPins() {
+    const loadPins = useCallback(() => {
         setLoading(true);
         getPins(channelId).then(p => {
             setPins(p);
             setLoading(false);
         });
-    }
+    }, [getPins, channelId]);
 
     useEffect(() => {
         loadPins();
-    }, [channelId]);
+    }, [loadPins]);
 
     // Refresh pin list on realtime pin/unpin events
     useEffect(() => {
@@ -36,7 +36,7 @@ export function PinnedMessagesPanel({ channelId, onClose }: Props) {
             window.removeEventListener("channel:message:pinned", onPinChanged as EventListener);
             window.removeEventListener("channel:message:unpinned", onPinChanged as EventListener);
         };
-    }, [channelId]);
+    }, [channelId, loadPins]);
 
     async function handleUnpin(messageId: string) {
         if (await unpinMessage(channelId, messageId)) {

@@ -2,13 +2,13 @@ import { useAuth } from "../context/AuthContext";
 
 export async function fetchWithAuth(
     url: string,
-    options: any = {},
+    options: RequestInit = {},
     auth: ReturnType<typeof useAuth>
 ) {
     const { refreshAccessToken } = auth;
 
     // First attempt
-    let res = await fetch(url, {
+    const res = await fetch(url, {
         ...options,
         credentials: "include",
     });

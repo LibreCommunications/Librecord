@@ -23,7 +23,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
         fetchWithAuth(`${API_URL}/presence/me`, {}, auth)
             .then(res => res.ok ? res.json() : null)
             .then(data => { if (data?.status) setStatus(data.status); });
-    }, [auth.user?.userId]);
+    }, [auth, auth.user?.userId]);
 
     const setMyStatus = useCallback(async (status: string) => {
         await fetchWithAuth(

@@ -46,6 +46,7 @@ export default function ChannelPermissionsPage() {
             }
             setLoading(false);
         });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [channelId, guildId]);
 
     function getOverrideState(roleId: string, permId: string): TriState {

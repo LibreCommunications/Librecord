@@ -85,9 +85,15 @@ export function useTypingIndicator(
         return () => clearInterval(interval);
     }, [typingUsers.length]);
 
-    // Reset when channel changes + stop typing on unmount/channel switch
+    // Stop typing on unmount/channel switch; reset handled by previous channelId ref
+    const prevChannelRef = useRef(channelId);
+    if (prevChannelRef.current !== channelId) {
+        prevChannelRef.current = channelId;
+        // Channel changed — clear stale typing indicators (synchronous, outside effect)
+        if (typingUsers.length > 0) setTypingUsers([]);
+    }
+
     useEffect(() => {
-        setTypingUsers([]);
         return () => {
             if (isTypingRef.current && channelId) {
                 isTypingRef.current = false;

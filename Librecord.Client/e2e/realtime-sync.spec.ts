@@ -140,6 +140,7 @@ test.describe.serial("Friendship realtime — request, accept, remove sync (#7, 
             },
             { apiUrl: API_URL },
         );
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const aUserId = bFriends.find((f: any) => f.otherUsername === frUserA.username)?.otherUserId;
         expect(aUserId).toBeTruthy();
 
@@ -558,7 +559,7 @@ test.describe.serial("Group DM leave — sidebar updates without refresh (#23)",
         }
 
         // B and C accept
-        for (const [page, requesterPage] of [[grpPageB, grpPageA], [grpPageC, grpPageA]] as const) {
+        for (const [page] of [[grpPageB, grpPageA], [grpPageC, grpPageA]] as const) {
             const requests = await page.evaluate(
                 async ({ apiUrl }) => {
                     const res = await fetch(`${apiUrl}/friends/requests`, { credentials: "include" });
@@ -590,6 +591,7 @@ test.describe.serial("Group DM leave — sidebar updates without refresh (#23)",
             { apiUrl: API_URL },
         );
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const memberIds = friends.map((f: any) => f.otherUserId);
         expect(memberIds.length).toBe(2);
 
@@ -727,6 +729,7 @@ test.describe.serial("New DM channel appears without refresh (#32)", () => {
             },
             { apiUrl: API_URL },
         );
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const bUserId = friends.find((f: any) => f.otherUsername === ndUserB.username)?.otherUserId;
 
         await ndPageA.evaluate(

@@ -10,6 +10,18 @@ import type { VoiceParticipant } from "../../voice/voiceStore";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+interface VoiceParticipantPayload {
+    userId: string;
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+    isMuted: boolean;
+    isDeafened: boolean;
+    isCameraOn: boolean;
+    isScreenSharing: boolean;
+    joinedAt: string;
+}
+
 interface Props {
     channelId: string;
     channelName?: string;
@@ -118,10 +130,7 @@ export function VoiceChannelView({ channelId }: Props) {
     const isInThisChannel = voiceState.isConnected && voiceState.channelId === channelId;
 
     useEffect(() => {
-        if (isInThisChannel) {
-            setPreviewParticipants([]);
-            return;
-        }
+        if (isInThisChannel) return;
 
         let cancelled = false;
 
@@ -133,9 +142,9 @@ export function VoiceChannelView({ channelId }: Props) {
                     auth,
                 );
                 if (!res.ok || cancelled) return;
-                const data = await res.json();
+                const data: VoiceParticipantPayload[] = await res.json();
                 if (!cancelled) {
-                    setPreviewParticipants(data.map((p: any) => ({
+                    setPreviewParticipants(data.map(p => ({
                         userId: p.userId,
                         username: p.username,
                         displayName: p.displayName,
@@ -163,8 +172,9 @@ export function VoiceChannelView({ channelId }: Props) {
             window.removeEventListener("voice:user:joined", onVoiceChange);
             window.removeEventListener("voice:user:left", onVoiceChange);
         };
-    }, [channelId, isInThisChannel]);
+    }, [channelId, isInThisChannel, auth]);
 
+    // When connected to this channel, use live state; otherwise use API preview
     const participants = isInThisChannel ? voiceState.participants : previewParticipants;
     const screenSharers = participants.filter(p => p.isScreenSharing);
     const totalTiles = participants.length + (isInThisChannel ? screenSharers.length : 0);

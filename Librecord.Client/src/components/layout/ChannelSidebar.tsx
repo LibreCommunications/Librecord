@@ -71,6 +71,7 @@ export default function ChannelSidebar({ guildId }: Props) {
     useEffect(() => {
         if (!guildId) return;
         loadChannels();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [guildId]);
 
     // Fetch voice participants for all voice channels
@@ -88,6 +89,7 @@ export default function ChannelSidebar({ guildId }: Props) {
             for (const [id, p] of results) map[id] = p;
             setChannelParticipants(map);
         });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [channels]);
 
     // Update participant list on voice join/leave/state events

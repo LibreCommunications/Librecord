@@ -23,6 +23,7 @@ export function CreateGroupModal({ onClose, onCreated }: Props) {
             setFriends(list);
             setLoading(false);
         });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     function toggle(userId: string) {

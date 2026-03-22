@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
@@ -16,21 +17,21 @@ export interface PinnedMessage {
 export function usePins() {
     const auth = useAuth();
 
-    async function pinMessage(channelId: string, messageId: string): Promise<boolean> {
+    const pinMessage = useCallback(async (channelId: string, messageId: string): Promise<boolean> => {
         const res = await fetchWithAuth(`${API_URL}/channels/${channelId}/pins/${messageId}`, { method: "POST" }, auth);
         return res.ok;
-    }
+    }, [auth]);
 
-    async function unpinMessage(channelId: string, messageId: string): Promise<boolean> {
+    const unpinMessage = useCallback(async (channelId: string, messageId: string): Promise<boolean> => {
         const res = await fetchWithAuth(`${API_URL}/channels/${channelId}/pins/${messageId}`, { method: "DELETE" }, auth);
         return res.ok;
-    }
+    }, [auth]);
 
-    async function getPins(channelId: string): Promise<PinnedMessage[]> {
+    const getPins = useCallback(async (channelId: string): Promise<PinnedMessage[]> => {
         const res = await fetchWithAuth(`${API_URL}/channels/${channelId}/pins`, {}, auth);
         if (!res.ok) return [];
         return res.json();
-    }
+    }, [auth]);
 
     return { pinMessage, unpinMessage, getPins };
 }

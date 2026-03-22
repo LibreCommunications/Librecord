@@ -34,6 +34,7 @@ export function RealtimeRoot() {
                 registerGuildListeners();
             }).catch(err => console.error("[Realtime] Guild connection failed", err)),
         ]).then(() => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (window as any).__realtimeReady = true;
             window.dispatchEvent(new Event("realtime:ready"));
         });
@@ -49,6 +50,7 @@ export function RealtimeRoot() {
             // User logged out
             userIdRef.current = null;
             started = false;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (window as any).__realtimeReady = false;
 
             cleanupNotifications();

@@ -6,7 +6,6 @@ import {
     expectAudioReceiving,
     expectVideoReceiving,
     expectVideoPlaying,
-    expectSpecificVideoPlaying,
     countActiveVideos,
     API_URL,
     type TestUser,

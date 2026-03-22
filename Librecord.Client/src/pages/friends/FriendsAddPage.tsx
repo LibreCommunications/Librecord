@@ -27,6 +27,7 @@ export default function FriendsAddPage() {
         }, 250);
 
         return () => clearTimeout(timeout);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [username]);
 
     function handleSelect(name: string) {

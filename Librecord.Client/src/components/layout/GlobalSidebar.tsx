@@ -101,6 +101,7 @@ export default function GlobalSidebar() {
             }
             channelToGuildRef.current = map;
         });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Handle guild deletion in realtime — remove from sidebar and redirect if viewing
