@@ -62,7 +62,10 @@ export function MessageList({
         if (!el) return;
 
         if (forceScrollOnNextUpdateRef?.current) {
-            el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+            // Delay scroll to let images/attachments render and affect scrollHeight
+            requestAnimationFrame(() => {
+                el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+            });
             forceScrollOnNextUpdateRef.current = false;
             prevMsgCountRef.current = messages.length;
             return;

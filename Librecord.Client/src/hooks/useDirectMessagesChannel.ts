@@ -49,6 +49,12 @@ export function useDirectMessagesChannel() {
 
         if (!res.ok) return null;
         const data = await res.json();
+
+        // Notify the DmSidebar to refresh so the new conversation appears
+        window.dispatchEvent(
+            new CustomEvent("dm:channel:created", { detail: { channelId: data.channelId } })
+        );
+
         return data.channelId;
     }, [auth]);
 
@@ -99,6 +105,12 @@ export function useDirectMessagesChannel() {
 
         if (!res.ok) return null;
         const data = await res.json();
+
+        // Notify the DmSidebar to refresh so the new group appears
+        window.dispatchEvent(
+            new CustomEvent("dm:channel:created", { detail: { channelId: data.channelId } })
+        );
+
         return data.channelId;
     }, [auth]);
 

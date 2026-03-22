@@ -130,6 +130,14 @@ public class DirectMessageChannelController : AuthenticatedController
 
         var channel = await _dms.CreateGroupAsync(UserId, request.MemberIds);
 
+        // Notify all members so their DM sidebar updates without refresh
+        foreach (var memberId in request.MemberIds)
+        {
+            await _dmHub.Clients.User(memberId.ToString()).SendAsync(
+                "dm:channel:created",
+                new { channelId = channel.Id });
+        }
+
         return Ok(new
         {
             channelId = channel.Id,
