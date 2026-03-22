@@ -207,19 +207,33 @@ static void ConfigureRateLimiting(IServiceCollection services)
             await context.HttpContext.Response.WriteAsync("Too many requests. Please try again later.", cancellationToken);
         };
 
-        // Global default: 60 requests per minute per IP
-        // Skip rate limiting for loopback (localhost dev/testing)
-        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+        // Use X-Forwarded-For from Nginx to identify the real client IP,
+        // falling back to the connection IP for direct access
+        static string GetClientIp(HttpContext ctx)
         {
+            var forwarded = ctx.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(forwarded))
+                return forwarded.Split(',')[0].Trim();
+
             var ip = ctx.Connection.RemoteIpAddress;
             if (ip != null && System.Net.IPAddress.IsLoopback(ip))
+                return "loopback";
+
+            return ip?.ToString() ?? "unknown";
+        }
+
+        // Global default: 300 requests per minute per client IP
+        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+        {
+            var clientIp = GetClientIp(ctx);
+            if (clientIp == "loopback")
                 return RateLimitPartition.GetNoLimiter("loopback");
 
             return RateLimitPartition.GetFixedWindowLimiter(
-                ip?.ToString() ?? "unknown",
+                clientIp,
                 _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = 60,
+                    PermitLimit = 300,
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
                 });
@@ -228,14 +242,14 @@ static void ConfigureRateLimiting(IServiceCollection services)
         // Stricter policy for auth endpoints (login/register brute force protection)
         options.AddPolicy("auth", ctx =>
         {
-            var ip = ctx.Connection.RemoteIpAddress;
-            if (ip != null && System.Net.IPAddress.IsLoopback(ip))
+            var clientIp = GetClientIp(ctx);
+            if (clientIp == "loopback")
                 return RateLimitPartition.GetNoLimiter("loopback");
             return RateLimitPartition.GetFixedWindowLimiter(
-                ip?.ToString() ?? "unknown",
+                clientIp,
                 _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = 10,
+                    PermitLimit = 20,
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
                 });
@@ -244,14 +258,14 @@ static void ConfigureRateLimiting(IServiceCollection services)
         // Stricter policy for file uploads
         options.AddPolicy("upload", ctx =>
         {
-            var ip = ctx.Connection.RemoteIpAddress;
-            if (ip != null && System.Net.IPAddress.IsLoopback(ip))
+            var clientIp = GetClientIp(ctx);
+            if (clientIp == "loopback")
                 return RateLimitPartition.GetNoLimiter("loopback");
             return RateLimitPartition.GetFixedWindowLimiter(
-                ip?.ToString() ?? "unknown",
+                clientIp,
                 _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = 10,
+                    PermitLimit = 30,
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
                 });
