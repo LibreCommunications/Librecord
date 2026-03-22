@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import {
     useFriends,
     type FriendshipListDto
@@ -10,8 +10,6 @@ import { useDirectMessagesChannel } from "../../hooks/useDirectMessagesChannel";
 import { useToast } from "../../context/ToastContext";
 import { Spinner } from "../../components/ui/Spinner";
 import { EmptyState } from "../../components/ui/EmptyState";
-import type { DmEventMap } from "../../realtime/dm/dmEvents";
-
 const API_URL = import.meta.env.VITE_API_URL;
 
 export default function FriendsListPage() {
