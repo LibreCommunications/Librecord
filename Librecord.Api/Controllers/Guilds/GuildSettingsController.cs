@@ -1,11 +1,13 @@
 using System.Security.Claims;
 using Librecord.Application.Interfaces;
 using Librecord.Application.Permissions;
+using Librecord.Application.Realtime.Guild;
 using Librecord.Domain.Permissions;
 using Librecord.Domain.Storage;
 using Librecord.Infra.Database;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Librecord.Api.Controllers;
 
@@ -16,15 +18,18 @@ public class GuildSettingsController : ControllerBase
     private readonly LibrecordContext _db;
     private readonly IPermissionService _permissions;
     private readonly IAttachmentStorageService _storage;
+    private readonly IGuildRealtimeNotifier _guildNotifier;
 
     public GuildSettingsController(
         IAttachmentStorageService storage,
         LibrecordContext db,
-        IPermissionService permissions)
+        IPermissionService permissions,
+        IGuildRealtimeNotifier guildNotifier)
     {
         _storage = storage;
         _db = db;
         _permissions = permissions;
+        _guildNotifier = guildNotifier;
     }
 
     [Authorize]
@@ -121,6 +126,19 @@ public class GuildSettingsController : ControllerBase
         var guild = await _db.Guilds.FindAsync(guildId);
         if (guild == null)
             return NotFound();
+
+        // Collect channel IDs before deletion so we can broadcast
+        var channelIds = await _db.GuildChannels
+            .Where(c => c.GuildId == guildId)
+            .Select(c => c.Id)
+            .ToListAsync();
+
+        // Notify all connected members before removing from DB
+        await _guildNotifier.NotifyGuildDeletedAsync(new GuildDeleted
+        {
+            GuildId = guildId,
+            ChannelIds = channelIds
+        });
 
         _db.Guilds.Remove(guild);
         await _db.SaveChangesAsync();

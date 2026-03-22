@@ -11,12 +11,31 @@ export function PinnedMessagesPanel({ channelId, onClose }: Props) {
     const [pins, setPins] = useState<PinnedMessage[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
+    function loadPins() {
         setLoading(true);
         getPins(channelId).then(p => {
             setPins(p);
             setLoading(false);
         });
+    }
+
+    useEffect(() => {
+        loadPins();
+    }, [channelId]);
+
+    // Refresh pin list on realtime pin/unpin events
+    useEffect(() => {
+        const onPinChanged = (e: CustomEvent<{ channelId: string; messageId: string }>) => {
+            if (e.detail.channelId !== channelId) return;
+            loadPins();
+        };
+
+        window.addEventListener("channel:message:pinned", onPinChanged as EventListener);
+        window.addEventListener("channel:message:unpinned", onPinChanged as EventListener);
+        return () => {
+            window.removeEventListener("channel:message:pinned", onPinChanged as EventListener);
+            window.removeEventListener("channel:message:unpinned", onPinChanged as EventListener);
+        };
     }, [channelId]);
 
     async function handleUnpin(messageId: string) {

@@ -213,6 +213,35 @@ export default function GuildChannelPage() {
     }, [channelId]);
 
     /* ------------------------------------------------------------------ */
+    /* REALTIME: PIN / UNPIN                                                */
+    /* ------------------------------------------------------------------ */
+
+    useEffect(() => {
+        if (!channelId) return;
+
+        const onPinned = (event: CustomEvent<GuildEventMap["channel:message:pinned"]>) => {
+            if (event.detail.channelId !== channelId) return;
+            setPinnedIds(prev => new Set(prev).add(event.detail.messageId));
+        };
+
+        const onUnpinned = (event: CustomEvent<GuildEventMap["channel:message:unpinned"]>) => {
+            if (event.detail.channelId !== channelId) return;
+            setPinnedIds(prev => {
+                const next = new Set(prev);
+                next.delete(event.detail.messageId);
+                return next;
+            });
+        };
+
+        window.addEventListener("channel:message:pinned", onPinned as EventListener);
+        window.addEventListener("channel:message:unpinned", onUnpinned as EventListener);
+        return () => {
+            window.removeEventListener("channel:message:pinned", onPinned as EventListener);
+            window.removeEventListener("channel:message:unpinned", onUnpinned as EventListener);
+        };
+    }, [channelId]);
+
+    /* ------------------------------------------------------------------ */
     /* LOAD CHANNEL + INITIAL MESSAGES                                     */
     /* ------------------------------------------------------------------ */
 

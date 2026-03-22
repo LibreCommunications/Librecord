@@ -47,4 +47,36 @@ export interface DmEventMap {
         userId: string;
         readAt: string;
     };
+
+    "friend:request:received": {
+        fromUserId: string;
+        fromUsername: string;
+        fromDisplayName: string;
+        fromAvatarUrl: string | null;
+    };
+
+    "friend:request:accepted": {
+        friendUserId: string;
+        friendUsername: string;
+        friendDisplayName: string;
+        friendAvatarUrl: string | null;
+    };
+
+    "friend:request:declined": {
+        declinedByUserId: string;
+    };
+
+    "friend:removed": {
+        removedByUserId: string;
+    };
+
+    "channel:message:pinned": {
+        channelId: string;
+        messageId: string;
+    };
+
+    "channel:message:unpinned": {
+        channelId: string;
+        messageId: string;
+    };
 }

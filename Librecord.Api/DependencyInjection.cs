@@ -3,6 +3,7 @@ using Librecord.Api.Hubs;
 using Librecord.Api.RealtimeNotifiers;
 using Librecord.Application.Realtime.DMs;
 using Librecord.Application.Realtime.Guild;
+using Librecord.Application.Realtime.Social;
 using Librecord.Application.Realtime.Voice;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<IDmRealtimeNotifier, SignalRDmRealtimeNotifier>();
         services.AddScoped<IGuildRealtimeNotifier, SignalRGuildRealtimeNotifier>();
         services.AddScoped<IVoiceRealtimeNotifier, SignalRVoiceRealtimeNotifier>();
+        services.AddScoped<IFriendshipRealtimeNotifier, SignalRFriendshipNotifier>();
 
         // ----------------------------
         // CORS (frontend)

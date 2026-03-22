@@ -44,3 +44,12 @@ public sealed class GuildMessageEdited : GuildMessageEvent
 public sealed class GuildMessageDeleted : GuildMessageEvent
 {
 }
+
+// ---------------------------------------------------------
+// GUILD DELETED (uses ChannelId to target broadcast groups)
+// ---------------------------------------------------------
+public sealed class GuildDeleted
+{
+    public Guid GuildId { get; init; }
+    public IReadOnlyList<Guid> ChannelIds { get; init; } = [];
+}

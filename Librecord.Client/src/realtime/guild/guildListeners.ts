@@ -24,9 +24,12 @@ export function registerGuildListeners() {
     guildConnection.off("guild:user:stop-typing");
     guildConnection.off("guild:user:presence");
     guildConnection.off("guild:channel:created");
+    guildConnection.off("guild:deleted");
     guildConnection.off("voice:user:joined");
     guildConnection.off("voice:user:left");
     guildConnection.off("voice:user:state");
+    guildConnection.off("channel:message:pinned");
+    guildConnection.off("channel:message:unpinned");
 
     /* ------------------------------------------------------------------ */
     /* MESSAGE PING (lightweight — for unread badges + notifications)      */
@@ -113,6 +116,36 @@ export function registerGuildListeners() {
                 console.warn("[SignalR] Failed to join new channel group", err);
             });
             dispatchGuildEvent("guild:channel:created", payload);
+        }
+    );
+
+    /* ------------------------------------------------------------------ */
+    /* GUILD DELETED                                                        */
+    /* ------------------------------------------------------------------ */
+    guildConnection.on(
+        "guild:deleted",
+        (payload: { guildId: string }) => {
+            console.log("[SignalR] guild:deleted", payload);
+            dispatchGuildEvent("guild:deleted", payload);
+        }
+    );
+
+    /* ------------------------------------------------------------------ */
+    /* PIN / UNPIN (guild channels)                                         */
+    /* ------------------------------------------------------------------ */
+    guildConnection.on(
+        "channel:message:pinned",
+        (payload: { channelId: string; messageId: string }) => {
+            console.log("[SignalR] channel:message:pinned", payload);
+            dispatchGuildEvent("channel:message:pinned", payload);
+        }
+    );
+
+    guildConnection.on(
+        "channel:message:unpinned",
+        (payload: { channelId: string; messageId: string }) => {
+            console.log("[SignalR] channel:message:unpinned", payload);
+            dispatchGuildEvent("channel:message:unpinned", payload);
         }
     );
 

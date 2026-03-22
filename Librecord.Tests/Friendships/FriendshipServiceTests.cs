@@ -1,3 +1,4 @@
+using Librecord.Application.Realtime.Social;
 using Librecord.Application.Services;
 using Librecord.Domain.Identity;
 using Librecord.Domain.Social;
@@ -10,8 +11,10 @@ public class FriendshipServiceTests
     private readonly Mock<IFriendshipRepository> _repo = new();
     private readonly Mock<IUserRepository> _users = new();
     private readonly Mock<IBlockRepository> _blocks = new();
+    private readonly Mock<IFriendshipRealtimeNotifier> _notifier = new();
 
-    private FriendshipService CreateService() => new(_repo.Object, _users.Object, _blocks.Object);
+    private FriendshipService CreateService() =>
+        new(_repo.Object, _users.Object, _blocks.Object, _notifier.Object);
 
     private static User MakeUser(Guid? id = null, string name = "bob") => new()
     {

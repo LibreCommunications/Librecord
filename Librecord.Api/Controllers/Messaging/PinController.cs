@@ -1,9 +1,11 @@
 using System.Security.Claims;
 using Librecord.Api.Dtos.Messages;
+using Librecord.Api.Hubs;
 using Librecord.Domain.Messaging.Common;
 using Librecord.Infra.Database;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Librecord.Api.Controllers.Messaging;
@@ -14,10 +16,17 @@ namespace Librecord.Api.Controllers.Messaging;
 public class PinController : ControllerBase
 {
     private readonly LibrecordContext _db;
+    private readonly IHubContext<DmHub> _dmHub;
+    private readonly IHubContext<GuildHub> _guildHub;
 
-    public PinController(LibrecordContext db)
+    public PinController(
+        LibrecordContext db,
+        IHubContext<DmHub> dmHub,
+        IHubContext<GuildHub> guildHub)
     {
         _db = db;
+        _dmHub = dmHub;
+        _guildHub = guildHub;
     }
 
     private Guid UserId =>
@@ -51,6 +60,15 @@ public class PinController : ControllerBase
         });
 
         await _db.SaveChangesAsync();
+
+        var payload = new { channelId, messageId };
+        await Task.WhenAll(
+            _dmHub.Clients.Group(DmHub.ChannelGroup(channelId))
+                .SendAsync("channel:message:pinned", payload),
+            _guildHub.Clients.Group(GuildHub.ChannelGroup(channelId))
+                .SendAsync("channel:message:pinned", payload)
+        );
+
         return Ok();
     }
 
@@ -67,6 +85,15 @@ public class PinController : ControllerBase
 
         _db.PinnedMessages.Remove(pin);
         await _db.SaveChangesAsync();
+
+        var payload = new { channelId, messageId };
+        await Task.WhenAll(
+            _dmHub.Clients.Group(DmHub.ChannelGroup(channelId))
+                .SendAsync("channel:message:unpinned", payload),
+            _guildHub.Clients.Group(GuildHub.ChannelGroup(channelId))
+                .SendAsync("channel:message:unpinned", payload)
+        );
+
         return Ok();
     }
 

@@ -22,6 +22,12 @@ export function registerDmListeners() {
     dmConnection.off("dm:user:stop-typing");
     dmConnection.off("dm:user:presence");
     dmConnection.off("dm:readstate:updated");
+    dmConnection.off("friend:request:received");
+    dmConnection.off("friend:request:accepted");
+    dmConnection.off("friend:request:declined");
+    dmConnection.off("friend:removed");
+    dmConnection.off("channel:message:pinned");
+    dmConnection.off("channel:message:unpinned");
 
     /* ------------------------------------------------------------------ */
     /* MESSAGE PING (lightweight — for unread badges + notifications)      */
@@ -110,6 +116,60 @@ export function registerDmListeners() {
         (payload: DmRealtimeReadStateUpdatedTransport) => {
             console.log("[SignalR] dm:readstate:updated", payload);
             dispatchDmEvent("dm:readstate:updated", payload);
+        }
+    );
+
+    /* ------------------------------------------------------------------ */
+    /* FRIENDSHIP EVENTS                                                    */
+    /* ------------------------------------------------------------------ */
+    dmConnection.on(
+        "friend:request:received",
+        (payload: { fromUserId: string; fromUsername: string; fromDisplayName: string; fromAvatarUrl: string | null }) => {
+            console.log("[SignalR] friend:request:received", payload);
+            dispatchDmEvent("friend:request:received", payload);
+        }
+    );
+
+    dmConnection.on(
+        "friend:request:accepted",
+        (payload: { friendUserId: string; friendUsername: string; friendDisplayName: string; friendAvatarUrl: string | null }) => {
+            console.log("[SignalR] friend:request:accepted", payload);
+            dispatchDmEvent("friend:request:accepted", payload);
+        }
+    );
+
+    dmConnection.on(
+        "friend:request:declined",
+        (payload: { declinedByUserId: string }) => {
+            console.log("[SignalR] friend:request:declined", payload);
+            dispatchDmEvent("friend:request:declined", payload);
+        }
+    );
+
+    dmConnection.on(
+        "friend:removed",
+        (payload: { removedByUserId: string }) => {
+            console.log("[SignalR] friend:removed", payload);
+            dispatchDmEvent("friend:removed", payload);
+        }
+    );
+
+    /* ------------------------------------------------------------------ */
+    /* PIN / UNPIN (DM channels)                                            */
+    /* ------------------------------------------------------------------ */
+    dmConnection.on(
+        "channel:message:pinned",
+        (payload: { channelId: string; messageId: string }) => {
+            console.log("[SignalR] channel:message:pinned", payload);
+            dispatchDmEvent("channel:message:pinned", payload);
+        }
+    );
+
+    dmConnection.on(
+        "channel:message:unpinned",
+        (payload: { channelId: string; messageId: string }) => {
+            console.log("[SignalR] channel:message:unpinned", payload);
+            dispatchDmEvent("channel:message:unpinned", payload);
         }
     );
 }

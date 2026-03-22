@@ -77,4 +77,18 @@ export interface GuildEventMap {
         isCameraOn: boolean;
         isScreenSharing: boolean;
     };
+
+    "guild:deleted": {
+        guildId: string;
+    };
+
+    "channel:message:pinned": {
+        channelId: string;
+        messageId: string;
+    };
+
+    "channel:message:unpinned": {
+        channelId: string;
+        messageId: string;
+    };
 }

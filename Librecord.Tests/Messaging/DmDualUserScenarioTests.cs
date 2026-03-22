@@ -340,7 +340,8 @@ public class DmDualUserScenarioTests
         Assert.NotNull(msg);
         _realtime.Verify(r => r.NotifyAsync(It.IsAny<DmMessageCreated>()), Times.Once);
 
-        // Step 3: Bob leaves
+        // Step 3: Bob leaves (only group DMs can be left)
+        ch.IsGroup = true;
         _channels.Setup(c => c.GetChannelAsync(newChannel.Id)).ReturnsAsync(ch);
         await channelSvc.LeaveChannelAsync(newChannel.Id, bob);
 

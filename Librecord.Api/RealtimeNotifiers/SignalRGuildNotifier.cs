@@ -70,4 +70,14 @@ public sealed class SignalRGuildRealtimeNotifier : IGuildRealtimeNotifier
             _ => Task.CompletedTask
         };
     }
+
+    public Task NotifyGuildDeletedAsync(GuildDeleted evt)
+    {
+        // Broadcast to every channel group in the guild so all connected members see it
+        var tasks = evt.ChannelIds.Select(channelId =>
+            _hub.Clients.Group(GuildHub.ChannelGroup(channelId))
+                .SendAsync("guild:deleted", new { guildId = evt.GuildId }));
+
+        return Task.WhenAll(tasks);
+    }
 }

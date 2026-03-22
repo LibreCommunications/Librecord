@@ -68,6 +68,13 @@ export default function DmSidebar() {
         loadDms();
     }, []);
 
+    // Refresh DM list when a friend is removed (conversation should disappear)
+    useEffect(() => {
+        const onFriendRemoved = () => { loadDms(); };
+        window.addEventListener("friend:removed", onFriendRemoved as EventListener);
+        return () => window.removeEventListener("friend:removed", onFriendRemoved as EventListener);
+    }, []);
+
     // Update presence from real-time events
     useEffect(() => {
         const onPresence = (e: CustomEvent<DmEventMap["dm:user:presence"]>) => {

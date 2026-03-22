@@ -101,6 +101,26 @@ export default function GlobalSidebar() {
         });
     }, []);
 
+    // Handle guild deletion in realtime — remove from sidebar and redirect if viewing
+    useEffect(() => {
+        const onGuildDeleted = (e: CustomEvent<GuildEventMap["guild:deleted"]>) => {
+            const deletedId = e.detail.guildId;
+            setGuilds(prev => prev.filter(g => g.id !== deletedId));
+            setGuildUnreads(prev => {
+                const next = { ...prev };
+                delete next[deletedId];
+                return next;
+            });
+            // If currently viewing the deleted guild, redirect to DMs
+            if (guildId === deletedId) {
+                navigate("/app/dm");
+            }
+        };
+
+        window.addEventListener("guild:deleted", onGuildDeleted as EventListener);
+        return () => window.removeEventListener("guild:deleted", onGuildDeleted as EventListener);
+    }, [guildId, navigate]);
+
     // Listen for guild message pings → increment guild unread
     useEffect(() => {
         const onGuildPing = (e: CustomEvent<GuildEventMap["guild:message:ping"]>) => {
