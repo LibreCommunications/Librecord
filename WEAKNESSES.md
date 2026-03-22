@@ -61,21 +61,17 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 - Only `DirectMessageServiceTests`, `GuildChannelMessageServiceTests`, `AuthServiceTests` exist
 - No tests for: PermissionService, ChannelService, PresenceService, VoiceService, FriendshipService (partial), UserService
 
-### [TEST-3] No tests in CI/CD pipeline
-- **File:** `.github/workflows/deploy.yml`
-- ~~No `dotnet test` step before deployment~~ → FIXED: added `dotnet test` step
-- ~~No `npm run lint` for frontend~~ → FIXED: added `npm run lint` step
-- Broken tests/lint errors now block deployment
+### ~~[TEST-3] No tests in CI/CD pipeline~~ FIXED
+- Added `dotnet test` and `npm run lint` steps before deployment
+- ESLint now at zero errors/warnings (81→0 properly fixed)
 
 ### [TEST-4] No rollback mechanism in deployment
 - **File:** `.github/scripts/deploy.sh` lines 56-71
 - Health check failure stops new backend but does not restore previous version
 - State file in `/tmp` (line 24) — cleared on reboot, loses deployment state
 
-### [TEST-5] No CI caching
-- `npm ci` runs without cache on every build
-- No dotnet restore caching
-- Slows down every deployment
+### ~~[TEST-5] No CI caching~~ FIXED
+- Added NuGet and npm caching via actions/cache@v4
 
 ---
 
@@ -113,10 +109,10 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 
 ## MEDIUM — Backend
 
-### [BE-1] N+1 query risk in hubs
-- `GuildHub.cs` lines 50-64, 85-93, 251-260: triple nested loops (connect, presence, disconnect) iterating guilds + channels
-- `DmHub.cs` lines 52-63, 81-86, 212-218: similar loop patterns
-- **Fix:** Batch group operations or flatten query results
+### ~~[BE-1] N+1 query risk in hubs~~ FIXED
+- DmHub: all sequential `AddToGroupAsync` and presence broadcasts replaced with `Task.WhenAll`
+- GuildHub: flattened nested guild→channel loops into single `SelectMany` + `Task.WhenAll`
+- Applied to connect, disconnect, and presence broadcasts in both hubs
 
 ### ~~[BE-2] GetChannelOverridesAsync missing WHERE clause~~ FIXED
 - Added `.Where(o => o.ChannelId == channelId)` to the query
@@ -222,12 +218,10 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 
 | Category | Critical | High | Medium | Low | Fixed |
 |----------|----------|------|--------|-----|-------|
-| Category | Critical | High | Medium | Low | Fixed |
-|----------|----------|------|--------|-----|-------|
-| Security | 0 | — | — | 1 | 4 (SEC-1, SEC-2, SEC-4, SEC-3 reverted) |
-| Architecture | — | 2 | — | — | 1 (ARCH-1) |
-| Testing/CI | — | 4 | — | — | 1 (TEST-3) |
+| Security | 0 | — | — | 1 | 4 |
+| Architecture | — | 2 | — | — | 1 |
+| Testing/CI | — | 3 | — | — | 2 (TEST-3, TEST-5) |
 | Frontend | — | 3 | 2 | 4 | 7 |
-| Backend | — | — | 5 | 0 | 6 |
+| Backend | — | — | 4 | 0 | 7 (BE-1) |
 | Infrastructure | — | — | — | 0 | 9 |
-| **Total** | **0** | **9** | **7** | **5** | **28** |
+| **Total** | **0** | **8** | **6** | **5** | **30** |

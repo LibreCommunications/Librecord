@@ -49,19 +49,8 @@ public class DmHub : Hub
             UserId,
             channels.Count);
 
-        foreach (var channel in channels)
-        {
-            var group = ChannelGroup(channel.Id);
-
-            _logger.LogInformation(
-                "[DM HUB] Adding connection {ConnectionId} to group {Group}",
-                Context.ConnectionId,
-                group);
-
-            await Groups.AddToGroupAsync(
-                Context.ConnectionId,
-                group);
-        }
+        await Task.WhenAll(channels.Select(channel =>
+            Groups.AddToGroupAsync(Context.ConnectionId, ChannelGroup(channel.Id))));
 
         _connections.Connect(UserId);
 
@@ -78,12 +67,9 @@ public class DmHub : Hub
                 _ => "online"
             };
 
-            foreach (var channel in channels)
-            {
-                await Clients.OthersInGroup(ChannelGroup(channel.Id)).SendAsync(
-                    "dm:user:presence",
-                    new { userId = UserId, status = broadcastStatus });
-            }
+            var presencePayload = new { userId = UserId, status = broadcastStatus };
+            await Task.WhenAll(channels.Select(channel =>
+                Clients.OthersInGroup(ChannelGroup(channel.Id)).SendAsync("dm:user:presence", presencePayload)));
         }
 
         await base.OnConnectedAsync();
@@ -210,12 +196,9 @@ public class DmHub : Hub
             if (!wasInvisible)
             {
                 var channels = await _channels.GetUserChannelsAsync(UserId);
-                foreach (var channel in channels)
-                {
-                    await Clients.OthersInGroup(ChannelGroup(channel.Id)).SendAsync(
-                        "dm:user:presence",
-                        new { userId = UserId, status = "offline" });
-                }
+                var offlinePayload = new { userId = UserId, status = "offline" };
+                await Task.WhenAll(channels.Select(channel =>
+                    Clients.OthersInGroup(ChannelGroup(channel.Id)).SendAsync("dm:user:presence", offlinePayload)));
             }
         }
 
