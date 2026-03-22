@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../hooks/useAuth";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { usePresence } from "../../hooks/usePresence";
 import { StatusDot } from "../../components/user/StatusDot";

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../hooks/useAuth";
 import { useChannels } from "../../hooks/useChannels";
 import { useGuildChannelMessages } from "../../hooks/useGuildChannelMessages";
 import { useUserProfile } from "../../hooks/useUserProfile";

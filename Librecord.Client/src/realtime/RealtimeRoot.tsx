@@ -6,7 +6,7 @@ import { registerGuildListeners } from "./guild/guildListeners";
 import { initNotifications, cleanupNotifications } from "./notifications";
 import { resetVoiceState } from "../voice/voiceStore";
 import * as livekitClient from "../voice/livekitClient";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 
 // Module-level flag — survives React StrictMode double-mount
 let started = false;

@@ -4,7 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useDirectMessages } from "../../hooks/useDirectMessages";
 import { useDirectMessagesChannel } from "../../hooks/useDirectMessagesChannel";
 import { useUserProfile } from "../../hooks/useUserProfile";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../hooks/useAuth";
 
 import { AddParticipantModal } from "./AddParticipantModal";
 import { DmHeader } from "./DmHeader";
