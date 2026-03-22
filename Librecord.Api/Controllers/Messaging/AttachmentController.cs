@@ -10,12 +10,14 @@ using Librecord.Domain.Storage;
 using Librecord.Infra.Database;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Librecord.Api.Controllers.Messaging;
 
 [ApiController]
 [Authorize]
 [Route("guild-channels/{channelId:guid}/messages")]
+[EnableRateLimiting("upload")]
 public class GuildMessageWithAttachmentController : AuthenticatedController
 {
     private readonly IGuildChannelMessageService _messages;
@@ -132,6 +134,7 @@ public class GuildMessageWithAttachmentController : AuthenticatedController
 [ApiController]
 [Authorize]
 [Route("dm-messages/channel/{channelId:guid}")]
+[EnableRateLimiting("upload")]
 public class DmMessageWithAttachmentController : AuthenticatedController
 {
     private readonly IDirectMessageService _dms;

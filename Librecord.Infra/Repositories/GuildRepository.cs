@@ -74,6 +74,7 @@ public class GuildRepository : IGuildRepository
     public Task<List<GuildChannelPermissionOverride>> GetChannelOverridesAsync(Guid channelId)
     {
         return _db.GuildChannelPermissionOverrides
+            .Where(o => o.ChannelId == channelId)
             .Include(o => o.Permission)
             .ToListAsync();
     }

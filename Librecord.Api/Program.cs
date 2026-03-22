@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Librecord.Api;
 using Librecord.Api.Hubs;
 using Librecord.Api.Middleware;
@@ -12,6 +13,7 @@ using Librecord.Infra.Database;
 using Librecord.Infra.Database.Seeders;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -36,6 +38,7 @@ builder.Services.AddApi(builder.Configuration);
 
 ConfigureDatabase(builder.Services, builder.Configuration);
 ConfigureSwagger(builder.Services);
+ConfigureRateLimiting(builder.Services);
 
 // --------------------------------------------------
 // BUILD APP
@@ -56,6 +59,7 @@ app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 app.MapHub<DmHub>("/hubs/dms");
@@ -166,6 +170,41 @@ static void ConfigureDevelopment(WebApplication app)
     // Dev certs only — HTTPS handled by Nginx in prod
     app.Urls.Add("https://localhost:5111");
     app.UseHttpsRedirection();
+}
+
+static void ConfigureRateLimiting(IServiceCollection services)
+{
+    services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+        // Global default: 60 requests per minute per IP
+        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 60,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                }));
+
+        // Stricter policy for auth endpoints (login/register brute force protection)
+        options.AddFixedWindowLimiter("auth", o =>
+        {
+            o.PermitLimit = 10;
+            o.Window = TimeSpan.FromMinutes(1);
+            o.QueueLimit = 0;
+        });
+
+        // Stricter policy for file uploads
+        options.AddFixedWindowLimiter("upload", o =>
+        {
+            o.PermitLimit = 10;
+            o.Window = TimeSpan.FromMinutes(1);
+            o.QueueLimit = 0;
+        });
+    });
 }
 
 static void ApplyMigrations(WebApplication app)

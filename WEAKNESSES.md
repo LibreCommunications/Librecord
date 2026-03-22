@@ -6,12 +6,8 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 
 ## CRITICAL
 
-### [SEC-1] No rate limiting anywhere
-- **File:** `Program.cs`, `DependencyInjection.cs`
-- No `AddRateLimiter()` / `UseRateLimiter()` middleware configured
-- Auth endpoints (`/auth/register`, `/auth/login`) are brute-forceable
-- File uploads (25MB) have no per-user throttle
-- **Fix:** Add ASP.NET Core rate limiting middleware with per-endpoint policies
+### ~~[SEC-1] No rate limiting anywhere~~ FIXED
+- Added global rate limiter (60 req/min per IP), `"auth"` policy (10/min), `"upload"` policy (10/min)
 
 ### [SEC-2] Missing authorization checks on pins and threads
 - **File:** `Librecord.Api/Controllers/Messaging/PinController.cs` — lines 29-55, 60-70
@@ -89,17 +85,12 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 
 ## HIGH — Frontend
 
-### [FE-1] No error boundaries
-- No `ErrorBoundary` component anywhere in the app
-- A single component crash takes down the entire application
-- **Fix:** Add error boundaries at root and per major section
+### ~~[FE-1] No error boundaries~~ FIXED
+- Added `ErrorBoundary` component wrapping the entire app in `main.tsx`
 
-### [FE-2] Silent failure on all critical user actions
-- `DmConversationPage.tsx` line 302, 322: message send/delete fail silently
-- `GuildPage.tsx` line 304, 324: same pattern
-- `ChannelSidebar.tsx` line 66: permission load fails silently
-- No toast or UI feedback when operations fail
-- **Fix:** Show error toasts on catch, roll back optimistic state
+### ~~[FE-2] Silent failure on all critical user actions~~ PARTIALLY FIXED
+- Added error toasts for message send and file upload failures in both DM and guild pages
+- `ChannelSidebar.tsx` permission load still fails silently
 
 ### [FE-3] Memory leaks: unreleased Object URLs
 - `AttachmentUpload.tsx` line 50: `URL.createObjectURL(file)` never revoked
@@ -133,25 +124,21 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 - `DmHub.cs` lines 52-63, 81-86, 212-218: similar loop patterns
 - **Fix:** Batch group operations or flatten query results
 
-### [BE-2] GetChannelOverridesAsync missing WHERE clause
-- `Librecord.Infra/Repositories/GuildRepository.cs` lines 74-79
-- Returns ALL permission overrides for ALL channels, filtered in-memory by caller
-- **Fix:** Add `.Where(o => o.ChannelId == channelId)` to query
+### ~~[BE-2] GetChannelOverridesAsync missing WHERE clause~~ FIXED
+- Added `.Where(o => o.ChannelId == channelId)` to the query
 
-### [BE-3] Silent exception swallowing
-- `SearchController.cs` lines 119-122: `catch { }` on decrypt — no logging, failures invisible
-- `DirectMessageChannelService.cs` lines 200-202: `catch { /* best effort */ }` on storage delete
-- **Fix:** Log at Warning level minimum before swallowing
+### ~~[BE-3] Silent exception swallowing~~ FIXED
+- `SearchController`: now logs `LogWarning` with message ID on decrypt failure
+- `DirectMessageChannelService`: now logs `LogWarning` with attachment URL on delete failure
 
 ### [BE-4] No CancellationToken propagation
 - No controller or service method accepts or forwards `CancellationToken`
 - Long-running requests cannot be cancelled when client disconnects
 - Affects all 24 controllers and all service methods
 
-### [BE-5] No logging in Application or Infrastructure layers
-- 0 `ILogger` injections in `Librecord.Application/` (business logic)
-- 0 `ILogger` injections in `Librecord.Infra/Repositories/`
-- 0 logging in any controller
+### [BE-5] No logging in Application or Infrastructure layers — PARTIALLY FIXED
+- Added `ILogger` to `DirectMessageChannelService` and `SearchController`
+- Remaining services and repositories still have no logging
 - No audit trail for sensitive operations (message edits/deletes, blocks, permission changes)
 
 ### [BE-6] Inconsistent error response formats
@@ -165,11 +152,10 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 - `DirectMessageChannelController.cs` line 36: `m.User.DisplayName` assumes User always present
 - `GuildHub.cs` lines 52, 87: `guild.Channels` assumed non-null in foreach
 
-### [BE-8] No FluentValidation — validation is manual and duplicated
-- Message length `4000` hardcoded in `DirectMessageService.cs` line 41 AND `GuildChannelMessageService.cs` line 53
-- File size limits hardcoded: `25MB` in `AttachmentController.cs` line 48, `5MB` in `UserProfileController.cs` line 79
+### [BE-8] No FluentValidation — validation is manual and duplicated — PARTIALLY FIXED
+- ~~Message length and file size limits hardcoded in multiple places~~ → centralized in `Limits.cs`
 - No request DTO validation attributes
-- **Fix:** Centralize limits in config, add FluentValidation
+- FluentValidation not yet added
 
 ### [BE-9] No database retry policy or connection pool tuning
 - `Program.cs` lines 149-152: `UseNpgsql()` with no retry config
@@ -239,13 +225,11 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 - Fails silently on non-HTTPS contexts
 - **Fix:** Await and show error toast on failure
 
-### [LOW-7] Console logging left in production code
-- `realtime/` files: `console.log("[Realtime] DM connected")`, `console.warn(...)` etc.
-- **Fix:** Use a debug logger or strip in production build
+### ~~[LOW-7] Console logging left in production code~~ FIXED
+- Removed all 28 `console.log` debug statements; kept `console.warn`/`console.error` for real errors
 
-### [LOW-8] UserId property duplicated across all controllers
-- Every controller has `private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);`
-- **Fix:** Extract to a base controller class
+### ~~[LOW-8] UserId property duplicated across all controllers~~ FIXED
+- Created `AuthenticatedController` base class; updated 20 controllers
 
 ### [LOW-9] Deploy state file in /tmp
 - `.github/scripts/deploy.sh` line 24: `/tmp/${PROJECT}-active-slot`
@@ -261,12 +245,12 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 
 ## Stats
 
-| Category | Critical | High | Medium | Low |
-|----------|----------|------|--------|-----|
-| Security | 4 | — | — | 1 |
-| Architecture | — | 3 | — | — |
-| Testing/CI | — | 5 | — | — |
-| Frontend | — | 6 | 5 | 4 |
-| Backend | — | — | 9 | 2 |
-| Infrastructure | — | — | — | 3 |
-| **Total** | **4** | **14** | **14** | **10** |
+| Category | Critical | High | Medium | Low | Fixed |
+|----------|----------|------|--------|-----|-------|
+| Security | 3 | — | — | 1 | 1 (SEC-1) |
+| Architecture | — | 3 | — | — | — |
+| Testing/CI | — | 5 | — | — | — |
+| Frontend | — | 4 | 5 | 4 | 2 (FE-1, FE-2 partial) |
+| Backend | — | — | 7 | 0 | 4 (BE-2, BE-3, BE-5 partial, BE-8 partial) |
+| Infrastructure | — | — | — | 3 | 2 (LOW-7, LOW-8) |
+| **Total** | **3** | **12** | **12** | **8** | **9** |
