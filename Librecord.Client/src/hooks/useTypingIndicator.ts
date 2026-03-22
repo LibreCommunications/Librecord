@@ -6,6 +6,7 @@ const TYPING_THROTTLE_MS = 3000;
 const TYPING_EXPIRE_MS = 5000;
 
 type TypingUser = {
+    channelId: string;
     userId: string;
     username: string;
     displayName: string;
@@ -43,7 +44,7 @@ export function useTypingIndicator(
             setTypingUsers(prev => {
                 const now = Date.now();
                 const filtered = prev.filter(t => t.expiresAt > now && t.userId !== userId);
-                return [...filtered, { userId, username, displayName: displayName ?? username, expiresAt: now + TYPING_EXPIRE_MS }];
+                return [...filtered, { channelId, userId, username, displayName: displayName ?? username, expiresAt: now + TYPING_EXPIRE_MS }];
             });
         };
 
@@ -85,14 +86,7 @@ export function useTypingIndicator(
         return () => clearInterval(interval);
     }, [typingUsers.length]);
 
-    // Stop typing on unmount/channel switch; reset handled by previous channelId ref
-    const prevChannelRef = useRef(channelId);
-    if (prevChannelRef.current !== channelId) {
-        prevChannelRef.current = channelId;
-        // Channel changed — clear stale typing indicators (synchronous, outside effect)
-        if (typingUsers.length > 0) setTypingUsers([]);
-    }
-
+    // Stop typing on unmount/channel switch
     useEffect(() => {
         return () => {
             if (isTypingRef.current && channelId) {
@@ -128,7 +122,10 @@ export function useTypingIndicator(
         connection.invoke("StopTyping", channelId).catch((e) => console.warn("[Typing] SignalR invoke failed:", e));
     }, [channelId, hub]);
 
-    const typingNames = typingUsers.map(t => t.displayName);
+    // Filter by current channelId so stale typing users from previous channels are excluded
+    const typingNames = typingUsers
+        .filter(t => t.channelId === channelId)
+        .map(t => t.displayName);
 
     return { typingNames, sendTyping, stopTyping };
 }

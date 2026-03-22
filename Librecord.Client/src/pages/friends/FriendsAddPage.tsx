@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useFriends, type FriendSuggestion } from "../../hooks/useFriends";
-import { useToast } from "../../context/ToastContext";
+import { useToast } from "../../hooks/useToast";
 import { Spinner } from "../../components/ui/Spinner";
 
 const API_URL = import.meta.env.VITE_API_URL;

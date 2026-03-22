@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useGuildSettings } from "../../hooks/useGuildSettings";
 import { ConfirmModal } from "../ui/ConfirmModal";
-import { useToast } from "../../context/ToastContext";
+import { useToast } from "../../hooks/useToast";
 
 interface Props {
     guildId: string;

@@ -6,7 +6,7 @@ import { useVoice } from "../../hooks/useVoice";
 import { UnreadBadge } from "../ui/UnreadBadge";
 import CreateChannelModal from "../../pages/guild/CreateChannelModal";
 import type { GuildEventMap } from "../../realtime/guild/guildEvents";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../hooks/useAuth";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { fetchWithAuth } from "../../api/fetchWithAuth";
 

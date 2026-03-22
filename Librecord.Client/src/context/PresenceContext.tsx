@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { useAuth } from "./AuthContext";
+import { createContext, useCallback, useEffect, useState, type ReactNode } from "react";
+import { useAuth } from "../hooks/useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -45,6 +45,4 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     );
 }
 
-export function usePresence() {
-    return useContext(PresenceContext);
-}
+export { PresenceContext };

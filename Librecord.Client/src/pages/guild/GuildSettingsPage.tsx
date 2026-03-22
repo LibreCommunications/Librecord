@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGuilds } from "../../hooks/useGuilds";
 import { useGuildSettings } from "../../hooks/useGuildSettings";
-import { useToast } from "../../context/ToastContext";
+import { useToast } from "../../hooks/useToast";
 import { GuildRoleSettings } from "./GuildRoleSettings";
 import { ConfirmModal } from "../../components/ui/ConfirmModal";
 import { Spinner } from "../../components/ui/Spinner";

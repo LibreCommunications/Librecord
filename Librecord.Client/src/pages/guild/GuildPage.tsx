@@ -19,7 +19,7 @@ import { AttachmentUpload } from "../../components/messages/AttachmentUpload";
 import { useAttachmentUpload } from "../../hooks/useAttachmentUpload";
 import { usePins } from "../../hooks/usePins";
 import { VoiceChannelView } from "../../components/voice/VoiceChannelView";
-import { useToast } from "../../context/ToastContext";
+import { useToast } from "../../hooks/useToast";
 
 import type { Message } from "../../types/message";
 import type { GuildEventMap } from "../../realtime/guild/guildEvents";

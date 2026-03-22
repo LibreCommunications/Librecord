@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useUserProfile } from "../../hooks/useUserProfile";
-import { usePresence } from "../../context/PresenceContext";
+import { usePresence } from "../../hooks/usePresence";
 import { StatusDot } from "../../components/user/StatusDot";
 
 const API_URL = import.meta.env.VITE_API_URL;

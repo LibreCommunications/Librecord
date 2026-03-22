@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useVoice } from "../../hooks/useVoice";
 import { useUserProfile } from "../../hooks/useUserProfile";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../hooks/useAuth";
 import { fetchWithAuth } from "../../api/fetchWithAuth";
 import { ParticipantTile } from "./ParticipantTile";
 import { ScreenShareTile } from "./ScreenShareTile";

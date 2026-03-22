@@ -1,12 +1,12 @@
 import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../hooks/useAuth";
 import { useGuilds, type GuildSummary } from "../../hooks/useGuilds";
 import { useChannels } from "../../hooks/useChannels";
 import CreateGuildModal from "../../pages/guild/CreateGuildModal";
 import { JoinGuildModal } from "../../components/guild/JoinGuildModal";
 import { StatusDot } from "../../components/user/StatusDot";
-import { usePresence } from "../../context/PresenceContext";
+import { usePresence } from "../../hooks/usePresence";
 import type { GuildEventMap } from "../../realtime/guild/guildEvents";
 import type { DmEventMap } from "../../realtime/dm/dmEvents";
 

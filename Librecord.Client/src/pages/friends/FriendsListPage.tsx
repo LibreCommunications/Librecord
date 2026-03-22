@@ -7,7 +7,7 @@ import {
 import RemoveFriendModal from "../../pages/friends/RemoveFriendModal";
 import { useNavigate } from "react-router-dom";
 import { useDirectMessagesChannel } from "../../hooks/useDirectMessagesChannel";
-import { useToast } from "../../context/ToastContext";
+import { useToast } from "../../hooks/useToast";
 import { Spinner } from "../../components/ui/Spinner";
 import { EmptyState } from "../../components/ui/EmptyState";
 const API_URL = import.meta.env.VITE_API_URL;

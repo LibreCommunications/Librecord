@@ -1,4 +1,4 @@
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
 const API_URL = import.meta.env.VITE_API_URL;

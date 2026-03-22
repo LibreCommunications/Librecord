@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { createContext, useCallback, useState, type ReactNode } from "react";
 
 export type ToastType = "success" | "error" | "info";
 
@@ -51,6 +51,4 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     );
 }
 
-export function useToast() {
-    return useContext(ToastContext);
-}
+export { ToastContext };

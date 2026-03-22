@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useGuildMembers, type GuildMember } from "../../hooks/useGuildMembers";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { StatusDot } from "../user/StatusDot";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../hooks/useAuth";
 import { fetchWithAuth } from "../../api/fetchWithAuth";
 import type { GuildEventMap } from "../../realtime/guild/guildEvents";
 

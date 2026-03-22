@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -97,8 +97,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (initialized.current) return;
         initialized.current = true;
 
-        loadUser().finally(() => setAuthLoading(false));
-    }, [loadUser]);
+        let cancelled = false;
+
+        (async () => {
+            let res = await fetch(`${API_URL}/users/me`, { credentials: "include" });
+
+            if (res.status === 401) {
+                const refreshed = await refreshAccessToken();
+                if (!refreshed) {
+                    if (!cancelled) { setUser(null); setAuthLoading(false); }
+                    return;
+                }
+                res = await fetch(`${API_URL}/users/me`, { credentials: "include" });
+            }
+
+            if (!cancelled) {
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.userId) {
+                        setUser({
+                            userId: data.userId,
+                            username: data.username,
+                            displayName: data.displayName,
+                            email: data.email,
+                            avatarUrl: data.avatarUrl,
+                            guilds: data.guilds,
+                        });
+                    } else {
+                        setUser(null);
+                    }
+                } else {
+                    setUser(null);
+                }
+                setAuthLoading(false);
+            }
+        })();
+
+        return () => { cancelled = true; };
+    }, [refreshAccessToken]);
 
     const login = useCallback(async (
         emailOrUsername: string,
@@ -171,6 +207,4 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
 }
 
-export function useAuth() {
-    return useContext(AuthContext);
-}
+export { AuthContext };

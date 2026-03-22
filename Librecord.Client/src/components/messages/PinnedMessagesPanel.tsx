@@ -9,19 +9,28 @@ interface Props {
 export function PinnedMessagesPanel({ channelId, onClose }: Props) {
     const { getPins, unpinMessage } = usePins();
     const [pins, setPins] = useState<PinnedMessage[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loadedChannel, setLoadedChannel] = useState<string | null>(null);
+
+    // Derive loading from whether we've loaded this channel's pins yet
+    const loading = loadedChannel !== channelId;
 
     const loadPins = useCallback(() => {
-        setLoading(true);
         getPins(channelId).then(p => {
             setPins(p);
-            setLoading(false);
+            setLoadedChannel(channelId);
         });
     }, [getPins, channelId]);
 
     useEffect(() => {
-        loadPins();
-    }, [loadPins]);
+        let cancelled = false;
+        getPins(channelId).then(p => {
+            if (!cancelled) {
+                setPins(p);
+                setLoadedChannel(channelId);
+            }
+        });
+        return () => { cancelled = true; };
+    }, [getPins, channelId]);
 
     // Refresh pin list on realtime pin/unpin events
     useEffect(() => {

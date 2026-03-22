@@ -15,7 +15,7 @@ import { useReactions } from "../../hooks/useReactions";
 import { useReadState } from "../../hooks/useReadState";
 import { AttachmentUpload } from "../../components/messages/AttachmentUpload";
 import { useAttachmentUpload } from "../../hooks/useAttachmentUpload";
-import { useToast } from "../../context/ToastContext";
+import { useToast } from "../../hooks/useToast";
 
 import type { Message } from "../../types/message";
 import type { DmEventMap } from "../../realtime/dm/dmEvents";

@@ -4,7 +4,7 @@ import {
     useDirectMessagesChannel,
     type DmChannel
 } from "../../hooks/useDirectMessagesChannel";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../hooks/useAuth";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { useReadState } from "../../hooks/useReadState";
 import { UnreadBadge } from "../ui/UnreadBadge";
