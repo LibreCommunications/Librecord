@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 import type { Message } from "../types/message";
@@ -8,12 +9,12 @@ const UPLOAD_TIMEOUT_MS = 60_000; // 60 seconds
 export function useAttachmentUpload() {
     const auth = useAuth();
 
-    async function sendGuildMessageWithAttachments(
+    const sendGuildMessageWithAttachments = useCallback(async (
         channelId: string,
         content: string,
         clientMessageId: string,
         files: File[]
-    ): Promise<Message | null> {
+    ): Promise<Message | null> => {
         const form = new FormData();
         form.append("content", content);
         form.append("clientMessageId", clientMessageId);
@@ -35,14 +36,14 @@ export function useAttachmentUpload() {
         } finally {
             clearTimeout(timeout);
         }
-    }
+    }, [auth]);
 
-    async function sendDmMessageWithAttachments(
+    const sendDmMessageWithAttachments = useCallback(async (
         channelId: string,
         content: string,
         clientMessageId: string,
         files: File[]
-    ): Promise<Message | null> {
+    ): Promise<Message | null> => {
         const form = new FormData();
         form.append("content", content);
         form.append("clientMessageId", clientMessageId);
@@ -64,7 +65,7 @@ export function useAttachmentUpload() {
         } finally {
             clearTimeout(timeout);
         }
-    }
+    }, [auth]);
 
     return { sendGuildMessageWithAttachments, sendDmMessageWithAttachments };
 }

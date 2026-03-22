@@ -59,7 +59,6 @@ export function AttachmentUpload({ files, onFilesChange, triggerRef }: Props) {
 
     // Expose open() to parent via ref
     if (triggerRef && typeof triggerRef === "object" && triggerRef !== null) {
-        // eslint-disable-next-line react-hooks/immutability
         (triggerRef as React.MutableRefObject<{ open: () => void }>).current = { open };
     }
 

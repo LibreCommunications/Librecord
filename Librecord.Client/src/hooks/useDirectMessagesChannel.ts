@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
@@ -26,16 +27,16 @@ export interface DmChannel {
 export function useDirectMessagesChannel() {
     const auth = useAuth();
 
-    async function getMyDms(): Promise<DmChannel[]> {
+    const getMyDms = useCallback(async (): Promise<DmChannel[]> => {
         const res = await fetchWithAuth(`${API_URL}/dms`, {}, auth);
         if (!res.ok) return [];
         return await res.json();
-    }
+    }, [auth]);
 
-    async function startDm(
+    const startDm = useCallback(async (
         targetUserId: string,
         content: string
-    ): Promise<string | null> {
+    ): Promise<string | null> => {
         const res = await fetchWithAuth(
             `${API_URL}/dms/start/${targetUserId}`,
             {
@@ -49,9 +50,9 @@ export function useDirectMessagesChannel() {
         if (!res.ok) return null;
         const data = await res.json();
         return data.channelId;
-    }
+    }, [auth]);
 
-    async function getDmChannel(channelId: string): Promise<DmChannel | null> {
+    const getDmChannel = useCallback(async (channelId: string): Promise<DmChannel | null> => {
         const res = await fetchWithAuth(
             `${API_URL}/dms/${channelId}`,
             {},
@@ -60,12 +61,12 @@ export function useDirectMessagesChannel() {
 
         if (!res.ok) return null;
         return await res.json();
-    }
+    }, [auth]);
 
-    async function addParticipant(
+    const addParticipant = useCallback(async (
         channelId: string,
         userId: string
-    ): Promise<boolean> {
+    ): Promise<boolean> => {
         const res = await fetchWithAuth(
             `${API_URL}/dms/${channelId}/participants/${userId}`,
             { method: "POST" },
@@ -73,9 +74,9 @@ export function useDirectMessagesChannel() {
         );
 
         return res.ok;
-    }
+    }, [auth]);
 
-    async function leaveChannel(channelId: string): Promise<boolean> {
+    const leaveChannel = useCallback(async (channelId: string): Promise<boolean> => {
         const res = await fetchWithAuth(
             `${API_URL}/dms/${channelId}/leave`,
             { method: "DELETE" },
@@ -83,9 +84,9 @@ export function useDirectMessagesChannel() {
         );
 
         return res.ok;
-    }
+    }, [auth]);
 
-    async function createGroup(memberIds: string[]): Promise<string | null> {
+    const createGroup = useCallback(async (memberIds: string[]): Promise<string | null> => {
         const res = await fetchWithAuth(
             `${API_URL}/dms/group`,
             {
@@ -99,7 +100,7 @@ export function useDirectMessagesChannel() {
         if (!res.ok) return null;
         const data = await res.json();
         return data.channelId;
-    }
+    }, [auth]);
 
     return {
         getMyDms,

@@ -8,16 +8,24 @@ export function useReadState() {
     const auth = useAuth();
 
     const markAsRead = useCallback(async (channelId: string, messageId: string): Promise<boolean> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/channels/${channelId}/ack`,
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ messageId }),
-            },
-            auth
-        );
-        return res.ok;
+        try {
+            const res = await fetchWithAuth(
+                `${API_URL}/channels/${channelId}/ack`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ messageId }),
+                },
+                auth
+            );
+            if (!res.ok) {
+                console.warn(`[ReadState] markAsRead failed: ${res.status} for channel=${channelId} message=${messageId}`);
+            }
+            return res.ok;
+        } catch (err) {
+            console.warn("[ReadState] markAsRead error:", err);
+            return false;
+        }
     }, [auth]);
 
     const getUnreadCounts = useCallback(async (channelIds: string[]): Promise<Record<string, number>> => {

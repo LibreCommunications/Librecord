@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
@@ -19,10 +20,10 @@ export interface SearchResult {
 export function useSearch() {
     const auth = useAuth();
 
-    async function search(
+    const search = useCallback(async (
         query: string,
         options?: { channelId?: string; guildId?: string; limit?: number }
-    ): Promise<SearchResult[]> {
+    ): Promise<SearchResult[]> => {
         const params = new URLSearchParams({ q: query });
         if (options?.channelId) params.set("channelId", options.channelId);
         if (options?.guildId) params.set("guildId", options.guildId);
@@ -36,7 +37,7 @@ export function useSearch() {
 
         if (!res.ok) return [];
         return res.json();
-    }
+    }, [auth]);
 
     return { search };
 }

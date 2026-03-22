@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
@@ -38,7 +39,7 @@ export function useChannels() {
     /* GET SINGLE CHANNEL                                                  */
     /* GET /channels/{channelId}                                           */
     /* ------------------------------------------------------------------ */
-    async function getChannel(channelId: string): Promise<GuildChannel | null> {
+    const getChannel = useCallback(async (channelId: string): Promise<GuildChannel | null> => {
         const res = await fetchWithAuth(
             `${API_URL}/channels/${channelId}`,
             {},
@@ -47,13 +48,13 @@ export function useChannels() {
 
         if (!res.ok) return null;
         return await res.json();
-    }
+    }, [auth]);
 
     /* ------------------------------------------------------------------ */
     /* LIST CHANNELS FOR GUILD                                             */
     /* GET /channels/guild/{guildId}                                       */
     /* ------------------------------------------------------------------ */
-    async function getGuildChannels(guildId: string): Promise<GuildChannel[]> {
+    const getGuildChannels = useCallback(async (guildId: string): Promise<GuildChannel[]> => {
         const res = await fetchWithAuth(
             `${API_URL}/channels/guild/${guildId}`,
             {},
@@ -62,16 +63,16 @@ export function useChannels() {
 
         if (!res.ok) return [];
         return await res.json();
-    }
+    }, [auth]);
 
     /* ------------------------------------------------------------------ */
     /* CREATE CHANNEL                                                      */
     /* POST /channels/guild/{guildId}                                      */
     /* ------------------------------------------------------------------ */
-    async function createChannel(
+    const createChannel = useCallback(async (
         guildId: string,
         dto: CreateChannelDto
-    ): Promise<GuildChannel | null> {
+    ): Promise<GuildChannel | null> => {
         const res = await fetchWithAuth(
             `${API_URL}/channels/guild/${guildId}`,
             {
@@ -84,16 +85,16 @@ export function useChannels() {
 
         if (!res.ok) return null;
         return await res.json();
-    }
+    }, [auth]);
 
     /* ------------------------------------------------------------------ */
     /* UPDATE CHANNEL                                                      */
     /* PUT /channels/{channelId}                                           */
     /* ------------------------------------------------------------------ */
-    async function updateChannel(
+    const updateChannel = useCallback(async (
         channelId: string,
         dto: UpdateChannelDto
-    ): Promise<GuildChannel | null> {
+    ): Promise<GuildChannel | null> => {
         const res = await fetchWithAuth(
             `${API_URL}/channels/${channelId}`,
             {
@@ -106,13 +107,13 @@ export function useChannels() {
 
         if (!res.ok) return null;
         return await res.json();
-    }
+    }, [auth]);
 
     /* ------------------------------------------------------------------ */
     /* DELETE CHANNEL                                                      */
     /* DELETE /channels/{channelId}                                        */
     /* ------------------------------------------------------------------ */
-    async function deleteChannel(channelId: string): Promise<boolean> {
+    const deleteChannel = useCallback(async (channelId: string): Promise<boolean> => {
         const res = await fetchWithAuth(
             `${API_URL}/channels/${channelId}`,
             { method: "DELETE" },
@@ -120,7 +121,7 @@ export function useChannels() {
         );
 
         return res.ok;
-    }
+    }, [auth]);
 
     return {
         getChannel,

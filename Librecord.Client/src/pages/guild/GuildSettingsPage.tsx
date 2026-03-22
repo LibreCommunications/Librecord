@@ -24,7 +24,6 @@ export default function GuildSettingsPage() {
         getGuild(guildId).then(g => {
             if (g) setName(g.name);
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [guildId]);
 
     async function handleSave() {

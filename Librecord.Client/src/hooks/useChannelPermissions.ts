@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
@@ -15,7 +16,7 @@ export interface ChannelOverride {
 export function useChannelPermissions() {
     const auth = useAuth();
 
-    async function getOverrides(channelId: string): Promise<ChannelOverride[]> {
+    const getOverrides = useCallback(async (channelId: string): Promise<ChannelOverride[]> => {
         const res = await fetchWithAuth(
             `${API_URL}/channels/${channelId}/permissions`,
             {},
@@ -23,9 +24,9 @@ export function useChannelPermissions() {
         );
         if (!res.ok) return [];
         return res.json();
-    }
+    }, [auth]);
 
-    async function setOverride(
+    const setOverride = useCallback(async (
         channelId: string,
         opts: {
             roleId?: string | null;
@@ -33,7 +34,7 @@ export function useChannelPermissions() {
             permissionId: string;
             allow: boolean | null;
         }
-    ): Promise<boolean> {
+    ): Promise<boolean> => {
         const res = await fetchWithAuth(
             `${API_URL}/channels/${channelId}/permissions`,
             {
@@ -44,7 +45,7 @@ export function useChannelPermissions() {
             auth
         );
         return res.ok;
-    }
+    }, [auth]);
 
     return { getOverrides, setOverride };
 }

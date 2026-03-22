@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
@@ -25,7 +26,7 @@ export function useFriends() {
     // -----------------------------
     // FRIEND LIST
     // -----------------------------
-    async function getFriends(): Promise<FriendshipListDto[]> {
+    const getFriends = useCallback(async (): Promise<FriendshipListDto[]> => {
         const res = await fetchWithAuth(
             `${API_URL}/friends/list`,
             {},
@@ -34,15 +35,15 @@ export function useFriends() {
 
         if (!res.ok) return [];
         return await res.json();
-    }
+    }, [auth]);
 
     // -----------------------------
     // REQUESTS
     // -----------------------------
-    async function getRequests(): Promise<{
+    const getRequests = useCallback(async (): Promise<{
         incoming: FriendshipListDto[];
         outgoing: FriendshipListDto[];
-    }> {
+    }> => {
         const res = await fetchWithAuth(
             `${API_URL}/friends/requests`,
             {},
@@ -53,12 +54,12 @@ export function useFriends() {
             return { incoming: [], outgoing: [] };
 
         return await res.json();
-    }
+    }, [auth]);
 
     // -----------------------------
     // USERNAME SUGGESTIONS
     // -----------------------------
-    async function suggestUsernames(query: string): Promise<FriendSuggestion[]> {
+    const suggestUsernames = useCallback(async (query: string): Promise<FriendSuggestion[]> => {
         if (!query.trim()) return [];
 
         const res = await fetchWithAuth(
@@ -69,9 +70,9 @@ export function useFriends() {
 
         if (!res.ok) return [];
         return await res.json();
-    }
+    }, [auth]);
 
-    async function sendRequest(username: string) {
+    const sendRequest = useCallback(async (username: string) => {
         return (
             await fetchWithAuth(
                 `${API_URL}/friends/request`,
@@ -83,9 +84,9 @@ export function useFriends() {
                 auth
             )
         ).ok;
-    }
+    }, [auth]);
 
-    async function acceptRequest(requesterId: string) {
+    const acceptRequest = useCallback(async (requesterId: string) => {
         return (
             await fetchWithAuth(
                 `${API_URL}/friends/accept/${requesterId}`,
@@ -93,9 +94,9 @@ export function useFriends() {
                 auth
             )
         ).ok;
-    }
+    }, [auth]);
 
-    async function declineRequest(requesterId: string) {
+    const declineRequest = useCallback(async (requesterId: string) => {
         return (
             await fetchWithAuth(
                 `${API_URL}/friends/decline/${requesterId}`,
@@ -103,9 +104,9 @@ export function useFriends() {
                 auth
             )
         ).ok;
-    }
+    }, [auth]);
 
-    async function removeFriend(friendId: string) {
+    const removeFriend = useCallback(async (friendId: string) => {
         return (
             await fetchWithAuth(
                 `${API_URL}/friends/remove/${friendId}`,
@@ -113,7 +114,7 @@ export function useFriends() {
                 auth
             )
         ).ok;
-    }
+    }, [auth]);
 
     return {
         getFriends,

@@ -37,14 +37,12 @@ export function GuildRoleSettings({ guildId }: Props) {
             setRoles(r);
             if (r.length > 0 && !selectedId) setSelectedId(r[0].id);
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [guildId]);
 
     const selected = roles.find(r => r.id === selectedId);
 
     useEffect(() => {
         if (selected) setEditName(selected.name);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedId]);
 
     async function handleCreate() {

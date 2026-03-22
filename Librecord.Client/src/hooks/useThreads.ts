@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
@@ -24,7 +25,7 @@ export interface ThreadMessage {
 export function useThreads() {
     const auth = useAuth();
 
-    async function createThread(channelId: string, parentMessageId: string, name: string): Promise<Thread | null> {
+    const createThread = useCallback(async (channelId: string, parentMessageId: string, name: string): Promise<Thread | null> => {
         const res = await fetchWithAuth(`${API_URL}/channels/${channelId}/threads`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -32,24 +33,24 @@ export function useThreads() {
         }, auth);
         if (!res.ok) return null;
         return res.json();
-    }
+    }, [auth]);
 
-    async function getThreads(channelId: string): Promise<Thread[]> {
+    const getThreads = useCallback(async (channelId: string): Promise<Thread[]> => {
         const res = await fetchWithAuth(`${API_URL}/channels/${channelId}/threads`, {}, auth);
         if (!res.ok) return [];
         return res.json();
-    }
+    }, [auth]);
 
-    async function getThreadMessages(channelId: string, threadId: string, limit = 50, before?: string): Promise<ThreadMessage[]> {
+    const getThreadMessages = useCallback(async (channelId: string, threadId: string, limit = 50, before?: string): Promise<ThreadMessage[]> => {
         const params = new URLSearchParams({ limit: String(limit) });
         if (before) params.set("before", before);
 
         const res = await fetchWithAuth(`${API_URL}/channels/${channelId}/threads/${threadId}/messages?${params}`, {}, auth);
         if (!res.ok) return [];
         return res.json();
-    }
+    }, [auth]);
 
-    async function postThreadMessage(channelId: string, threadId: string, content: string): Promise<ThreadMessage | null> {
+    const postThreadMessage = useCallback(async (channelId: string, threadId: string, content: string): Promise<ThreadMessage | null> => {
         const res = await fetchWithAuth(`${API_URL}/channels/${channelId}/threads/${threadId}/messages`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -57,7 +58,7 @@ export function useThreads() {
         }, auth);
         if (!res.ok) return null;
         return res.json();
-    }
+    }, [auth]);
 
     return { createThread, getThreads, getThreadMessages, postThreadMessage };
 }

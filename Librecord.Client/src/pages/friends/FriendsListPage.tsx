@@ -48,7 +48,6 @@ export default function FriendsListPage() {
 
     useEffect(() => {
         loadData();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Refresh friend list on realtime friendship events
@@ -66,7 +65,6 @@ export default function FriendsListPage() {
             window.removeEventListener("friend:request:declined", refresh as EventListener);
             window.removeEventListener("friend:removed", refresh as EventListener);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     function avatar(url: string | null) {

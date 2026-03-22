@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 import type {Message, TransportMessage} from "../types/message";
@@ -12,7 +13,7 @@ function mapTransportToUi(msg: TransportMessage): Message {
     return {
         id: msg.id,
         channelId: msg.channelId,
-        
+
         content: msg.content,
         createdAt: msg.createdAt,
         editedAt: msg.editedAt ?? null,
@@ -37,11 +38,11 @@ export function useDirectMessages() {
     // GET CHANNEL MESSAGES
     // GET /dm-messages/channel/{channelId}
     // --------------------------------------------------
-    async function getChannelMessages(
+    const getChannelMessages = useCallback(async (
         channelId: string,
         limit = 50,
         before?: string
-    ): Promise<Message[]> {
+    ): Promise<Message[]> => {
         const params = new URLSearchParams({
             limit: String(limit),
         });
@@ -58,24 +59,24 @@ export function useDirectMessages() {
 
         const data: TransportMessage[] = await res.json();
         return data.map(mapTransportToUi);
-    }
+    }, [auth]);
 
     // --------------------------------------------------
     // SEND MESSAGE
     // POST /dm-messages/channel/{channelId}
     // --------------------------------------------------
-    async function sendMessage(
+    const sendMessage = useCallback(async (
         channelId: string,
         content: string,
         clientMessageId: string
-    ): Promise<void> {
+    ): Promise<void> => {
         const res = await fetchWithAuth(
             `${API_URL}/dm-messages/channel/${channelId}`,
             {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    content,           
+                    content,
                     clientMessageId,
                 }),
             },
@@ -85,7 +86,7 @@ export function useDirectMessages() {
         if (!res.ok) {
             throw new Error("Failed to send message");
         }
-    }
+    }, [auth]);
 
 
 
@@ -94,17 +95,17 @@ export function useDirectMessages() {
     // EDIT MESSAGE
     // PUT /dm-messages/{messageId}
     // --------------------------------------------------
-    async function editMessage(
+    const editMessage = useCallback(async (
         messageId: string,
         content: string
-    ): Promise<Message> {
+    ): Promise<Message> => {
         const res = await fetchWithAuth(
             `${API_URL}/dm-messages/${messageId}`,
             {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    content, 
+                    content,
                 }),
             },
             auth
@@ -116,14 +117,14 @@ export function useDirectMessages() {
 
         const msg: TransportMessage = await res.json();
         return mapTransportToUi(msg);
-    }
+    }, [auth]);
 
 
     // --------------------------------------------------
     // DELETE MESSAGE
     // DELETE /dm-messages/{messageId}
     // --------------------------------------------------
-    async function deleteMessage(messageId: string): Promise<void> {
+    const deleteMessage = useCallback(async (messageId: string): Promise<void> => {
         const res = await fetchWithAuth(
             `${API_URL}/dm-messages/${messageId}`,
             { method: "DELETE" },
@@ -133,7 +134,7 @@ export function useDirectMessages() {
         if (!res.ok) {
             throw new Error("Failed to delete message");
         }
-    }
+    }, [auth]);
 
     return {
         getChannelMessages,

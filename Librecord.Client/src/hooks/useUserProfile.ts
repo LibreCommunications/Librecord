@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
@@ -11,15 +12,15 @@ export function useUserProfile() {
     // ---------------------------
     // Resolve avatar URL
     // ---------------------------
-    function getAvatarUrl(avatarUrl?: string | null): string {
+    const getAvatarUrl = useCallback((avatarUrl?: string | null): string => {
         if (!avatarUrl) return DEFAULT_AVATAR;
         return `${API_URL}${avatarUrl}`;
-    }
+    }, []);
 
     // ---------------------------
     // Update display name
     // ---------------------------
-    async function updateDisplayName(newName: string): Promise<boolean> {
+    const updateDisplayName = useCallback(async (newName: string): Promise<boolean> => {
         const res = await fetchWithAuth(
             `${API_URL}/users/display-name`,
             {
@@ -34,12 +35,12 @@ export function useUserProfile() {
 
         await loadUser();
         return true;
-    }
+    }, [auth, loadUser]);
 
     // ---------------------------
     // Upload avatar
     // ---------------------------
-    async function uploadAvatar(file: File): Promise<string | null> {
+    const uploadAvatar = useCallback(async (file: File): Promise<string | null> => {
         const form = new FormData();
         form.append("file", file);
 
@@ -60,7 +61,7 @@ export function useUserProfile() {
         await loadUser();
 
         return data.avatarUrl;
-    }
+    }, [auth, loadUser]);
 
     return {
         user,

@@ -66,7 +66,6 @@ export default function DmSidebar() {
 
     useEffect(() => {
         loadDms();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Refresh DM list when a friend is removed or a new DM channel is created
@@ -78,7 +77,6 @@ export default function DmSidebar() {
             window.removeEventListener("friend:removed", refresh as EventListener);
             window.removeEventListener("dm:channel:created", refresh as EventListener);
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Update DM list when a member leaves a group DM
@@ -100,7 +98,6 @@ export default function DmSidebar() {
         };
         window.addEventListener("dm:member:left", onMemberLeft as EventListener);
         return () => window.removeEventListener("dm:member:left", onMemberLeft as EventListener);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [dmId, user?.userId]);
 
     // Update presence from real-time events

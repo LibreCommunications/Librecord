@@ -21,7 +21,6 @@ export function ThreadPanel({ channelId, threadId, threadName, onClose }: Props)
             setMessages(msgs.reverse());
             setLoading(false);
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [threadId]);
 
     async function handleSend() {

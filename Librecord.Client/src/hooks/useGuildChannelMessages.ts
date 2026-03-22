@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 import type { Message } from "../types/message";
@@ -14,10 +15,10 @@ export function useGuildChannelMessages() {
     // GET SINGLE MESSAGE
     // GET /guild-channels/{channelId}/messages/{messageId}
     // ----------------------------------------------
-    async function getMessage(
+    const getMessage = useCallback(async (
         channelId: string,
         messageId: string
-    ): Promise<Message | null> {
+    ): Promise<Message | null> => {
         const res = await fetchWithAuth(
             `${API_URL}/guild-channels/${channelId}/messages/${messageId}`,
             {},
@@ -26,17 +27,17 @@ export function useGuildChannelMessages() {
 
         if (!res.ok) return null;
         return res.json();
-    }
+    }, [auth]);
 
     // ----------------------------------------------
     // GET CHANNEL MESSAGES
     // GET /guild-channels/{channelId}/messages
     // ----------------------------------------------
-    async function getChannelMessages(
+    const getChannelMessages = useCallback(async (
         channelId: string,
         limit = 50,
         before?: string
-    ): Promise<Message[]> {
+    ): Promise<Message[]> => {
         const params = new URLSearchParams({
             limit: String(limit),
         });
@@ -51,17 +52,17 @@ export function useGuildChannelMessages() {
 
         if (!res.ok) return [];
         return res.json();
-    }
+    }, [auth]);
 
     // ----------------------------------------------
     // CREATE MESSAGE
     // POST /guild-channels/{channelId}/messages
     // ----------------------------------------------
-    async function createMessage(
+    const createMessage = useCallback(async (
         channelId: string,
         content: string,
         clientMessageId?: string
-    ): Promise<Message | null> {
+    ): Promise<Message | null> => {
         const res = await fetchWithAuth(
             `${API_URL}/guild-channels/${channelId}/messages`,
             {
@@ -74,17 +75,17 @@ export function useGuildChannelMessages() {
 
         if (!res.ok) return null;
         return res.json();
-    }
+    }, [auth]);
 
     // ----------------------------------------------
     // EDIT MESSAGE
     // PUT /guild-channels/{channelId}/messages/{messageId}
     // ----------------------------------------------
-    async function editMessage(
+    const editMessage = useCallback(async (
         channelId: string,
         messageId: string,
         content: string
-    ): Promise<Message | null> {
+    ): Promise<Message | null> => {
         const res = await fetchWithAuth(
             `${API_URL}/guild-channels/${channelId}/messages/${messageId}`,
             {
@@ -100,16 +101,16 @@ export function useGuildChannelMessages() {
         }
 
         return res.json();
-    }
+    }, [auth]);
 
     // ----------------------------------------------
     // DELETE MESSAGE
     // DELETE /guild-channels/{channelId}/messages/{messageId}
     // ----------------------------------------------
-    async function deleteMessage(
+    const deleteMessage = useCallback(async (
         channelId: string,
         messageId: string
-    ): Promise<void> {
+    ): Promise<void> => {
         const res = await fetchWithAuth(
             `${API_URL}/guild-channels/${channelId}/messages/${messageId}`,
             { method: "DELETE" },
@@ -119,7 +120,7 @@ export function useGuildChannelMessages() {
         if (!res.ok) {
             throw new Error("Failed to delete message");
         }
-    }
+    }, [auth]);
 
     return {
         getMessage,

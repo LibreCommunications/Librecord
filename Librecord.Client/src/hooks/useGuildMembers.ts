@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
@@ -15,7 +16,7 @@ export interface GuildMember {
 export function useGuildMembers() {
     const auth = useAuth();
 
-    async function getMembers(guildId: string): Promise<GuildMember[]> {
+    const getMembers = useCallback(async (guildId: string): Promise<GuildMember[]> => {
         const res = await fetchWithAuth(
             `${API_URL}/guilds/${guildId}/members`,
             {},
@@ -24,7 +25,7 @@ export function useGuildMembers() {
 
         if (!res.ok) return [];
         return res.json();
-    }
+    }, [auth]);
 
     return { getMembers };
 }

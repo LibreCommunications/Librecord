@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
@@ -35,7 +36,7 @@ export function useGuilds() {
     // ------------------------------------------------------------------
     // GET USER GUILDS (SIDEBAR)
     // ------------------------------------------------------------------
-    async function getGuilds(): Promise<GuildSummary[]> {
+    const getGuilds = useCallback(async (): Promise<GuildSummary[]> => {
         const res = await fetchWithAuth(
             `${API_URL}/guilds`,
             {},
@@ -44,12 +45,12 @@ export function useGuilds() {
 
         if (!res.ok) return [];
         return await res.json();
-    }
+    }, [auth]);
 
     // ------------------------------------------------------------------
     // GET SINGLE GUILD
     // ------------------------------------------------------------------
-    async function getGuild(guildId: string): Promise<Guild | null> {
+    const getGuild = useCallback(async (guildId: string): Promise<Guild | null> => {
         const res = await fetchWithAuth(
             `${API_URL}/guilds/${guildId}`,
             {},
@@ -58,12 +59,12 @@ export function useGuilds() {
 
         if (!res.ok) return null;
         return await res.json();
-    }
+    }, [auth]);
 
     // ------------------------------------------------------------------
     // CREATE GUILD
     // ------------------------------------------------------------------
-    async function createGuild(name: string): Promise<Guild | null> {
+    const createGuild = useCallback(async (name: string): Promise<Guild | null> => {
         if (!name.trim()) return null;
 
         const res = await fetchWithAuth(
@@ -78,12 +79,12 @@ export function useGuilds() {
 
         if (!res.ok) return null;
         return await res.json();
-    }
+    }, [auth]);
 
     // ------------------------------------------------------------------
     // GET GUILD CHANNELS
     // ------------------------------------------------------------------
-    async function getGuildChannels(guildId: string): Promise<GuildChannel[]> {
+    const getGuildChannels = useCallback(async (guildId: string): Promise<GuildChannel[]> => {
         const res = await fetchWithAuth(
             `${API_URL}/guilds/${guildId}/channels`,
             {},
@@ -92,12 +93,12 @@ export function useGuilds() {
 
         if (!res.ok) return [];
         return await res.json();
-    }
+    }, [auth]);
 
     // ------------------------------------------------------------------
     // GET SINGLE CHANNEL (ACCESS-CHECKED)
     // ------------------------------------------------------------------
-    async function getChannel(channelId: string): Promise<GuildChannel | null> {
+    const getChannel = useCallback(async (channelId: string): Promise<GuildChannel | null> => {
         const res = await fetchWithAuth(
             `${API_URL}/guilds/channels/${channelId}`,
             {},
@@ -106,7 +107,7 @@ export function useGuilds() {
 
         if (!res.ok) return null;
         return await res.json();
-    }
+    }, [auth]);
 
     return {
         getGuilds,

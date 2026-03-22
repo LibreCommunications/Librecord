@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
@@ -30,10 +31,10 @@ export interface InvitePreview {
 export function useGuildInvites() {
     const auth = useAuth();
 
-    async function createInvite(
+    const createInvite = useCallback(async (
         guildId: string,
         options?: { maxUses?: number; expiresInHours?: number }
-    ): Promise<GuildInvite | null> {
+    ): Promise<GuildInvite | null> => {
         const res = await fetchWithAuth(
             `${API_URL}/guilds/${guildId}/invites`,
             {
@@ -46,9 +47,9 @@ export function useGuildInvites() {
 
         if (!res.ok) return null;
         return res.json();
-    }
+    }, [auth]);
 
-    async function getInvites(guildId: string): Promise<GuildInvite[]> {
+    const getInvites = useCallback(async (guildId: string): Promise<GuildInvite[]> => {
         const res = await fetchWithAuth(
             `${API_URL}/guilds/${guildId}/invites`,
             {},
@@ -57,9 +58,9 @@ export function useGuildInvites() {
 
         if (!res.ok) return [];
         return res.json();
-    }
+    }, [auth]);
 
-    async function getInvitePreview(code: string): Promise<InvitePreview | null> {
+    const getInvitePreview = useCallback(async (code: string): Promise<InvitePreview | null> => {
         const res = await fetchWithAuth(
             `${API_URL}/invites/${code}`,
             {},
@@ -68,9 +69,9 @@ export function useGuildInvites() {
 
         if (!res.ok) return null;
         return res.json();
-    }
+    }, [auth]);
 
-    async function joinByCode(code: string): Promise<{ id: string; name: string } | null> {
+    const joinByCode = useCallback(async (code: string): Promise<{ id: string; name: string } | null> => {
         const res = await fetchWithAuth(
             `${API_URL}/invites/${code}/join`,
             { method: "POST" },
@@ -79,9 +80,9 @@ export function useGuildInvites() {
 
         if (!res.ok) return null;
         return res.json();
-    }
+    }, [auth]);
 
-    async function revokeInvite(inviteId: string): Promise<boolean> {
+    const revokeInvite = useCallback(async (inviteId: string): Promise<boolean> => {
         const res = await fetchWithAuth(
             `${API_URL}/invites/${inviteId}`,
             { method: "DELETE" },
@@ -89,7 +90,7 @@ export function useGuildInvites() {
         );
 
         return res.ok;
-    }
+    }, [auth]);
 
     return {
         createInvite,

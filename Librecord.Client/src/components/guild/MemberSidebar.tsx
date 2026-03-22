@@ -40,7 +40,6 @@ export function MemberSidebar({ guildId }: Props) {
                 setPresenceMap(data);
             }
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [guildId]);
 
     // Listen for realtime presence changes
