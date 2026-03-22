@@ -33,6 +33,8 @@ public static class DependencyInjection
         services.AddScoped<IReactionService, ReactionService>();
         services.AddScoped<IVoiceService, VoiceService>();
         services.AddScoped<IBlockService, BlockService>();
+        services.AddScoped<IGuildMemberService, GuildMemberService>();
+        services.AddScoped<IGuildSettingsService, GuildSettingsService>();
 
         // Add more application services later:
         // services.AddScoped<IGuildService, GuildService>();

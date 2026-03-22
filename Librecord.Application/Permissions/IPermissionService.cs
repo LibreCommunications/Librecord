@@ -14,4 +14,8 @@ public interface IPermissionService
         Guid userId,
         Guid channelId,
         PermissionCapability permission);
+
+    Task SetChannelOverrideAsync(
+        Guid channelId, Guid? roleId, Guid? userId,
+        Guid permissionId, bool? allow);
 }

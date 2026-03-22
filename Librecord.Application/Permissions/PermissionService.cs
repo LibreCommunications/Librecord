@@ -100,4 +100,44 @@ public class PermissionService : IPermissionService
         // -----------------------------------------------------
         return await HasGuildPermissionAsync(userId, channel.GuildId, required);
     }
+
+    // ---------------------------------------------------------
+    // SET CHANNEL OVERRIDE
+    // ---------------------------------------------------------
+    public async Task SetChannelOverrideAsync(
+        Guid channelId, Guid? roleId, Guid? userId,
+        Guid permissionId, bool? allow)
+    {
+        var existing = await _guilds.GetChannelOverrideAsync(channelId, permissionId, roleId, userId);
+
+        if (allow == null)
+        {
+            // Remove override (inherit)
+            if (existing != null)
+            {
+                await _guilds.RemoveChannelOverrideAsync(existing);
+                await _guilds.SaveChangesAsync();
+            }
+            return;
+        }
+
+        if (existing != null)
+        {
+            existing.Allow = allow;
+        }
+        else
+        {
+            await _guilds.AddChannelOverrideAsync(new Domain.Guilds.GuildChannelPermissionOverride
+            {
+                Id = Guid.NewGuid(),
+                ChannelId = channelId,
+                RoleId = roleId,
+                UserId = userId,
+                PermissionId = permissionId,
+                Allow = allow,
+            });
+        }
+
+        await _guilds.SaveChangesAsync();
+    }
 }

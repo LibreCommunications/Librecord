@@ -85,4 +85,68 @@ public class GuildRepository : IGuildRepository
             .Include(c => c.Guild)
             .FirstOrDefaultAsync(c => c.Id == channelId);
     }
+
+    public Task<List<Guid>> GetChannelIdsAsync(Guid guildId)
+    {
+        return _db.GuildChannels
+            .Where(c => c.GuildId == guildId)
+            .Select(c => c.Id)
+            .ToListAsync();
+    }
+
+    public Task RemoveMemberAsync(GuildMember member)
+    {
+        _db.GuildMembers.Remove(member);
+        return Task.CompletedTask;
+    }
+
+    public Task<GuildBan?> GetBanAsync(Guid guildId, Guid userId)
+        => _db.GuildBans.FirstOrDefaultAsync(b => b.GuildId == guildId && b.UserId == userId);
+
+    public Task<List<GuildBan>> GetBansAsync(Guid guildId)
+        => _db.GuildBans
+            .Where(b => b.GuildId == guildId)
+            .Include(b => b.User)
+            .Include(b => b.Moderator)
+            .OrderByDescending(b => b.CreatedAt)
+            .ToListAsync();
+
+    public Task AddBanAsync(GuildBan ban)
+    {
+        _db.GuildBans.Add(ban);
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveBanAsync(GuildBan ban)
+    {
+        _db.GuildBans.Remove(ban);
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveGuildAsync(Guild guild)
+    {
+        _db.Guilds.Remove(guild);
+        return Task.CompletedTask;
+    }
+
+    public Task<GuildChannelPermissionOverride?> GetChannelOverrideAsync(
+        Guid channelId, Guid permissionId, Guid? roleId, Guid? userId)
+        => _db.GuildChannelPermissionOverrides
+            .FirstOrDefaultAsync(o =>
+                o.ChannelId == channelId &&
+                o.PermissionId == permissionId &&
+                o.RoleId == roleId &&
+                o.UserId == userId);
+
+    public Task AddChannelOverrideAsync(GuildChannelPermissionOverride overrideEntity)
+    {
+        _db.GuildChannelPermissionOverrides.Add(overrideEntity);
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveChannelOverrideAsync(GuildChannelPermissionOverride overrideEntity)
+    {
+        _db.GuildChannelPermissionOverrides.Remove(overrideEntity);
+        return Task.CompletedTask;
+    }
 }

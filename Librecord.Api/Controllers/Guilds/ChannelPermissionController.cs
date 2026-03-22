@@ -1,12 +1,8 @@
-using System.Security.Claims;
-using Librecord.Application.Guilds;
 using Librecord.Application.Permissions;
 using Librecord.Domain.Guilds;
 using Librecord.Domain.Permissions;
-using Librecord.Infra.Database;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace Librecord.Api.Controllers.Guilds;
 
@@ -17,20 +13,15 @@ public class ChannelPermissionController : AuthenticatedController
 {
     private readonly IGuildRepository _guilds;
     private readonly IPermissionService _permissions;
-    private readonly LibrecordContext _db;
 
     public ChannelPermissionController(
         IGuildRepository guilds,
-        IPermissionService permissions,
-        LibrecordContext db)
+        IPermissionService permissions)
     {
         _guilds = guilds;
         _permissions = permissions;
-        _db = db;
     }
-    // ---------------------------------------------------------
-    // LIST OVERRIDES FOR CHANNEL
-    // ---------------------------------------------------------
+
     [HttpGet]
     public async Task<IActionResult> List(Guid channelId)
     {
@@ -54,9 +45,6 @@ public class ChannelPermissionController : AuthenticatedController
         }));
     }
 
-    // ---------------------------------------------------------
-    // SET OVERRIDE (role or user)
-    // ---------------------------------------------------------
     [HttpPut]
     public async Task<IActionResult> Set(
         Guid channelId,
@@ -75,41 +63,9 @@ public class ChannelPermissionController : AuthenticatedController
         if (req.RoleId != null && req.UserId != null)
             return BadRequest("Cannot set both roleId and userId.");
 
-        var existing = await _db.GuildChannelPermissionOverrides
-            .FirstOrDefaultAsync(o =>
-                o.ChannelId == channelId &&
-                o.PermissionId == req.PermissionId &&
-                o.RoleId == req.RoleId &&
-                o.UserId == req.UserId);
+        await _permissions.SetChannelOverrideAsync(
+            channelId, req.RoleId, req.UserId, req.PermissionId, req.Allow);
 
-        if (req.Allow == null)
-        {
-            if (existing != null)
-            {
-                _db.GuildChannelPermissionOverrides.Remove(existing);
-                await _db.SaveChangesAsync();
-            }
-            return Ok();
-        }
-
-        if (existing != null)
-        {
-            existing.Allow = req.Allow;
-        }
-        else
-        {
-            _db.GuildChannelPermissionOverrides.Add(new GuildChannelPermissionOverride
-            {
-                Id = Guid.NewGuid(),
-                ChannelId = channelId,
-                RoleId = req.RoleId,
-                UserId = req.UserId,
-                PermissionId = req.PermissionId,
-                Allow = req.Allow,
-            });
-        }
-
-        await _db.SaveChangesAsync();
         return Ok();
     }
 }
