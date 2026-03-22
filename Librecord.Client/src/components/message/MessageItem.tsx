@@ -49,7 +49,7 @@ export function MessageItem({
     const [lightboxSrc, setLightboxSrc] = useState<{ src: string; alt: string } | null>(null);
 
     return (
-        <div className="flex gap-4 px-4 py-1.5 group relative hover:bg-[#2e3035] transition-colors">
+        <div className="flex gap-4 px-4 py-1.5 group relative hover:bg-[#2e3035] transition-colors" data-testid={`message-${msg.id}`}>
             <img
                 src={getAvatarUrl(msg.author.avatarUrl)}
                 className="w-10 h-10 rounded-full object-cover mt-0.5 cursor-pointer hover:opacity-80 transition-opacity"
@@ -92,6 +92,7 @@ export function MessageItem({
                                 }
                             }}
                             className="w-full bg-[#383a40] rounded-lg px-3 py-2 text-[#dbdee1] outline-none border border-[#5865F2] resize-none"
+                        data-testid="edit-message-input"
                             rows={Math.min(editContent.split("\n").length, 6)}
                         />
                         <div className="text-xs text-[#949ba4] mt-1">
@@ -104,6 +105,7 @@ export function MessageItem({
                 ) : (
                     <div
                         className="leading-relaxed text-[#dbdee1] message-content [&_a]:text-[#00a8fc] [&_a:hover]:underline [&_code]:bg-[#2b2d31] [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-sm"
+                        data-testid="message-content"
                         dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
                     />
                 )}

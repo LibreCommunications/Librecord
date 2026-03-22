@@ -65,7 +65,7 @@ test.describe.serial("Full guild + WebRTC voice flow with media verification", (
     test("User A creates a guild", async () => {
         // The sidebar icons use a custom tooltip div (not HTML title attr).
         // Target the clickable icon by finding the tooltip text's parent group.
-        await pageA.locator("div.group:has(div:text-is('Create a Server')) > div.cursor-pointer").click();
+        await pageA.locator("[data-testid='create-guild-btn']").click();
         await pageA.getByPlaceholder("My Guild").fill("E2E Test Guild");
         await pageA.getByRole("button", { name: /create guild/i }).click();
 
@@ -100,7 +100,7 @@ test.describe.serial("Full guild + WebRTC voice flow with media verification", (
     // ─── 4. USER B JOINS THE GUILD VIA INVITE CODE ────────────────────
 
     test("User B joins the guild via invite code", async () => {
-        await pageB.locator("div.group:has(div:text-is('Join a Server')) > div.cursor-pointer").click();
+        await pageB.locator("[data-testid='join-guild-btn']").click();
         await pageB.getByPlaceholder("e.g. AbCdEfGh").fill(inviteCode);
         await pageB.getByRole("button", { name: /join server/i }).click();
 

@@ -140,6 +140,23 @@ else
     done
 
     ok "PostgreSQL ready (localhost:5432)"
+
+    # Wait for MinIO to be ready, then create the attachment bucket
+    echo -e "  Waiting for MinIO..."
+    MINIO_RETRIES=15
+    until curl -sf http://localhost:9000/minio/health/live &>/dev/null; do
+        MINIO_RETRIES=$((MINIO_RETRIES - 1))
+        if [ $MINIO_RETRIES -le 0 ]; then
+            fail "MinIO did not become ready in time"
+        fi
+        sleep 1
+    done
+
+    # Create the attachment bucket if it doesn't exist
+    docker exec librecord-minio-dev mc alias set local http://localhost:9000 minioadmin minioadmin &>/dev/null
+    docker exec librecord-minio-dev mc mb local/librecord-attachments --ignore-existing &>/dev/null
+    ok "MinIO bucket 'librecord-attachments' ready"
+
     ok "MinIO ready (localhost:9000, console :9001)"
     ok "LiveKit ready (localhost:7880)"
 fi

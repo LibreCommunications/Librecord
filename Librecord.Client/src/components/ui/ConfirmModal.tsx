@@ -63,6 +63,7 @@ export function ConfirmModal({
                     <button
                         onClick={handleConfirm}
                         disabled={loading}
+                        data-testid="confirm-btn"
                         className={`
                             px-4 py-2 rounded text-sm font-medium text-white
                             disabled:opacity-50 flex items-center gap-2

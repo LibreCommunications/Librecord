@@ -20,6 +20,7 @@ function SidebarIcon({
     className = "",
     onClick,
     to,
+    testId,
 }: {
     children: React.ReactNode;
     active?: boolean;
@@ -28,9 +29,10 @@ function SidebarIcon({
     className?: string;
     onClick?: () => void;
     to?: string;
+    testId?: string;
 }) {
     const inner = (
-        <div className="relative group flex items-center">
+        <div className="relative group flex items-center" data-testid={testId}>
             {/* Active / unread indicator pill */}
             <span
                 className={`
@@ -180,7 +182,7 @@ export default function GlobalSidebar() {
 
     return (
         <>
-            <aside className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 gap-2 overflow-y-auto no-scrollbar">
+            <aside id="global-sidebar" className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 gap-2 overflow-y-auto no-scrollbar">
 
                 {/* DM */}
                 <SidebarIcon to="/app/dm" active={isDmPage} unread={dmUnread} tooltip="Direct Messages" className="bg-[#313338] hover:bg-[#5865F2] text-white">
@@ -200,6 +202,7 @@ export default function GlobalSidebar() {
                         active={guildId === g.id}
                         unread={(guildUnreads[g.id] ?? 0) > 0}
                         tooltip={g.name}
+                        testId={`guild-icon-${g.id}`}
                         className="bg-[#313338] hover:bg-[#5865F2] text-white"
                     >
                         {g.iconUrl ? (
@@ -220,6 +223,7 @@ export default function GlobalSidebar() {
                 <SidebarIcon
                     onClick={() => setShowCreate(true)}
                     tooltip="Create a Server"
+                    testId="create-guild-btn"
                     className="bg-[#313338] hover:bg-[#248046] text-[#248046] hover:text-white"
                 >
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -232,6 +236,7 @@ export default function GlobalSidebar() {
                 <SidebarIcon
                     onClick={() => setShowJoin(true)}
                     tooltip="Join a Server"
+                    testId="join-guild-btn"
                     className="bg-[#313338] hover:bg-[#5865F2] text-[#248046] hover:text-white"
                 >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

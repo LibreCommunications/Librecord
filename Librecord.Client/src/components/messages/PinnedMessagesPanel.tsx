@@ -59,7 +59,7 @@ export function PinnedMessagesPanel({ channelId, onClose }: Props) {
                 )}
 
                 {pins.map(pin => (
-                    <div key={pin.messageId} className="bg-[#1e1f22] rounded p-3 text-sm">
+                    <div key={pin.messageId} className="bg-[#1e1f22] rounded p-3 text-sm" data-testid="pin-card">
                         <div className="flex items-center justify-between mb-1">
                             <span className="font-medium text-gray-200">{pin.author.displayName}</span>
                             <button

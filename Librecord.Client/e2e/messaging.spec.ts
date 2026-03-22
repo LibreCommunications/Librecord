@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { makeUser, registerUser, BASE, API_URL, type TestUser } from "./helpers";
+import { makeUser, registerUser, waitForRealtime, BASE, API_URL, type TestUser } from "./helpers";
 import type { BrowserContext, Page } from "@playwright/test";
 
 /**
@@ -52,7 +52,7 @@ test.describe.serial("Guild messaging — send, receive, edit, delete, notificat
 
     test("Create guild + invite + Bob joins", async () => {
         // A creates guild
-        await pageA.locator("div.group:has(div:text-is('Create a Server')) > div.cursor-pointer").click();
+        await pageA.locator("[data-testid='create-guild-btn']").click();
         await pageA.getByPlaceholder("My Guild").fill("Messaging Test Guild");
         await pageA.getByRole("button", { name: /create guild/i }).click();
         await pageA.waitForURL(/\/app\/guild\//, { timeout: 10_000 });
@@ -74,7 +74,7 @@ test.describe.serial("Guild messaging — send, receive, edit, delete, notificat
         inviteCode = resp.code;
 
         // B joins
-        await pageB.locator("div.group:has(div:text-is('Join a Server')) > div.cursor-pointer").click();
+        await pageB.locator("[data-testid='join-guild-btn']").click();
         await pageB.getByPlaceholder("e.g. AbCdEfGh").fill(inviteCode);
         await pageB.getByRole("button", { name: /join server/i }).click();
         await pageB.waitForURL(new RegExp(`/app/guild/${guildId}`), { timeout: 15_000 });
@@ -113,11 +113,17 @@ test.describe.serial("Guild messaging — send, receive, edit, delete, notificat
         await pageA.waitForURL(/\/app\/guild\/[^/]+\/[^/]+/, { timeout: 5_000 });
         textChannelId = pageA.url().match(/\/app\/guild\/[^/]+\/([^/]+)/)![1];
 
-        // B navigates to same channel
-        await pageB.reload();
-        await pageB.waitForSelector("text=Text Channels", { timeout: 10_000 });
-        await pageB.locator(`a[href="/app/guild/${guildId}/${textChannelId}"]`).click();
-        await pageB.waitForURL(new RegExp(textChannelId), { timeout: 5_000 });
+        // B navigates to same channel (full page load to ensure fresh SignalR connection)
+        await pageB.goto(`${BASE}/app/guild/${guildId}/${textChannelId}`);
+        await pageB.waitForLoadState("networkidle");
+        await waitForRealtime(pageB);
+        await expect(pageB.locator(`textarea[placeholder*="Message #"]`)).toBeVisible({ timeout: 10_000 });
+
+        // Also ensure A has a fresh SignalR connection
+        await pageA.goto(`${BASE}/app/guild/${guildId}/${textChannelId}`);
+        await pageA.waitForLoadState("networkidle");
+        await waitForRealtime(pageA);
+        await expect(pageA.locator(`textarea[placeholder*="Message #"]`)).toBeVisible({ timeout: 10_000 });
     });
 
     // ─── SEND & RECEIVE ──────────────────────────────────────────────
@@ -131,10 +137,10 @@ test.describe.serial("Guild messaging — send, receive, edit, delete, notificat
         await input.press("Enter");
 
         // Alice should see her own message
-        await expect(pageA.locator(`.message-content:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
+        await expect(pageA.locator(`[data-testid='message-content']:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
 
         // Bob should see Alice's message in real-time
-        await expect(pageB.locator(`.message-content:has-text("${msg}")`)).toBeVisible({ timeout: 10_000 });
+        await expect(pageB.locator(`[data-testid='message-content']:has-text("${msg}")`)).toBeVisible({ timeout: 10_000 });
     });
 
     test("Bob sends a message, Alice sees it in real-time", async () => {
@@ -144,8 +150,8 @@ test.describe.serial("Guild messaging — send, receive, edit, delete, notificat
         await input.fill(msg);
         await input.press("Enter");
 
-        await expect(pageB.locator(`.message-content:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
-        await expect(pageA.locator(`.message-content:has-text("${msg}")`)).toBeVisible({ timeout: 10_000 });
+        await expect(pageB.locator(`[data-testid='message-content']:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
+        await expect(pageA.locator(`[data-testid='message-content']:has-text("${msg}")`)).toBeVisible({ timeout: 10_000 });
     });
 
     test("Messages appear in correct order", async () => {
@@ -157,20 +163,20 @@ test.describe.serial("Guild messaging — send, receive, edit, delete, notificat
 
         await input.fill(msg1);
         await input.press("Enter");
-        await expect(pageA.locator(`.message-content:has-text("${msg1}")`)).toBeVisible({ timeout: 5_000 });
+        await expect(pageA.locator(`[data-testid='message-content']:has-text("${msg1}")`)).toBeVisible({ timeout: 5_000 });
 
         await input.fill(msg2);
         await input.press("Enter");
-        await expect(pageA.locator(`.message-content:has-text("${msg2}")`)).toBeVisible({ timeout: 5_000 });
+        await expect(pageA.locator(`[data-testid='message-content']:has-text("${msg2}")`)).toBeVisible({ timeout: 5_000 });
 
         await input.fill(msg3);
         await input.press("Enter");
-        await expect(pageA.locator(`.message-content:has-text("${msg3}")`)).toBeVisible({ timeout: 5_000 });
+        await expect(pageA.locator(`[data-testid='message-content']:has-text("${msg3}")`)).toBeVisible({ timeout: 5_000 });
 
         // Verify order on Bob's side: msg1 should be ABOVE msg3
-        await expect(pageB.locator(`.message-content:has-text("${msg3}")`)).toBeVisible({ timeout: 10_000 });
+        await expect(pageB.locator(`[data-testid='message-content']:has-text("${msg3}")`)).toBeVisible({ timeout: 10_000 });
 
-        const allMessages = pageB.locator(".message-content");
+        const allMessages = pageB.locator("[data-testid='message-content']");
         const texts = await allMessages.allTextContents();
         const idx1 = texts.findIndex(t => t.includes(msg1));
         const idx2 = texts.findIndex(t => t.includes(msg2));
@@ -191,16 +197,16 @@ test.describe.serial("Guild messaging — send, receive, edit, delete, notificat
         await input.fill(original);
         await input.press("Enter");
 
-        await expect(pageA.locator(`.message-content:has-text("${original}")`)).toBeVisible({ timeout: 5_000 });
-        await expect(pageB.locator(`.message-content:has-text("${original}")`)).toBeVisible({ timeout: 10_000 });
+        await expect(pageA.locator(`[data-testid='message-content']:has-text("${original}")`)).toBeVisible({ timeout: 5_000 });
+        await expect(pageB.locator(`[data-testid='message-content']:has-text("${original}")`)).toBeVisible({ timeout: 10_000 });
 
         // Hover over the message to reveal action buttons, then click Edit
-        const msgRow = pageA.locator(`.group:has(.message-content:has-text("${original}"))`);
+        const msgRow = pageA.locator(`.group:has([data-testid='message-content']:has-text("${original}"))`);
         await msgRow.hover();
         await msgRow.locator("[title='Edit']").click();
 
         // Edit textarea should appear with the original content
-        const editTextarea = pageA.locator("textarea.border-\\[\\#5865F2\\]");
+        const editTextarea = pageA.locator("[data-testid='edit-message-input']");
         await expect(editTextarea).toBeVisible({ timeout: 3_000 });
 
         // Clear and type new content
@@ -208,15 +214,15 @@ test.describe.serial("Guild messaging — send, receive, edit, delete, notificat
         await editTextarea.press("Enter");
 
         // Alice sees the edited content
-        await expect(pageA.locator(`.message-content:has-text("${edited}")`)).toBeVisible({ timeout: 5_000 });
+        await expect(pageA.locator(`[data-testid='message-content']:has-text("${edited}")`)).toBeVisible({ timeout: 5_000 });
         // Original should be gone
-        await expect(pageA.locator(`.message-content:has-text("${original}")`)).not.toBeVisible({ timeout: 3_000 });
+        await expect(pageA.locator(`[data-testid='message-content']:has-text("${original}")`)).not.toBeVisible({ timeout: 3_000 });
         // "(edited)" label should appear
         await expect(pageA.locator("text=(edited)").last()).toBeVisible();
 
         // Bob sees the edit in real-time
-        await expect(pageB.locator(`.message-content:has-text("${edited}")`)).toBeVisible({ timeout: 10_000 });
-        await expect(pageB.locator(`.message-content:has-text("${original}")`)).not.toBeVisible();
+        await expect(pageB.locator(`[data-testid='message-content']:has-text("${edited}")`)).toBeVisible({ timeout: 10_000 });
+        await expect(pageB.locator(`[data-testid='message-content']:has-text("${original}")`)).not.toBeVisible();
         await expect(pageB.locator("text=(edited)").last()).toBeVisible();
     });
 
@@ -229,20 +235,20 @@ test.describe.serial("Guild messaging — send, receive, edit, delete, notificat
         await input.fill(msg);
         await input.press("Enter");
 
-        await expect(pageA.locator(`.message-content:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
-        await expect(pageB.locator(`.message-content:has-text("${msg}")`)).toBeVisible({ timeout: 10_000 });
+        await expect(pageA.locator(`[data-testid='message-content']:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
+        await expect(pageB.locator(`[data-testid='message-content']:has-text("${msg}")`)).toBeVisible({ timeout: 10_000 });
 
         // Hover and click delete
-        const msgRow = pageA.locator(`.group:has(.message-content:has-text("${msg}"))`);
+        const msgRow = pageA.locator(`.group:has([data-testid='message-content']:has-text("${msg}"))`);
         await msgRow.hover();
         await msgRow.locator("[title='Delete']").click();
 
         // Confirm the "Delete Message" modal
-        await pageA.locator("button.bg-\\[\\#da373c\\]").click();
+        await pageA.locator("[data-testid='confirm-btn']").click();
 
         // Message should disappear from both
-        await expect(pageA.locator(`.message-content:has-text("${msg}")`)).not.toBeVisible({ timeout: 10_000 });
-        await expect(pageB.locator(`.message-content:has-text("${msg}")`)).not.toBeVisible({ timeout: 10_000 });
+        await expect(pageA.locator(`[data-testid='message-content']:has-text("${msg}")`)).not.toBeVisible({ timeout: 10_000 });
+        await expect(pageB.locator(`[data-testid='message-content']:has-text("${msg}")`)).not.toBeVisible({ timeout: 10_000 });
     });
 
     // ─── TYPING INDICATOR ────────────────────────────────────────────
@@ -328,18 +334,18 @@ test.describe.serial("Guild messaging — send, receive, edit, delete, notificat
         const input = pageA.locator(`textarea[placeholder*="Message #"]`);
         await input.fill(msg);
         await input.press("Enter");
-        await expect(pageA.locator(`.message-content:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
+        await expect(pageA.locator(`[data-testid='message-content']:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
 
         // Bob should see an unread badge next to "second-channel" in the sidebar
         // The UnreadBadge is a span with bg-red-500 text
         await expect(
-            pageB.locator('a:has(span.truncate:has-text("second-channel"))').locator("span.bg-red-500"),
+            pageB.locator('a:has(span.truncate:has-text("second-channel"))').locator("[data-testid='unread-badge']"),
         ).toBeVisible({ timeout: 10_000 });
 
         // Bob navigates to the second channel — badge should clear
         await pageB.locator('a:has(span.truncate:has-text("second-channel"))').first().click();
         await expect(
-            pageB.locator(`.message-content:has-text("${msg}")`),
+            pageB.locator(`[data-testid='message-content']:has-text("${msg}")`),
         ).toBeVisible({ timeout: 5_000 });
 
         // Navigate back — Alice sends to first channel
@@ -497,9 +503,9 @@ test.describe.serial("DM messaging — friend request, send, receive, edit, dele
         await input.press("Enter");
 
         // A sees it
-        await expect(dmPageA.locator(`.message-content:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
+        await expect(dmPageA.locator(`[data-testid='message-content']:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
         // B sees it in real-time
-        await expect(dmPageB.locator(`.message-content:has-text("${msg}")`)).toBeVisible({ timeout: 10_000 });
+        await expect(dmPageB.locator(`[data-testid='message-content']:has-text("${msg}")`)).toBeVisible({ timeout: 10_000 });
     });
 
     test("User B sends a DM, User A receives it in real-time", async () => {
@@ -509,8 +515,8 @@ test.describe.serial("DM messaging — friend request, send, receive, edit, dele
         await input.fill(msg);
         await input.press("Enter");
 
-        await expect(dmPageB.locator(`.message-content:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
-        await expect(dmPageA.locator(`.message-content:has-text("${msg}")`)).toBeVisible({ timeout: 10_000 });
+        await expect(dmPageB.locator(`[data-testid='message-content']:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
+        await expect(dmPageA.locator(`[data-testid='message-content']:has-text("${msg}")`)).toBeVisible({ timeout: 10_000 });
     });
 
     // ─── DM EDIT ─────────────────────────────────────────────────────
@@ -523,22 +529,22 @@ test.describe.serial("DM messaging — friend request, send, receive, edit, dele
         await input.fill(original);
         await input.press("Enter");
 
-        await expect(dmPageA.locator(`.message-content:has-text("${original}")`)).toBeVisible({ timeout: 5_000 });
-        await expect(dmPageB.locator(`.message-content:has-text("${original}")`)).toBeVisible({ timeout: 10_000 });
+        await expect(dmPageA.locator(`[data-testid='message-content']:has-text("${original}")`)).toBeVisible({ timeout: 5_000 });
+        await expect(dmPageB.locator(`[data-testid='message-content']:has-text("${original}")`)).toBeVisible({ timeout: 10_000 });
 
         // Hover + click edit
-        const msgRow = dmPageA.locator(`.group:has(.message-content:has-text("${original}"))`);
+        const msgRow = dmPageA.locator(`.group:has([data-testid='message-content']:has-text("${original}"))`);
         await msgRow.hover();
         await msgRow.locator("[title='Edit']").click();
 
-        const editTextarea = dmPageA.locator("textarea.border-\\[\\#5865F2\\]");
+        const editTextarea = dmPageA.locator("[data-testid='edit-message-input']");
         await expect(editTextarea).toBeVisible({ timeout: 3_000 });
         await editTextarea.fill(edited);
         await editTextarea.press("Enter");
 
         // Both see the edit
-        await expect(dmPageA.locator(`.message-content:has-text("${edited}")`)).toBeVisible({ timeout: 5_000 });
-        await expect(dmPageB.locator(`.message-content:has-text("${edited}")`)).toBeVisible({ timeout: 10_000 });
+        await expect(dmPageA.locator(`[data-testid='message-content']:has-text("${edited}")`)).toBeVisible({ timeout: 5_000 });
+        await expect(dmPageB.locator(`[data-testid='message-content']:has-text("${edited}")`)).toBeVisible({ timeout: 10_000 });
 
         // "(edited)" label on both
         await expect(dmPageA.locator("text=(edited)").last()).toBeVisible();
@@ -554,18 +560,18 @@ test.describe.serial("DM messaging — friend request, send, receive, edit, dele
         await input.fill(msg);
         await input.press("Enter");
 
-        await expect(dmPageA.locator(`.message-content:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
-        await expect(dmPageB.locator(`.message-content:has-text("${msg}")`)).toBeVisible({ timeout: 10_000 });
+        await expect(dmPageA.locator(`[data-testid='message-content']:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
+        await expect(dmPageB.locator(`[data-testid='message-content']:has-text("${msg}")`)).toBeVisible({ timeout: 10_000 });
 
-        const msgRow = dmPageA.locator(`.group:has(.message-content:has-text("${msg}"))`);
+        const msgRow = dmPageA.locator(`.group:has([data-testid='message-content']:has-text("${msg}"))`);
         await msgRow.hover();
         await msgRow.locator("[title='Delete']").click();
 
         // Confirm the "Delete Message" modal
-        await dmPageA.locator("button.bg-\\[\\#da373c\\]").click();
+        await dmPageA.locator("[data-testid='confirm-btn']").click();
 
-        await expect(dmPageA.locator(`.message-content:has-text("${msg}")`)).not.toBeVisible({ timeout: 10_000 });
-        await expect(dmPageB.locator(`.message-content:has-text("${msg}")`)).not.toBeVisible({ timeout: 10_000 });
+        await expect(dmPageA.locator(`[data-testid='message-content']:has-text("${msg}")`)).not.toBeVisible({ timeout: 10_000 });
+        await expect(dmPageB.locator(`[data-testid='message-content']:has-text("${msg}")`)).not.toBeVisible({ timeout: 10_000 });
     });
 
     // ─── DM TYPING INDICATOR ────────────────────────────────────────
@@ -623,21 +629,21 @@ test.describe.serial("DM messaging — friend request, send, receive, edit, dele
         const input = dmPageA.locator(`textarea[placeholder*="Message"]`);
         await input.fill(msg);
         await input.press("Enter");
-        await expect(dmPageA.locator(`.message-content:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
+        await expect(dmPageA.locator(`[data-testid='message-content']:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
 
         // B should see an unread badge in the DM sidebar
-        // The UnreadBadge renders a span.bg-red-500 inside the DM link
+        // The UnreadBadge renders a [data-testid='unread-badge'] inside the DM link
         await expect(
-            dmPageB.locator(`a[href="/app/dm/${dmChannelId}"]`).locator("span.bg-red-500"),
+            dmPageB.locator(`a[href="/app/dm/${dmChannelId}"]`).locator("[data-testid='unread-badge']"),
         ).toBeVisible({ timeout: 10_000 });
 
         // B clicks the DM — badge clears, message visible
         await dmPageB.locator(`a[href="/app/dm/${dmChannelId}"]`).click();
-        await expect(dmPageB.locator(`.message-content:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
+        await expect(dmPageB.locator(`[data-testid='message-content']:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
 
         // Badge should be gone
         await expect(
-            dmPageB.locator(`a[href="/app/dm/${dmChannelId}"]`).locator("span.bg-red-500"),
+            dmPageB.locator(`a[href="/app/dm/${dmChannelId}"]`).locator("[data-testid='unread-badge']"),
         ).not.toBeVisible({ timeout: 5_000 });
     });
 
@@ -656,11 +662,11 @@ test.describe.serial("DM messaging — friend request, send, receive, edit, dele
 
         // Wait for last message to appear on B
         await expect(
-            dmPageB.locator(`.message-content:has-text("${messages[4]}")`),
+            dmPageB.locator(`[data-testid='message-content']:has-text("${messages[4]}")`),
         ).toBeVisible({ timeout: 15_000 });
 
         // Verify order
-        const allContent = await dmPageB.locator(".message-content").allTextContents();
+        const allContent = await dmPageB.locator("[data-testid='message-content']").allTextContents();
         const indices = messages.map(m => allContent.findIndex(t => t.includes(m)));
 
         for (let i = 0; i < indices.length - 1; i++) {
@@ -677,14 +683,14 @@ test.describe.serial("DM messaging — friend request, send, receive, edit, dele
         await input.fill(original);
         await input.press("Enter");
 
-        await expect(dmPageA.locator(`.message-content:has-text("${original}")`)).toBeVisible({ timeout: 5_000 });
+        await expect(dmPageA.locator(`[data-testid='message-content']:has-text("${original}")`)).toBeVisible({ timeout: 5_000 });
 
         // Start editing
-        const msgRow = dmPageA.locator(`.group:has(.message-content:has-text("${original}"))`);
+        const msgRow = dmPageA.locator(`.group:has([data-testid='message-content']:has-text("${original}"))`);
         await msgRow.hover();
         await msgRow.locator("[title='Edit']").click();
 
-        const editTextarea = dmPageA.locator("textarea.border-\\[\\#5865F2\\]");
+        const editTextarea = dmPageA.locator("[data-testid='edit-message-input']");
         await expect(editTextarea).toBeVisible({ timeout: 3_000 });
 
         // Type something different but press Escape
@@ -692,9 +698,9 @@ test.describe.serial("DM messaging — friend request, send, receive, edit, dele
         await editTextarea.press("Escape");
 
         // Original message should still be there, unchanged
-        await expect(dmPageA.locator(`.message-content:has-text("${original}")`)).toBeVisible();
+        await expect(dmPageA.locator(`[data-testid='message-content']:has-text("${original}")`)).toBeVisible();
         // No "(edited)" label
-        await expect(dmPageA.locator(`.group:has(.message-content:has-text("${original}")) >> text=(edited)`)).not.toBeVisible();
+        await expect(dmPageA.locator(`.group:has([data-testid='message-content']:has-text("${original}")) >> text=(edited)`)).not.toBeVisible();
     });
 
     // ─── CLEANUP ─────────────────────────────────────────────────────
