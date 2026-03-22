@@ -211,10 +211,9 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 ### ~~[LOW-9] Deploy state file in /tmp~~ FIXED
 - Moved to `/var/lib/${PROJECT}/active-slot`
 
-### [LOW-10] Generic client README
-- `Librecord.Client/README.md` is the default Vite template README
-- No root-level README.md exists
-- **Fix:** Write project-specific documentation
+### ~~[LOW-10] Generic client README~~ FIXED
+- Removed generic Vite template README from client
+- Created proper root README.md with architecture, setup, testing, project structure
 
 ---
 
@@ -227,5 +226,5 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 | Testing/CI | — | 5 | — | — | — |
 | Frontend | — | 3 | 2 | 4 | 7 |
 | Backend | — | — | 5 | 0 | 6 |
-| Infrastructure | — | — | — | 1 | 7 |
-| **Total** | **1** | **10** | **7** | **6** | **24** |
+| Infrastructure | — | — | — | 0 | 8 |
+| **Total** | **1** | **10** | **7** | **5** | **25** |
