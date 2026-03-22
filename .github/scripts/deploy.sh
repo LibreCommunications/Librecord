@@ -22,7 +22,11 @@ case "$ENV" in
 esac
 
 STATE_DIR="/var/lib/${PROJECT}"
-mkdir -p "$STATE_DIR" 2>/dev/null || true
+sudo mkdir -p "$STATE_DIR" && sudo chown "$(id -u):$(id -g)" "$STATE_DIR" 2>/dev/null || {
+    # Fallback to home directory if /var/lib is not writable
+    STATE_DIR="$HOME/.${PROJECT}"
+    mkdir -p "$STATE_DIR"
+}
 STATE_FILE="${STATE_DIR}/active-slot"
 UPSTREAM_FILE="/etc/nginx/conf.d/${PROJECT}-upstream.conf"
 
