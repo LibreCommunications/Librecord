@@ -17,7 +17,7 @@ RUN dotnet publish Librecord.Api/Librecord.Api.csproj -c Release -o /app --no-re
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 
-RUN adduser --disabled-password --no-create-home appuser
+RUN useradd --no-create-home --shell /bin/false appuser
 USER appuser
 
 COPY --from=build /app .
