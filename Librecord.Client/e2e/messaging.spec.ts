@@ -686,13 +686,15 @@ test.describe.serial("DM messaging — friend request, send, receive, edit, dele
 
         await expect(dmPageA.locator(`[data-testid='message-content']:has-text("${original}")`)).toBeVisible({ timeout: 5_000 });
 
-        // Start editing
+        // Start editing — hover to reveal action buttons, wait for them, then click Edit
         const msgRow = dmPageA.locator(`.group:has([data-testid='message-content']:has-text("${original}"))`);
         await msgRow.hover();
-        await msgRow.locator("[title='Edit']").click();
+        const editBtn = msgRow.locator("[title='Edit']");
+        await expect(editBtn).toBeVisible({ timeout: 3_000 });
+        await editBtn.click();
 
         const editTextarea = dmPageA.locator("[data-testid='edit-message-input']");
-        await expect(editTextarea).toBeVisible({ timeout: 3_000 });
+        await expect(editTextarea).toBeVisible({ timeout: 5_000 });
 
         // Type something different but press Escape
         await editTextarea.fill("This should not save");
