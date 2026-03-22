@@ -24,7 +24,17 @@ var builder = WebApplication.CreateBuilder(args);
 // --------------------------------------------------
 var jwtOpts = builder.Configuration
     .GetSection("Jwt")
-    .Get<JwtOptions>()!;
+    .Get<JwtOptions>()
+    ?? throw new InvalidOperationException("JWT configuration is missing. Set Jwt:SigningKey, Jwt:Issuer, Jwt:Audience.");
+
+if (string.IsNullOrWhiteSpace(jwtOpts.SigningKey) || jwtOpts.SigningKey.Length < 32)
+    throw new InvalidOperationException("JWT SigningKey must be at least 32 characters.");
+
+if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("Default")))
+    throw new InvalidOperationException("ConnectionStrings:Default is missing.");
+
+if (string.IsNullOrWhiteSpace(builder.Configuration["Security:MessageEncryptionKey"]))
+    throw new InvalidOperationException("Security:MessageEncryptionKey is missing.");
 
 // --------------------------------------------------
 // SERVICE REGISTRATION
@@ -152,7 +162,11 @@ static void ConfigureDatabase(
 {
     services.AddDbContext<LibrecordContext>(options =>
         options.UseNpgsql(
-            config.GetConnectionString("Default")
+            config.GetConnectionString("Default"),
+            npgsql => npgsql.EnableRetryOnFailure(
+                maxRetryCount: 3,
+                maxRetryDelay: TimeSpan.FromSeconds(5),
+                errorCodesToAdd: null)
         ));
 }
 

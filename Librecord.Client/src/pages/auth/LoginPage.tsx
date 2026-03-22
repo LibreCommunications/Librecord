@@ -52,6 +52,7 @@ export default function LoginPage() {
                     </span>
                     <input
                         type="text"
+                        required
                         value={emailOrUsername}
                         onChange={(e) => setEmailOrUsername(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && handleLogin()}
@@ -66,6 +67,7 @@ export default function LoginPage() {
                     </span>
                     <input
                         type="password"
+                        required
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && handleLogin()}

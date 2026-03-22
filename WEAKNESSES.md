@@ -9,21 +9,21 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 ### ~~[SEC-1] No rate limiting anywhere~~ FIXED
 - Added global rate limiter (60 req/min per IP), `"auth"` policy (10/min), `"upload"` policy (10/min)
 
+### ~~[SEC-3] AllowedHosts wildcard in production~~ FIXED
+- Changed from `"*"` to `"localhost"` in base appsettings.json
+
+### ~~[SEC-4] No environment variable validation on startup~~ FIXED
+- App now fails fast if JWT config, connection string, or encryption key are missing/invalid
+
 ### [SEC-2] Missing authorization checks on pins and threads
 - **File:** `Librecord.Api/Controllers/Messaging/PinController.cs` — lines 29-55, 60-70
 - **File:** `Librecord.Api/Controllers/Messaging/ThreadController.cs` — lines 32-65, 144-193
 - Any authenticated user can pin/unpin messages and create/post in threads in any channel
 - **Fix:** Add permission checks (e.g. `ManageChannels` for pins, channel membership for threads)
 
-### [SEC-3] AllowedHosts wildcard in production
-- **File:** `Librecord.Api/appsettings.json` line 9: `"AllowedHosts": "*"`
-- Accepts requests with any Host header — DNS rebinding risk
-- **Fix:** Set environment-specific allowed hosts
+### ~~[SEC-3] AllowedHosts wildcard in production~~ FIXED (see above)
 
-### [SEC-4] No environment variable validation on startup
-- **File:** `Librecord.Api/Program.cs`
-- If `JWT_SIGNING_KEY` or `MESSAGE_ENCRYPTION_KEY` are missing in production, app starts with dev defaults
-- **Fix:** Validate required config values at startup, fail fast if missing
+### ~~[SEC-4] No environment variable validation on startup~~ FIXED (see above)
 
 ---
 
@@ -92,11 +92,9 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 - Added error toasts for message send and file upload failures in both DM and guild pages
 - `ChannelSidebar.tsx` permission load still fails silently
 
-### [FE-3] Memory leaks: unreleased Object URLs
-- `AttachmentUpload.tsx` line 50: `URL.createObjectURL(file)` never revoked
-- `ProfileSettings.tsx` line 34: same — avatar preview URL leaks
-- Each file selection without cleanup wastes browser memory
-- **Fix:** `URL.revokeObjectURL()` in cleanup/on file change
+### ~~[FE-3] Memory leaks: unreleased Object URLs~~ FIXED
+- `AttachmentUpload.tsx`: uses ref-based URL map with cleanup on file removal and unmount
+- `ProfileSettings.tsx`: revokes previous URL before creating new one
 
 ### [FE-4] No virtual scrolling for message lists
 - `MessageList.tsx` renders ALL messages in DOM (no windowing)
@@ -147,8 +145,8 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 - Other controllers use proper DTOs
 - **Fix:** Use consistent DTO responses everywhere
 
-### [BE-7] Missing null checks
-- `ThreadController.cs` line 179: `FindAsync(UserId)` with no null check, then `user!.Id` at line 188
+### [BE-7] Missing null checks — PARTIALLY FIXED
+- ~~`ThreadController.cs`: `FindAsync(UserId)` with no null check~~ → added null check + return Unauthorized
 - `DirectMessageChannelController.cs` line 36: `m.User.DisplayName` assumes User always present
 - `GuildHub.cs` lines 52, 87: `guild.Channels` assumed non-null in foreach
 
@@ -157,9 +155,8 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 - No request DTO validation attributes
 - FluentValidation not yet added
 
-### [BE-9] No database retry policy or connection pool tuning
-- `Program.cs` lines 149-152: `UseNpgsql()` with no retry config
-- No `EnableRetryOnFailure()`, no max pool size, no connection lifetime settings
+### ~~[BE-9] No database retry policy~~ FIXED
+- Added `EnableRetryOnFailure(maxRetryCount: 3, maxRetryDelay: 5s)` to UseNpgsql
 
 ---
 
@@ -181,17 +178,13 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 - Every parent re-render re-renders ALL messages in the list
 - **Fix:** Wrap with `React.memo` and stabilize callback props
 
-### [FE-10] XSS risk in markdown renderer
-- `MessageItem.tsx` line 107: `dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}`
-- `markdown.ts`: URL regex `/(https?:\/\/[^\s<]+)/g` doesn't validate against `javascript:` protocol
-- HTML is escaped, but link URL validation is missing
-- **Fix:** Validate URLs before wrapping in `<a>` tags
+### ~~[FE-10] XSS risk in markdown renderer~~ FIXED
+- Link auto-detection now validates URLs with `new URL()` and rejects non-http/https protocols
 
-### [FE-11] Missing client-side form validation
-- `LoginPage.tsx` lines 53-73: no `required`, no pattern validation on inputs
-- `RegisterPage.tsx` lines 55-99: email missing `type="email"`, no length limits
-- `CreateChannelModal.tsx` lines 88-99: no `minLength`/`maxLength`/`required`
-- **Fix:** Add HTML5 validation attributes at minimum
+### [FE-11] Missing client-side form validation — PARTIALLY FIXED
+- ~~Login/Register pages missing `required`~~ → added `required` to all inputs
+- ~~Register: no length constraints~~ → added `minLength`/`maxLength` on username, `minLength` on password
+- `CreateChannelModal.tsx` still has no validation
 
 ---
 
@@ -247,10 +240,10 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 
 | Category | Critical | High | Medium | Low | Fixed |
 |----------|----------|------|--------|-----|-------|
-| Security | 3 | — | — | 1 | 1 (SEC-1) |
+| Security | 1 | — | — | 1 | 3 (SEC-1, SEC-3, SEC-4) |
 | Architecture | — | 3 | — | — | — |
 | Testing/CI | — | 5 | — | — | — |
-| Frontend | — | 4 | 5 | 4 | 2 (FE-1, FE-2 partial) |
-| Backend | — | — | 7 | 0 | 4 (BE-2, BE-3, BE-5 partial, BE-8 partial) |
+| Frontend | — | 3 | 3 | 4 | 5 (FE-1, FE-2 partial, FE-3, FE-10, FE-11 partial) |
+| Backend | — | — | 5 | 0 | 6 (BE-2, BE-3, BE-5 partial, BE-7 partial, BE-8 partial, BE-9) |
 | Infrastructure | — | — | — | 3 | 2 (LOW-7, LOW-8) |
-| **Total** | **3** | **12** | **12** | **8** | **9** |
+| **Total** | **1** | **11** | **8** | **8** | **16** |

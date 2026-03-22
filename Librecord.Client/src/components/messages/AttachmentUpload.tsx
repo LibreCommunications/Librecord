@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 interface Props {
     files: File[];
@@ -8,6 +8,35 @@ interface Props {
 
 export function AttachmentUpload({ files, onFilesChange, triggerRef }: Props) {
     const inputRef = useRef<HTMLInputElement>(null);
+
+    // Create and track object URLs — revoke on cleanup or file change
+    const urlMapRef = useRef(new Map<File, string>());
+
+    function getPreviewUrl(file: File): string {
+        if (!urlMapRef.current.has(file)) {
+            urlMapRef.current.set(file, URL.createObjectURL(file));
+        }
+        return urlMapRef.current.get(file)!;
+    }
+
+    useEffect(() => {
+        const map = urlMapRef.current;
+        // Revoke URLs for files that were removed
+        for (const [file, url] of map) {
+            if (!files.includes(file)) {
+                URL.revokeObjectURL(url);
+                map.delete(file);
+            }
+        }
+    }, [files]);
+
+    // Revoke all on unmount
+    useEffect(() => {
+        return () => {
+            for (const url of urlMapRef.current.values()) URL.revokeObjectURL(url);
+            urlMapRef.current.clear();
+        };
+    }, []);
 
     function handleFiles(newFiles: FileList | null) {
         if (!newFiles) return;
@@ -47,7 +76,7 @@ export function AttachmentUpload({ files, onFilesChange, triggerRef }: Props) {
                         >
                             {file.type.startsWith("image/") ? (
                                 <img
-                                    src={URL.createObjectURL(file)}
+                                    src={getPreviewUrl(file)}
                                     className="w-10 h-10 rounded object-cover"
                                     alt=""
                                 />

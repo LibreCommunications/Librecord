@@ -31,6 +31,7 @@ export default function ProfileSettings() {
         if (!file) return;
 
         setAvatarFile(file);
+        if (avatarPreview) URL.revokeObjectURL(avatarPreview);
         setAvatarPreview(URL.createObjectURL(file));
     }
 
@@ -41,6 +42,7 @@ export default function ProfileSettings() {
         await uploadAvatar(avatarFile);
         setUploadingAvatar(false);
 
+        if (avatarPreview) URL.revokeObjectURL(avatarPreview);
         setAvatarPreview(null);
         setAvatarFile(null);
     }

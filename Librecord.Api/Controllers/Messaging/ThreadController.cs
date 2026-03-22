@@ -173,6 +173,7 @@ public class ThreadController : AuthenticatedController
         await _db.SaveChangesAsync();
 
         var user = await _db.Users.FindAsync(UserId);
+        if (user == null) return Unauthorized();
 
         return Ok(new
         {
@@ -181,7 +182,7 @@ public class ThreadController : AuthenticatedController
             createdAt = message.CreatedAt,
             author = new
             {
-                id = user!.Id,
+                id = user.Id,
                 username = user.UserName,
                 displayName = user.DisplayName,
                 avatarUrl = user.AvatarUrl

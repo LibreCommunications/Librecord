@@ -54,6 +54,7 @@ export default function RegisterPage() {
                     </span>
                     <input
                         type="email"
+                        required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className="w-full mt-2 px-3 py-2.5 rounded-[4px] bg-[#1e1f22] text-white outline-none border border-[#1e1f22] focus:border-[#5865F2] transition-colors"
@@ -67,6 +68,9 @@ export default function RegisterPage() {
                     </span>
                     <input
                         type="text"
+                        required
+                        minLength={3}
+                        maxLength={32}
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         className="w-full mt-2 px-3 py-2.5 rounded-[4px] bg-[#1e1f22] text-white outline-none border border-[#1e1f22] focus:border-[#5865F2] transition-colors"
@@ -92,6 +96,8 @@ export default function RegisterPage() {
                     </span>
                     <input
                         type="password"
+                        required
+                        minLength={6}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && handleRegister()}
