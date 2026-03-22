@@ -65,6 +65,9 @@ for i in $(seq 1 $ATTEMPTS); do
   fi
   if [ "$i" -eq "$ATTEMPTS" ]; then
     echo "ERROR: Health check failed after $ATTEMPTS attempts"
+    echo "=== Container logs (last 50 lines) ==="
+    docker logs "${PROJECT}-backend-${NEW_SLOT}" --tail 50 2>&1 || true
+    echo "=== End of logs ==="
     echo "Rolling back: stopping backend-$NEW_SLOT"
     docker compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" --profile "$NEW_SLOT" stop "backend-$NEW_SLOT"
     exit 1
