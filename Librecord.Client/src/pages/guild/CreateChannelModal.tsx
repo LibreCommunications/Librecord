@@ -87,6 +87,9 @@ export default function CreateChannelModal({
 
                 <input
                     autoFocus
+                    required
+                    minLength={1}
+                    maxLength={64}
                     value={name}
                     onChange={e => setName(e.target.value)}
                     placeholder="general"

@@ -341,6 +341,7 @@ export default function GuildChannelPage() {
                     setMessages(prev =>
                         prev.filter(m => m.clientMessageId !== clientMessageId)
                     );
+                    setPendingFiles(filesToSend);
                     toast("Failed to send file. The upload may have timed out.", "error");
                 }
             } else {
@@ -350,6 +351,7 @@ export default function GuildChannelPage() {
             setMessages(prev =>
                 prev.filter(m => m.clientMessageId !== clientMessageId)
             );
+            if (filesToSend.length > 0) setPendingFiles(filesToSend);
             toast("Failed to send message.", "error");
         } finally {
             setSending(false);
@@ -415,12 +417,22 @@ export default function GuildChannelPage() {
         setMessages(prev =>
             prev.map(m => {
                 if (m.id !== messageId) return m;
-                // Don't add duplicate reaction from same user
                 if (m.reactions.some(r => r.userId === user.userId && r.emoji === emoji)) return m;
                 return { ...m, reactions: [...m.reactions, { userId: user.userId, emoji, createdAt: new Date().toISOString() }] };
             })
         );
-        await addReaction(messageId, emoji);
+        try {
+            await addReaction(messageId, emoji);
+        } catch {
+            // Rollback optimistic reaction
+            setMessages(prev =>
+                prev.map(m =>
+                    m.id === messageId
+                        ? { ...m, reactions: m.reactions.filter(r => !(r.userId === user.userId && r.emoji === emoji)) }
+                        : m
+                )
+            );
+        }
     };
 
     const handleRemoveReaction = async (messageId: string, emoji: string) => {

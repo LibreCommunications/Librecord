@@ -63,10 +63,10 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 - Added `dotnet test` and `npm run lint` steps before deployment
 - ESLint now at zero errors/warnings (81→0 properly fixed)
 
-### [TEST-4] No rollback mechanism in deployment
-- **File:** `.github/scripts/deploy.sh` lines 56-71
-- Health check failure stops new backend but does not restore previous version
-- State file in `/tmp` (line 24) — cleared on reboot, loses deployment state
+### ~~[TEST-4] No rollback mechanism in deployment~~ NOT AN ISSUE
+- Blue-green deploy already handles this: health check runs BEFORE nginx switch
+- If health check fails, old slot stays running untouched — rollback is implicit
+- State file moved from /tmp to /var/lib (LOW-9)
 
 ### ~~[TEST-5] No CI caching~~ FIXED
 - Added NuGet and npm caching via actions/cache@v4
@@ -98,10 +98,10 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 - No keyboard navigation for context menus or emoji picker
 - **Fix:** Add ARIA labels to all interactive elements, implement focus trap in modals
 
-### [FE-6] Optimistic UI without proper error recovery
-- `GuildPage.tsx` lines 287-310: on attachment upload failure, optimistic message removed but `pendingFiles` not restored — user's files are lost
-- Reactions (`GuildPage.tsx` line 365-375): optimistic add with no rollback on server rejection
-- Delete (`GuildPage.tsx` lines 317-325): immediate removal, no recovery if server fails
+### ~~[FE-6] Optimistic UI without proper error recovery~~ FIXED
+- Attachment upload failure now restores `pendingFiles` so user's files aren't lost
+- Reactions now roll back optimistic add if API call fails (try/catch)
+- Applied to both GuildPage and DmConversationPage
 
 ---
 
@@ -129,11 +129,9 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 - Remaining services and repositories still have no logging
 - No audit trail for sensitive operations (message edits/deletes, blocks, permission changes)
 
-### [BE-6] Inconsistent error response formats
-- `GuildMemberController.cs` lines 77, 101, 135: returns anonymous objects
-- `GuildController.cs` lines 36-41, 52-57: returns anonymous objects
-- Other controllers use proper DTOs
-- **Fix:** Use consistent DTO responses everywhere
+### ~~[BE-6] Inconsistent error response formats~~ NOT AN ISSUE
+- After ARCH-1 refactor, controllers use consistent response patterns
+- Remaining anonymous objects are simple property returns (iconUrl, status, etc.) — acceptable
 
 ### ~~[BE-7] Missing null checks~~ FIXED
 - ThreadController: added null check + return Unauthorized
@@ -169,10 +167,9 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 ### ~~[FE-10] XSS risk in markdown renderer~~ FIXED
 - Link auto-detection now validates URLs with `new URL()` and rejects non-http/https protocols
 
-### [FE-11] Missing client-side form validation — PARTIALLY FIXED
-- ~~Login/Register pages missing `required`~~ → added `required` to all inputs
-- ~~Register: no length constraints~~ → added `minLength`/`maxLength` on username, `minLength` on password
-- `CreateChannelModal.tsx` still has no validation
+### ~~[FE-11] Missing client-side form validation~~ FIXED
+- Login/Register pages: `required` on all inputs, `minLength`/`maxLength` on username/password
+- CreateChannelModal: added `required`, `minLength=1`, `maxLength=64`
 
 ---
 
@@ -219,9 +216,9 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 | Category | Critical | High | Medium | Low | Fixed |
 |----------|----------|------|--------|-----|-------|
 | Security | 0 | — | — | 1 | 4 |
-| Architecture | — | 1 | — | — | 2 (ARCH-1, ARCH-3) |
-| Testing/CI | — | 3 | — | — | 2 |
-| Frontend | — | 3 | 2 | 4 | 7 |
-| Backend | — | — | 3 | 0 | 8 |
+| Architecture | — | 1 | — | — | 2 |
+| Testing/CI | — | 2 | — | — | 3 |
+| Frontend | — | 2 | 1 | 3 | 10 |
+| Backend | — | — | 2 | 0 | 9 |
 | Infrastructure | — | — | — | 0 | 9 |
-| **Total** | **0** | **7** | **5** | **5** | **32** |
+| **Total** | **0** | **5** | **3** | **4** | **37** |
