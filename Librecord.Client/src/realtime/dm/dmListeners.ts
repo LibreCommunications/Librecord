@@ -29,6 +29,7 @@ export function registerDmListeners() {
     dmConnection.off("channel:message:pinned");
     dmConnection.off("channel:message:unpinned");
     dmConnection.off("dm:member:left");
+    dmConnection.off("dm:channel:created");
 
     /* ------------------------------------------------------------------ */
     /* MESSAGE PING (lightweight — for unread badges + notifications)      */
@@ -171,6 +172,21 @@ export function registerDmListeners() {
         (payload: { channelId: string; messageId: string }) => {
             console.log("[SignalR] channel:message:unpinned", payload);
             dispatchDmEvent("channel:message:unpinned", payload);
+        }
+    );
+
+    /* ------------------------------------------------------------------ */
+    /* DM CHANNEL CREATED (new DM started by another user)                  */
+    /* ------------------------------------------------------------------ */
+    dmConnection.on(
+        "dm:channel:created",
+        (payload: { channelId: string }) => {
+            console.log("[SignalR] dm:channel:created", payload);
+            // Join the new channel's SignalR group so we receive messages
+            dmConnection.invoke("JoinChannel", payload.channelId).catch((err) => {
+                console.warn("[SignalR] Failed to join new DM channel group", err);
+            });
+            dispatchDmEvent("dm:channel:created", payload);
         }
     );
 

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Librecord.Api.Dtos.Messages;
 using Librecord.Api.Hubs;
 using Librecord.Domain.Messaging.Common;
+using Librecord.Domain.Security;
 using Librecord.Infra.Database;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,15 +19,18 @@ public class PinController : ControllerBase
     private readonly LibrecordContext _db;
     private readonly IHubContext<DmHub> _dmHub;
     private readonly IHubContext<GuildHub> _guildHub;
+    private readonly IMessageEncryptionService _encryption;
 
     public PinController(
         LibrecordContext db,
         IHubContext<DmHub> dmHub,
-        IHubContext<GuildHub> guildHub)
+        IHubContext<GuildHub> guildHub,
+        IMessageEncryptionService encryption)
     {
         _db = db;
         _dmHub = dmHub;
         _guildHub = guildHub;
+        _encryption = encryption;
     }
 
     private Guid UserId =>
@@ -107,28 +111,52 @@ public class PinController : ControllerBase
             .Where(p => p.ChannelId == channelId)
             .Include(p => p.Message)
                 .ThenInclude(m => m.User)
+            .Include(p => p.Message)
+                .ThenInclude(m => m.DmContext)
+            .Include(p => p.Message)
+                .ThenInclude(m => m.GuildContext)
             .Include(p => p.PinnedBy)
             .OrderByDescending(p => p.PinnedAt)
             .ToListAsync();
 
-        return Ok(pins.Select(p => new
+        return Ok(pins.Select(p =>
         {
-            messageId = p.MessageId,
-            channelId = p.ChannelId,
-            content = p.Message.ContentText,
-            createdAt = p.Message.CreatedAt,
-            author = new
+            // Decrypt message content using whichever context is available
+            string? content = null;
+            if (p.Message.DmContext != null)
             {
-                id = p.Message.User.Id,
-                username = p.Message.User.UserName,
-                displayName = p.Message.User.DisplayName
-            },
-            pinnedBy = new
+                content = _encryption.Decrypt(
+                    p.Message.Content,
+                    p.Message.DmContext.EncryptionSalt,
+                    p.Message.DmContext.EncryptionAlgorithm);
+            }
+            else if (p.Message.GuildContext != null)
             {
-                id = p.PinnedBy.Id,
-                displayName = p.PinnedBy.DisplayName
-            },
-            pinnedAt = p.PinnedAt
+                content = _encryption.Decrypt(
+                    p.Message.Content,
+                    p.Message.GuildContext.EncryptionSalt,
+                    p.Message.GuildContext.EncryptionAlgorithm);
+            }
+
+            return new
+            {
+                messageId = p.MessageId,
+                channelId = p.ChannelId,
+                content,
+                createdAt = p.Message.CreatedAt,
+                author = new
+                {
+                    id = p.Message.User.Id,
+                    username = p.Message.User.UserName,
+                    displayName = p.Message.User.DisplayName
+                },
+                pinnedBy = new
+                {
+                    id = p.PinnedBy.Id,
+                    displayName = p.PinnedBy.DisplayName
+                },
+                pinnedAt = p.PinnedAt
+            };
         }));
     }
 }

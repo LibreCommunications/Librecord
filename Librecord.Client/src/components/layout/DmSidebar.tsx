@@ -68,11 +68,15 @@ export default function DmSidebar() {
         loadDms();
     }, []);
 
-    // Refresh DM list when a friend is removed
+    // Refresh DM list when a friend is removed or a new DM channel is created
     useEffect(() => {
-        const onFriendRemoved = () => { loadDms(); };
-        window.addEventListener("friend:removed", onFriendRemoved as EventListener);
-        return () => window.removeEventListener("friend:removed", onFriendRemoved as EventListener);
+        const refresh = () => { loadDms(); };
+        window.addEventListener("friend:removed", refresh as EventListener);
+        window.addEventListener("dm:channel:created", refresh as EventListener);
+        return () => {
+            window.removeEventListener("friend:removed", refresh as EventListener);
+            window.removeEventListener("dm:channel:created", refresh as EventListener);
+        };
     }, []);
 
     // Update DM list when a member leaves a group DM

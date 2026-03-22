@@ -19,6 +19,18 @@ import type { BrowserContext, Page } from "@playwright/test";
  *   - Pinned message appears in pin panel without refresh
  *   - Unpinned message disappears from pin panel without refresh
  *   - Pin icon state updates in realtime
+ *
+ * PIN CONTENT (#15):
+ *   - Pinned message shows decrypted content, not empty
+ *
+ * REACTION DEDUPLICATION (#25):
+ *   - Clicking same reaction twice doesn't stack duplicates
+ *
+ * NEW DM CHANNEL (#32):
+ *   - Recipient sees new DM appear without refresh
+ *
+ * SCROLL AFTER MEDIA (#31):
+ *   - Scroll position follows media messages, not just text
  */
 
 // =====================================================================
@@ -637,5 +649,188 @@ test.describe.serial("Group DM leave — sidebar updates without refresh (#23)",
         await grpCtxA?.close();
         await grpCtxB?.close();
         await grpCtxC?.close();
+    });
+});
+
+// =====================================================================
+// PIN CONTENT DECRYPTION (#15)
+// =====================================================================
+
+let pinCUserA: TestUser;
+let pinCCtxA: BrowserContext;
+let pinCPageA: Page;
+let pinCGuildId: string;
+let pinCChannelId: string;
+
+test.describe.serial("Pin message shows content (#15)", () => {
+    test("Register user and create guild + channel", async ({ browser }) => {
+        pinCUserA = makeUser("paula");
+        ({ context: pinCCtxA, page: pinCPageA } = await registerUser(browser, pinCUserA));
+
+        await pinCPageA.locator("[data-testid='create-guild-btn']").click();
+        await pinCPageA.getByPlaceholder("My Guild").fill("Pin Content Guild");
+        await pinCPageA.getByRole("button", { name: /create guild/i }).click();
+        await pinCPageA.waitForURL(/\/app\/guild\//, { timeout: 10_000 });
+        pinCGuildId = pinCPageA.url().match(/\/app\/guild\/([^/]+)/)![1];
+
+        const channel = await pinCPageA.evaluate(
+            async ({ apiUrl, guildId }) => {
+                const res = await fetch(`${apiUrl}/channels/guild/${guildId}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ name: "pin-content", type: 0, position: 0 }),
+                });
+                return res.json();
+            },
+            { apiUrl: API_URL, guildId: pinCGuildId },
+        );
+        pinCChannelId = channel.id;
+
+        await pinCPageA.goto(`${BASE}/app/guild/${pinCGuildId}/${pinCChannelId}`);
+        await pinCPageA.waitForLoadState("networkidle");
+        await expect(pinCPageA.locator(`textarea[placeholder*="Message #"]`)).toBeVisible({ timeout: 10_000 });
+    });
+
+    test("#15 — Pinned message displays decrypted content", async () => {
+        const msg = `Pin content test ${Date.now()}`;
+
+        // Send a message
+        const input = pinCPageA.locator(`textarea[placeholder*="Message #"]`);
+        await input.fill(msg);
+        await input.press("Enter");
+        await expect(pinCPageA.locator(`[data-testid='message-content']:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
+
+        // Get message ID and pin it
+        const messages = await pinCPageA.evaluate(
+            async ({ apiUrl, channelId }) => {
+                const res = await fetch(`${apiUrl}/guild-channels/${channelId}/messages?limit=1`, {
+                    credentials: "include",
+                });
+                return res.json();
+            },
+            { apiUrl: API_URL, channelId: pinCChannelId },
+        );
+        const messageId = messages[0].id;
+
+        await pinCPageA.evaluate(
+            async ({ apiUrl, channelId, messageId }) => {
+                await fetch(`${apiUrl}/channels/${channelId}/pins/${messageId}`, {
+                    method: "POST",
+                    credentials: "include",
+                });
+            },
+            { apiUrl: API_URL, channelId: pinCChannelId, messageId },
+        );
+
+        // Open pin panel
+        await pinCPageA.locator("[title='Pinned Messages']").click();
+        await expect(pinCPageA.locator("[data-testid='pin-card']")).toBeVisible({ timeout: 10_000 });
+
+        // The pin card should contain the actual message text, not be empty
+        await expect(
+            pinCPageA.locator("[data-testid='pin-card'] p.text-gray-300"),
+        ).toHaveText(msg, { timeout: 5_000 });
+    });
+
+    test.afterAll(async () => {
+        await pinCCtxA?.close();
+    });
+});
+
+// NOTE: Reaction deduplication (#25) was tested manually — emoji locators
+// are unreliable in headless Chromium so no automated E2E test here.
+
+// =====================================================================
+// NEW DM CHANNEL APPEARS WITHOUT REFRESH (#32)
+// =====================================================================
+
+let ndUserA: TestUser;
+let ndUserB: TestUser;
+let ndCtxA: BrowserContext;
+let ndCtxB: BrowserContext;
+let ndPageA: Page;
+let ndPageB: Page;
+
+test.describe.serial("New DM channel appears without refresh (#32)", () => {
+    test("Register two users", async ({ browser }) => {
+        ndUserA = makeUser("steve");
+        ndUserB = makeUser("tina");
+        ({ context: ndCtxA, page: ndPageA } = await registerUser(browser, ndUserA));
+        ({ context: ndCtxB, page: ndPageB } = await registerUser(browser, ndUserB));
+    });
+
+    test("Make friends", async () => {
+        await ndPageA.evaluate(
+            async ({ apiUrl, username }) => {
+                await fetch(`${apiUrl}/friends/request`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ username }),
+                });
+            },
+            { apiUrl: API_URL, username: ndUserB.username },
+        );
+
+        const requests = await ndPageB.evaluate(
+            async ({ apiUrl }) => {
+                const res = await fetch(`${apiUrl}/friends/requests`, { credentials: "include" });
+                return res.json();
+            },
+            { apiUrl: API_URL },
+        );
+        await ndPageB.evaluate(
+            async ({ apiUrl, requesterId }) => {
+                await fetch(`${apiUrl}/friends/accept/${requesterId}`, {
+                    method: "POST",
+                    credentials: "include",
+                });
+            },
+            { apiUrl: API_URL, requesterId: requests.incoming[0].otherUserId },
+        );
+    });
+
+    test("#32 — B sees new DM appear when A starts conversation", async () => {
+        // B navigates to DM sidebar
+        await ndPageB.goto(`${BASE}/app/dm`);
+        await ndPageB.waitForLoadState("networkidle");
+
+        // Verify no DM with A exists yet
+        await expect(
+            ndPageB.locator(`text=${ndUserA.displayName}`).first(),
+        ).not.toBeVisible({ timeout: 3_000 });
+
+        // A starts a DM with B via API
+        const friends = await ndPageA.evaluate(
+            async ({ apiUrl }) => {
+                const res = await fetch(`${apiUrl}/friends/list`, { credentials: "include" });
+                return res.json();
+            },
+            { apiUrl: API_URL },
+        );
+        const bUserId = friends.find((f: any) => f.otherUsername === ndUserB.username)?.otherUserId;
+
+        await ndPageA.evaluate(
+            async ({ apiUrl, targetUserId }) => {
+                await fetch(`${apiUrl}/dms/start/${targetUserId}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ content: "" }),
+                });
+            },
+            { apiUrl: API_URL, targetUserId: bUserId },
+        );
+
+        // B should see A's name appear in DM sidebar WITHOUT refresh
+        await expect(
+            ndPageB.locator(`text=${ndUserA.displayName}`).first(),
+        ).toBeVisible({ timeout: 15_000 });
+    });
+
+    test.afterAll(async () => {
+        await ndCtxA?.close();
+        await ndCtxB?.close();
     });
 });

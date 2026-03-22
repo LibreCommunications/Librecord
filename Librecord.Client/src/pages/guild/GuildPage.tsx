@@ -322,6 +322,8 @@ export default function GuildChannelPage() {
                     setMessages(prev => prev.map(m =>
                         m.clientMessageId === clientMessageId ? { ...serverMsg, clientMessageId } : m
                     ));
+                    // Re-scroll after attachments are rendered
+                    shouldAutoScrollRef.current = true;
                 } else {
                     setMessages(prev =>
                         prev.filter(m => m.clientMessageId !== clientMessageId)
@@ -394,11 +396,12 @@ export default function GuildChannelPage() {
     const handleAddReaction = async (messageId: string, emoji: string) => {
         if (!user) return;
         setMessages(prev =>
-            prev.map(m =>
-                m.id === messageId
-                    ? { ...m, reactions: [...m.reactions, { userId: user.userId, emoji, createdAt: new Date().toISOString() }] }
-                    : m
-            )
+            prev.map(m => {
+                if (m.id !== messageId) return m;
+                // Don't add duplicate reaction from same user
+                if (m.reactions.some(r => r.userId === user.userId && r.emoji === emoji)) return m;
+                return { ...m, reactions: [...m.reactions, { userId: user.userId, emoji, createdAt: new Date().toISOString() }] };
+            })
         );
         await addReaction(messageId, emoji);
     };

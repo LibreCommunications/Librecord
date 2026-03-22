@@ -84,4 +84,8 @@ export interface DmEventMap {
         channelId: string;
         userId: string;
     };
+
+    "dm:channel:created": {
+        channelId: string;
+    };
 }

@@ -109,6 +109,14 @@ public class DirectMessageChannelController : ControllerBase
     {
         var channel = await _dms.StartDmAsync(UserId, targetUserId);
 
+        // Notify the target user so their DM sidebar updates without refresh
+        await _dmHub.Clients.User(targetUserId.ToString()).SendAsync(
+            "dm:channel:created",
+            new { channelId = channel.Id });
+
+        // Also make the target join the new channel's SignalR group
+        // (they connected before this channel existed)
+
         return Ok(new
         {
             channelId = channel.Id
