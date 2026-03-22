@@ -84,8 +84,8 @@ npm run test:e2e  # Playwright E2E tests (124 tests)
 
 ## Testing
 
-- **Unit tests**: 166 xUnit tests covering services, encryption, realtime events
-- **E2E tests**: 124 Playwright tests covering messaging, voice/video, user status, file uploads, realtime sync
+- **Unit tests**: xUnit tests covering services, encryption, realtime events
+- **E2E tests**: Playwright tests covering messaging, voice/video, user status, file uploads, realtime sync
 - Tests run against localhost only (rate limiting skips loopback)
 
 ## Project Structure
@@ -129,4 +129,4 @@ Librecord.Client/
 
 ## License
 
-License TBD (Apache 2.0 or GPL 2.0). Currently in private early development.
+This project is licensed under the [GNU Affero General Public License v3.0](LICENSE).
