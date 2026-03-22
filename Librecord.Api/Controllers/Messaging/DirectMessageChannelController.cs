@@ -10,7 +10,7 @@ namespace Librecord.Api.Controllers.Messaging;
 [ApiController]
 [Route("dms")]
 [Authorize]
-public class DirectMessageChannelController : ControllerBase
+public class DirectMessageChannelController : AuthenticatedController
 {
     private readonly IDirectMessageChannelService _dms;
     private readonly IHubContext<DmHub> _dmHub;
@@ -22,10 +22,6 @@ public class DirectMessageChannelController : ControllerBase
         _dms = dms;
         _dmHub = dmHub;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     // ---------------------------------------------------------
     // GET USER DM CHANNELS
     // ---------------------------------------------------------
@@ -152,8 +148,6 @@ public class DirectMessageChannelController : ControllerBase
         await _dms.AddParticipantAsync(channelId, UserId, userId);
         return Ok();
     }
-
-
     // ---------------------------------------------------------
     // LEAVE CHANNEL
     // ---------------------------------------------------------

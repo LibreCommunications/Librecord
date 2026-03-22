@@ -13,7 +13,7 @@ namespace Librecord.Api.Controllers.Guilds;
 [ApiController]
 [Authorize]
 [Route("guilds/{guildId:guid}")]
-public class GuildMemberController : ControllerBase
+public class GuildMemberController : AuthenticatedController
 {
     private readonly IGuildService _guilds;
     private readonly IPermissionService _permissions;
@@ -28,10 +28,6 @@ public class GuildMemberController : ControllerBase
         _permissions = permissions;
         _db = db;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     // ---------------------------------------------------------
     // LIST MEMBERS
     // ---------------------------------------------------------

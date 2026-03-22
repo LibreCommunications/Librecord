@@ -12,7 +12,7 @@ namespace Librecord.Api.Controllers.Users;
 [ApiController]
 [Authorize]
 [Route("presence")]
-public class PresenceController : ControllerBase
+public class PresenceController : AuthenticatedController
 {
     private readonly IPresenceService _presence;
     private readonly IConnectionTracker _connections;
@@ -30,10 +30,6 @@ public class PresenceController : ControllerBase
         _dmChannels = dmChannels;
         _dmHub = dmHub;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     // ---------------------------------------------------------
     // SET STATUS
     // ---------------------------------------------------------

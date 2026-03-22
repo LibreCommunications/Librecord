@@ -9,7 +9,6 @@ export const dmConnection = new signalR.HubConnectionBuilder()
     .build();
 
 dmConnection.onreconnected(() => {
-    console.log("[Realtime] DM reconnected");
     registerDmListeners();
 });
 

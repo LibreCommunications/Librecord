@@ -9,7 +9,6 @@ import type {
 } from "./dmTypes";
 
 export function registerDmListeners() {
-    console.log("[DM] registering DM listeners");
 
     /* ------------------------------------------------------------------ */
     /* CLEAN UP (important for StrictMode & reconnects)                    */
@@ -47,7 +46,6 @@ export function registerDmListeners() {
     dmConnection.on(
         "dm:message:new",
         (payload: DmRealtimeMessageTransport) => {
-            console.log("[SignalR] dm:message:new", payload);
 
             dispatchDmEvent("dm:message:new", {
                 message: mapDmRealtimeToMessage(payload),
@@ -62,7 +60,6 @@ export function registerDmListeners() {
     dmConnection.on(
         "dm:message:edited",
         (payload: DmRealtimeMessageEditedTransport) => {
-            console.log("[SignalR] dm:message:edited", payload);
 
             dispatchDmEvent(
                 "dm:message:edited",
@@ -77,7 +74,6 @@ export function registerDmListeners() {
     dmConnection.on(
         "dm:message:deleted",
         (payload: DmRealtimeMessageDeletedTransport) => {
-            console.log("[SignalR] dm:message:deleted", payload);
 
             dispatchDmEvent("dm:message:deleted", payload);
         }
@@ -116,7 +112,6 @@ export function registerDmListeners() {
     dmConnection.on(
         "dm:readstate:updated",
         (payload: DmRealtimeReadStateUpdatedTransport) => {
-            console.log("[SignalR] dm:readstate:updated", payload);
             dispatchDmEvent("dm:readstate:updated", payload);
         }
     );
@@ -127,7 +122,6 @@ export function registerDmListeners() {
     dmConnection.on(
         "friend:request:received",
         (payload: { fromUserId: string; fromUsername: string; fromDisplayName: string; fromAvatarUrl: string | null }) => {
-            console.log("[SignalR] friend:request:received", payload);
             dispatchDmEvent("friend:request:received", payload);
         }
     );
@@ -135,7 +129,6 @@ export function registerDmListeners() {
     dmConnection.on(
         "friend:request:accepted",
         (payload: { friendUserId: string; friendUsername: string; friendDisplayName: string; friendAvatarUrl: string | null }) => {
-            console.log("[SignalR] friend:request:accepted", payload);
             dispatchDmEvent("friend:request:accepted", payload);
         }
     );
@@ -143,7 +136,6 @@ export function registerDmListeners() {
     dmConnection.on(
         "friend:request:declined",
         (payload: { declinedByUserId: string }) => {
-            console.log("[SignalR] friend:request:declined", payload);
             dispatchDmEvent("friend:request:declined", payload);
         }
     );
@@ -151,7 +143,6 @@ export function registerDmListeners() {
     dmConnection.on(
         "friend:removed",
         (payload: { removedByUserId: string }) => {
-            console.log("[SignalR] friend:removed", payload);
             dispatchDmEvent("friend:removed", payload);
         }
     );
@@ -162,7 +153,6 @@ export function registerDmListeners() {
     dmConnection.on(
         "channel:message:pinned",
         (payload: { channelId: string; messageId: string }) => {
-            console.log("[SignalR] channel:message:pinned", payload);
             dispatchDmEvent("channel:message:pinned", payload);
         }
     );
@@ -170,7 +160,6 @@ export function registerDmListeners() {
     dmConnection.on(
         "channel:message:unpinned",
         (payload: { channelId: string; messageId: string }) => {
-            console.log("[SignalR] channel:message:unpinned", payload);
             dispatchDmEvent("channel:message:unpinned", payload);
         }
     );
@@ -181,7 +170,6 @@ export function registerDmListeners() {
     dmConnection.on(
         "dm:channel:created",
         (payload: { channelId: string }) => {
-            console.log("[SignalR] dm:channel:created", payload);
             // Join the new channel's SignalR group so we receive messages
             dmConnection.invoke("JoinChannel", payload.channelId).catch((err) => {
                 console.warn("[SignalR] Failed to join new DM channel group", err);
@@ -196,7 +184,6 @@ export function registerDmListeners() {
     dmConnection.on(
         "dm:member:left",
         (payload: { channelId: string; userId: string }) => {
-            console.log("[SignalR] dm:member:left", payload);
             dispatchDmEvent("dm:member:left", payload);
         }
     );

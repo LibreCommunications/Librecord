@@ -9,7 +9,7 @@ namespace Librecord.Api.Controllers.Messaging;
 [ApiController]
 [Authorize]
 [Route("channels")]
-public class ReadStateController : ControllerBase
+public class ReadStateController : AuthenticatedController
 {
     private readonly IReadStateRepository _readStates;
     private readonly IDmRealtimeNotifier _realtime;
@@ -19,10 +19,6 @@ public class ReadStateController : ControllerBase
         _readStates = readStates;
         _realtime = realtime;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     // ---------------------------------------------------------
     // MARK CHANNEL AS READ
     // ---------------------------------------------------------

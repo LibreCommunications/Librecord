@@ -10,7 +10,7 @@ namespace Librecord.Api.Controllers;
 
 [ApiController]
 [Route("users")]
-public class UserProfileController : ControllerBase
+public class UserProfileController : AuthenticatedController
 {
     private readonly LibrecordContext _db;
     private readonly IAttachmentStorageService _storage;
@@ -36,7 +36,7 @@ public class UserProfileController : ControllerBase
         if (request.DisplayName.Length > 32)
             return BadRequest("Display name is too long.");
 
-        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = UserId;
 
         var user = await _db.Users.FindAsync(userId);
         if (user == null)
@@ -52,7 +52,7 @@ public class UserProfileController : ControllerBase
     [HttpGet("me")]
     public async Task<IActionResult> GetMyInfo()
     {
-        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = UserId;
 
         var result = await _users.GetUserInfoAsync(userId);
 
@@ -76,10 +76,10 @@ public class UserProfileController : ControllerBase
         if (!allowedExtensions.Contains(ext))
             return BadRequest("Unsupported file type.");
 
-        if (file.Length > 5 * 1024 * 1024) // 5MB
+        if (file.Length > Librecord.Application.Limits.MaxAvatarSize)
             return BadRequest("File too large.");
 
-        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = UserId;
         var user = await _db.Users.FindAsync(userId);
         if (user == null) return Unauthorized();
 

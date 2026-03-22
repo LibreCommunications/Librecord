@@ -10,7 +10,7 @@ namespace Librecord.Api.Controllers.Media;
 [ApiController]
 [Authorize]
 [Route("cdn/private")]
-public class PrivateCdnController : ControllerBase
+public class PrivateCdnController : AuthenticatedController
 {
     private readonly IAttachmentStorageService _storage;
     private readonly LibrecordContext _db;
@@ -22,10 +22,6 @@ public class PrivateCdnController : ControllerBase
         _storage = storage;
         _db = db;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     /// <summary>
     /// Validates access then streams the file directly from MinIO through the backend.
     /// </summary>

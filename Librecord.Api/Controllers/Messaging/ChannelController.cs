@@ -16,7 +16,7 @@ namespace Librecord.Api.Controllers;
 [ApiController]
 [Route("channels")]
 [Authorize]
-public class ChannelController : ControllerBase
+public class ChannelController : AuthenticatedController
 {
     private readonly IChannelService _channels;
     private readonly IPermissionService _permissions;
@@ -34,10 +34,6 @@ public class ChannelController : ControllerBase
         _guildHub = guildHub;
         _guilds = guilds;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     // ---------------------------------------------------------
     // GET CHANNEL
     // ---------------------------------------------------------

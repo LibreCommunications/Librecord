@@ -25,12 +25,12 @@ export function RealtimeRoot() {
 
         Promise.all([
             dmConnection.start().then(() => {
-                console.log("[Realtime] DM connected");
+                // DM connected
                 registerDmListeners();
             }).catch(err => console.error("[Realtime] DM connection failed", err)),
 
             guildConnection.start().then(() => {
-                console.log("[Realtime] Guild connected");
+                // Guild connected
                 registerGuildListeners();
             }).catch(err => console.error("[Realtime] Guild connection failed", err)),
         ]).then(() => {
@@ -56,7 +56,7 @@ export function RealtimeRoot() {
             resetVoiceState();
             dmConnection.stop().catch(() => {});
             guildConnection.stop().catch(() => {});
-            console.log("[Realtime] Connections stopped (logout)");
+            // Connections stopped
         }
     }, [user]);
 

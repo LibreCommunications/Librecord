@@ -8,7 +8,7 @@ namespace Librecord.Api.Controllers.Messaging;
 [ApiController]
 [Authorize]
 [Route("messages/{messageId:guid}/reactions")]
-public class ReactionController : ControllerBase
+public class ReactionController : AuthenticatedController
 {
     private readonly IReactionService _reactions;
 
@@ -16,10 +16,6 @@ public class ReactionController : ControllerBase
     {
         _reactions = reactions;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     // ---------------------------------------------------------
     // ADD REACTION
     // ---------------------------------------------------------

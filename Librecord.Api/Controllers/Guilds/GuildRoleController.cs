@@ -10,7 +10,7 @@ namespace Librecord.Api.Controllers.Guilds;
 [ApiController]
 [Authorize]
 [Route("guilds/{guildId:guid}/roles")]
-public class GuildRoleController : ControllerBase
+public class GuildRoleController : AuthenticatedController
 {
     private readonly IRoleRepository _roles;
     private readonly IGuildRepository _guilds;
@@ -25,10 +25,6 @@ public class GuildRoleController : ControllerBase
         _guilds = guilds;
         _permissions = permissions;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     // ---------------------------------------------------------
     // LIST ROLES
     // ---------------------------------------------------------

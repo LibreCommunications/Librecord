@@ -13,7 +13,7 @@ namespace Librecord.Api.Controllers.Guilds;
 [ApiController]
 [Authorize]
 [Route("channels/{channelId:guid}/permissions")]
-public class ChannelPermissionController : ControllerBase
+public class ChannelPermissionController : AuthenticatedController
 {
     private readonly IGuildRepository _guilds;
     private readonly IPermissionService _permissions;
@@ -28,10 +28,6 @@ public class ChannelPermissionController : ControllerBase
         _permissions = permissions;
         _db = db;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     // ---------------------------------------------------------
     // LIST OVERRIDES FOR CHANNEL
     // ---------------------------------------------------------

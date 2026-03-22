@@ -16,7 +16,7 @@ namespace Librecord.Api.Controllers.Messaging;
 [ApiController]
 [Authorize]
 [Route("guild-channels/{channelId:guid}/messages")]
-public class GuildMessageWithAttachmentController : ControllerBase
+public class GuildMessageWithAttachmentController : AuthenticatedController
 {
     private readonly IGuildChannelMessageService _messages;
     private readonly IPermissionService _permissions;
@@ -37,15 +37,11 @@ public class GuildMessageWithAttachmentController : ControllerBase
         _realtime = realtime;
         _db = db;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     // ---------------------------------------------------------
     // SEND MESSAGE WITH ATTACHMENTS
     // ---------------------------------------------------------
     [HttpPost("with-attachments")]
-    [RequestSizeLimit(25 * 1024 * 1024)] // 25MB
+    [RequestSizeLimit(Librecord.Application.Limits.MaxAttachmentSize)] // 25MB
     public async Task<IActionResult> CreateWithAttachments(
         Guid channelId,
         [FromForm] string? content,
@@ -136,7 +132,7 @@ public class GuildMessageWithAttachmentController : ControllerBase
 [ApiController]
 [Authorize]
 [Route("dm-messages/channel/{channelId:guid}")]
-public class DmMessageWithAttachmentController : ControllerBase
+public class DmMessageWithAttachmentController : AuthenticatedController
 {
     private readonly IDirectMessageService _dms;
     private readonly IAttachmentStorageService _storage;
@@ -154,12 +150,8 @@ public class DmMessageWithAttachmentController : ControllerBase
         _realtime = realtime;
         _db = db;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     [HttpPost("with-attachments")]
-    [RequestSizeLimit(25 * 1024 * 1024)]
+    [RequestSizeLimit(Librecord.Application.Limits.MaxAttachmentSize)]
     public async Task<IActionResult> CreateWithAttachments(
         Guid channelId,
         [FromForm] string? content,

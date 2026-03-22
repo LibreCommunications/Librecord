@@ -11,7 +11,6 @@ export const guildConnection = new signalR.HubConnectionBuilder()
     .build();
 
 guildConnection.onreconnected(() => {
-    console.log("[Realtime] Guild reconnected");
     registerGuildListeners();
 });
 

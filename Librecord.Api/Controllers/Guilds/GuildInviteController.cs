@@ -7,7 +7,7 @@ namespace Librecord.Api.Controllers.Guilds;
 
 [ApiController]
 [Authorize]
-public class GuildInviteController : ControllerBase
+public class GuildInviteController : AuthenticatedController
 {
     private readonly IGuildInviteService _invites;
     private readonly IGuildService _guilds;
@@ -19,10 +19,6 @@ public class GuildInviteController : ControllerBase
         _invites = invites;
         _guilds = guilds;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     // ---------------------------------------------------------
     // CREATE INVITE
     // ---------------------------------------------------------

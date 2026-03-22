@@ -14,7 +14,6 @@ import type {
 import type { GuildEventMap } from "./guildEvents";
 
 export function registerGuildListeners() {
-    console.log("[Guild] registering guild listeners");
 
     guildConnection.off("guild:message:ping");
     guildConnection.off("guild:message:new");
@@ -47,7 +46,6 @@ export function registerGuildListeners() {
     guildConnection.on(
         "guild:message:new",
         (payload: GuildRealtimeMessageTransport) => {
-            console.log("[SignalR] guild:message:new", payload);
 
             dispatchGuildEvent("guild:message:new", {
                 message: mapGuildRealtimeToMessage(payload),
@@ -59,7 +57,6 @@ export function registerGuildListeners() {
     guildConnection.on(
         "guild:message:edited",
         (payload: GuildRealtimeMessageEditedTransport) => {
-            console.log("[SignalR] guild:message:edited", payload);
 
             dispatchGuildEvent(
                 "guild:message:edited",
@@ -71,7 +68,6 @@ export function registerGuildListeners() {
     guildConnection.on(
         "guild:message:deleted",
         (payload: GuildRealtimeMessageDeletedTransport) => {
-            console.log("[SignalR] guild:message:deleted", payload);
 
             dispatchGuildEvent("guild:message:deleted", payload);
         }
@@ -110,7 +106,6 @@ export function registerGuildListeners() {
     guildConnection.on(
         "guild:channel:created",
         (payload: { channelId: string; guildId: string; name: string; type: number; position: number }) => {
-            console.log("[SignalR] guild:channel:created", payload);
             // Join the new channel group so we receive real-time events for it
             guildConnection.invoke("JoinChannel", payload.channelId).catch((err) => {
                 console.warn("[SignalR] Failed to join new channel group", err);
@@ -125,7 +120,6 @@ export function registerGuildListeners() {
     guildConnection.on(
         "guild:deleted",
         (payload: { guildId: string }) => {
-            console.log("[SignalR] guild:deleted", payload);
             dispatchGuildEvent("guild:deleted", payload);
         }
     );
@@ -136,7 +130,6 @@ export function registerGuildListeners() {
     guildConnection.on(
         "channel:message:pinned",
         (payload: { channelId: string; messageId: string }) => {
-            console.log("[SignalR] channel:message:pinned", payload);
             dispatchGuildEvent("channel:message:pinned", payload);
         }
     );
@@ -144,7 +137,6 @@ export function registerGuildListeners() {
     guildConnection.on(
         "channel:message:unpinned",
         (payload: { channelId: string; messageId: string }) => {
-            console.log("[SignalR] channel:message:unpinned", payload);
             dispatchGuildEvent("channel:message:unpinned", payload);
         }
     );
@@ -155,7 +147,6 @@ export function registerGuildListeners() {
     guildConnection.on(
         "voice:user:joined",
         (payload: GuildEventMap["voice:user:joined"]) => {
-            console.log("[SignalR] voice:user:joined", payload);
             addParticipant({
                 userId: payload.userId,
                 username: payload.username,
@@ -174,7 +165,6 @@ export function registerGuildListeners() {
     guildConnection.on(
         "voice:user:left",
         (payload: GuildEventMap["voice:user:left"]) => {
-            console.log("[SignalR] voice:user:left", payload);
             removeParticipant(payload.userId);
             dispatchGuildEvent("voice:user:left", payload);
         }
@@ -183,7 +173,6 @@ export function registerGuildListeners() {
     guildConnection.on(
         "voice:user:state",
         (payload: GuildEventMap["voice:user:state"]) => {
-            console.log("[SignalR] voice:user:state", payload);
             updateParticipantState(payload.userId, {
                 isMuted: payload.isMuted,
                 isDeafened: payload.isDeafened,

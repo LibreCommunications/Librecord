@@ -2,6 +2,7 @@ using Librecord.Application.Messaging;
 using Librecord.Domain.Messaging.Direct;
 using Librecord.Domain.Social;
 using Librecord.Domain.Storage;
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace Librecord.Tests.Messaging;
@@ -14,7 +15,8 @@ public class DirectMessageChannelServiceTests
     private readonly Mock<IAttachmentStorageService> _storage = new();
 
     private DirectMessageChannelService CreateService() =>
-        new(_dms.Object, _friendships.Object, _blocks.Object, _storage.Object);
+        new(_dms.Object, _friendships.Object, _blocks.Object, _storage.Object,
+            Mock.Of<ILogger<DirectMessageChannelService>>());
 
     private static DmChannel MakeChannel(Guid channelId, params Guid[] memberIds)
     {

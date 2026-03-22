@@ -14,7 +14,7 @@ namespace Librecord.Api.Controllers.Messaging;
 [ApiController]
 [Authorize]
 [Route("channels/{channelId:guid}/pins")]
-public class PinController : ControllerBase
+public class PinController : AuthenticatedController
 {
     private readonly LibrecordContext _db;
     private readonly IHubContext<DmHub> _dmHub;
@@ -32,10 +32,6 @@ public class PinController : ControllerBase
         _guildHub = guildHub;
         _encryption = encryption;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     // ---------------------------------------------------------
     // PIN MESSAGE
     // ---------------------------------------------------------

@@ -50,8 +50,8 @@ public class GuildChannelMessageService : IGuildChannelMessageService
         if (string.IsNullOrWhiteSpace(content) && !hasAttachments)
             throw new ArgumentException("Message content or attachments required.");
 
-        if (content.Length > 4000)
-            throw new ArgumentException("Message content must not exceed 4000 characters.");
+        if (content.Length > Limits.MaxMessageLength)
+            throw new ArgumentException($"Message content must not exceed {Limits.MaxMessageLength} characters.");
 
         var message = new Message
         {

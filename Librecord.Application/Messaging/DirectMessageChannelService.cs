@@ -1,6 +1,7 @@
 using Librecord.Domain.Messaging.Direct;
 using Librecord.Domain.Social;
 using Librecord.Domain.Storage;
+using Microsoft.Extensions.Logging;
 
 namespace Librecord.Application.Messaging;
 
@@ -10,17 +11,20 @@ public class DirectMessageChannelService : IDirectMessageChannelService
     private readonly IFriendshipRepository _friendships;
     private readonly IBlockRepository _blocks;
     private readonly IAttachmentStorageService _storage;
+    private readonly ILogger<DirectMessageChannelService> _logger;
 
     public DirectMessageChannelService(
         IDirectMessageChannelRepository dms,
         IFriendshipRepository friendships,
         IBlockRepository blocks,
-        IAttachmentStorageService storage)
+        IAttachmentStorageService storage,
+        ILogger<DirectMessageChannelService> logger)
     {
         _dms = dms;
         _friendships = friendships;
         _blocks = blocks;
         _storage = storage;
+        _logger = logger;
     }
 
     // ---------------------------------------------------------
@@ -198,7 +202,10 @@ public class DirectMessageChannelService : IDirectMessageChannelService
                 foreach (var att in dm.Message.Attachments)
                 {
                     try { await _storage.DeleteAsync(att.Url); }
-                    catch { /* best effort */ }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to delete attachment {Url} during channel cleanup", att.Url);
+                    }
                 }
             }
 

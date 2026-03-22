@@ -11,7 +11,7 @@ namespace Librecord.Api.Controllers.Messaging;
 [ApiController]
 [Authorize]
 [Route("channels/{channelId:guid}/threads")]
-public class ThreadController : ControllerBase
+public class ThreadController : AuthenticatedController
 {
     private readonly LibrecordContext _db;
     private readonly IMessageEncryptionService _encryption;
@@ -21,10 +21,6 @@ public class ThreadController : ControllerBase
         _db = db;
         _encryption = encryption;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     // ---------------------------------------------------------
     // CREATE THREAD FROM MESSAGE
     // ---------------------------------------------------------

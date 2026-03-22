@@ -13,7 +13,7 @@ namespace Librecord.Api.Controllers;
 
 [ApiController]
 [Route("guilds")]
-public class GuildSettingsController : ControllerBase
+public class GuildSettingsController : AuthenticatedController
 {
     private readonly LibrecordContext _db;
     private readonly IPermissionService _permissions;
@@ -81,8 +81,7 @@ public class GuildSettingsController : ControllerBase
         Guid guildId,
         [FromBody] UpdateGuildRequest request)
     {
-        var userId = Guid.Parse(
-            User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = UserId;
 
         var permission = await _permissions.HasGuildPermissionAsync(
             userId, guildId, GuildPermission.ManageGuild);
@@ -114,8 +113,7 @@ public class GuildSettingsController : ControllerBase
     [HttpDelete("{guildId:guid}")]
     public async Task<IActionResult> DeleteGuild(Guid guildId)
     {
-        var userId = Guid.Parse(
-            User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var userId = UserId;
 
         var permission = await _permissions.HasGuildPermissionAsync(
             userId, guildId, GuildPermission.ManageGuild);

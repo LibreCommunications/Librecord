@@ -10,7 +10,7 @@ namespace Librecord.Api.Controllers.Social;
 [ApiController]
 [Authorize]
 [Route("blocks")]
-public class BlockController : ControllerBase
+public class BlockController : AuthenticatedController
 {
     private readonly LibrecordContext _db;
 
@@ -18,10 +18,6 @@ public class BlockController : ControllerBase
     {
         _db = db;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     // ---------------------------------------------------------
     // BLOCK USER
     // ---------------------------------------------------------

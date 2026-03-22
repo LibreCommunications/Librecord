@@ -5,6 +5,7 @@ using Librecord.Domain.Messaging.Common;
 using Librecord.Domain.Messaging.Direct;
 using Librecord.Domain.Social;
 using Librecord.Domain.Storage;
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace Librecord.Tests.Messaging;
@@ -27,7 +28,8 @@ public class DmDualUserScenarioTests
         new(_messages.Object, _channels.Object, _realtime.Object, _blocks.Object);
 
     private DirectMessageChannelService CreateChannelService() =>
-        new(_channels.Object, _friendships.Object, _blocks.Object, _storage.Object);
+        new(_channels.Object, _friendships.Object, _blocks.Object, _storage.Object,
+            Mock.Of<ILogger<DirectMessageChannelService>>());
 
     private static User MakeUser(Guid id, string name) => new()
     {

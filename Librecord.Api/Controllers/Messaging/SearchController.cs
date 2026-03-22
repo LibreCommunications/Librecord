@@ -10,20 +10,21 @@ namespace Librecord.Api.Controllers.Messaging;
 [ApiController]
 [Authorize]
 [Route("search")]
-public class SearchController : ControllerBase
+public class SearchController : AuthenticatedController
 {
     private readonly LibrecordContext _db;
     private readonly IMessageEncryptionService _encryption;
+    private readonly ILogger<SearchController> _logger;
 
-    public SearchController(LibrecordContext db, IMessageEncryptionService encryption)
+    public SearchController(
+        LibrecordContext db,
+        IMessageEncryptionService encryption,
+        ILogger<SearchController> logger)
     {
         _db = db;
         _encryption = encryption;
+        _logger = logger;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     // ---------------------------------------------------------
     // SEARCH MESSAGES
     // ---------------------------------------------------------
@@ -116,9 +117,9 @@ public class SearchController : ControllerBase
 
                 if (results.Count >= limit) break;
             }
-            catch
+            catch (Exception ex)
             {
-                // Skip messages that fail to decrypt
+                _logger.LogWarning(ex, "Failed to decrypt message {MessageId} during search", msg.Id);
             }
         }
 
