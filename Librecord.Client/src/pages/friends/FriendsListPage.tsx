@@ -24,7 +24,8 @@ export default function FriendsListPage() {
     const [friends, setFriends] = useState<FriendshipListDto[]>([]);
     const [incoming, setIncoming] = useState<FriendshipListDto[]>([]);
     const [outgoing, setOutgoing] = useState<FriendshipListDto[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [dataLoaded, setDataLoaded] = useState(false);
+    const loading = !dataLoaded;
 
     const navigate = useNavigate();
     const { startDm } = useDirectMessagesChannel();
@@ -34,8 +35,6 @@ export default function FriendsListPage() {
         useState<FriendshipListDto | null>(null);
 
     const loadData = useCallback(async function loadData() {
-        setLoading(true);
-
         const friendsList = await getFriends();
         const requestData = await getRequests();
 
@@ -43,12 +42,22 @@ export default function FriendsListPage() {
         setIncoming(requestData?.incoming ?? []);
         setOutgoing(requestData?.outgoing ?? []);
 
-        setLoading(false);
+        setDataLoaded(true);
     }, [getFriends, getRequests]);
 
     useEffect(() => {
-        loadData();
-    }, [loadData]);
+        let cancelled = false;
+        (async () => {
+            const friendsList = await getFriends();
+            const requestData = await getRequests();
+            if (cancelled) return;
+            setFriends(friendsList ?? []);
+            setIncoming(requestData?.incoming ?? []);
+            setOutgoing(requestData?.outgoing ?? []);
+            setDataLoaded(true);
+        })();
+        return () => { cancelled = true; };
+    }, [getFriends, getRequests]);
 
     // Refresh friend list on realtime friendship events
     useEffect(() => {

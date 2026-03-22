@@ -8,6 +8,12 @@ import { resetVoiceState } from "../voice/voiceStore";
 import * as livekitClient from "../voice/livekitClient";
 import { useAuth } from "../hooks/useAuth";
 
+declare global {
+    interface Window {
+        __realtimeReady?: boolean;
+    }
+}
+
 // Module-level flag — survives React StrictMode double-mount
 let started = false;
 
@@ -34,7 +40,7 @@ export function RealtimeRoot() {
                 registerGuildListeners();
             }).catch(err => console.error("[Realtime] Guild connection failed", err)),
         ]).then(() => {
-            (window as any).__realtimeReady = true;
+            window.__realtimeReady = true;
             window.dispatchEvent(new Event("realtime:ready"));
         });
     });
@@ -49,7 +55,7 @@ export function RealtimeRoot() {
             // User logged out
             userIdRef.current = null;
             started = false;
-            (window as any).__realtimeReady = false;
+            window.__realtimeReady = false;
 
             cleanupNotifications();
             livekitClient.disconnect().catch(() => {});

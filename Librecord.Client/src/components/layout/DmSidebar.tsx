@@ -65,8 +65,39 @@ export default function DmSidebar() {
     }, [getMyDms, getUnreadCounts, user?.userId, auth]);
 
     useEffect(() => {
-        loadDms();
-    }, [loadDms]);
+        let cancelled = false;
+        (async () => {
+            const list = await getMyDms();
+            if (cancelled) return;
+            setDms(list);
+
+            if (list.length > 0) {
+                const counts = await getUnreadCounts(list.map(d => d.id));
+                if (cancelled) return;
+                setUnreads(counts);
+
+                const otherUserIds = list.flatMap(dm =>
+                    dm.members.filter(m => m.id !== user?.userId).map(m => m.id)
+                );
+                const uniqueIds = [...new Set(otherUserIds)];
+                if (uniqueIds.length > 0) {
+                    const res = await fetchWithAuth(
+                        `${API_URL}/presence/bulk`,
+                        {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ userIds: uniqueIds }),
+                        },
+                        auth
+                    );
+                    if (!cancelled && res.ok) {
+                        setPresenceMap(await res.json());
+                    }
+                }
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [getMyDms, getUnreadCounts, user?.userId, auth]);
 
     // Refresh DM list when a friend is removed or a new DM channel is created
     useEffect(() => {
@@ -130,16 +161,10 @@ export default function DmSidebar() {
         return () => window.removeEventListener("dm:message:ping", onPing as EventListener);
     }, [dmId, user?.userId]);
 
-    // Clear unread when we navigate into a channel
-    useEffect(() => {
-        if (!dmId) return;
-        setUnreads(prev => {
-            if (!prev[dmId]) return prev;
-            const next = { ...prev };
-            delete next[dmId];
-            return next;
-        });
-    }, [dmId]);
+    // Derive effective unreads — clear count for the active channel
+    const effectiveUnreads = dmId
+        ? Object.fromEntries(Object.entries(unreads).filter(([k]) => k !== dmId))
+        : unreads;
 
     return (
         <>
@@ -184,7 +209,7 @@ export default function DmSidebar() {
 
                     const showAvatar = others.length === 1;
                     const avatar = showAvatar ? getAvatarUrl(others[0].avatarUrl) : undefined;
-                    const unreadCount = unreads[dm.id] ?? 0;
+                    const unreadCount = effectiveUnreads[dm.id] ?? 0;
                     const otherStatus = showAvatar ? (presenceMap[others[0].id] ?? "offline") : undefined;
 
                     return (

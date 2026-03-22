@@ -29,16 +29,16 @@ export default function ChannelSidebar({ guildId }: Props) {
 
     const [channels, setChannels] = useState<GuildChannel[]>([]);
     const [unreads, setUnreads] = useState<Record<string, number>>({});
-    const [loading, setLoading] = useState(true);
+    const [loadedGuildId, setLoadedGuildId] = useState<string | null>(null);
+    const loading = loadedGuildId !== guildId;
     const [showCreate, setShowCreate] = useState(false);
     const [canManageChannels, setCanManageChannels] = useState(false);
     const [channelParticipants, setChannelParticipants] = useState<Record<string, { userId: string; username: string; displayName: string; avatarUrl: string | null; isMuted: boolean; isDeafened: boolean }[]>>({});
 
     const loadChannels = useCallback(async function loadChannels() {
-        setLoading(true);
         const list = await getGuildChannels(guildId);
         setChannels(list);
-        setLoading(false);
+        setLoadedGuildId(guildId);
 
         if (list.length > 0) {
             const counts = await getUnreadCounts(list.map(c => c.id));
@@ -70,8 +70,41 @@ export default function ChannelSidebar({ guildId }: Props) {
 
     useEffect(() => {
         if (!guildId) return;
-        loadChannels();
-    }, [guildId, loadChannels]);
+        let cancelled = false;
+        (async () => {
+            const list = await getGuildChannels(guildId);
+            if (cancelled) return;
+            setChannels(list);
+            setLoadedGuildId(guildId);
+
+            if (list.length > 0) {
+                const counts = await getUnreadCounts(list.map(c => c.id));
+                if (!cancelled) setUnreads(counts);
+            }
+
+            try {
+                const [membersRes, rolesRes] = await Promise.all([
+                    fetchWithAuth(`${API_URL}/guilds/${guildId}/members`, {}, auth),
+                    fetchWithAuth(`${API_URL}/guilds/${guildId}/roles`, {}, auth),
+                ]);
+                if (!cancelled && membersRes.ok && rolesRes.ok) {
+                    const members = await membersRes.json();
+                    const roles = await rolesRes.json();
+                    const me = members.find((m: { userId: string }) => m.userId === user?.userId);
+                    const myRoleIds = new Set((me?.roles ?? []).map((r: { id: string }) => r.id));
+                    const hasManage = roles
+                        .filter((r: { id: string }) => myRoleIds.has(r.id))
+                        .some((r: { permissions: { permissionId: string; allow: boolean }[] }) =>
+                            r.permissions.some(p => p.permissionId === MANAGE_CHANNELS_PERMISSION_ID && p.allow)
+                        );
+                    setCanManageChannels(hasManage);
+                }
+            } catch {
+                if (!cancelled) setCanManageChannels(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [guildId, getGuildChannels, getUnreadCounts, auth, user?.userId]);
 
     // Fetch voice participants for all voice channels
     useEffect(() => {
@@ -131,16 +164,10 @@ export default function ChannelSidebar({ guildId }: Props) {
         return () => window.removeEventListener("guild:message:ping", onPing as EventListener);
     }, [channelId, user?.userId]);
 
-    // Clear unread when navigating into a channel
-    useEffect(() => {
-        if (!channelId) return;
-        setUnreads(prev => {
-            if (!prev[channelId]) return prev;
-            const next = { ...prev };
-            delete next[channelId];
-            return next;
-        });
-    }, [channelId]);
+    // Derive effective unreads — clear count for the active channel
+    const effectiveUnreads = channelId
+        ? Object.fromEntries(Object.entries(unreads).filter(([k]) => k !== channelId))
+        : unreads;
 
     async function handleCreateChannel(data: {
         name: string;
@@ -175,7 +202,7 @@ export default function ChannelSidebar({ guildId }: Props) {
                                 )}
                             </div>
                             {textChannels.map(ch => {
-                                const unreadCount = unreads[ch.id] ?? 0;
+                                const unreadCount = effectiveUnreads[ch.id] ?? 0;
                                 const isActive = channelId === ch.id;
                                 const hasUnread = unreadCount > 0 && !isActive;
 

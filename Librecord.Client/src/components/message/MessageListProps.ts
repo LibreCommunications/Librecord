@@ -30,7 +30,7 @@ export interface MessageListProps {
 
     getAvatarUrl: (avatarUrl?: string | null) => string;
 
-    forceScrollOnNextUpdate?: ScrollIntentRef;
+    forceScrollOnNextUpdateRef?: ScrollIntentRef;
 
     onLoadMore?: () => void;
     hasMore?: boolean;

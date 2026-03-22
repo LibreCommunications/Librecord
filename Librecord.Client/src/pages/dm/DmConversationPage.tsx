@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
 import { useDirectMessages } from "../../hooks/useDirectMessages";
-import { useDirectMessagesChannel } from "../../hooks/useDirectMessagesChannel";
+import { useDirectMessagesChannel, type DmChannel } from "../../hooks/useDirectMessagesChannel";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -49,7 +49,7 @@ export default function DmConversationPage() {
     const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
     const [messages, setMessages] = useState<OptimisticMessage[]>([]);
-    const [channel, setChannel] = useState<any>(null);
+    const [channel, setChannel] = useState<DmChannel | null>(null);
     const [channelName, setChannelName] = useState<string | null>(null);
     const [content, setContent] = useState("");
     const [loading, setLoading] = useState(false);
@@ -235,12 +235,12 @@ export default function DmConversationPage() {
                 setChannel(channel);
 
                 const others = channel.members.filter(
-                    (m: any) => m.id !== user?.userId
+                    m => m.id !== user?.userId
                 );
 
                 setChannelName(
                     others.length
-                        ? others.map((o: any) => o.displayName).join(", ")
+                        ? others.map(o => o.displayName).join(", ")
                         : "Direct Message"
                 );
 
@@ -423,7 +423,7 @@ export default function DmConversationPage() {
                 onAddReaction={handleAddReaction}
                 onRemoveReaction={handleRemoveReaction}
                 getAvatarUrl={getAvatarUrl}
-                forceScrollOnNextUpdate={shouldAutoScrollRef}
+                forceScrollOnNextUpdateRef={shouldAutoScrollRef}
                 onLoadMore={handleLoadMore}
                 hasMore={hasMore}
                 loadingMore={loadingMore}

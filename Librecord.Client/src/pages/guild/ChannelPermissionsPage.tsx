@@ -27,25 +27,28 @@ export default function ChannelPermissionsPage() {
     const [roles, setRoles] = useState<GuildRole[]>([]);
     const [overrides, setOverrides] = useState<ChannelOverride[]>([]);
     const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [loadedChannelId, setLoadedChannelId] = useState<string | null>(null);
+    const loading = loadedChannelId !== channelId;
 
     useEffect(() => {
         if (!channelId || !guildId) return;
+        let cancelled = false;
 
-        setLoading(true);
         Promise.all([
             getChannel(channelId),
             getRoles(guildId),
             getOverrides(channelId),
         ]).then(([channel, roleList, overrideList]) => {
+            if (cancelled) return;
             setChannelName(channel?.name ?? "");
             setRoles(roleList);
             setOverrides(overrideList);
             if (roleList.length > 0 && !selectedRoleId) {
                 setSelectedRoleId(roleList[0].id);
             }
-            setLoading(false);
+            setLoadedChannelId(channelId);
         });
+        return () => { cancelled = true; };
     }, [channelId, guildId, getChannel, getOverrides, getRoles, selectedRoleId]);
 
     function getOverrideState(roleId: string, permId: string): TriState {

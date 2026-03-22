@@ -12,15 +12,18 @@ export function ThreadPanel({ channelId, threadId, threadName, onClose }: Props)
     const { getThreadMessages, postThreadMessage } = useThreads();
     const [messages, setMessages] = useState<ThreadMessage[]>([]);
     const [content, setContent] = useState("");
-    const [loading, setLoading] = useState(true);
+    const [loadedThreadId, setLoadedThreadId] = useState<string | null>(null);
+    const loading = loadedThreadId !== threadId;
     const [sending, setSending] = useState(false);
 
     useEffect(() => {
-        setLoading(true);
+        let cancelled = false;
         getThreadMessages(channelId, threadId).then(msgs => {
+            if (cancelled) return;
             setMessages(msgs.reverse());
-            setLoading(false);
+            setLoadedThreadId(threadId);
         });
+        return () => { cancelled = true; };
     }, [threadId, channelId, getThreadMessages]);
 
     async function handleSend() {

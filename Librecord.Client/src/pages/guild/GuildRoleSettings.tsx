@@ -30,20 +30,24 @@ export function GuildRoleSettings({ guildId }: Props) {
     const { getRoles, createRole, updateRole, deleteRole, setPermission } = useGuildRoles();
     const [roles, setRoles] = useState<GuildRole[]>([]);
     const [selectedId, setSelectedId] = useState<string | null>(null);
-    const [editName, setEditName] = useState("");
 
     useEffect(() => {
+        let cancelled = false;
         getRoles(guildId).then(r => {
+            if (cancelled) return;
             setRoles(r);
             if (r.length > 0 && !selectedId) setSelectedId(r[0].id);
         });
+        return () => { cancelled = true; };
     }, [guildId, getRoles, selectedId]);
 
     const selected = roles.find(r => r.id === selectedId);
 
-    useEffect(() => {
-        if (selected) setEditName(selected.name);
-    }, [selectedId, selected]);
+    // Derive editName from selected role — reset when selection changes
+    const derivedEditName = selected?.name ?? "";
+    const [editNameOverride, setEditNameOverride] = useState<{ id: string | null; name: string } | null>(null);
+    const editName = editNameOverride?.id === selectedId ? editNameOverride.name : derivedEditName;
+    const setEditName = (name: string) => setEditNameOverride({ id: selectedId, name });
 
     async function handleCreate() {
         const role = await createRole(guildId, "New Role");

@@ -149,22 +149,13 @@ export default function GlobalSidebar() {
         return () => window.removeEventListener("dm:message:ping", onDmPing as EventListener);
     }, [isDmPage, user?.userId]);
 
-    // Clear guild unread when navigating into that guild
-    useEffect(() => {
-        if (guildId) {
-            setGuildUnreads(prev => {
-                if (!prev[guildId]) return prev;
-                const next = { ...prev };
-                delete next[guildId];
-                return next;
-            });
-        }
-    }, [guildId]);
+    // Derive effective guild unreads — clear count for the active guild
+    const effectiveGuildUnreads = guildId
+        ? Object.fromEntries(Object.entries(guildUnreads).filter(([k]) => k !== guildId))
+        : guildUnreads;
 
-    // Clear DM unread when navigating to DMs
-    useEffect(() => {
-        if (isDmPage) setDmUnread(false);
-    }, [isDmPage]);
+    // Derive effective DM unread — clear when on DM page
+    const effectiveDmUnread = isDmPage ? false : dmUnread;
 
     const avatarSrc =
         user?.avatarUrl
@@ -185,7 +176,7 @@ export default function GlobalSidebar() {
             <aside id="global-sidebar" className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 gap-2 overflow-y-auto no-scrollbar">
 
                 {/* DM */}
-                <SidebarIcon to="/app/dm" active={isDmPage} unread={dmUnread} tooltip="Direct Messages" className="bg-[#313338] hover:bg-[#5865F2] text-white">
+                <SidebarIcon to="/app/dm" active={isDmPage} unread={effectiveDmUnread} tooltip="Direct Messages" className="bg-[#313338] hover:bg-[#5865F2] text-white">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                     </svg>
@@ -200,7 +191,7 @@ export default function GlobalSidebar() {
                         key={g.id}
                         to={`/app/guild/${g.id}`}
                         active={guildId === g.id}
-                        unread={(guildUnreads[g.id] ?? 0) > 0}
+                        unread={(effectiveGuildUnreads[g.id] ?? 0) > 0}
                         tooltip={g.name}
                         testId={`guild-icon-${g.id}`}
                         className="bg-[#313338] hover:bg-[#5865F2] text-white"

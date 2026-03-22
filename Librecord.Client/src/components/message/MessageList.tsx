@@ -20,7 +20,7 @@ export function MessageList({
                                 onAddReaction,
                                 onRemoveReaction,
                                 getAvatarUrl,
-                                forceScrollOnNextUpdate,
+                                forceScrollOnNextUpdateRef,
                                 onLoadMore,
                                 hasMore,
                                 loadingMore,
@@ -61,9 +61,9 @@ export function MessageList({
         const el = containerRef.current;
         if (!el) return;
 
-        if (forceScrollOnNextUpdate?.current) {
+        if (forceScrollOnNextUpdateRef?.current) {
             el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-            forceScrollOnNextUpdate.current = false;
+            forceScrollOnNextUpdateRef.current = false;
             prevMsgCountRef.current = messages.length;
             return;
         }
@@ -76,7 +76,7 @@ export function MessageList({
         }
 
         prevMsgCountRef.current = messages.length;
-    }, [messages, forceScrollOnNextUpdate]);
+    }, [messages, forceScrollOnNextUpdateRef]);
 
     // ----------------------------------
     // INFINITE SCROLL (older messages)

@@ -576,7 +576,7 @@ export default function GuildChannelPage() {
                             onAddReaction={handleAddReaction}
                             onRemoveReaction={handleRemoveReaction}
                             getAvatarUrl={getAvatarUrl}
-                            forceScrollOnNextUpdate={shouldAutoScrollRef}
+                            forceScrollOnNextUpdateRef={shouldAutoScrollRef}
                             onLoadMore={handleLoadMore}
                             hasMore={hasMore}
                             loadingMore={loadingMore}

@@ -4,6 +4,14 @@ import { fetchWithAuth } from "../api/fetchWithAuth";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+interface GuildBanEntry {
+    guildId: string;
+    userId: string;
+    moderatorId: string;
+    reason: string | null;
+    createdAt: string;
+}
+
 export function useGuildSettings() {
     const auth = useAuth();
 
@@ -40,7 +48,7 @@ export function useGuildSettings() {
         return res.ok;
     }, [auth]);
 
-    const getBans = useCallback(async (guildId: string): Promise<any[]> => {
+    const getBans = useCallback(async (guildId: string): Promise<GuildBanEntry[]> => {
         const res = await fetchWithAuth(`${API_URL}/guilds/${guildId}/bans`, {}, auth);
         if (!res.ok) return [];
         return res.json();

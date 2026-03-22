@@ -10,19 +10,19 @@ export default function FriendsAddPage() {
     const { toast } = useToast();
 
     const [username, setUsername] = useState("");
-    const [suggestions, setSuggestions] = useState<FriendSuggestion[]>([]);
+    const [rawSuggestions, setRawSuggestions] = useState<FriendSuggestion[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [loading, setLoading] = useState(false);
 
+    // Derive suggestions — empty when input is blank
+    const suggestions = username.trim() ? rawSuggestions : [];
+
     useEffect(() => {
-        if (!username.trim()) {
-            setSuggestions([]);
-            return;
-        }
+        if (!username.trim()) return;
 
         const timeout = setTimeout(async () => {
             const results = await suggestUsernames(username.trim());
-            setSuggestions(results);
+            setRawSuggestions(results);
             setShowSuggestions(true);
         }, 250);
 
