@@ -47,7 +47,7 @@ public class GuildHub : Hub
 
         var guilds = await _guilds.GetGuildsForUserAsync(UserId);
 
-        var allChannelIds = guilds.SelectMany(g => g.Channels.Select(c => c.Id)).ToList();
+        var allChannelIds = guilds.SelectMany(g => (g.Channels ?? []).Select(c => c.Id)).ToList();
 
         await Task.WhenAll(allChannelIds.Select(channelId =>
             Groups.AddToGroupAsync(Context.ConnectionId, ChannelGroup(channelId))));
@@ -230,7 +230,7 @@ public class GuildHub : Hub
             if (!wasInvisible)
             {
                 var guilds = await _guilds.GetGuildsForUserAsync(UserId);
-                var offlineChannelIds = guilds.SelectMany(g => g.Channels.Select(c => c.Id)).ToList();
+                var offlineChannelIds = guilds.SelectMany(g => (g.Channels ?? []).Select(c => c.Id)).ToList();
                 var offlinePayload = new { userId = UserId, status = "offline" };
                 await Task.WhenAll(offlineChannelIds.Select(chId =>
                     Clients.OthersInGroup(ChannelGroup(chId)).SendAsync("guild:user:presence", offlinePayload)));

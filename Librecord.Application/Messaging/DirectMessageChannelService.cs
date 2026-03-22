@@ -91,7 +91,22 @@ public class DirectMessageChannelService : IDirectMessageChannelService
         });
 
         await _dms.AddChannelAsync(channel);
-        await _dms.SaveChangesAsync();
+
+        try
+        {
+            await _dms.SaveChangesAsync();
+        }
+        catch (Exception)
+        {
+            // Possible race condition — another request created the same DM concurrently.
+            // Re-fetch and return the existing channel if it now exists.
+            var retryChannels = await _dms.GetUserDmChannelsAsync(requesterId);
+            var retry = retryChannels.FirstOrDefault(c =>
+                !c.IsGroup && c.Members.Any(m => m.UserId == targetUserId));
+
+            if (retry != null) return retry;
+            throw;
+        }
 
         return channel;
     }

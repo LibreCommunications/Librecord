@@ -34,7 +34,7 @@ public class DirectMessageChannelController : AuthenticatedController
         {
             var others = c.Members
                 .Where(m => m.UserId != UserId)
-                .Select(m => m.User.DisplayName)
+                .Select(m => m.User?.DisplayName ?? "Unknown")
                 .ToList();
 
             var name = others.Count > 0

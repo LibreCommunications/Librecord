@@ -43,11 +43,9 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 - If second save fails, first is already committed → orphaned/inconsistent data
 - **Fix:** Wrap multi-step operations in `IDbContextTransaction`
 
-### [ARCH-3] Race condition: DM channel creation not atomic
-- `DirectMessageChannelService.cs` — lines 62-67
-- Fetch existing DM then create new one is not atomic
-- Two users creating same DM simultaneously → duplicate channels
-- **Fix:** Use unique constraint + upsert pattern or database-level locking
+### ~~[ARCH-3] Race condition: DM channel creation not atomic~~ FIXED
+- StartDmAsync now catches save failures and re-fetches existing channel
+- If a concurrent request created the same DM, the retry finds and returns it
 
 ---
 
@@ -137,10 +135,10 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 - Other controllers use proper DTOs
 - **Fix:** Use consistent DTO responses everywhere
 
-### [BE-7] Missing null checks — PARTIALLY FIXED
-- ~~`ThreadController.cs`: `FindAsync(UserId)` with no null check~~ → added null check + return Unauthorized
-- `DirectMessageChannelController.cs` line 36: `m.User.DisplayName` assumes User always present
-- `GuildHub.cs` lines 52, 87: `guild.Channels` assumed non-null in foreach
+### ~~[BE-7] Missing null checks~~ FIXED
+- ThreadController: added null check + return Unauthorized
+- DirectMessageChannelController: `m.User?.DisplayName ?? "Unknown"`
+- GuildHub: `(g.Channels ?? [])` null guard on SelectMany
 
 ### [BE-8] No FluentValidation — validation is manual and duplicated — PARTIALLY FIXED
 - ~~Message length and file size limits hardcoded in multiple places~~ → centralized in `Limits.cs`
@@ -218,10 +216,12 @@ Comprehensive audit of the Librecord codebase. Organized by severity and categor
 
 | Category | Critical | High | Medium | Low | Fixed |
 |----------|----------|------|--------|-----|-------|
+| Category | Critical | High | Medium | Low | Fixed |
+|----------|----------|------|--------|-----|-------|
 | Security | 0 | — | — | 1 | 4 |
-| Architecture | — | 2 | — | — | 1 |
-| Testing/CI | — | 3 | — | — | 2 (TEST-3, TEST-5) |
+| Architecture | — | 1 | — | — | 2 (ARCH-1, ARCH-3) |
+| Testing/CI | — | 3 | — | — | 2 |
 | Frontend | — | 3 | 2 | 4 | 7 |
-| Backend | — | — | 4 | 0 | 7 (BE-1) |
+| Backend | — | — | 3 | 0 | 8 |
 | Infrastructure | — | — | — | 0 | 9 |
-| **Total** | **0** | **8** | **6** | **5** | **30** |
+| **Total** | **0** | **7** | **5** | **5** | **32** |
