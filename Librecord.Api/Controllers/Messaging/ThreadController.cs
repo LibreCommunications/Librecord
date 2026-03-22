@@ -30,6 +30,14 @@ public class ThreadController : AuthenticatedController
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest("Thread name is required.");
 
+        // Verify the user is a member of this channel
+        var isMember = await _db.DmChannelMembers
+            .AnyAsync(m => m.ChannelId == channelId && m.UserId == UserId)
+            || await _db.GuildChannels
+            .AnyAsync(c => c.Id == channelId && c.Guild.Members.Any(m => m.UserId == UserId));
+
+        if (!isMember) return Forbid();
+
         // Verify parent message is in this channel
         var inChannel = await _db.DmChannelMessages
             .AnyAsync(m => m.ChannelId == channelId && m.MessageId == request.ParentMessageId)

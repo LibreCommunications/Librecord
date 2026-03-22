@@ -38,6 +38,14 @@ public class PinController : AuthenticatedController
     [HttpPost("{messageId:guid}")]
     public async Task<IActionResult> Pin(Guid channelId, Guid messageId)
     {
+        // Verify the user is a member of this channel
+        var isMember = await _db.DmChannelMembers
+            .AnyAsync(m => m.ChannelId == channelId && m.UserId == UserId)
+            || await _db.GuildChannels
+            .AnyAsync(c => c.Id == channelId && c.Guild.Members.Any(m => m.UserId == UserId));
+
+        if (!isMember) return Forbid();
+
         var existing = await _db.PinnedMessages
             .FirstOrDefaultAsync(p => p.ChannelId == channelId && p.MessageId == messageId);
 
@@ -78,6 +86,13 @@ public class PinController : AuthenticatedController
     [HttpDelete("{messageId:guid}")]
     public async Task<IActionResult> Unpin(Guid channelId, Guid messageId)
     {
+        var isMember = await _db.DmChannelMembers
+            .AnyAsync(m => m.ChannelId == channelId && m.UserId == UserId)
+            || await _db.GuildChannels
+            .AnyAsync(c => c.Id == channelId && c.Guild.Members.Any(m => m.UserId == UserId));
+
+        if (!isMember) return Forbid();
+
         var pin = await _db.PinnedMessages
             .FirstOrDefaultAsync(p => p.ChannelId == channelId && p.MessageId == messageId);
 

@@ -16,4 +16,10 @@ public interface IUserService
     // ----------------------------------
     Task<User?> GetByIdAsync(Guid userId);
     Task<IReadOnlyList<User>> GetByIdsAsync(IEnumerable<Guid> userIds);
+
+    // ----------------------------------
+    // PROFILE MUTATIONS
+    // ----------------------------------
+    Task<string?> UpdateDisplayNameAsync(Guid userId, string displayName);
+    Task<string?> UpdateAvatarAsync(Guid userId, Stream fileStream, string fileName, string contentType);
 }

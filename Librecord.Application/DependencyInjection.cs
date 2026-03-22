@@ -3,6 +3,7 @@ using Librecord.Application.Interfaces;
 using Librecord.Application.Messaging;
 using Librecord.Application.Permissions;
 using Librecord.Application.Services;
+using Librecord.Application.Social;
 using Librecord.Application.Users;
 using Librecord.Application.Voice;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<IPresenceService, PresenceService>();
         services.AddScoped<IReactionService, ReactionService>();
         services.AddScoped<IVoiceService, VoiceService>();
+        services.AddScoped<IBlockService, BlockService>();
 
         // Add more application services later:
         // services.AddScoped<IGuildService, GuildService>();

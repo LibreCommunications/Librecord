@@ -1,8 +1,5 @@
-using System.Security.Claims;
 using Librecord.Api.Models.UserProfile;
 using Librecord.Application.Interfaces;
-using Librecord.Domain.Storage;
-using Librecord.Infra.Database;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,17 +9,10 @@ namespace Librecord.Api.Controllers;
 [Route("users")]
 public class UserProfileController : AuthenticatedController
 {
-    private readonly LibrecordContext _db;
-    private readonly IAttachmentStorageService _storage;
     private readonly IUserService _users;
 
-    public UserProfileController(
-        IAttachmentStorageService storage,
-        LibrecordContext db,
-        IUserService users)
+    public UserProfileController(IUserService users)
     {
-        _storage = storage;
-        _db = db;
         _users = users;
     }
 
@@ -36,32 +26,23 @@ public class UserProfileController : AuthenticatedController
         if (request.DisplayName.Length > 32)
             return BadRequest("Display name is too long.");
 
-        var userId = UserId;
+        var displayName = await _users.UpdateDisplayNameAsync(UserId, request.DisplayName);
+        if (displayName == null) return Unauthorized();
 
-        var user = await _db.Users.FindAsync(userId);
-        if (user == null)
-            return Unauthorized();
-
-        user.DisplayName = request.DisplayName;
-        await _db.SaveChangesAsync();
-
-        return Ok(new { displayName = user.DisplayName });
+        return Ok(new { displayName });
     }
 
     [Authorize]
     [HttpGet("me")]
     public async Task<IActionResult> GetMyInfo()
     {
-        var userId = UserId;
-
-        var result = await _users.GetUserInfoAsync(userId);
+        var result = await _users.GetUserInfoAsync(UserId);
 
         if (!result.Success)
             return BadRequest(new { error = result.Error });
 
         return Ok(result);
     }
-
 
     [Authorize]
     [HttpPost("avatar")]
@@ -79,27 +60,10 @@ public class UserProfileController : AuthenticatedController
         if (file.Length > Librecord.Application.Limits.MaxAvatarSize)
             return BadRequest("File too large.");
 
-        var userId = UserId;
-        var user = await _db.Users.FindAsync(userId);
-        if (user == null) return Unauthorized();
-
-        // Delete old avatar
-        if (!string.IsNullOrEmpty(user.AvatarUrl))
-        {
-            var oldKey = user.AvatarUrl.Replace("/cdn/", "");
-            await _storage.DeleteAsync(oldKey);
-        }
-
-        // New file ID to avoid caching issues
-        var fileId = Guid.NewGuid().ToString("N");
-        var objectName = $"avatars/{userId}/{fileId}{ext}";
-
         await using var stream = file.OpenReadStream();
-        await _storage.UploadAsync(objectName, stream, file.ContentType);
+        var avatarUrl = await _users.UpdateAvatarAsync(UserId, stream, file.FileName, file.ContentType);
+        if (avatarUrl == null) return Unauthorized();
 
-        user.AvatarUrl = $"/cdn/public/{objectName}";
-        await _db.SaveChangesAsync();
-
-        return Ok(new { avatarUrl = user.AvatarUrl });
+        return Ok(new { avatarUrl });
     }
 }
