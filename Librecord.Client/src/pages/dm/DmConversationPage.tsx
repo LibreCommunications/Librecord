@@ -15,6 +15,7 @@ import { useReactions } from "../../hooks/useReactions";
 import { useReadState } from "../../hooks/useReadState";
 import { AttachmentUpload } from "../../components/messages/AttachmentUpload";
 import { useAttachmentUpload } from "../../hooks/useAttachmentUpload";
+import { useToast } from "../../context/ToastContext";
 
 import type { Message } from "../../types/message";
 import type { DmEventMap } from "../../realtime/dm/dmEvents";
@@ -31,6 +32,7 @@ export default function DmConversationPage() {
 
     const { user } = useAuth();
     const { getAvatarUrl } = useUserProfile();
+    const { toast } = useToast();
 
     const {
         getChannelMessages,
@@ -63,6 +65,14 @@ export default function DmConversationPage() {
     const attachTriggerRef = useRef<{ open: () => void }>(null);
 
     const { typingNames, sendTyping, stopTyping } = useTypingIndicator(dmId, "dm", user?.userId);
+
+    // Warn before leaving page while uploading (#36)
+    useEffect(() => {
+        if (!sending) return;
+        const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+        window.addEventListener("beforeunload", handler);
+        return () => window.removeEventListener("beforeunload", handler);
+    }, [sending]);
 
     /* ------------------------------------------------------------------ */
     /* Realtime helpers                                                    */
@@ -297,6 +307,7 @@ export default function DmConversationPage() {
                     setMessages(prev =>
                         prev.filter(m => m.clientMessageId !== clientMessageId)
                     );
+                    toast("Failed to send file. The upload may have timed out.", "error");
                 }
             } else {
                 await sendMessage(dmId, text, clientMessageId);
@@ -305,6 +316,7 @@ export default function DmConversationPage() {
             setMessages(prev =>
                 prev.filter(m => m.clientMessageId !== clientMessageId)
             );
+            toast("Failed to send message.", "error");
         } finally {
             setSending(false);
         }
@@ -407,6 +419,14 @@ export default function DmConversationPage() {
 
             <div className="px-4 py-3 shrink-0">
                 <AttachmentUpload files={pendingFiles} onFilesChange={setPendingFiles} triggerRef={attachTriggerRef} />
+                {sending && (
+                    <div className="flex items-center gap-2 px-4 py-1.5 text-xs text-[#949ba4]">
+                        <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <circle cx="12" cy="12" r="10" strokeDasharray="56" strokeDashoffset="14" />
+                        </svg>
+                        Uploading…
+                    </div>
+                )}
                 <div className="flex items-center bg-[#383a40] rounded-lg">
                     <button
                         onClick={() => attachTriggerRef.current?.open()}

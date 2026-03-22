@@ -3,6 +3,7 @@ import { fetchWithAuth } from "../api/fetchWithAuth";
 import type { Message } from "../types/message";
 
 const API_URL = import.meta.env.VITE_API_URL;
+const UPLOAD_TIMEOUT_MS = 60_000; // 60 seconds
 
 export function useAttachmentUpload() {
     const auth = useAuth();
@@ -20,13 +21,20 @@ export function useAttachmentUpload() {
             form.append("files", file);
         }
 
-        const res = await fetchWithAuth(
-            `${API_URL}/guild-channels/${channelId}/messages/with-attachments`,
-            { method: "POST", body: form },
-            auth
-        );
-        if (!res.ok) return null;
-        return res.json();
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+
+        try {
+            const res = await fetchWithAuth(
+                `${API_URL}/guild-channels/${channelId}/messages/with-attachments`,
+                { method: "POST", body: form, signal: controller.signal },
+                auth
+            );
+            if (!res.ok) return null;
+            return res.json();
+        } finally {
+            clearTimeout(timeout);
+        }
     }
 
     async function sendDmMessageWithAttachments(
@@ -42,13 +50,20 @@ export function useAttachmentUpload() {
             form.append("files", file);
         }
 
-        const res = await fetchWithAuth(
-            `${API_URL}/dm-messages/channel/${channelId}/with-attachments`,
-            { method: "POST", body: form },
-            auth
-        );
-        if (!res.ok) return null;
-        return res.json();
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+
+        try {
+            const res = await fetchWithAuth(
+                `${API_URL}/dm-messages/channel/${channelId}/with-attachments`,
+                { method: "POST", body: form, signal: controller.signal },
+                auth
+            );
+            if (!res.ok) return null;
+            return res.json();
+        } finally {
+            clearTimeout(timeout);
+        }
     }
 
     return { sendGuildMessageWithAttachments, sendDmMessageWithAttachments };
