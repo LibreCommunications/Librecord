@@ -25,6 +25,9 @@ public static class DependencyInjection
             .Bind(config.GetSection("Jwt"))
             .ValidateDataAnnotations();
 
+        // In-memory cache for repository query results (short TTL)
+        services.AddMemoryCache();
+
         //
         // ─── REPOSITORIES ──────────────────────────────────────────────────────────
         //

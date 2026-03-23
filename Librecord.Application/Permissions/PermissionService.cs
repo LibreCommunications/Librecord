@@ -1,4 +1,4 @@
-﻿using Librecord.Domain.Guilds;
+using Librecord.Domain.Guilds;
 using Librecord.Domain.Permissions;
 
 namespace Librecord.Application.Permissions;
@@ -144,7 +144,7 @@ public class PermissionService : IPermissionService
         }
         else
         {
-            await _guilds.AddChannelOverrideAsync(new Domain.Guilds.GuildChannelPermissionOverride
+            await _guilds.AddChannelOverrideAsync(new GuildChannelPermissionOverride
             {
                 Id = Guid.NewGuid(),
                 ChannelId = channelId,
