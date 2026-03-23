@@ -193,9 +193,9 @@ test.describe.serial("New 1-on-1 DM appears in sender's sidebar (#32)", () => {
         await dmSenderPageA.goto(`${BASE}/app/dm/friends/list`);
         await dmSenderPageA.waitForLoadState("networkidle");
 
-        // No DM with B yet
+        // No DM with B yet in the sidebar
         await expect(
-            dmSenderPageA.locator(`text=${dmSenderB.displayName}`).first(),
+            dmSenderPageA.locator(`[data-testid^="dm-sidebar-entry-"]`).filter({ hasText: dmSenderB.displayName }),
         ).not.toBeVisible({ timeout: 3_000 });
 
         // A starts DM via API
@@ -222,7 +222,7 @@ test.describe.serial("New 1-on-1 DM appears in sender's sidebar (#32)", () => {
 
         // A's sidebar should now show B's name WITHOUT refresh
         await expect(
-            dmSenderPageA.locator(`text=${dmSenderB.displayName}`).first(),
+            dmSenderPageA.locator(`[data-testid^="dm-sidebar-entry-"]`).filter({ hasText: dmSenderB.displayName }),
         ).toBeVisible({ timeout: 15_000 });
     });
 
@@ -372,14 +372,20 @@ test.describe.serial("Reaction popup renders above input (#34)", () => {
         await expect(moreBtn).toBeVisible({ timeout: 3_000 });
         await moreBtn.click();
 
-        // Emoji picker should be visible
-        const emojiPicker = zPageA.locator(".z-\\[100\\]");
+        // Menu should show "Add Reaction" option
+        const addReactionBtn = zPageA.locator("text=Add Reaction");
+        await expect(addReactionBtn).toBeVisible({ timeout: 3_000 });
+
+        // Click "Add Reaction" to show inline emoji picker
+        await addReactionBtn.click();
+
+        // Emoji picker (quick emoji grid) should be visible
+        const emojiPicker = zPageA.locator(".z-50").filter({ hasText: "👍" });
         await expect(emojiPicker).toBeVisible({ timeout: 3_000 });
     });
 
     test("Emoji picker renders above the message input area", async () => {
-        // The picker should have z-index 100 and be positioned above
-        const picker = zPageA.locator(".z-\\[100\\]");
+        const picker = zPageA.locator(".z-50").filter({ hasText: "👍" });
         const inputArea = zPageA.locator(`textarea[placeholder*="Message #"]`);
 
         if (await picker.isVisible()) {

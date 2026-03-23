@@ -144,12 +144,22 @@ export default function DmSidebar() {
         return () => window.removeEventListener("dm:user:presence", onPresence as EventListener);
     }, []);
 
-    // Increment unread when a message ping arrives for a non-active channel
+    // Increment unread when a message ping arrives for a non-active channel.
+    // If the channel was closed (not in dms list), re-fetch to restore it.
     useEffect(() => {
         const onPing = (e: CustomEvent<DmEventMap["dm:message:ping"]>) => {
             const { channelId: pingChannel, authorId } = e.detail;
             if (pingChannel === dmId) return;
             if (authorId === user?.userId) return;
+
+            setDms(prev => {
+                const exists = prev.some(d => d.id === pingChannel);
+                if (!exists) {
+                    // Channel was closed/hidden — reload DM list to restore it
+                    loadDms();
+                }
+                return prev;
+            });
 
             setUnreads(prev => ({
                 ...prev,
@@ -159,7 +169,7 @@ export default function DmSidebar() {
 
         window.addEventListener("dm:message:ping", onPing as EventListener);
         return () => window.removeEventListener("dm:message:ping", onPing as EventListener);
-    }, [dmId, user?.userId]);
+    }, [dmId, user?.userId, loadDms]);
 
     // Derive effective unreads — clear count for the active channel
     const effectiveUnreads = dmId
@@ -213,7 +223,7 @@ export default function DmSidebar() {
                     const otherStatus = showAvatar ? (presenceMap[others[0].id] ?? "offline") : undefined;
 
                     return (
-                        <div key={dm.id} className="group relative">
+                        <div key={dm.id} className="group relative" data-testid={`dm-sidebar-entry-${dm.id}`}>
                             <Link to={`/app/dm/${dm.id}`}>
                                 <div
                                     className={`

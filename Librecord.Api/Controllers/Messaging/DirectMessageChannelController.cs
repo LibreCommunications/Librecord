@@ -105,8 +105,8 @@ public class DirectMessageChannelController : AuthenticatedController
     {
         var channel = await _dms.StartDmAsync(UserId, targetUserId);
 
-        // Notify the target user so their DM sidebar updates without refresh
-        await _dmHub.Clients.User(targetUserId.ToString()).SendAsync(
+        // Notify both users so their DM sidebars update without refresh
+        await _dmHub.Clients.Users(UserId.ToString(), targetUserId.ToString()).SendAsync(
             "dm:channel:created",
             new { channelId = channel.Id });
 
