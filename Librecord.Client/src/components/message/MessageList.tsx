@@ -82,6 +82,7 @@ export function MessageList({
 
         // Reset scroll tracking when messages are cleared (channel switch)
         if (messages.length === 0) {
+            console.log("[MessageList] messages cleared — resetting scroll state");
             isAtBottomRef.current = true;
             prevMsgCountRef.current = 0;
             return;
@@ -90,11 +91,15 @@ export function MessageList({
         // Only auto-scroll when new messages arrive (count increased),
         // not when existing messages are mutated (reactions, edits)
         if (messages.length > prevMsgCountRef.current) {
+            console.log(`[MessageList] new messages: ${prevMsgCountRef.current} → ${messages.length}, isAtBottom=${isAtBottomRef.current}`);
             // Initial load (from empty) — always scroll to bottom
             if (prevMsgCountRef.current === 0 || isAtBottomRef.current) {
+                console.log("[MessageList] scrolling to bottom (initial load or at bottom)");
                 el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
             } else {
-                setNewMsgCount(prev => prev + (messages.length - prevMsgCountRef.current));
+                const added = messages.length - prevMsgCountRef.current;
+                console.log(`[MessageList] showing "new messages" badge: +${added}`);
+                setNewMsgCount(prev => prev + added);
             }
         }
 

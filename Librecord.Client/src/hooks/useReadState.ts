@@ -8,6 +8,7 @@ export function useReadState() {
     const auth = useAuth();
 
     const markAsRead = useCallback(async (channelId: string, messageId: string): Promise<boolean> => {
+        console.log(`[ReadState] markAsRead called — channel=${channelId} message=${messageId}`);
         try {
             const res = await fetchWithAuth(
                 `${API_URL}/channels/${channelId}/ack`,
@@ -20,6 +21,8 @@ export function useReadState() {
             );
             if (!res.ok) {
                 console.warn(`[ReadState] markAsRead failed: ${res.status} for channel=${channelId} message=${messageId}`);
+            } else {
+                console.log(`[ReadState] markAsRead success — channel=${channelId} message=${messageId}`);
             }
             return res.ok;
         } catch (err) {
@@ -29,6 +32,7 @@ export function useReadState() {
     }, [auth]);
 
     const getUnreadCounts = useCallback(async (channelIds: string[]): Promise<Record<string, number>> => {
+        console.log(`[ReadState] getUnreadCounts called — channels=${JSON.stringify(channelIds)}`);
         if (channelIds.length === 0) return {};
 
         const res = await fetchWithAuth(
@@ -42,7 +46,9 @@ export function useReadState() {
         );
 
         if (!res.ok) return {};
-        return res.json();
+        const counts = await res.json();
+        console.log(`[ReadState] getUnreadCounts result —`, counts);
+        return counts;
     }, [auth]);
 
     return { markAsRead, getUnreadCounts };
