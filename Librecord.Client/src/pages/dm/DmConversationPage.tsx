@@ -68,6 +68,7 @@ export default function DmConversationPage() {
 
     const shouldAutoScrollRef = useRef(false);
     const attachTriggerRef = useRef<{ open: () => void }>(null);
+    const [prevDmId, setPrevDmId] = useState(dmId);
 
     const { typingNames, sendTyping, stopTyping } = useTypingIndicator(dmId, "dm", user?.userId);
 
@@ -253,14 +254,18 @@ export default function DmConversationPage() {
     /* LOAD CHANNEL + INITIAL MESSAGES                                     */
     /* ------------------------------------------------------------------ */
 
-    useEffect(() => {
-        if (!dmId) return;
-        let stale = false;
-
+    // Reset state synchronously during render when channel changes
+    if (dmId !== prevDmId) {
+        setPrevDmId(dmId);
         setLoading(true);
         setMessages([]);
         setChannel(null);
         setChannelName(null);
+    }
+
+    useEffect(() => {
+        if (!dmId) return;
+        let stale = false;
 
         Promise.all([getDmChannel(dmId), getChannelMessages(dmId), getPins(dmId)])
             .then(([channel, msgs, pins]) => {

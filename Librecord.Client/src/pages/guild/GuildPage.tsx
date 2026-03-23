@@ -70,6 +70,7 @@ export default function GuildChannelPage() {
 
     const shouldAutoScrollRef = useRef(false);
     const attachTriggerRef = useRef<{ open: () => void }>(null);
+    const [prevChannelId, setPrevChannelId] = useState(channelId);
 
     const { typingNames, sendTyping, stopTyping } = useTypingIndicator(channelId, "guild", user?.userId);
 
@@ -255,14 +256,18 @@ export default function GuildChannelPage() {
     /* LOAD CHANNEL + INITIAL MESSAGES                                     */
     /* ------------------------------------------------------------------ */
 
-    useEffect(() => {
-        if (!channelId) return;
-        let stale = false;
-
+    // Reset state synchronously during render when channel changes
+    if (channelId !== prevChannelId) {
+        setPrevChannelId(channelId);
         setLoading(true);
         setMessages([]);
         setChannelName(null);
         setChannelTopic(null);
+    }
+
+    useEffect(() => {
+        if (!channelId) return;
+        let stale = false;
 
         Promise.all([
             getChannel(channelId),
