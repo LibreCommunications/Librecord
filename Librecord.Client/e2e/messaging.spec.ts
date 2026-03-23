@@ -319,6 +319,7 @@ test.describe.serial("Guild messaging — send, receive, edit, delete, notificat
         // triggers OnConnectedAsync which joins all channel groups.
         await pageB.goto(`${BASE}/app/guild/${guildId}/${textChannelId}`);
         await pageB.waitForLoadState("networkidle");
+        await waitForRealtime(pageB);
         await expect(pageB.locator(`textarea[placeholder*="Message #"]`)).toBeVisible({ timeout: 10_000 });
         // Verify second-channel appears in Bob's sidebar
         await expect(
@@ -327,6 +328,7 @@ test.describe.serial("Guild messaging — send, receive, edit, delete, notificat
 
         await pageA.goto(`${BASE}/app/guild/${guildId}/${channel2.id}`);
         await pageA.waitForLoadState("networkidle");
+        await waitForRealtime(pageA);
         await expect(pageA.locator(`textarea[placeholder*="Message #"]`)).toBeVisible({ timeout: 10_000 });
 
         // Alice sends a message in second-channel

@@ -36,7 +36,8 @@ public class GuildRepository : IGuildRepository
 
     public async Task<List<Guild>> GetGuildsForUserAsync(Guid userId)
     {
-        var key = $"repo:guilds-for-user:{userId}";
+        var gen = _cache.Get<long>("repo:guilds-gen");
+        var key = $"repo:guilds-for-user:v{gen}:{userId}";
         if (_cache.TryGetValue(key, out List<Guild>? cached))
             return cached!;
 
@@ -186,7 +187,7 @@ public class GuildRepository : IGuildRepository
     {
         _db.GuildMembers.Remove(member);
         _cache.Remove($"repo:member:{member.GuildId}:{member.UserId}");
-        _cache.Remove($"repo:guilds-for-user:{member.UserId}");
+        InvalidateGuildsForUserGen();
         return Task.CompletedTask;
     }
 
@@ -245,7 +246,7 @@ public class GuildRepository : IGuildRepository
 
                 case GuildMember m:
                     _cache.Remove($"repo:member:{m.GuildId}:{m.UserId}");
-                    _cache.Remove($"repo:guilds-for-user:{m.UserId}");
+                    InvalidateGuildsForUserGen();
                     break;
 
                 case RolePermission rp:
@@ -263,6 +264,8 @@ public class GuildRepository : IGuildRepository
 
                 case GuildChannel ch:
                     _cache.Remove($"repo:channel:{ch.Id}");
+                    // Channel added/removed changes the guilds-for-user result
+                    InvalidateGuildsForUserGen();
                     break;
             }
         }
@@ -275,9 +278,13 @@ public class GuildRepository : IGuildRepository
     /// </summary>
     private void InvalidateAllRolePermsBatch()
     {
-        // Simple approach: bump a version counter stored in cache.
-        // GetRolesPermissionsBatchAsync uses this version in its key.
         var gen = _cache.Get<long>("repo:role-perms-gen");
         _cache.Set("repo:role-perms-gen", gen + 1);
+    }
+
+    private void InvalidateGuildsForUserGen()
+    {
+        var gen = _cache.Get<long>("repo:guilds-gen");
+        _cache.Set("repo:guilds-gen", gen + 1);
     }
 }

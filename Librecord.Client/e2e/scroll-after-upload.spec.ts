@@ -168,12 +168,11 @@ test.describe.serial("DM scroll position after image upload (#31)", () => {
             dmPageA.locator(`[data-testid='message-content']:has-text("DM image scroll test")`),
         ).toBeVisible({ timeout: 30_000 });
 
-        // Wait for any image in the message list to load
-        await dmPageA.waitForTimeout(2_000);
-
-        // The scroll should still be at (or near) the bottom
-        const atBottom = await isScrolledToBottom(dmPageA, SCROLL_CONTAINER);
-        expect(atBottom).toBe(true);
+        // Poll until scroll settles at bottom (image load + re-scroll may take a moment)
+        await expect.poll(
+            () => isScrolledToBottom(dmPageA, SCROLL_CONTAINER),
+            { message: "Should be at bottom after image upload", timeout: 10_000 },
+        ).toBe(true);
 
         fs.unlinkSync(tmpImage);
     });
@@ -184,12 +183,11 @@ test.describe.serial("DM scroll position after image upload (#31)", () => {
             dmPageB.locator(`[data-testid='message-content']:has-text("DM image scroll test")`),
         ).toBeVisible({ timeout: 10_000 });
 
-        // Give images time to load
-        await dmPageB.waitForTimeout(2_000);
-
-        // Bob's scroll should also be at the bottom
-        const atBottom = await isScrolledToBottom(dmPageB, SCROLL_CONTAINER);
-        expect(atBottom).toBe(true);
+        // Poll until scroll settles at bottom
+        await expect.poll(
+            () => isScrolledToBottom(dmPageB, SCROLL_CONTAINER),
+            { message: "Receiver should be at bottom after image arrives", timeout: 10_000 },
+        ).toBe(true);
     });
 
     test.afterAll(async () => {
@@ -268,12 +266,11 @@ test.describe.serial("Guild channel scroll position after image upload (#58)", (
             guildPageA.locator(`[data-testid='message-content']:has-text("Guild image scroll test")`),
         ).toBeVisible({ timeout: 30_000 });
 
-        // Wait for image to load
-        await guildPageA.waitForTimeout(2_000);
-
-        // Should still be at the bottom
-        const atBottom = await isScrolledToBottom(guildPageA, SCROLL_CONTAINER);
-        expect(atBottom).toBe(true);
+        // Poll until scroll settles at bottom
+        await expect.poll(
+            () => isScrolledToBottom(guildPageA, SCROLL_CONTAINER),
+            { message: "Should be at bottom after guild image upload", timeout: 10_000 },
+        ).toBe(true);
 
         fs.unlinkSync(tmpImage);
     });
@@ -294,16 +291,14 @@ test.describe.serial("Guild channel scroll position after image upload (#58)", (
                 guildPageA.locator(`[data-testid='message-content']:has-text("Multi upload ${i}")`),
             ).toBeVisible({ timeout: 30_000 });
 
-            // Wait for image to load
-            await guildPageA.waitForTimeout(1_500);
-
             fs.unlinkSync(tmpImage);
         }
 
-        // After all uploads, should still be at the bottom
-        await guildPageA.waitForTimeout(1_000);
-        const atBottom = await isScrolledToBottom(guildPageA, SCROLL_CONTAINER);
-        expect(atBottom).toBe(true);
+        // Poll until scroll settles at bottom after all uploads
+        await expect.poll(
+            () => isScrolledToBottom(guildPageA, SCROLL_CONTAINER),
+            { message: "Should be at bottom after multiple uploads", timeout: 10_000 },
+        ).toBe(true);
     });
 
     test.afterAll(async () => {
