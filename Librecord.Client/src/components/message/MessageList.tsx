@@ -94,8 +94,11 @@ export function MessageList({
             console.log(`[MessageList] new messages: ${prevMsgCountRef.current} → ${messages.length}, isAtBottom=${isAtBottomRef.current}`);
             // Initial load (from empty) — always scroll to bottom
             if (prevMsgCountRef.current === 0 || isAtBottomRef.current) {
-                console.log("[MessageList] scrolling to bottom (initial load or at bottom)");
-                el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+                // Use instant scroll for initial load to avoid race with incoming
+                // realtime messages arriving before smooth animation completes
+                const behavior = prevMsgCountRef.current === 0 ? "instant" : "smooth";
+                console.log(`[MessageList] scrolling to bottom (${behavior}, initial=${prevMsgCountRef.current === 0})`);
+                el.scrollTo({ top: el.scrollHeight, behavior });
             } else {
                 const added = messages.length - prevMsgCountRef.current;
                 console.log(`[MessageList] showing "new messages" badge: +${added}`);
