@@ -164,10 +164,16 @@ export default function ChannelSidebar({ guildId }: Props) {
         return () => window.removeEventListener("guild:message:ping", onPing as EventListener);
     }, [channelId, user?.userId]);
 
-    // Derive effective unreads — clear count for the active channel
-    const effectiveUnreads = channelId
-        ? Object.fromEntries(Object.entries(unreads).filter(([k]) => k !== channelId))
-        : unreads;
+    // Clear unread count when navigating into a channel (render-phase)
+    const [prevActiveChannelId, setPrevActiveChannelId] = useState(channelId);
+    if (channelId && channelId !== prevActiveChannelId) {
+        setPrevActiveChannelId(channelId);
+        if (unreads[channelId]) {
+            const next = { ...unreads };
+            delete next[channelId];
+            setUnreads(next);
+        }
+    }
 
     async function handleCreateChannel(data: {
         name: string;
@@ -202,7 +208,7 @@ export default function ChannelSidebar({ guildId }: Props) {
                                 )}
                             </div>
                             {textChannels.map(ch => {
-                                const unreadCount = effectiveUnreads[ch.id] ?? 0;
+                                const unreadCount = unreads[ch.id] ?? 0;
                                 const isActive = channelId === ch.id;
                                 const hasUnread = unreadCount > 0 && !isActive;
 

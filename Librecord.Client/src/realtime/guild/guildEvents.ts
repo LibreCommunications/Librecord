@@ -91,4 +91,18 @@ export interface GuildEventMap {
         channelId: string;
         messageId: string;
     };
+
+    "channel:reaction:added": {
+        channelId: string;
+        messageId: string;
+        userId: string;
+        emoji: string;
+    };
+
+    "channel:reaction:removed": {
+        channelId: string;
+        messageId: string;
+        userId: string;
+        emoji: string;
+    };
 }

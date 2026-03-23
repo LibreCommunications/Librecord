@@ -29,6 +29,8 @@ export function registerGuildListeners() {
     guildConnection.off("voice:user:state");
     guildConnection.off("channel:message:pinned");
     guildConnection.off("channel:message:unpinned");
+    guildConnection.off("channel:reaction:added");
+    guildConnection.off("channel:reaction:removed");
 
     /* ------------------------------------------------------------------ */
     /* MESSAGE PING (lightweight — for unread badges + notifications)      */
@@ -138,6 +140,23 @@ export function registerGuildListeners() {
         "channel:message:unpinned",
         (payload: { channelId: string; messageId: string }) => {
             dispatchGuildEvent("channel:message:unpinned", payload);
+        }
+    );
+
+    /* ------------------------------------------------------------------ */
+    /* REACTIONS                                                            */
+    /* ------------------------------------------------------------------ */
+    guildConnection.on(
+        "channel:reaction:added",
+        (payload: GuildEventMap["channel:reaction:added"]) => {
+            dispatchGuildEvent("channel:reaction:added", payload);
+        }
+    );
+
+    guildConnection.on(
+        "channel:reaction:removed",
+        (payload: GuildEventMap["channel:reaction:removed"]) => {
+            dispatchGuildEvent("channel:reaction:removed", payload);
         }
     );
 

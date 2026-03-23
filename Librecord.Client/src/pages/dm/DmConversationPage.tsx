@@ -251,6 +251,49 @@ export default function DmConversationPage() {
     }, [dmId]);
 
     /* ------------------------------------------------------------------ */
+    /* REALTIME: REACTIONS                                                  */
+    /* ------------------------------------------------------------------ */
+
+    useEffect(() => {
+        if (!dmId) return;
+
+        const onAdded = (event: CustomEvent<DmEventMap["channel:reaction:added"]>) => {
+            const { channelId, messageId, userId: reactUserId, emoji } = event.detail;
+            if (channelId !== dmId) return;
+            if (reactUserId === user?.userId) return;
+
+            setMessages(prev =>
+                prev.map(m => {
+                    if (m.id !== messageId) return m;
+                    if (m.reactions.some(r => r.userId === reactUserId && r.emoji === emoji)) return m;
+                    return { ...m, reactions: [...m.reactions, { userId: reactUserId, emoji, createdAt: new Date().toISOString() }] };
+                })
+            );
+        };
+
+        const onRemoved = (event: CustomEvent<DmEventMap["channel:reaction:removed"]>) => {
+            const { channelId, messageId, userId: reactUserId, emoji } = event.detail;
+            if (channelId !== dmId) return;
+            if (reactUserId === user?.userId) return;
+
+            setMessages(prev =>
+                prev.map(m =>
+                    m.id === messageId
+                        ? { ...m, reactions: m.reactions.filter(r => !(r.userId === reactUserId && r.emoji === emoji)) }
+                        : m
+                )
+            );
+        };
+
+        window.addEventListener("channel:reaction:added", onAdded as EventListener);
+        window.addEventListener("channel:reaction:removed", onRemoved as EventListener);
+        return () => {
+            window.removeEventListener("channel:reaction:added", onAdded as EventListener);
+            window.removeEventListener("channel:reaction:removed", onRemoved as EventListener);
+        };
+    }, [dmId, user?.userId]);
+
+    /* ------------------------------------------------------------------ */
     /* LOAD CHANNEL + INITIAL MESSAGES                                     */
     /* ------------------------------------------------------------------ */
 
