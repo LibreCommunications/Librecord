@@ -222,7 +222,7 @@ static void ConfigureRateLimiting(IServiceCollection services)
             return ip?.ToString() ?? "unknown";
         }
 
-        // Global default: 300 requests per minute per client IP
+        // Global default: 600 requests per minute per client IP
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
         {
             var clientIp = GetClientIp(ctx);
@@ -233,7 +233,7 @@ static void ConfigureRateLimiting(IServiceCollection services)
                 clientIp,
                 _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = 300,
+                    PermitLimit = 600,
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
                 });
