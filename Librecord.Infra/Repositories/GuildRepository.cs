@@ -71,6 +71,16 @@ public class GuildRepository : IGuildRepository
             .ToListAsync();
     }
 
+    public Task<List<Permission>> GetRolesPermissionsBatchAsync(IEnumerable<Guid> roleIds)
+    {
+        var ids = roleIds.ToList();
+        return _db.RolePermissions
+            .Where(rp => ids.Contains(rp.RoleId))
+            .Select(rp => rp.Permission)
+            .Distinct()
+            .ToListAsync();
+    }
+
     public Task<List<GuildChannelPermissionOverride>> GetChannelOverridesAsync(Guid channelId)
     {
         return _db.GuildChannelPermissionOverrides

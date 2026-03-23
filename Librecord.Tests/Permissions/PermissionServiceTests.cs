@@ -34,11 +34,17 @@ public class PermissionServiceTests
             }).ToList()
         };
 
+        // Setup per-role queries (used by channel permission fallback)
         foreach (var (roleId, perms) in roles)
         {
             _guilds.Setup(g => g.GetRolePermissionsAsync(roleId))
                 .ReturnsAsync(perms);
         }
+
+        // Setup batch query (used by guild permission checks)
+        var allPerms = roles.SelectMany(r => r.perms).Distinct().ToList();
+        _guilds.Setup(g => g.GetRolesPermissionsBatchAsync(It.IsAny<IEnumerable<Guid>>()))
+            .ReturnsAsync(allPerms);
 
         return member;
     }

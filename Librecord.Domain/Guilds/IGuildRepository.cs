@@ -14,6 +14,7 @@ public interface IGuildRepository
     Task AddGuildAsync(Guild guild);
 
     Task<List<Permission>> GetRolePermissionsAsync(Guid roleId);
+    Task<List<Permission>> GetRolesPermissionsBatchAsync(IEnumerable<Guid> roleIds);
 
     Task<List<GuildChannelPermissionOverride>> GetChannelOverridesAsync(Guid channelId);
 

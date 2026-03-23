@@ -51,27 +51,18 @@ public class GuildMemberController : AuthenticatedController
     [HttpGet("permissions/me")]
     public async Task<IActionResult> MyPermissions(Guid guildId)
     {
-        if (!await _guilds.IsMemberAsync(guildId, UserId))
-            return Forbid();
+        var granted = await _permissions.GetGrantedGuildPermissionsAsync(UserId, guildId);
+        if (granted == null) return Forbid();
 
-        var result = new Dictionary<string, bool>();
-        var checks = new (string key, PermissionCapability perm)[]
+        return Ok(new
         {
-            ("manageGuild", GuildPermission.ManageGuild),
-            ("manageChannels", GuildPermission.ManageChannels),
-            ("manageRoles", GuildPermission.ManageRoles),
-            ("kickMembers", GuildPermission.KickMembers),
-            ("banMembers", GuildPermission.BanMembers),
-            ("inviteMembers", GuildPermission.InviteMembers),
-        };
-
-        foreach (var (key, perm) in checks)
-        {
-            var r = await _permissions.HasGuildPermissionAsync(UserId, guildId, perm);
-            result[key] = r.Allowed;
-        }
-
-        return Ok(result);
+            manageGuild = granted.Contains(GuildPermission.ManageGuild),
+            manageChannels = granted.Contains(GuildPermission.ManageChannels),
+            manageRoles = granted.Contains(GuildPermission.ManageRoles),
+            kickMembers = granted.Contains(GuildPermission.KickMembers),
+            banMembers = granted.Contains(GuildPermission.BanMembers),
+            inviteMembers = granted.Contains(GuildPermission.InviteMembers),
+        });
     }
 
     [HttpPost("kick/{userId:guid}")]
