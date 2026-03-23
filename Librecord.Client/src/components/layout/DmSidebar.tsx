@@ -259,26 +259,20 @@ export default function DmSidebar() {
                                     )}
                                 </div>
                             </Link>
-                            <button
+                            {dm.isGroup && <button
                                 onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    if (dm.isGroup) {
-                                        setLeaveConfirmId(dm.id);
-                                    } else {
-                                        // Hide 1-on-1 DM from sidebar
-                                        setDms(prev => prev.filter(d => d.id !== dm.id));
-                                        if (dmId === dm.id) navigate("/app/dm");
-                                    }
+                                    setLeaveConfirmId(dm.id);
                                 }}
                                 className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-[#949ba4] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                                title={dm.isGroup ? "Leave group" : "Close conversation"}
+                                title="Leave group"
                             >
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <line x1="18" y1="6" x2="6" y2="18" />
                                     <line x1="6" y1="6" x2="18" y2="18" />
                                 </svg>
-                            </button>
+                            </button>}
                         </div>
                     );
                 })}
