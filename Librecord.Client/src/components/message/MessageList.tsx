@@ -31,6 +31,15 @@ export function MessageList({
     const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
     const [newMsgCount, setNewMsgCount] = useState(0);
     const prevMsgCountRef = useRef(messages.length);
+    const [prevMsgLen, setPrevMsgLen] = useState(messages.length);
+
+    // Clear "new messages" badge when messages are reset (channel switch)
+    if (messages.length === 0 && prevMsgLen > 0) {
+        setPrevMsgLen(0);
+        setNewMsgCount(0);
+    } else if (messages.length !== prevMsgLen) {
+        setPrevMsgLen(messages.length);
+    }
 
     // ----------------------------------
     // TRACK SCROLL POSITION
@@ -71,10 +80,18 @@ export function MessageList({
             return;
         }
 
+        // Reset scroll tracking when messages are cleared (channel switch)
+        if (messages.length === 0) {
+            isAtBottomRef.current = true;
+            prevMsgCountRef.current = 0;
+            return;
+        }
+
         // Only auto-scroll when new messages arrive (count increased),
         // not when existing messages are mutated (reactions, edits)
         if (messages.length > prevMsgCountRef.current) {
-            if (isAtBottomRef.current) {
+            // Initial load (from empty) — always scroll to bottom
+            if (prevMsgCountRef.current === 0 || isAtBottomRef.current) {
                 el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
             } else {
                 setNewMsgCount(prev => prev + (messages.length - prevMsgCountRef.current));
