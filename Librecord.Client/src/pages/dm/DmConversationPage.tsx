@@ -68,6 +68,8 @@ export default function DmConversationPage() {
 
     const shouldAutoScrollRef = useRef(false);
     const attachTriggerRef = useRef<{ open: () => void }>(null);
+    const dmIdRef = useRef(dmId);
+    useEffect(() => { dmIdRef.current = dmId; }, [dmId]);
     const [prevDmId, setPrevDmId] = useState(dmId);
 
     const { typingNames, sendTyping, stopTyping } = useTypingIndicator(dmId, "dm", user?.userId);
@@ -438,12 +440,16 @@ export default function DmConversationPage() {
 
     const handleLoadMore = async () => {
         if (!dmId || loadingMore || !hasMore || messages.length === 0) return;
+        const fetchForId = dmId;
         setLoadingMore(true);
 
         const oldestId = messages[0].id;
-        const older = await getChannelMessages(dmId, 50, oldestId);
-        const reversed = older.slice().reverse();
+        const older = await getChannelMessages(fetchForId, 50, oldestId);
 
+        // Bail if channel changed while fetching
+        if (dmIdRef.current !== fetchForId) { setLoadingMore(false); return; }
+
+        const reversed = older.slice().reverse();
         setMessages(prev => [...reversed, ...prev]);
         setHasMore(older.length >= 50);
         setLoadingMore(false);

@@ -70,6 +70,8 @@ export default function GuildChannelPage() {
 
     const shouldAutoScrollRef = useRef(false);
     const attachTriggerRef = useRef<{ open: () => void }>(null);
+    const channelIdRef = useRef(channelId);
+    useEffect(() => { channelIdRef.current = channelId; }, [channelId]);
     const [prevChannelId, setPrevChannelId] = useState(channelId);
 
     const { typingNames, sendTyping, stopTyping } = useTypingIndicator(channelId, "guild", user?.userId);
@@ -447,12 +449,16 @@ export default function GuildChannelPage() {
 
     const handleLoadMore = async () => {
         if (!channelId || loadingMore || !hasMore || messages.length === 0) return;
+        const fetchForId = channelId;
         setLoadingMore(true);
 
         const oldestId = messages[0].id;
-        const older = await getChannelMessages(channelId, 50, oldestId);
-        const reversed = older.slice().reverse();
+        const older = await getChannelMessages(fetchForId, 50, oldestId);
 
+        // Bail if channel changed while fetching
+        if (channelIdRef.current !== fetchForId) { setLoadingMore(false); return; }
+
+        const reversed = older.slice().reverse();
         setMessages(prev => [...reversed, ...prev]);
         setHasMore(older.length >= 50);
         setLoadingMore(false);
