@@ -382,10 +382,10 @@ export default function DmConversationPage() {
 
         try {
             if (filesToSend.length > 0) {
-                const serverMsg = await sendDmMessageWithAttachments(dmId, text, clientMessageId, filesToSend);
-                if (serverMsg) {
+                const result = await sendDmMessageWithAttachments(dmId, text, clientMessageId, filesToSend);
+                if (result.ok) {
                     setMessages(prev => prev.map(m =>
-                        m.clientMessageId === clientMessageId ? { ...serverMsg, clientMessageId } : m
+                        m.clientMessageId === clientMessageId ? { ...result.message, clientMessageId } : m
                     ));
                     // Re-scroll after attachments are rendered
                     shouldAutoScrollRef.current = true;
@@ -394,7 +394,9 @@ export default function DmConversationPage() {
                         prev.filter(m => m.clientMessageId !== clientMessageId)
                     );
                     setPendingFiles(filesToSend);
-                    toast("Failed to send file. The upload may have timed out.", "error");
+                    toast(result.status === 413
+                        ? "File exceeds the 25 MB size limit."
+                        : "Failed to send file. The upload may have timed out.", "error");
                 }
             } else {
                 await sendMessage(dmId, text, clientMessageId);
@@ -504,7 +506,8 @@ export default function DmConversationPage() {
     if (!dmId) return null;
 
     return (
-        <div className="flex-1 flex flex-col bg-[#313338] min-h-0 overflow-hidden">
+        <div className="flex-1 flex bg-[#313338] overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 min-h-0">
             <div className="flex items-center border-b border-black/20">
                 <div className="flex-1">
                     <DmHeader
@@ -636,6 +639,8 @@ export default function DmConversationPage() {
                 </div>
                 );
             })()}
+
+        </div>
 
             {showPins && dmId && (
                 <PinnedMessagesPanel channelId={dmId} onClose={() => setShowPins(false)} />

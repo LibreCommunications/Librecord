@@ -221,7 +221,7 @@ export default function DmSidebar() {
                     const others = dm.members.filter(m => m.id !== user?.userId);
                     const name = others.length > 0
                         ? others.map(u => u.displayName).join(", ")
-                        : dm.id.slice(0, 8);
+                        : "Empty Group";
 
                     const showAvatar = others.length === 1;
                     const avatar = showAvatar ? getAvatarUrl(others[0].avatarUrl) : undefined;

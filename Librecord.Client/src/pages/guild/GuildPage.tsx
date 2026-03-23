@@ -378,10 +378,10 @@ export default function GuildChannelPage() {
 
         try {
             if (filesToSend.length > 0) {
-                const serverMsg = await sendGuildMessageWithAttachments(channelId, text, clientMessageId, filesToSend);
-                if (serverMsg) {
+                const result = await sendGuildMessageWithAttachments(channelId, text, clientMessageId, filesToSend);
+                if (result.ok) {
                     setMessages(prev => prev.map(m =>
-                        m.clientMessageId === clientMessageId ? { ...serverMsg, clientMessageId } : m
+                        m.clientMessageId === clientMessageId ? { ...result.message, clientMessageId } : m
                     ));
                     // Re-scroll after attachments are rendered
                     shouldAutoScrollRef.current = true;
@@ -390,7 +390,9 @@ export default function GuildChannelPage() {
                         prev.filter(m => m.clientMessageId !== clientMessageId)
                     );
                     setPendingFiles(filesToSend);
-                    toast("Failed to send file. The upload may have timed out.", "error");
+                    toast(result.status === 413
+                        ? "File exceeds the 25 MB size limit."
+                        : "Failed to send file. The upload may have timed out.", "error");
                 }
             } else {
                 await createMessage(channelId, text, clientMessageId);

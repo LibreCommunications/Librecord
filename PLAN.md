@@ -7,14 +7,16 @@ Prioritized roadmap combining open GitHub issues and remaining codebase weakness
 ## P0 — Bugs (fix now)
 
 ### Messaging bugs
-- **#45** New message bubbles inconsistent — unread badges appear/disappear unreliably, persist after reading
-- **#44** Guild reaction resets chat position — adding/removing reaction scrolls to bottom after refresh
-- **#31** DM scroll position — resets to last text message instead of last item (media)
+- ~~**#45** New message bubbles inconsistent~~ — **Fixed.** Unread badges now clear from state on nav; instant scroll on initial load; skip badge for prepended (older) messages; fixed handleLoadMore race condition on channel switch
+- ~~**#44** Guild reaction resets chat position~~ — **Fixed.** Added realtime reaction events via SignalR (channel:reaction:added/removed); reactions now sync across users without refresh
 - ~~**#32** New DM from unknown user~~ — **Fixed.** Backend now notifies both sender and target via `dm:channel:created`; sidebar re-fetches on ping for closed DMs
+- **#49** Bugged conversation if alone — group DM with no other members shows raw ID string in sidebar
+- **#48** File too big shows wrong fail message — >100MB upload shows generic error instead of size-specific message
+- **#31** DM scroll position — resets to last text message instead of last item (media)
 
 ### Pin bugs
 - **#15** Pin message content not showing — decryption fix deployed, needs verification
-- **#40** Pinning in DM not available — pin UI missing from DM conversation page
+- **#40** Pinning in DM not available — pin UI missing from DM conversation page (labeled "invalid")
 
 ### Voice/Screenshare bugs
 - **#8** Voice channel renders as text channel — channel type detection issue
@@ -22,9 +24,7 @@ Prioritized roadmap combining open GitHub issues and remaining codebase weakness
 - **#28** Screenshare crashes on YouTube — likely DRM/codec issue, needs investigation
 
 ### Upload bugs
-- **#47** Cancel button on refresh warning breaks file upload — `sending` state stuck after beforeunload cancel
-- **#33** File upload timeout/crash — 60s timeout added, needs testing
-- **#46** AudioContext warning on keypress — harmless browser warning, mark as wontfix
+- **#33** File upload timeout/crash — 60s timeout added, needs testing (labeled "invalid")
 
 ---
 
@@ -32,7 +32,7 @@ Prioritized roadmap combining open GitHub issues and remaining codebase weakness
 
 ### Social
 - ~~**#21** Cancel friend request~~ — **Done.** Cancel button on outgoing requests, realtime sync to both users
-- ~~**#39** Delete friend's DM~~ — **Done.** Close button hides 1-on-1 DM; DM reappears when new message arrives
+- ~~**#39** Delete friend's DM~~ — **Done.** Close button removed from 1-on-1 DMs; DM reappears when new message arrives
 
 ### Guild management
 - **#18** Kick/Ban UI — backend exists, need frontend buttons in member list
@@ -78,9 +78,10 @@ Prioritized roadmap combining open GitHub issues and remaining codebase weakness
 ## Suggested work order
 
 **Week 1 — Critical bugs:**
-1. #45 (unread badges) + #44 (reaction scroll) — both affect daily usage
-2. #40 (DM pins missing) + #15 (pin content) — pin system broken
-3. #47 (upload cancel stuck) — blocks file uploads after cancel
+1. ~~#45 (unread badges) + #44 (reaction scroll)~~ — **Done**
+2. #49 (solo group DM display) + #48 (file size error message) — quick fixes
+3. #40 (DM pins missing) + #15 (pin content) — pin system broken
+4. #31 (DM scroll position)
 
 **Week 2 — Features users are asking for:**
 1. ~~#21 (cancel friend request) + #39 (delete DM)~~ — **Done**

@@ -6,6 +6,10 @@ import type { Message } from "../types/message";
 const API_URL = import.meta.env.VITE_API_URL;
 const UPLOAD_TIMEOUT_MS = 60_000; // 60 seconds
 
+export type UploadResult =
+    | { ok: true; message: Message }
+    | { ok: false; status: number }; // 0 = timeout/network error
+
 export function useAttachmentUpload() {
     const auth = useAuth();
 
@@ -14,7 +18,7 @@ export function useAttachmentUpload() {
         content: string,
         clientMessageId: string,
         files: File[]
-    ): Promise<Message | null> => {
+    ): Promise<UploadResult> => {
         const form = new FormData();
         form.append("content", content);
         form.append("clientMessageId", clientMessageId);
@@ -31,8 +35,10 @@ export function useAttachmentUpload() {
                 { method: "POST", body: form, signal: controller.signal },
                 auth
             );
-            if (!res.ok) return null;
-            return res.json();
+            if (!res.ok) return { ok: false, status: res.status };
+            return { ok: true, message: await res.json() };
+        } catch {
+            return { ok: false, status: 0 };
         } finally {
             clearTimeout(timeout);
         }
@@ -43,7 +49,7 @@ export function useAttachmentUpload() {
         content: string,
         clientMessageId: string,
         files: File[]
-    ): Promise<Message | null> => {
+    ): Promise<UploadResult> => {
         const form = new FormData();
         form.append("content", content);
         form.append("clientMessageId", clientMessageId);
@@ -60,8 +66,10 @@ export function useAttachmentUpload() {
                 { method: "POST", body: form, signal: controller.signal },
                 auth
             );
-            if (!res.ok) return null;
-            return res.json();
+            if (!res.ok) return { ok: false, status: res.status };
+            return { ok: true, message: await res.json() };
+        } catch {
+            return { ok: false, status: 0 };
         } finally {
             clearTimeout(timeout);
         }
