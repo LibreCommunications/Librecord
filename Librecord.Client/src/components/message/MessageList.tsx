@@ -88,6 +88,12 @@ export function MessageList({
             return;
         }
 
+        // Skip when older messages are being prepended (infinite scroll)
+        if (loadingMore) {
+            prevMsgCountRef.current = messages.length;
+            return;
+        }
+
         // Only auto-scroll when new messages arrive (count increased),
         // not when existing messages are mutated (reactions, edits)
         if (messages.length > prevMsgCountRef.current) {
@@ -96,9 +102,16 @@ export function MessageList({
             if (prevMsgCountRef.current === 0 || isAtBottomRef.current) {
                 // Use instant scroll for initial load to avoid race with incoming
                 // realtime messages arriving before smooth animation completes
-                const behavior = prevMsgCountRef.current === 0 ? "instant" : "smooth";
-                console.log(`[MessageList] scrolling to bottom (${behavior}, initial=${prevMsgCountRef.current === 0})`);
-                el.scrollTo({ top: el.scrollHeight, behavior });
+                const isInitial = prevMsgCountRef.current === 0;
+                console.log(`[MessageList] scrolling to bottom (${isInitial ? "instant" : "smooth"}, initial=${isInitial})`);
+                if (isInitial) {
+                    // Wait for DOM layout to complete before scrolling
+                    requestAnimationFrame(() => {
+                        el.scrollTo({ top: el.scrollHeight, behavior: "instant" });
+                    });
+                } else {
+                    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+                }
             } else {
                 const added = messages.length - prevMsgCountRef.current;
                 console.log(`[MessageList] showing "new messages" badge: +${added}`);
@@ -107,18 +120,18 @@ export function MessageList({
         }
 
         prevMsgCountRef.current = messages.length;
-    }, [messages, forceScrollOnNextUpdateRef]);
+    }, [messages, forceScrollOnNextUpdateRef, loadingMore]);
 
     // ----------------------------------
     // INFINITE SCROLL (older messages)
     // ----------------------------------
     const handleIntersect = useCallback(
         (entries: IntersectionObserverEntry[]) => {
-            if (entries[0]?.isIntersecting && hasMore && !loadingMore && onLoadMore) {
+            if (entries[0]?.isIntersecting && hasMore && !loadingMore && !loading && onLoadMore) {
                 onLoadMore();
             }
         },
-        [hasMore, loadingMore, onLoadMore]
+        [hasMore, loadingMore, loading, onLoadMore]
     );
 
     useEffect(() => {
