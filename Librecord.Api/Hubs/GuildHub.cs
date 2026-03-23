@@ -52,6 +52,8 @@ public class GuildHub : Hub
         await Task.WhenAll(allChannelIds.Select(channelId =>
             Groups.AddToGroupAsync(Context.ConnectionId, ChannelGroup(channelId))));
 
+        _connections.Connect(UserId);
+
         _logger.LogInformation(
             "[GUILD HUB] User {UserId} joined {Count} guild(s), {ChannelCount} channel(s)",
             UserId, guilds.Count, allChannelIds.Count);
@@ -220,6 +222,8 @@ public class GuildHub : Hub
                 "[GUILD HUB] Failed to leave voice on disconnect | UserId={UserId}",
                 UserId);
         }
+
+        _connections.Disconnect(UserId);
 
         // Only broadcast offline if no remaining connections and not invisible
         if (!_connections.IsOnline(UserId))

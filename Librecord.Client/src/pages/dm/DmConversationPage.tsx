@@ -93,6 +93,28 @@ export default function DmConversationPage() {
         return () => window.removeEventListener("dm:channel:deleted", handler as EventListener);
     }, [dmId, navigate]);
 
+    // ── DM-specific: member left/added (#56) ─────────────
+    useEffect(() => {
+        if (!dmId) return;
+
+        const onLeft = (event: CustomEvent<DmEventMap["dm:member:left"]>) => {
+            if (event.detail.channelId !== dmId) return;
+            setChannel(prev => prev ? { ...prev, members: prev.members.filter(m => m.id !== event.detail.userId) } : prev);
+        };
+        const onAdded = (event: CustomEvent<DmEventMap["dm:member:added"]>) => {
+            if (event.detail.channelId !== dmId) return;
+            // Re-fetch channel to get the new member's full info
+            getDmChannel(dmId).then(ch => { if (ch) setChannel(ch); });
+        };
+
+        window.addEventListener("dm:member:left", onLeft as EventListener);
+        window.addEventListener("dm:member:added", onAdded as EventListener);
+        return () => {
+            window.removeEventListener("dm:member:left", onLeft as EventListener);
+            window.removeEventListener("dm:member:added", onAdded as EventListener);
+        };
+    }, [dmId, getDmChannel]);
+
     if (!dmId) return null;
 
     return (

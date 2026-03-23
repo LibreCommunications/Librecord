@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using Librecord.Application.Guilds;
+using Librecord.Application.Permissions;
+using Librecord.Domain.Permissions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,13 +13,16 @@ public class GuildInviteController : AuthenticatedController
 {
     private readonly IGuildInviteService _invites;
     private readonly IGuildService _guilds;
+    private readonly IPermissionService _permissions;
 
     public GuildInviteController(
         IGuildInviteService invites,
-        IGuildService guilds)
+        IGuildService guilds,
+        IPermissionService permissions)
     {
         _invites = invites;
         _guilds = guilds;
+        _permissions = permissions;
     }
     // ---------------------------------------------------------
     // CREATE INVITE
@@ -27,8 +32,8 @@ public class GuildInviteController : AuthenticatedController
         Guid guildId,
         [FromBody] CreateInviteRequest? request = null)
     {
-        if (!await _guilds.IsMemberAsync(guildId, UserId))
-            return Forbid();
+        var perm = await _permissions.HasGuildPermissionAsync(UserId, guildId, GuildPermission.InviteMembers);
+        if (!perm.Allowed) return Forbid();
 
         try
         {

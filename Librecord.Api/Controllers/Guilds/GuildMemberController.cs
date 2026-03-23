@@ -48,6 +48,32 @@ public class GuildMemberController : AuthenticatedController
         }));
     }
 
+    [HttpGet("permissions/me")]
+    public async Task<IActionResult> MyPermissions(Guid guildId)
+    {
+        if (!await _guilds.IsMemberAsync(guildId, UserId))
+            return Forbid();
+
+        var result = new Dictionary<string, bool>();
+        var checks = new (string key, PermissionCapability perm)[]
+        {
+            ("manageGuild", GuildPermission.ManageGuild),
+            ("manageChannels", GuildPermission.ManageChannels),
+            ("manageRoles", GuildPermission.ManageRoles),
+            ("kickMembers", GuildPermission.KickMembers),
+            ("banMembers", GuildPermission.BanMembers),
+            ("inviteMembers", GuildPermission.InviteMembers),
+        };
+
+        foreach (var (key, perm) in checks)
+        {
+            var r = await _permissions.HasGuildPermissionAsync(UserId, guildId, perm);
+            result[key] = r.Allowed;
+        }
+
+        return Ok(result);
+    }
+
     [HttpPost("kick/{userId:guid}")]
     public async Task<IActionResult> Kick(Guid guildId, Guid userId)
     {

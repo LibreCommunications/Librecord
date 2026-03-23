@@ -32,6 +32,7 @@ export function registerDmListeners() {
     dmConnection.off("dm:channel:created");
     dmConnection.off("dm:channel:deleted");
     dmConnection.off("dm:member:added");
+    dmConnection.off("dm:leave:ack");
     dmConnection.off("channel:reaction:added");
     dmConnection.off("channel:reaction:removed");
 
@@ -227,6 +228,16 @@ export function registerDmListeners() {
         "dm:member:left",
         (payload: { channelId: string; userId: string }) => {
             dispatchDmEvent("dm:member:left", payload);
+        }
+    );
+
+    /* ------------------------------------------------------------------ */
+    /* DM LEAVE ACK — server tells THIS user to leave a SignalR group (#55) */
+    /* ------------------------------------------------------------------ */
+    dmConnection.on(
+        "dm:leave:ack",
+        (payload: { channelId: string }) => {
+            dmConnection.invoke("LeaveChannel", payload.channelId).catch(() => {});
         }
     );
 }

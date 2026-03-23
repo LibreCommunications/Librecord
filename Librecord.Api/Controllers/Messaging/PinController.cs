@@ -62,6 +62,9 @@ public class PinController : AuthenticatedController
     [HttpGet]
     public async Task<IActionResult> List(Guid channelId)
     {
+        if (!await _pins.IsChannelMemberAsync(channelId, UserId))
+            return Forbid();
+
         var pins = await _pins.GetPinnedMessagesAsync(channelId);
 
         return Ok(pins.Select(p => new

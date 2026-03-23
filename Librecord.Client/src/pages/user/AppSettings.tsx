@@ -7,10 +7,6 @@ export default function AppSettings() {
     const [notifSounds, setNotifSounds] = useState(() => {
         return localStorage.getItem("lr:notif-sounds") !== "false";
     });
-    const [compactMode, setCompactMode] = useState(() => {
-        return localStorage.getItem("lr:compact-mode") === "true";
-    });
-
     function toggle(key: string, value: boolean, setter: (v: boolean) => void) {
         localStorage.setItem(key, String(value));
         setter(value);
@@ -41,20 +37,6 @@ export default function AppSettings() {
                 </div>
             </section>
 
-            {/* Appearance */}
-            <section>
-                <h2 className="text-xs font-bold uppercase text-[#b5bac1] tracking-wide mb-4">
-                    Appearance
-                </h2>
-                <div className="space-y-3">
-                    <ToggleRow
-                        label="Compact Mode"
-                        description="Reduce padding between messages for a denser view."
-                        checked={compactMode}
-                        onChange={v => toggle("lr:compact-mode", v, setCompactMode)}
-                    />
-                </div>
-            </section>
         </div>
     );
 }

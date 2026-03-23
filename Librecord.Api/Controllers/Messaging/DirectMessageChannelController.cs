@@ -188,6 +188,12 @@ public class DirectMessageChannelController : AuthenticatedController
     {
         await _dms.LeaveChannelAsync(channelId, UserId);
 
+        // Tell the leaving user to leave the SignalR group so they stop
+        // receiving messages for this channel (#55)
+        await _dmHub.Clients.User(UserId.ToString()).SendAsync(
+            "dm:leave:ack",
+            new { channelId });
+
         // Notify remaining members that this user left
         await _dmHub.Clients.Group(DmHub.ChannelGroup(channelId)).SendAsync(
             "dm:member:left",

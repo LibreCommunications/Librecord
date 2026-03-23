@@ -1,4 +1,7 @@
+using Librecord.Application.Guilds;
 using Librecord.Application.Messaging;
+using Librecord.Application.Permissions;
+using Librecord.Domain.Permissions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,10 +13,17 @@ namespace Librecord.Api.Controllers.Messaging;
 public class SearchController : AuthenticatedController
 {
     private readonly IMessageSearchService _search;
+    private readonly IPermissionService _permissions;
+    private readonly IGuildService _guilds;
 
-    public SearchController(IMessageSearchService search)
+    public SearchController(
+        IMessageSearchService search,
+        IPermissionService permissions,
+        IGuildService guilds)
     {
         _search = search;
+        _permissions = permissions;
+        _guilds = guilds;
     }
 
     [HttpGet]
@@ -25,6 +35,22 @@ public class SearchController : AuthenticatedController
     {
         if (string.IsNullOrWhiteSpace(q))
             return BadRequest("Search query is required.");
+
+        // Verify the user has access to the channel/guild being searched
+        if (channelId.HasValue)
+        {
+            var perm = await _permissions.HasChannelPermissionAsync(UserId, channelId.Value, ChannelPermission.ReadMessages);
+            if (!perm.Allowed) return Forbid();
+        }
+        else if (guildId.HasValue)
+        {
+            if (!await _guilds.IsMemberAsync(guildId.Value, UserId))
+                return Forbid();
+        }
+        else
+        {
+            return BadRequest("Either channelId or guildId is required.");
+        }
 
         limit = Math.Clamp(limit, 1, 50);
 
