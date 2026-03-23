@@ -64,6 +64,29 @@ export function MessageList({
     }, []);
 
     // ----------------------------------
+    // RE-SCROLL WHEN MEDIA LOADS
+    // ----------------------------------
+    // Images/videos load asynchronously after the DOM is updated.
+    // If we were at the bottom, re-scroll so loaded media doesn't
+    // push the viewport up. The load event doesn't bubble, so we
+    // use capture to intercept it on descendant <img>/<video> elements.
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+
+        function onMediaLoad(e: Event) {
+            const tag = (e.target as HTMLElement)?.tagName;
+            if (tag !== "IMG" && tag !== "VIDEO") return;
+            if (isAtBottomRef.current) {
+                el!.scrollTo({ top: el!.scrollHeight, behavior: "instant" });
+            }
+        }
+
+        el.addEventListener("load", onMediaLoad, true);
+        return () => el.removeEventListener("load", onMediaLoad, true);
+    }, []);
+
+    // ----------------------------------
     // AUTO-SCROLL LOGIC
     // ----------------------------------
     useEffect(() => {
@@ -71,7 +94,9 @@ export function MessageList({
         if (!el) return;
 
         if (forceScrollOnNextUpdateRef?.current) {
-            // Delay scroll to let images/attachments render and affect scrollHeight
+            // Mark as at-bottom so the media load handler will re-scroll
+            // when images/videos finish loading after this initial scroll
+            isAtBottomRef.current = true;
             requestAnimationFrame(() => {
                 el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
             });

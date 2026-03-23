@@ -30,6 +30,8 @@ export function registerDmListeners() {
     dmConnection.off("channel:message:unpinned");
     dmConnection.off("dm:member:left");
     dmConnection.off("dm:channel:created");
+    dmConnection.off("dm:channel:deleted");
+    dmConnection.off("dm:member:added");
     dmConnection.off("channel:reaction:added");
     dmConnection.off("channel:reaction:removed");
 
@@ -195,6 +197,26 @@ export function registerDmListeners() {
                 console.warn("[SignalR] Failed to join new DM channel group", err);
             });
             dispatchDmEvent("dm:channel:created", payload);
+        }
+    );
+
+    /* ------------------------------------------------------------------ */
+    /* DM CHANNEL DELETED (1-on-1 DM deleted by a member)                    */
+    /* ------------------------------------------------------------------ */
+    dmConnection.on(
+        "dm:channel:deleted",
+        (payload: { channelId: string }) => {
+            dispatchDmEvent("dm:channel:deleted", payload);
+        }
+    );
+
+    /* ------------------------------------------------------------------ */
+    /* DM MEMBER ADDED (new participant in group DM)                         */
+    /* ------------------------------------------------------------------ */
+    dmConnection.on(
+        "dm:member:added",
+        (payload: { channelId: string; userId: string }) => {
+            dispatchDmEvent("dm:member:added", payload);
         }
     );
 

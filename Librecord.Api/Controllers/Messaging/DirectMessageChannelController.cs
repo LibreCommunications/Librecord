@@ -30,22 +30,32 @@ public class DirectMessageChannelController : AuthenticatedController
     {
         var channels = await _dms.GetUserChannelsAsync(UserId);
 
-        var result = channels.Select(c =>
+        var result = new List<object>();
+        foreach (var c in channels)
         {
             var others = c.Members
                 .Where(m => m.UserId != UserId)
                 .Select(m => m.User?.DisplayName ?? "Unknown")
                 .ToList();
 
-            var name = others.Count > 0
-                ? string.Join(", ", others)
-                : c.Id.ToString().Split('-')[0];
+            var name = c.IsGroup
+                ? (c.Name ?? "Unnamed Group")
+                : (others.Count > 0 ? string.Join(", ", others) : c.Id.ToString().Split('-')[0]);
 
-            return new
+            // For 1-on-1 DMs, include friendship status so the UI knows
+            // whether to show the delete button
+            bool? isFriend = null;
+            if (!c.IsGroup)
+            {
+                isFriend = await _dms.AreMembersFriendsAsync(c.Id, UserId);
+            }
+
+            result.Add(new
             {
                 id = c.Id,
                 name,
                 isGroup = c.IsGroup,
+                isFriend,
                 members = c.Members.Select(m => new
                 {
                     id = m.UserId,
@@ -53,8 +63,8 @@ public class DirectMessageChannelController : AuthenticatedController
                     displayName = m.User.DisplayName,
                     avatarUrl = m.User.AvatarUrl
                 })
-            };
-        });
+            });
+        }
 
         return Ok(result);
     }
@@ -77,9 +87,9 @@ public class DirectMessageChannelController : AuthenticatedController
             .Select(m => m.User.DisplayName)
             .ToList();
 
-        var name = others.Count > 0
-            ? string.Join(", ", others)
-            : channel.Id.ToString().Split('-')[0];
+        var name = channel.IsGroup
+            ? (channel.Name ?? "Unnamed Group")
+            : (others.Count > 0 ? string.Join(", ", others) : channel.Id.ToString().Split('-')[0]);
 
         return Ok(new
         {
@@ -128,7 +138,10 @@ public class DirectMessageChannelController : AuthenticatedController
         if (request.MemberIds == null || request.MemberIds.Count == 0)
             return BadRequest("At least one member is required.");
 
-        var channel = await _dms.CreateGroupAsync(UserId, request.MemberIds);
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return BadRequest("Group name is required.");
+
+        var channel = await _dms.CreateGroupAsync(UserId, request.MemberIds, request.Name);
 
         // Notify all members so their DM sidebar updates without refresh
         foreach (var memberId in request.MemberIds)
@@ -154,6 +167,17 @@ public class DirectMessageChannelController : AuthenticatedController
         Guid userId)
     {
         await _dms.AddParticipantAsync(channelId, UserId, userId);
+
+        // Notify the new user so they can join the channel's SignalR group
+        await _dmHub.Clients.User(userId.ToString()).SendAsync(
+            "dm:channel:created",
+            new { channelId });
+
+        // Notify existing members that a new member was added
+        await _dmHub.Clients.Group(DmHub.ChannelGroup(channelId)).SendAsync(
+            "dm:member:added",
+            new { channelId, userId });
+
         return Ok();
     }
     // ---------------------------------------------------------
@@ -171,9 +195,32 @@ public class DirectMessageChannelController : AuthenticatedController
 
         return Ok();
     }
+
+    // ---------------------------------------------------------
+    // DELETE 1-ON-1 DM (only when not friends)
+    // ---------------------------------------------------------
+    [HttpDelete("{channelId:guid}")]
+    public async Task<IActionResult> DeleteDm(Guid channelId)
+    {
+        // Get the channel members before deleting so we can notify them
+        var channel = await _dms.GetChannelAsync(channelId);
+        if (channel == null) return NotFound();
+
+        var memberIds = channel.Members.Select(m => m.UserId).ToList();
+
+        await _dms.DeleteDmAsync(channelId, UserId);
+
+        // Notify both users so their sidebars update
+        await _dmHub.Clients.Users(memberIds.Select(id => id.ToString()).ToArray()).SendAsync(
+            "dm:channel:deleted",
+            new { channelId });
+
+        return Ok();
+    }
 }
 
 public class CreateGroupRequest
 {
+    public string Name { get; set; } = "";
     public List<Guid> MemberIds { get; set; } = [];
 }

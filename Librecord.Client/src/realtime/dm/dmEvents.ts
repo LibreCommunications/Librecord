@@ -80,12 +80,21 @@ export interface DmEventMap {
         messageId: string;
     };
 
+    "dm:member:added": {
+        channelId: string;
+        userId: string;
+    };
+
     "dm:member:left": {
         channelId: string;
         userId: string;
     };
 
     "dm:channel:created": {
+        channelId: string;
+    };
+
+    "dm:channel:deleted": {
         channelId: string;
     };
 

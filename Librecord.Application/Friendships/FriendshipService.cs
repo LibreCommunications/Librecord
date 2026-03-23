@@ -158,9 +158,15 @@ public class FriendshipService : IFriendshipService
         await _repo.DeleteAsync(fs);
         await _repo.SaveChangesAsync();
 
+        // Notify both users so DM sidebars refresh isFriend status
         await _notifier.NotifyAsync(new FriendRemoved
         {
             UserId = friendId,
+            RemovedByUserId = userId
+        });
+        await _notifier.NotifyAsync(new FriendRemoved
+        {
+            UserId = userId,
             RemovedByUserId = userId
         });
 

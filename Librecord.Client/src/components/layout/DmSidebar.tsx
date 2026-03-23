@@ -19,7 +19,7 @@ export default function DmSidebar() {
     const { dmId } = useParams();
     const location = useLocation();
     const navigate = useNavigate();
-    const { getMyDms, leaveChannel } = useDirectMessagesChannel();
+    const { getMyDms, leaveChannel, deleteDm } = useDirectMessagesChannel();
     const auth = useAuth();
     const { user } = auth;
     const { getAvatarUrl } = useUserProfile();
@@ -30,6 +30,7 @@ export default function DmSidebar() {
     const [presenceMap, setPresenceMap] = useState<Record<string, string>>({});
     const [showCreateGroup, setShowCreateGroup] = useState(false);
     const [leaveConfirmId, setLeaveConfirmId] = useState<string | null>(null);
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
     const isFriendsPage = location.pathname.startsWith("/app/dm/friends");
 
@@ -104,9 +105,11 @@ export default function DmSidebar() {
         const refresh = () => { loadDms(); };
         window.addEventListener("friend:removed", refresh as EventListener);
         window.addEventListener("dm:channel:created", refresh as EventListener);
+        window.addEventListener("dm:member:added", refresh as EventListener);
         return () => {
             window.removeEventListener("friend:removed", refresh as EventListener);
             window.removeEventListener("dm:channel:created", refresh as EventListener);
+            window.removeEventListener("dm:member:added", refresh as EventListener);
         };
     }, [loadDms]);
 
@@ -130,6 +133,17 @@ export default function DmSidebar() {
         window.addEventListener("dm:member:left", onMemberLeft as EventListener);
         return () => window.removeEventListener("dm:member:left", onMemberLeft as EventListener);
     }, [dmId, user?.userId, navigate]);
+
+    // Handle DM channel deletion (1-on-1 DM deleted by either member)
+    useEffect(() => {
+        const onDeleted = (e: CustomEvent<DmEventMap["dm:channel:deleted"]>) => {
+            const { channelId } = e.detail;
+            setDms(prev => prev.filter(d => d.id !== channelId));
+            if (dmId === channelId) navigate("/app/dm");
+        };
+        window.addEventListener("dm:channel:deleted", onDeleted as EventListener);
+        return () => window.removeEventListener("dm:channel:deleted", onDeleted as EventListener);
+    }, [dmId, navigate]);
 
     // Update presence from real-time events
     useEffect(() => {
@@ -219,9 +233,9 @@ export default function DmSidebar() {
             <div className="space-y-0.5 mt-1">
                 {dms.map(dm => {
                     const others = dm.members.filter(m => m.id !== user?.userId);
-                    const name = others.length > 0
-                        ? others.map(u => u.displayName).join(", ")
-                        : "Empty Group";
+                    const name = dm.isGroup
+                        ? (dm.name ?? "Unnamed Group")
+                        : (others.length > 0 ? others.map(u => u.displayName).join(", ") : "Empty Group");
 
                     const showAvatar = others.length === 1;
                     const avatar = showAvatar ? getAvatarUrl(others[0].avatarUrl) : undefined;
@@ -273,6 +287,20 @@ export default function DmSidebar() {
                                     <line x1="6" y1="6" x2="18" y2="18" />
                                 </svg>
                             </button>}
+                            {!dm.isGroup && dm.isFriend === false && <button
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setDeleteConfirmId(dm.id);
+                                }}
+                                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-[#949ba4] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Delete conversation"
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                            </button>}
                         </div>
                     );
                 })}
@@ -312,6 +340,35 @@ export default function DmSidebar() {
             </div>
             );
         })()}
+
+        {deleteConfirmId && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDeleteConfirmId(null)}>
+                <div className="bg-[#313338] rounded-lg w-[400px] p-5" onClick={e => e.stopPropagation()}>
+                    <h3 className="text-white text-lg font-semibold mb-2">Delete Conversation</h3>
+                    <p className="text-[#949ba4] text-sm mb-5">
+                        Are you sure you want to delete this conversation? All messages and attachments will be permanently removed for both users.
+                    </p>
+                    <div className="flex justify-end gap-3">
+                        <button onClick={() => setDeleteConfirmId(null)} className="px-4 py-2 text-sm text-[#dbdee1] hover:underline">
+                            Cancel
+                        </button>
+                        <button
+                            onClick={async () => {
+                                if (await deleteDm(deleteConfirmId)) {
+                                    setDms(prev => prev.filter(d => d.id !== deleteConfirmId));
+                                    if (dmId === deleteConfirmId) navigate("/app/dm");
+                                }
+                                setDeleteConfirmId(null);
+                            }}
+                            className="px-4 py-2 text-sm bg-[#da373c] text-white rounded hover:bg-[#a12828] transition-colors"
+                            data-testid="confirm-delete-dm"
+                        >
+                            Delete Conversation
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {showCreateGroup && (
             <CreateGroupModal

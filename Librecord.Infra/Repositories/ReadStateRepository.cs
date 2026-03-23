@@ -106,6 +106,15 @@ public class ReadStateRepository : IReadStateRepository
         return result;
     }
 
+    public async Task DeleteByChannelIdAsync(Guid channelId)
+    {
+        var states = await _db.ChannelReadStates
+            .Where(r => r.ChannelId == channelId)
+            .ToListAsync();
+
+        _db.ChannelReadStates.RemoveRange(states);
+    }
+
     public Task SaveChangesAsync()
     {
         return _db.SaveChangesAsync();

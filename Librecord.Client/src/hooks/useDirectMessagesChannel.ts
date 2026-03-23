@@ -18,6 +18,7 @@ export interface DmChannel {
     id: string;
     name?: string | null;
     isGroup: boolean;
+    isFriend?: boolean | null;
     members: DmUser[];
 }
 
@@ -92,13 +93,23 @@ export function useDirectMessagesChannel() {
         return res.ok;
     }, [auth]);
 
-    const createGroup = useCallback(async (memberIds: string[]): Promise<string | null> => {
+    const deleteDm = useCallback(async (channelId: string): Promise<boolean> => {
+        const res = await fetchWithAuth(
+            `${API_URL}/dms/${channelId}`,
+            { method: "DELETE" },
+            auth
+        );
+
+        return res.ok;
+    }, [auth]);
+
+    const createGroup = useCallback(async (memberIds: string[], name: string): Promise<string | null> => {
         const res = await fetchWithAuth(
             `${API_URL}/dms/group`,
             {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ memberIds }),
+                body: JSON.stringify({ name, memberIds }),
             },
             auth
         );
@@ -120,6 +131,7 @@ export function useDirectMessagesChannel() {
         getDmChannel,
         addParticipant,
         leaveChannel,
+        deleteDm,
         createGroup,
     };
 }

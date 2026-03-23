@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { makeUser, registerUser, BASE, API_URL, type TestUser } from "./helpers";
+import { makeUser, registerUser, waitForRealtime, BASE, API_URL, type TestUser } from "./helpers";
 import type { BrowserContext, Page } from "@playwright/test";
 
 /**
@@ -204,42 +204,79 @@ test.describe.serial("Close DM conversation (#39)", () => {
         ).toBeVisible({ timeout: 10_000 });
     });
 
-    test("X button appears on hover for 1-on-1 DM", async () => {
-        const dmRow = dmPageA.locator(`a[href="/app/dm/${dmChannelId}"]`).locator("..");
-        await dmRow.hover();
+    test("No delete button while users are still friends", async () => {
+        const dmEntry = dmPageA.locator(`[data-testid='dm-sidebar-entry-${dmChannelId}']`);
+        await dmEntry.hover();
 
+        // Delete button should NOT appear while users are friends
         await expect(
-            dmRow.locator("[title='Close conversation']"),
-        ).toBeVisible({ timeout: 3_000 });
+            dmEntry.locator("[title='Delete conversation']"),
+        ).not.toBeVisible({ timeout: 2_000 });
     });
 
-    test("Clicking X removes DM from sidebar", async () => {
-        const dmRow = dmPageA.locator(`a[href="/app/dm/${dmChannelId}"]`).locator("..");
-        await dmRow.hover();
-        await dmRow.locator("[title='Close conversation']").click();
+    test("B navigates to DM sidebar", async () => {
+        await dmPageB.goto(`${BASE}/app/dm`);
+        await dmPageB.waitForLoadState("networkidle");
+        await waitForRealtime(dmPageB);
+        await expect(
+            dmPageB.locator(`text=${dmUserA.displayName}`).first(),
+        ).toBeVisible({ timeout: 10_000 });
+    });
 
-        // DM should disappear from sidebar
+    test("DM persists after unfriending, delete button appears", async () => {
+        // B unfriends A via API
+        const friends = await dmPageB.evaluate(
+            async ({ apiUrl }) => {
+                const res = await fetch(`${apiUrl}/friends/list`, { credentials: "include" });
+                return res.json();
+            },
+            { apiUrl: API_URL },
+        );
+        const aUserId = friends.find((f: { otherUsername: string }) => f.otherUsername === dmUserA.username)?.otherUserId;
+
+        await dmPageB.evaluate(
+            async ({ apiUrl, friendId }) => {
+                await fetch(`${apiUrl}/friends/remove/${friendId}`, {
+                    method: "DELETE",
+                    credentials: "include",
+                });
+            },
+            { apiUrl: API_URL, friendId: aUserId },
+        );
+
+        // Wait for the friend:removed event to propagate and DM list to refresh
+        await dmPageA.waitForTimeout(2_000);
+
+        // DM should still be visible in A's sidebar
+        await expect(
+            dmPageA.locator(`a[href="/app/dm/${dmChannelId}"]`),
+        ).toBeVisible({ timeout: 5_000 });
+
+        // Now the delete button should appear on hover (since no longer friends)
+        const dmEntry = dmPageA.locator(`[data-testid='dm-sidebar-entry-${dmChannelId}']`);
+        await dmEntry.hover();
+        await expect(
+            dmEntry.locator("[title='Delete conversation']"),
+        ).toBeVisible({ timeout: 5_000 });
+    });
+
+    test("Clicking delete removes DM from both sidebars", async () => {
+        const dmEntry = dmPageA.locator(`[data-testid='dm-sidebar-entry-${dmChannelId}']`);
+        await dmEntry.hover();
+        await dmEntry.locator("[title='Delete conversation']").click();
+
+        // Confirm the deletion
+        await dmPageA.locator("[data-testid='confirm-delete-dm']").click();
+
+        // DM should disappear from A's sidebar
         await expect(
             dmPageA.locator(`a[href="/app/dm/${dmChannelId}"]`),
         ).not.toBeVisible({ timeout: 5_000 });
-    });
 
-    test("DM reappears when new message arrives", async () => {
-        // B sends a message to the DM
-        await dmPageB.goto(`${BASE}/app/dm/${dmChannelId}`);
-        await dmPageB.waitForLoadState("networkidle");
-        await expect(dmPageB.locator(`textarea[placeholder*="Message"]`)).toBeVisible({ timeout: 10_000 });
-
-        const msg = `Reappear test ${Date.now()}`;
-        await dmPageB.locator(`textarea[placeholder*="Message"]`).fill(msg);
-        await dmPageB.locator(`textarea[placeholder*="Message"]`).press("Enter");
-        await expect(dmPageB.locator(`[data-testid='message-content']:has-text("${msg}")`)).toBeVisible({ timeout: 5_000 });
-
-        // A should see the DM reappear via the ping event refreshing the sidebar
-        // (the dm:message:ping triggers unread badge which shows the DM)
+        // DM should also disappear from B's sidebar (via real-time event)
         await expect(
-            dmPageA.locator(`a[href="/app/dm/${dmChannelId}"]`),
-        ).toBeVisible({ timeout: 15_000 });
+            dmPageB.locator(`a[href="/app/dm/${dmChannelId}"]`),
+        ).not.toBeVisible({ timeout: 10_000 });
     });
 
     test.afterAll(async () => {

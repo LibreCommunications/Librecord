@@ -601,7 +601,7 @@ test.describe.serial("Group DM leave — sidebar updates without refresh (#23)",
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     credentials: "include",
-                    body: JSON.stringify({ memberIds }),
+                    body: JSON.stringify({ name: "Test Group", memberIds }),
                 });
                 return res.json();
             },
@@ -621,9 +621,9 @@ test.describe.serial("Group DM leave — sidebar updates without refresh (#23)",
     });
 
     test("#23 — B leaves group, A and C see B disappear without refresh", async () => {
-        // Verify A sees B's name in the conversation
+        // Verify A is on the group DM conversation page
         await expect(
-            grpPageA.locator(`text=${grpUserB.displayName}`).first(),
+            grpPageA.locator(`text=Test Group`).first(),
         ).toBeVisible({ timeout: 5_000 });
 
         // B leaves the group via API

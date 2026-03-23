@@ -1,3 +1,4 @@
+using Librecord.Domain.Messaging.Common;
 using Librecord.Domain.Messaging.Direct;
 using Librecord.Domain.Social;
 using Librecord.Domain.Storage;
@@ -11,6 +12,7 @@ public class DirectMessageChannelService : IDirectMessageChannelService
     private readonly IFriendshipRepository _friendships;
     private readonly IBlockRepository _blocks;
     private readonly IAttachmentStorageService _storage;
+    private readonly IReadStateRepository _readStates;
     private readonly ILogger<DirectMessageChannelService> _logger;
 
     public DirectMessageChannelService(
@@ -18,12 +20,14 @@ public class DirectMessageChannelService : IDirectMessageChannelService
         IFriendshipRepository friendships,
         IBlockRepository blocks,
         IAttachmentStorageService storage,
+        IReadStateRepository readStates,
         ILogger<DirectMessageChannelService> logger)
     {
         _dms = dms;
         _friendships = friendships;
         _blocks = blocks;
         _storage = storage;
+        _readStates = readStates;
         _logger = logger;
     }
 
@@ -114,8 +118,11 @@ public class DirectMessageChannelService : IDirectMessageChannelService
     // ---------------------------------------------------------
     // CREATE GROUP DM
     // ---------------------------------------------------------
-    public async Task<DmChannel> CreateGroupAsync(Guid creatorId, List<Guid> memberIds)
+    public async Task<DmChannel> CreateGroupAsync(Guid creatorId, List<Guid> memberIds, string name)
     {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Group name is required.");
+
         if (memberIds.Count < 1)
             throw new ArgumentException("Group DM requires at least one other member.");
 
@@ -135,6 +142,7 @@ public class DirectMessageChannelService : IDirectMessageChannelService
         var channel = new DmChannel
         {
             Id = Guid.NewGuid(),
+            Name = name.Trim(),
             IsGroup = true
         };
 
@@ -224,10 +232,65 @@ public class DirectMessageChannelService : IDirectMessageChannelService
                 }
             }
 
+            // Clean up read state records (no FK cascade for generic ChannelId)
+            await _readStates.DeleteByChannelIdAsync(channelId);
+
             await _dms.DeleteChannelAsync(channel);
         }
 
         await _dms.SaveChangesAsync();
+    }
+
+    // ---------------------------------------------------------
+    // DELETE 1-ON-1 DM (only when users are NOT friends)
+    // ---------------------------------------------------------
+    public async Task DeleteDmAsync(Guid channelId, Guid userId)
+    {
+        var channel = await _dms.GetChannelAsync(channelId)
+                      ?? throw new InvalidOperationException("DM not found.");
+
+        if (channel.IsGroup)
+            throw new InvalidOperationException("Cannot delete a group DM. Use leave instead.");
+
+        if (channel.Members.All(m => m.UserId != userId))
+            throw new UnauthorizedAccessException("You are not a member of this DM.");
+
+        var otherUser = channel.Members.FirstOrDefault(m => m.UserId != userId);
+        if (otherUser != null && await _friendships.UsersAreConfirmedFriendsAsync(userId, otherUser.UserId))
+            throw new InvalidOperationException("Cannot delete a DM with a current friend. Remove them as a friend first.");
+
+        // Delete attachment files from MinIO storage
+        foreach (var dm in channel.Messages)
+        {
+            foreach (var att in dm.Message.Attachments)
+            {
+                try { await _storage.DeleteAsync(att.Url); }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to delete attachment {Url} during DM cleanup", att.Url);
+                }
+            }
+        }
+
+        // Clean up read state records (no FK cascade for generic ChannelId)
+        await _readStates.DeleteByChannelIdAsync(channelId);
+
+        await _dms.DeleteChannelAsync(channel);
+        await _dms.SaveChangesAsync();
+    }
+
+    // ---------------------------------------------------------
+    // CHECK IF 1-ON-1 DM MEMBERS ARE FRIENDS
+    // ---------------------------------------------------------
+    public async Task<bool> AreMembersFriendsAsync(Guid channelId, Guid userId)
+    {
+        var channel = await _dms.GetChannelAsync(channelId);
+        if (channel == null || channel.IsGroup) return false;
+
+        var otherUser = channel.Members.FirstOrDefault(m => m.UserId != userId);
+        if (otherUser == null) return false;
+
+        return await _friendships.UsersAreConfirmedFriendsAsync(userId, otherUser.UserId);
     }
 
     // ---------------------------------------------------------

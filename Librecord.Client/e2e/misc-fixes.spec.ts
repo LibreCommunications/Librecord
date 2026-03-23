@@ -101,7 +101,7 @@ test.describe.serial("Group DM appears for all members (#32)", () => {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     credentials: "include",
-                    body: JSON.stringify({ memberIds }),
+                    body: JSON.stringify({ name: "Test Group", memberIds }),
                 });
                 return res.json();
             },
@@ -126,9 +126,9 @@ test.describe.serial("Group DM appears for all members (#32)", () => {
         await grpPageA.goto(`${BASE}/app/dm`);
         await grpPageA.waitForLoadState("networkidle");
 
-        // A should see B and C's names (group DM shows member names)
+        // A should see the group name in the sidebar
         await expect(
-            grpPageA.locator(`text=${grpUserB.displayName}`).first(),
+            grpPageA.locator(`text=Test Group`).first(),
         ).toBeVisible({ timeout: 10_000 });
     });
 
