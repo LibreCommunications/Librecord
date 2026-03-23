@@ -171,10 +171,16 @@ export default function DmSidebar() {
         return () => window.removeEventListener("dm:message:ping", onPing as EventListener);
     }, [dmId, user?.userId, loadDms]);
 
-    // Derive effective unreads — clear count for the active channel
-    const effectiveUnreads = dmId
-        ? Object.fromEntries(Object.entries(unreads).filter(([k]) => k !== dmId))
-        : unreads;
+    // Clear unread count when navigating into a DM (render-phase)
+    const [prevActiveDmId, setPrevActiveDmId] = useState(dmId);
+    if (dmId && dmId !== prevActiveDmId) {
+        setPrevActiveDmId(dmId);
+        if (unreads[dmId]) {
+            const next = { ...unreads };
+            delete next[dmId];
+            setUnreads(next);
+        }
+    }
 
     return (
         <>
@@ -219,7 +225,7 @@ export default function DmSidebar() {
 
                     const showAvatar = others.length === 1;
                     const avatar = showAvatar ? getAvatarUrl(others[0].avatarUrl) : undefined;
-                    const unreadCount = effectiveUnreads[dm.id] ?? 0;
+                    const unreadCount = unreads[dm.id] ?? 0;
                     const otherStatus = showAvatar ? (presenceMap[others[0].id] ?? "offline") : undefined;
 
                     return (

@@ -7,6 +7,7 @@ import type {
     DmRealtimeMessageDeletedTransport,
     DmRealtimeReadStateUpdatedTransport,
 } from "./dmTypes";
+import type { DmEventMap } from "./dmEvents";
 
 export function registerDmListeners() {
 
@@ -29,6 +30,8 @@ export function registerDmListeners() {
     dmConnection.off("channel:message:unpinned");
     dmConnection.off("dm:member:left");
     dmConnection.off("dm:channel:created");
+    dmConnection.off("channel:reaction:added");
+    dmConnection.off("channel:reaction:removed");
 
     /* ------------------------------------------------------------------ */
     /* MESSAGE PING (lightweight — for unread badges + notifications)      */
@@ -161,6 +164,23 @@ export function registerDmListeners() {
         "channel:message:unpinned",
         (payload: { channelId: string; messageId: string }) => {
             dispatchDmEvent("channel:message:unpinned", payload);
+        }
+    );
+
+    /* ------------------------------------------------------------------ */
+    /* REACTIONS                                                            */
+    /* ------------------------------------------------------------------ */
+    dmConnection.on(
+        "channel:reaction:added",
+        (payload: DmEventMap["channel:reaction:added"]) => {
+            dispatchDmEvent("channel:reaction:added", payload);
+        }
+    );
+
+    dmConnection.on(
+        "channel:reaction:removed",
+        (payload: DmEventMap["channel:reaction:removed"]) => {
+            dispatchDmEvent("channel:reaction:removed", payload);
         }
     );
 

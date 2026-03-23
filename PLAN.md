@@ -10,7 +10,7 @@ Prioritized roadmap combining open GitHub issues and remaining codebase weakness
 - **#45** New message bubbles inconsistent — unread badges appear/disappear unreliably, persist after reading
 - **#44** Guild reaction resets chat position — adding/removing reaction scrolls to bottom after refresh
 - **#31** DM scroll position — resets to last text message instead of last item (media)
-- **#32** New DM from unknown user — first message from new user doesn't appear (partially fixed, needs testing)
+- ~~**#32** New DM from unknown user~~ — **Fixed.** Backend now notifies both sender and target via `dm:channel:created`; sidebar re-fetches on ping for closed DMs
 
 ### Pin bugs
 - **#15** Pin message content not showing — decryption fix deployed, needs verification
@@ -31,8 +31,8 @@ Prioritized roadmap combining open GitHub issues and remaining codebase weakness
 ## P1 — Features (next sprint)
 
 ### Social
-- **#21** Cancel friend request — add cancel button on outgoing requests
-- **#39** Delete friend's DM — button to remove 1-on-1 DM from sidebar
+- ~~**#21** Cancel friend request~~ — **Done.** Cancel button on outgoing requests, realtime sync to both users
+- ~~**#39** Delete friend's DM~~ — **Done.** Close button hides 1-on-1 DM; DM reappears when new message arrives
 
 ### Guild management
 - **#18** Kick/Ban UI — backend exists, need frontend buttons in member list
@@ -44,12 +44,12 @@ Prioritized roadmap combining open GitHub issues and remaining codebase weakness
 ### Messaging features
 - **#43** Reply system — reply to specific message with highlight/quote
 - **#42** Thread UI — backend complete, wire up ThreadPanel to GuildPage
-- **#34** Reaction popup z-index — popup overflows below message input
+- ~~**#34** Reaction popup z-index~~ — **Fixed.** z-index corrected, E2E test updated
 
 ### Upload UX
-- **#35** File upload loading indicator — "Uploading..." added, needs testing
-- **#36** File lost on refresh — beforeunload warning added, needs testing
-- **#37** Failed upload toast — error toast added, needs testing
+- ~~**#35** File upload loading indicator~~ — **Done.** "Uploading..." indicator, verified by E2E
+- ~~**#36** File lost on refresh~~ — **Done.** beforeunload warning, verified by E2E
+- ~~**#37** Failed upload toast~~ — **Done.** Error toast on failed upload, verified by E2E
 
 ---
 
@@ -83,7 +83,7 @@ Prioritized roadmap combining open GitHub issues and remaining codebase weakness
 3. #47 (upload cancel stuck) — blocks file uploads after cancel
 
 **Week 2 — Features users are asking for:**
-1. #21 (cancel friend request) + #39 (delete DM)
+1. ~~#21 (cancel friend request) + #39 (delete DM)~~ — **Done**
 2. #18 + #17 (kick/ban + role assignment) — guild management basics
 3. #13 + #12 (channel settings + server settings access)
 

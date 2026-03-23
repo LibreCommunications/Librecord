@@ -88,4 +88,18 @@ export interface DmEventMap {
     "dm:channel:created": {
         channelId: string;
     };
+
+    "channel:reaction:added": {
+        channelId: string;
+        messageId: string;
+        userId: string;
+        emoji: string;
+    };
+
+    "channel:reaction:removed": {
+        channelId: string;
+        messageId: string;
+        userId: string;
+        emoji: string;
+    };
 }
