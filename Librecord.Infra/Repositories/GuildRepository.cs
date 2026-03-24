@@ -138,6 +138,7 @@ public class GuildRepository : IGuildRepository
     public Task<Guild?> GetGuildAsync(Guid id)
     {
         return _db.Guilds
+            .Include(g => g.Channels)
             .Include(g => g.Roles)
             .ThenInclude(r => r.Permissions)
             .AsSplitQuery()
