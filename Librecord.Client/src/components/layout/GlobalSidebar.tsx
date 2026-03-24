@@ -8,8 +8,7 @@ import { JoinGuildModal } from "../../components/guild/JoinGuildModal";
 import { StatusDot } from "../../components/user/StatusDot";
 import { usePresence } from "../../hooks/usePresence";
 import type { AppEventMap } from "../../realtime/events";
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { API_URL } from "../../api/client";
 
 function SidebarIcon({
     children,

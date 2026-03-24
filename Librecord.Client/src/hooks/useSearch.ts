@@ -1,18 +1,8 @@
 import { useCallback } from "react";
 import { search as searchApi } from "../api/client";
+import type { SearchResult } from "../types/search";
 
-export interface SearchResult {
-    id: string;
-    channelId: string;
-    content: string;
-    createdAt: string;
-    author: {
-        id: string;
-        username: string;
-        displayName: string;
-        avatarUrl: string | null;
-    };
-}
+export type { SearchResult };
 
 export function useSearch() {
     const search = useCallback(

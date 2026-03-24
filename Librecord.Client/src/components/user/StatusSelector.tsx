@@ -1,8 +1,6 @@
 import { useState } from "react";
-import { fetchWithAuth } from "../../api/fetchWithAuth";
+import { presence } from "../../api/client";
 import { StatusDot } from "./StatusDot";
-
-const API_URL = import.meta.env.VITE_API_URL;
 
 const statuses = [
     { value: "online", label: "Online" },
@@ -22,14 +20,7 @@ export function StatusSelector({ currentStatus, onStatusChange }: Props) {
     async function handleSelect(status: string) {
         setOpen(false);
 
-        await fetchWithAuth(
-            `${API_URL}/presence`,
-            {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status }),
-            },
-        );
+        await presence.set(status);
 
         onStatusChange(status);
     }

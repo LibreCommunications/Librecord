@@ -8,9 +8,8 @@ import CreateChannelModal from "../../pages/guild/CreateChannelModal";
 import type { AppEventMap } from "../../realtime/events";
 import { useAuth } from "../../hooks/useAuth";
 import { useUserProfile } from "../../hooks/useUserProfile";
-import { fetchWithAuth } from "../../api/fetchWithAuth";
+import { guilds as guildsApi, roles as rolesApi, voice } from "../../api/client";
 
-const API_URL = import.meta.env.VITE_API_URL;
 const MANAGE_CHANNELS_PERMISSION_ID = "11111111-1111-1111-1111-111111111104";
 
 interface Props {
@@ -46,22 +45,18 @@ export default function ChannelSidebar({ guildId }: Props) {
 
         // Check if current user can manage channels
         try {
-            const [membersRes, rolesRes] = await Promise.all([
-                fetchWithAuth(`${API_URL}/guilds/${guildId}/members`, {}),
-                fetchWithAuth(`${API_URL}/guilds/${guildId}/roles`, {}),
+            const [members, guildRoles] = await Promise.all([
+                guildsApi.members(guildId),
+                rolesApi.list(guildId),
             ]);
-            if (membersRes.ok && rolesRes.ok) {
-                const members = await membersRes.json();
-                const roles = await rolesRes.json();
-                const me = members.find((m: { userId: string }) => m.userId === user?.userId);
-                const myRoleIds = new Set((me?.roles ?? []).map((r: { id: string }) => r.id));
-                const hasManage = roles
-                    .filter((r: { id: string }) => myRoleIds.has(r.id))
-                    .some((r: { permissions: { permissionId: string; allow: boolean }[] }) =>
-                        r.permissions.some(p => p.permissionId === MANAGE_CHANNELS_PERMISSION_ID && p.allow)
-                    );
-                setCanManageChannels(hasManage);
-            }
+            const me = members.find(m => m.userId === user?.userId);
+            const myRoleIds = new Set((me?.roles ?? []).map(r => r.id));
+            const hasManage = guildRoles
+                .filter(r => myRoleIds.has(r.id))
+                .some(r =>
+                    r.permissions.some(p => p.permissionId === MANAGE_CHANNELS_PERMISSION_ID && p.allow)
+                );
+            setCanManageChannels(hasManage);
         } catch {
             setCanManageChannels(false);
         }
@@ -78,8 +73,7 @@ export default function ChannelSidebar({ guildId }: Props) {
         if (voiceChs.length === 0) return;
         Promise.all(
             voiceChs.map(ch =>
-                fetchWithAuth(`${API_URL}/voice/channels/${ch.id}/participants`, {})
-                    .then(r => r.ok ? r.json() : [])
+                voice.participants(ch.id)
                     .then(participants => [ch.id, participants] as const)
             )
         ).then(results => {

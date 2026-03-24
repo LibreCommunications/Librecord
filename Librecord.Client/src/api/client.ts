@@ -1,6 +1,6 @@
 import { fetchWithAuth } from "./fetchWithAuth";
 
-const API_URL = import.meta.env.VITE_API_URL;
+export const API_URL: string = import.meta.env.VITE_API_URL;
 
 /**
  * Typed API client. All backend calls go through here.
@@ -385,6 +385,58 @@ export const channelPermissions = {
 };
 
 // ──────────────────────────────────────────────────────────
+// THREADS
+// ──────────────────────────────────────────────────────────
+
+import type { Thread, ThreadMessage } from "../types/thread";
+
+export const threads = {
+    create: (channelId: string, parentMessageId: string, name: string) =>
+        requestOptional<Thread>(`/channels/${channelId}/threads`, { method: "POST", ...json({ parentMessageId, name }) }),
+    list: (channelId: string) =>
+        request<Thread[]>(`/channels/${channelId}/threads`).catch(() => [] as Thread[]),
+    messages: (channelId: string, threadId: string, limit = 50, before?: string) => {
+        const params = new URLSearchParams({ limit: String(limit) });
+        if (before) params.set("before", before);
+        return request<ThreadMessage[]>(`/channels/${channelId}/threads/${threadId}/messages?${params}`).catch(() => [] as ThreadMessage[]);
+    },
+    postMessage: (channelId: string, threadId: string, content: string) =>
+        requestOptional<ThreadMessage>(`/channels/${channelId}/threads/${threadId}/messages`, { method: "POST", ...json({ content }) }),
+};
+
+// ──────────────────────────────────────────────────────────
+// VOICE
+// ──────────────────────────────────────────────────────────
+
+export const voice = {
+    participants: (channelId: string) =>
+        request<{ userId: string; username: string; displayName: string; avatarUrl: string | null; isMuted: boolean; isDeafened: boolean; isCameraOn: boolean; isScreenSharing: boolean; joinedAt: string }[]>(
+            `/voice/channels/${channelId}/participants`
+        ).catch(() => []),
+};
+
+// ──────────────────────────────────────────────────────────
+// ATTACHMENT UPLOADS
+// ──────────────────────────────────────────────────────────
+
+export const uploads = {
+    guildMessage: (channelId: string, content: string, clientMessageId: string, files: File[], signal?: AbortSignal) => {
+        const form = new FormData();
+        form.append("content", content);
+        form.append("clientMessageId", clientMessageId);
+        for (const file of files) form.append("files", file);
+        return request<Message>(`/guild-channels/${channelId}/messages/with-attachments`, { method: "POST", body: form, signal });
+    },
+    dmMessage: (channelId: string, content: string, clientMessageId: string, files: File[], signal?: AbortSignal) => {
+        const form = new FormData();
+        form.append("content", content);
+        form.append("clientMessageId", clientMessageId);
+        for (const file of files) form.append("files", file);
+        return request<Message>(`/dm-messages/channel/${channelId}/with-attachments`, { method: "POST", body: form, signal });
+    },
+};
+
+// ──────────────────────────────────────────────────────────
 // EXPORTED TYPES FOR CONSUMERS
 // ──────────────────────────────────────────────────────────
 
@@ -393,3 +445,4 @@ export type { DmChannel, DmUser } from "../types/dm";
 export type { Message, MessageAttachment, MessageReaction, MessageEdit, TransportMessage } from "../types/message";
 export type { Friend, FriendRequests } from "../types/friend";
 export type { PinnedMessage } from "../types/pin";
+export type { Thread, ThreadMessage } from "../types/thread";

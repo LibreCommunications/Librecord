@@ -4,8 +4,7 @@ import { ReactionBar } from "../messages/ReactionBar";
 import { ImageLightbox } from "../ui/ImageLightbox";
 import { renderMarkdown } from "../../utils/markdown";
 import type { MessageItemProps } from "./MessageItemProps";
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { API_URL } from "../../api/client";
 
 function resolveAttachmentUrl(url: string): string {
     if (url.startsWith("http://") || url.startsWith("https://")) return url;

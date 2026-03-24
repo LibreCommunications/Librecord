@@ -1,12 +1,8 @@
 import { useCallback } from "react";
 import { blocks } from "../api/client";
+import type { BlockedUser } from "../types/block";
 
-export interface BlockedUser {
-    userId: string;
-    username: string;
-    displayName: string;
-    blockedAt: string;
-}
+export type { BlockedUser };
 
 export function useBlocks() {
     const blockUser = useCallback(async (userId: string): Promise<boolean> => {

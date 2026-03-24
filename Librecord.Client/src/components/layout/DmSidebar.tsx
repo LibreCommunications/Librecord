@@ -9,11 +9,9 @@ import { useUserProfile } from "../../hooks/useUserProfile";
 import { useReadState } from "../../hooks/useReadState";
 import { UnreadBadge } from "../ui/UnreadBadge";
 import { StatusDot } from "../user/StatusDot";
-import { fetchWithAuth } from "../../api/fetchWithAuth";
+import { presence } from "../../api/client";
 import type { AppEventMap } from "../../realtime/events";
 import { CreateGroupModal } from "../dm/CreateGroupModal";
-
-const API_URL = import.meta.env.VITE_API_URL;
 
 export default function DmSidebar() {
     const { dmId } = useParams();
@@ -48,16 +46,8 @@ export default function DmSidebar() {
             const uniqueIds = [...new Set(otherUserIds)];
 
             if (uniqueIds.length > 0) {
-                await fetchWithAuth(
-                    `${API_URL}/presence/bulk`,
-                    {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ userIds: uniqueIds }),
-                    },
-                ).then(res => {
-                    if (res.ok) return res.json().then(setPresenceMap);
-                }).catch(() => {});
+                const map = await presence.bulk(uniqueIds);
+                setPresenceMap(map);
             }
         }
     }, [getMyDms, getUnreadCounts, user?.userId]);

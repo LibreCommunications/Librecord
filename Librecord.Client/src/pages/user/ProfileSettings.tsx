@@ -3,8 +3,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { usePresence } from "../../hooks/usePresence";
 import { StatusDot } from "../../components/user/StatusDot";
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { API_URL } from "../../api/client";
 
 export default function ProfileSettings() {
     const { user, logout } = useAuth();

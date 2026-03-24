@@ -1,8 +1,7 @@
 import { useCallback } from "react";
-import { fetchWithAuth } from "../api/fetchWithAuth";
+import { uploads, ApiError } from "../api/client";
 import type { Message } from "../types/message";
 
-const API_URL = import.meta.env.VITE_API_URL;
 const UPLOAD_TIMEOUT_MS = 60_000; // 60 seconds
 
 export type UploadResult =
@@ -16,24 +15,14 @@ export function useAttachmentUpload() {
         clientMessageId: string,
         files: File[]
     ): Promise<UploadResult> => {
-        const form = new FormData();
-        form.append("content", content);
-        form.append("clientMessageId", clientMessageId);
-        for (const file of files) {
-            form.append("files", file);
-        }
-
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
 
         try {
-            const res = await fetchWithAuth(
-                `${API_URL}/guild-channels/${channelId}/messages/with-attachments`,
-                { method: "POST", body: form, signal: controller.signal },
-            );
-            if (!res.ok) return { ok: false, status: res.status };
-            return { ok: true, message: await res.json() };
-        } catch {
+            const message = await uploads.guildMessage(channelId, content, clientMessageId, files, controller.signal);
+            return { ok: true, message };
+        } catch (err) {
+            if (err instanceof ApiError) return { ok: false, status: err.status };
             return { ok: false, status: 0 };
         } finally {
             clearTimeout(timeout);
@@ -46,24 +35,14 @@ export function useAttachmentUpload() {
         clientMessageId: string,
         files: File[]
     ): Promise<UploadResult> => {
-        const form = new FormData();
-        form.append("content", content);
-        form.append("clientMessageId", clientMessageId);
-        for (const file of files) {
-            form.append("files", file);
-        }
-
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
 
         try {
-            const res = await fetchWithAuth(
-                `${API_URL}/dm-messages/channel/${channelId}/with-attachments`,
-                { method: "POST", body: form, signal: controller.signal },
-            );
-            if (!res.ok) return { ok: false, status: res.status };
-            return { ok: true, message: await res.json() };
-        } catch {
+            const message = await uploads.dmMessage(channelId, content, clientMessageId, files, controller.signal);
+            return { ok: true, message };
+        } catch (err) {
+            if (err instanceof ApiError) return { ok: false, status: err.status };
             return { ok: false, status: 0 };
         } finally {
             clearTimeout(timeout);

@@ -1,25 +1,11 @@
 import { useState, useEffect } from "react";
 import { useVoice } from "../../hooks/useVoice";
 import { useUserProfile } from "../../hooks/useUserProfile";
-import { fetchWithAuth } from "../../api/fetchWithAuth";
+import { voice } from "../../api/client";
 import { ParticipantTile } from "./ParticipantTile";
 import { ScreenShareTile } from "./ScreenShareTile";
 import { SpeakerIcon } from "./VoiceIcons";
 import type { VoiceParticipant } from "../../voice/voiceStore";
-
-const API_URL = import.meta.env.VITE_API_URL;
-
-interface VoiceParticipantPayload {
-    userId: string;
-    username: string;
-    displayName: string;
-    avatarUrl: string | null;
-    isMuted: boolean;
-    isDeafened: boolean;
-    isCameraOn: boolean;
-    isScreenSharing: boolean;
-    joinedAt: string;
-}
 
 interface Props {
     channelId: string;
@@ -134,12 +120,7 @@ export function VoiceChannelView({ channelId }: Props) {
 
         async function fetchParticipants() {
             try {
-                const res = await fetchWithAuth(
-                    `${API_URL}/voice/channels/${channelId}/participants`,
-                    {},
-                );
-                if (!res.ok || cancelled) return;
-                const data: VoiceParticipantPayload[] = await res.json();
+                const data = await voice.participants(channelId);
                 if (!cancelled) {
                     setPreviewParticipants(data.map(p => ({
                         userId: p.userId,

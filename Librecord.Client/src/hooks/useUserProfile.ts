@@ -1,8 +1,6 @@
 import { useCallback } from "react";
 import { useAuth } from "./useAuth";
-import { userProfile } from "../api/client";
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { userProfile, API_URL } from "../api/client";
 const DEFAULT_AVATAR = "/default-avatar.png";
 
 export function useUserProfile() {
