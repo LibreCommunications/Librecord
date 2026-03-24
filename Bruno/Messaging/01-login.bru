@@ -1,5 +1,5 @@
 meta {
-  name: Login (get token)
+  name: Login (reuse token)
   type: http
   seq: 1
 }
@@ -17,13 +17,34 @@ body:json {
   }
 }
 
+script:pre-request {
+  // Skip login if we already have a token from _setup
+  const existing = bru.getVar('accessToken');
+  if (existing && existing.length > 0) {
+    // Token already set — skip this request
+  }
+}
+
 script:post-response {
-  const cookies = res.headers['set-cookie'];
-  if (cookies) {
-    const accessCookie = cookies.find(c => c.startsWith('accessToken='));
-    if (accessCookie) {
-      const token = accessCookie.split('=')[1].split(';')[0];
-      bru.setVar('accessToken', token);
+  if (res.status === 200) {
+    const cookies = res.headers['set-cookie'];
+    if (cookies) {
+      const accessCookie = cookies.find(c => c.startsWith('accessToken='));
+      if (accessCookie) {
+        const token = accessCookie.split('=')[1].split(';')[0];
+        bru.setVar('accessToken', token);
+      }
     }
   }
+}
+
+tests {
+  test("has access token", function() {
+    const token = bru.getVar('accessToken');
+    expect(token).to.be.a('string').and.not.be.empty;
+  });
+}
+
+assert {
+  res.responseTime: lt 3000
 }

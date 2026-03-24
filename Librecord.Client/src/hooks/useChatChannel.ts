@@ -74,6 +74,7 @@ export function useChatChannel(config: ChatChannelConfig) {
     const shouldAutoScrollRef = useRef(false);
     const attachTriggerRef = useRef<{ open: () => void }>(null);
     const channelIdRef = useRef(channelId);
+    const abortRef = useRef<AbortController | null>(null);
     useEffect(() => { channelIdRef.current = channelId; }, [channelId]);
 
     const { typingNames, sendTyping, stopTyping } = useTypingIndicator(channelId, config.typingScope, user?.userId);
@@ -214,20 +215,25 @@ export function useChatChannel(config: ChatChannelConfig) {
     // ── LOAD INITIAL MESSAGES + PINS ─────────────────────
     useEffect(() => {
         if (!channelId) return;
-        let stale = false;
+
+        // Abort any in-flight requests from the previous channel
+        abortRef.current?.abort();
+        const ac = new AbortController();
+        abortRef.current = ac;
 
         Promise.all([config.getMessages(channelId), getPins(channelId)])
             .then(([msgs, pins]) => {
-                if (stale) return;
+                if (ac.signal.aborted) return;
                 const reversed = msgs.slice().reverse();
                 setMessages(reversed);
                 setHasMore(msgs.length >= 50);
                 setPinnedIds(new Set(pins.map(p => p.messageId)));
                 if (reversed.length > 0) markAsRead(channelId, reversed[reversed.length - 1].id);
             })
-            .finally(() => { if (!stale) setLoading(false); });
+            .catch(() => {}) // AbortError is expected
+            .finally(() => { if (!ac.signal.aborted) setLoading(false); });
 
-        return () => { stale = true; };
+        return () => { ac.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [channelId]);
 

@@ -25,7 +25,6 @@ async function refreshOnce(): Promise<boolean> {
 /**
  * Fetch with automatic 401 retry via token refresh.
  * Uses a globally registered refresh function (set by AuthProvider).
- * Logs all requests for debugging.
  */
 export async function fetchWithAuth(
     url: string,
@@ -62,13 +61,10 @@ export async function fetchWithAuth(
 
     // Retry original request
     console.debug(`[fetch] ${method} ${short} → retrying after refresh`);
-    const t1 = performance.now();
     const retryRes = await fetch(url, {
         ...options,
         credentials: "include",
     });
-    const ms2 = Math.round(performance.now() - t1);
-    console.debug(`[fetch] ${method} ${short} → ${retryRes.status} (${ms2}ms, retry)`);
 
     return retryRes;
 }
