@@ -1,16 +1,8 @@
 import { useEffect, useState } from "react";
-import { fetchWithAuth } from "../api/fetchWithAuth";
+import { guilds } from "../api/client";
+import type { GuildPermissions } from "../types/guild";
 
-const API_URL = import.meta.env.VITE_API_URL;
-
-export interface GuildPermissions {
-    manageGuild: boolean;
-    manageChannels: boolean;
-    manageRoles: boolean;
-    kickMembers: boolean;
-    banMembers: boolean;
-    inviteMembers: boolean;
-}
+export type { GuildPermissions };
 
 const NONE: GuildPermissions = {
     manageGuild: false,
@@ -37,12 +29,11 @@ export function useGuildPermissions(guildId: string | undefined) {
         if (!guildId) return;
         let stale = false;
 
-        fetchWithAuth(`${API_URL}/guilds/${guildId}/permissions/me`, {})
-            .then(async (res) => {
-                if (stale) return;
-                if (res.ok) setPermissions(await res.json());
-                setLoaded(true);
-            });
+        guilds.myPermissions(guildId).then((result) => {
+            if (stale) return;
+            if (result) setPermissions(result);
+            setLoaded(true);
+        });
 
         return () => { stale = true; };
     }, [guildId]);

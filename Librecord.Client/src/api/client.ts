@@ -205,9 +205,9 @@ export const friends = {
         request<{ success: boolean }>(`/friends/cancel/${targetId}`, { method: "POST" }),
     remove: (friendId: string) =>
         request<{ success: boolean }>(`/friends/remove/${friendId}`, { method: "DELETE" }),
-    suggest: (input: string) =>
+    suggest: (query: string) =>
         request<{ id: string; username: string; displayName: string; avatarUrl: string | null }[]>(
-            `/friends/suggest?input=${encodeURIComponent(input)}`
+            `/friends/suggest?query=${encodeURIComponent(query)}`
         ).catch(() => []),
 };
 
@@ -300,13 +300,15 @@ export const blocks = {
     list: () => request<{ userId: string; username: string; displayName: string; blockedAt: string }[]>("/blocks").catch(() => []),
     block: (userId: string) => request<void>(`/blocks/${userId}`, { method: "PUT" }),
     unblock: (userId: string) => request<void>(`/blocks/${userId}`, { method: "DELETE" }),
+    isBlocked: (userId: string) =>
+        request<{ blocked: boolean }>(`/blocks/${userId}`).then(d => d.blocked).catch(() => false),
 };
 
 // ──────────────────────────────────────────────────────────
 // ROLES
 // ──────────────────────────────────────────────────────────
 
-import type { GuildRole, RolePermission } from "../types/guild";
+import type { GuildRole } from "../types/guild";
 
 export const roles = {
     list: (guildId: string) => request<GuildRole[]>(`/guilds/${guildId}/roles`).catch(() => [] as GuildRole[]),
@@ -337,6 +339,49 @@ export const invites = {
     getByCode: (code: string) => requestOptional<{ code: string; guild: { id: string; name: string; iconUrl: string | null } }>(`/invites/${code}`),
     join: (code: string) => request<{ id: string; name: string; iconUrl: string | null }>(`/invites/${code}/join`, { method: "POST" }),
     revoke: (inviteId: string) => request<void>(`/invites/${inviteId}`, { method: "DELETE" }),
+};
+
+// ──────────────────────────────────────────────────────────
+// GUILD MODERATION
+// ──────────────────────────────────────────────────────────
+
+export interface GuildBanEntry {
+    guildId: string;
+    userId: string;
+    moderatorId: string;
+    reason: string | null;
+    createdAt: string;
+}
+
+export const guildModeration = {
+    kick: (guildId: string, userId: string) =>
+        request<void>(`/guilds/${guildId}/kick/${userId}`, { method: "POST" }),
+    ban: (guildId: string, userId: string, reason?: string) =>
+        request<void>(`/guilds/${guildId}/bans/${userId}`, { method: "POST", ...json({ reason }) }),
+    unban: (guildId: string, userId: string) =>
+        request<void>(`/guilds/${guildId}/bans/${userId}`, { method: "DELETE" }),
+    getBans: (guildId: string) =>
+        request<GuildBanEntry[]>(`/guilds/${guildId}/bans`).catch(() => [] as GuildBanEntry[]),
+};
+
+// ──────────────────────────────────────────────────────────
+// CHANNEL PERMISSIONS
+// ──────────────────────────────────────────────────────────
+
+export interface ChannelOverride {
+    id: string;
+    channelId: string;
+    roleId: string | null;
+    userId: string | null;
+    permissionId: string;
+    allow: boolean | null;
+}
+
+export const channelPermissions = {
+    getOverrides: (channelId: string) =>
+        request<ChannelOverride[]>(`/channels/${channelId}/permissions`).catch(() => [] as ChannelOverride[]),
+    setOverride: (channelId: string, opts: { roleId?: string | null; userId?: string | null; permissionId: string; allow: boolean | null }) =>
+        request<void>(`/channels/${channelId}/permissions`, { method: "PUT", ...json(opts) }),
 };
 
 // ──────────────────────────────────────────────────────────

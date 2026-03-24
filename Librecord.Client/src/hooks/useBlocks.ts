@@ -1,7 +1,5 @@
 import { useCallback } from "react";
-import { fetchWithAuth } from "../api/fetchWithAuth";
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { blocks } from "../api/client";
 
 export interface BlockedUser {
     userId: string;
@@ -12,27 +10,32 @@ export interface BlockedUser {
 
 export function useBlocks() {
     const blockUser = useCallback(async (userId: string): Promise<boolean> => {
-        const res = await fetchWithAuth(`${API_URL}/blocks/${userId}`, { method: "PUT" });
-        return res.ok;
+        try {
+            await blocks.block(userId);
+            return true;
+        } catch {
+            return false;
+        }
     }, []);
 
     const unblockUser = useCallback(async (userId: string): Promise<boolean> => {
-        const res = await fetchWithAuth(`${API_URL}/blocks/${userId}`, { method: "DELETE" });
-        return res.ok;
+        try {
+            await blocks.unblock(userId);
+            return true;
+        } catch {
+            return false;
+        }
     }, []);
 
-    const getBlockedUsers = useCallback(async (): Promise<BlockedUser[]> => {
-        const res = await fetchWithAuth(`${API_URL}/blocks`, {});
-        if (!res.ok) return [];
-        return res.json();
-    }, []);
+    const getBlockedUsers = useCallback(
+        (): Promise<BlockedUser[]> => blocks.list() as Promise<BlockedUser[]>,
+        [],
+    );
 
-    const isBlocked = useCallback(async (userId: string): Promise<boolean> => {
-        const res = await fetchWithAuth(`${API_URL}/blocks/${userId}`, {});
-        if (!res.ok) return false;
-        const data = await res.json();
-        return data.blocked;
-    }, []);
+    const isBlocked = useCallback(
+        (userId: string): Promise<boolean> => blocks.isBlocked(userId),
+        [],
+    );
 
     return { blockUser, unblockUser, getBlockedUsers, isBlocked };
 }

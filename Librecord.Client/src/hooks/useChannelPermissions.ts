@@ -1,46 +1,33 @@
 import { useCallback } from "react";
-import { fetchWithAuth } from "../api/fetchWithAuth";
+import { channelPermissions, type ChannelOverride } from "../api/client";
 
-const API_URL = import.meta.env.VITE_API_URL;
-
-export interface ChannelOverride {
-    id: string;
-    channelId: string;
-    roleId: string | null;
-    userId: string | null;
-    permissionId: string;
-    allow: boolean | null;
-}
+export type { ChannelOverride };
 
 export function useChannelPermissions() {
-    const getOverrides = useCallback(async (channelId: string): Promise<ChannelOverride[]> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/channels/${channelId}/permissions`,
-            {},
-        );
-        if (!res.ok) return [];
-        return res.json();
-    }, []);
+    const getOverrides = useCallback(
+        (channelId: string): Promise<ChannelOverride[]> => channelPermissions.getOverrides(channelId),
+        [],
+    );
 
-    const setOverride = useCallback(async (
-        channelId: string,
-        opts: {
-            roleId?: string | null;
-            userId?: string | null;
-            permissionId: string;
-            allow: boolean | null;
-        }
-    ): Promise<boolean> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/channels/${channelId}/permissions`,
-            {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(opts),
+    const setOverride = useCallback(
+        async (
+            channelId: string,
+            opts: {
+                roleId?: string | null;
+                userId?: string | null;
+                permissionId: string;
+                allow: boolean | null;
             },
-        );
-        return res.ok;
-    }, []);
+        ): Promise<boolean> => {
+            try {
+                await channelPermissions.setOverride(channelId, opts);
+                return true;
+            } catch {
+                return false;
+            }
+        },
+        [],
+    );
 
     return { getOverrides, setOverride };
 }

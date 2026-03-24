@@ -1,24 +1,23 @@
 import { useCallback } from "react";
-import { fetchWithAuth } from "../api/fetchWithAuth";
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { reactions } from "../api/client";
 
 export function useReactions() {
-
     const addReaction = useCallback(async (messageId: string, emoji: string): Promise<boolean> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`,
-            { method: "PUT" },
-        );
-        return res.ok;
+        try {
+            await reactions.add(messageId, emoji);
+            return true;
+        } catch {
+            return false;
+        }
     }, []);
 
     const removeReaction = useCallback(async (messageId: string, emoji: string): Promise<boolean> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`,
-            { method: "DELETE" },
-        );
-        return res.ok;
+        try {
+            await reactions.remove(messageId, emoji);
+            return true;
+        } catch {
+            return false;
+        }
     }, []);
 
     return { addReaction, removeReaction };

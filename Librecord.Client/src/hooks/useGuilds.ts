@@ -1,106 +1,26 @@
 import { useCallback } from "react";
-import { fetchWithAuth } from "../api/fetchWithAuth";
+import { guilds } from "../api/client";
+import type { GuildSummary, Guild, GuildChannel } from "../types/guild";
 
-const API_URL = import.meta.env.VITE_API_URL;
+export type { GuildSummary, Guild, GuildChannel };
 
-// -----------------------------
-// TYPES
-// -----------------------------
-export interface GuildSummary {
-    id: string;
-    name: string;
-    iconUrl: string | null;
-}
-
-export interface Guild {
-    id: string;
-    name: string;
-    iconUrl: string | null;
-    createdAt?: string;
-}
-
-export interface GuildChannel {
-    id: string;
-    name: string;
-    type: number;
-    parentId: string | null;
-}
-
-// -----------------------------
-// HOOK
-// -----------------------------
 export function useGuilds() {
+    const getGuilds = useCallback((): Promise<GuildSummary[]> => guilds.list(), []);
 
-    // ------------------------------------------------------------------
-    // GET USER GUILDS (SIDEBAR)
-    // ------------------------------------------------------------------
-    const getGuilds = useCallback(async (): Promise<GuildSummary[]> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/guilds`,
-            {},
-        );
+    const getGuild = useCallback((guildId: string): Promise<Guild | null> => guilds.get(guildId), []);
 
-        if (!res.ok) return [];
-        return await res.json();
-    }, []);
-
-    // ------------------------------------------------------------------
-    // GET SINGLE GUILD
-    // ------------------------------------------------------------------
-    const getGuild = useCallback(async (guildId: string): Promise<Guild | null> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/guilds/${guildId}`,
-            {},
-        );
-
-        if (!res.ok) return null;
-        return await res.json();
-    }, []);
-
-    // ------------------------------------------------------------------
-    // CREATE GUILD
-    // ------------------------------------------------------------------
     const createGuild = useCallback(async (name: string): Promise<Guild | null> => {
         if (!name.trim()) return null;
-
-        const res = await fetchWithAuth(
-            `${API_URL}/guilds`,
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name })
-            },
-        );
-
-        if (!res.ok) return null;
-        return await res.json();
+        try {
+            return await guilds.create(name);
+        } catch {
+            return null;
+        }
     }, []);
 
-    // ------------------------------------------------------------------
-    // GET GUILD CHANNELS
-    // ------------------------------------------------------------------
-    const getGuildChannels = useCallback(async (guildId: string): Promise<GuildChannel[]> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/guilds/${guildId}/channels`,
-            {},
-        );
+    const getGuildChannels = useCallback((guildId: string): Promise<GuildChannel[]> => guilds.channels(guildId), []);
 
-        if (!res.ok) return [];
-        return await res.json();
-    }, []);
-
-    // ------------------------------------------------------------------
-    // GET SINGLE CHANNEL (ACCESS-CHECKED)
-    // ------------------------------------------------------------------
-    const getChannel = useCallback(async (channelId: string): Promise<GuildChannel | null> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/guilds/channels/${channelId}`,
-            {},
-        );
-
-        if (!res.ok) return null;
-        return await res.json();
-    }, []);
+    const getChannel = useCallback((channelId: string): Promise<GuildChannel | null> => guilds.getChannel(channelId), []);
 
     return {
         getGuilds,

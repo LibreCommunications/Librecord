@@ -1,24 +1,12 @@
 import { useCallback } from "react";
-import { fetchWithAuth } from "../api/fetchWithAuth";
+import { guilds, channels } from "../api/client";
+import type { GuildChannel } from "../types/guild";
 
-const API_URL = import.meta.env.VITE_API_URL;
-
-/* ------------------------------------------------------------------ */
-/* TYPES                                                               */
-/* ------------------------------------------------------------------ */
-export interface GuildChannel {
-    id: string;
-    guildId: string;
-    name: string;
-    type: number; // GuildChannelType enum value
-    position: number;
-    topic: string | null;
-    createdAt: string;
-}
+export type { GuildChannel };
 
 export interface CreateChannelDto {
     name: string;
-    type: number; // GuildChannelType
+    type: number;
     position: number;
     topic?: string | null;
 }
@@ -28,92 +16,46 @@ export interface UpdateChannelDto {
     topic?: string | null;
 }
 
-/* ------------------------------------------------------------------ */
-/* HOOK                                                                */
-/* ------------------------------------------------------------------ */
 export function useChannels() {
+    const getChannel = useCallback(
+        (channelId: string): Promise<GuildChannel | null> => guilds.getChannel(channelId),
+        [],
+    );
 
-    /* ------------------------------------------------------------------ */
-    /* GET SINGLE CHANNEL                                                  */
-    /* GET /channels/{channelId}                                           */
-    /* ------------------------------------------------------------------ */
-    const getChannel = useCallback(async (channelId: string): Promise<GuildChannel | null> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/channels/${channelId}`,
-            {},
-        );
+    const getGuildChannels = useCallback(
+        (guildId: string): Promise<GuildChannel[]> => guilds.channels(guildId),
+        [],
+    );
 
-        if (!res.ok) return null;
-        return await res.json();
-    }, []);
+    const createChannel = useCallback(
+        async (guildId: string, dto: CreateChannelDto): Promise<GuildChannel | null> => {
+            try {
+                return await channels.create(guildId, dto);
+            } catch {
+                return null;
+            }
+        },
+        [],
+    );
 
-    /* ------------------------------------------------------------------ */
-    /* LIST CHANNELS FOR GUILD                                             */
-    /* GET /channels/guild/{guildId}                                       */
-    /* ------------------------------------------------------------------ */
-    const getGuildChannels = useCallback(async (guildId: string): Promise<GuildChannel[]> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/channels/guild/${guildId}`,
-            {},
-        );
+    const updateChannel = useCallback(
+        async (channelId: string, dto: UpdateChannelDto): Promise<GuildChannel | null> => {
+            try {
+                return await channels.update(channelId, dto);
+            } catch {
+                return null;
+            }
+        },
+        [],
+    );
 
-        if (!res.ok) return [];
-        return await res.json();
-    }, []);
-
-    /* ------------------------------------------------------------------ */
-    /* CREATE CHANNEL                                                      */
-    /* POST /channels/guild/{guildId}                                      */
-    /* ------------------------------------------------------------------ */
-    const createChannel = useCallback(async (
-        guildId: string,
-        dto: CreateChannelDto
-    ): Promise<GuildChannel | null> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/channels/guild/${guildId}`,
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(dto),
-            },
-        );
-
-        if (!res.ok) return null;
-        return await res.json();
-    }, []);
-
-    /* ------------------------------------------------------------------ */
-    /* UPDATE CHANNEL                                                      */
-    /* PUT /channels/{channelId}                                           */
-    /* ------------------------------------------------------------------ */
-    const updateChannel = useCallback(async (
-        channelId: string,
-        dto: UpdateChannelDto
-    ): Promise<GuildChannel | null> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/channels/${channelId}`,
-            {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(dto),
-            },
-        );
-
-        if (!res.ok) return null;
-        return await res.json();
-    }, []);
-
-    /* ------------------------------------------------------------------ */
-    /* DELETE CHANNEL                                                      */
-    /* DELETE /channels/{channelId}                                        */
-    /* ------------------------------------------------------------------ */
     const deleteChannel = useCallback(async (channelId: string): Promise<boolean> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/channels/${channelId}`,
-            { method: "DELETE" },
-        );
-
-        return res.ok;
+        try {
+            await channels.delete(channelId);
+            return true;
+        } catch {
+            return false;
+        }
     }, []);
 
     return {

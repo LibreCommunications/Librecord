@@ -1,119 +1,71 @@
 import { useCallback } from "react";
-import { fetchWithAuth } from "../api/fetchWithAuth";
+import { dms } from "../api/client";
+import type { DmChannel, DmUser } from "../types/dm";
 
-const API_URL = import.meta.env.VITE_API_URL;
+export type { DmChannel, DmUser };
 
-// --------------------------------------------------
-// TYPES
-// --------------------------------------------------
-export interface DmUser {
-    id: string;
-    username: string;
-    displayName: string;
-    avatarUrl: string | null;
-}
-
-export interface DmChannel {
-    id: string;
-    name?: string | null;
-    isGroup: boolean;
-    isFriend?: boolean | null;
-    members: DmUser[];
-}
-
-// --------------------------------------------------
-// HOOK
-// --------------------------------------------------
 export function useDirectMessagesChannel() {
-    const getMyDms = useCallback(async (): Promise<DmChannel[]> => {
-        const res = await fetchWithAuth(`${API_URL}/dms`, {});
-        if (!res.ok) return [];
-        return await res.json();
+    const getMyDms = useCallback((): Promise<DmChannel[]> => dms.list(), []);
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const startDm = useCallback(async (targetUserId: string, _content: string): Promise<string | null> => {
+        try {
+            const data = await dms.start(targetUserId);
+
+            window.dispatchEvent(
+                new CustomEvent("dm:channel:created", { detail: { channelId: data.channelId } }),
+            );
+
+            return data.channelId;
+        } catch {
+            return null;
+        }
     }, []);
 
-    const startDm = useCallback(async (
-        targetUserId: string,
-        content: string
-    ): Promise<string | null> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/dms/start/${targetUserId}`,
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ content }),
-            },
-        );
+    const getDmChannel = useCallback(
+        (channelId: string): Promise<DmChannel | null> => dms.get(channelId),
+        [],
+    );
 
-        if (!res.ok) return null;
-        const data = await res.json();
-
-        // Notify the DmSidebar to refresh so the new conversation appears
-        window.dispatchEvent(
-            new CustomEvent("dm:channel:created", { detail: { channelId: data.channelId } })
-        );
-
-        return data.channelId;
-    }, []);
-
-    const getDmChannel = useCallback(async (channelId: string): Promise<DmChannel | null> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/dms/${channelId}`,
-            {},
-        );
-
-        if (!res.ok) return null;
-        return await res.json();
-    }, []);
-
-    const addParticipant = useCallback(async (
-        channelId: string,
-        userId: string
-    ): Promise<boolean> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/dms/${channelId}/participants/${userId}`,
-            { method: "POST" },
-        );
-
-        return res.ok;
+    const addParticipant = useCallback(async (channelId: string, userId: string): Promise<boolean> => {
+        try {
+            await dms.addParticipant(channelId, userId);
+            return true;
+        } catch {
+            return false;
+        }
     }, []);
 
     const leaveChannel = useCallback(async (channelId: string): Promise<boolean> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/dms/${channelId}/leave`,
-            { method: "DELETE" },
-        );
-
-        return res.ok;
+        try {
+            await dms.leave(channelId);
+            return true;
+        } catch {
+            return false;
+        }
     }, []);
 
     const deleteDm = useCallback(async (channelId: string): Promise<boolean> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/dms/${channelId}`,
-            { method: "DELETE" },
-        );
-
-        return res.ok;
+        try {
+            await dms.delete(channelId);
+            return true;
+        } catch {
+            return false;
+        }
     }, []);
 
     const createGroup = useCallback(async (memberIds: string[], name: string): Promise<string | null> => {
-        const res = await fetchWithAuth(
-            `${API_URL}/dms/group`,
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name, memberIds }),
-            },
-        );
+        try {
+            const data = await dms.createGroup(name, memberIds);
 
-        if (!res.ok) return null;
-        const data = await res.json();
+            window.dispatchEvent(
+                new CustomEvent("dm:channel:created", { detail: { channelId: data.channelId } }),
+            );
 
-        // Notify the DmSidebar to refresh so the new group appears
-        window.dispatchEvent(
-            new CustomEvent("dm:channel:created", { detail: { channelId: data.channelId } })
-        );
-
-        return data.channelId;
+            return data.channelId;
+        } catch {
+            return null;
+        }
     }, []);
 
     return {
