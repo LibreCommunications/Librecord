@@ -6,7 +6,9 @@ import {
     addParticipant,
     removeParticipant,
     updateParticipantState,
+    getVoiceState,
 } from "../voice/voiceStore";
+import { playJoinSound, playLeaveSound } from "../voice/sounds";
 import type {
     DmRealtimeMessageTransport,
     DmRealtimeMessageEditedTransport,
@@ -338,6 +340,7 @@ export function registerListeners() {
     appConnection.on(
         "voice:user:joined",
         (payload: AppEventMap["voice:user:joined"]) => {
+            const vsJoin = getVoiceState();
             addParticipant({
                 userId: payload.userId,
                 username: payload.username,
@@ -350,14 +353,21 @@ export function registerListeners() {
                 joinedAt: new Date().toISOString(),
             });
             dispatchAppEvent("voice:user:joined", payload);
+            if (vsJoin.isConnected && vsJoin.channelId === payload.channelId) {
+                playJoinSound();
+            }
         }
     );
 
     appConnection.on(
         "voice:user:left",
         (payload: AppEventMap["voice:user:left"]) => {
+            const vsLeave = getVoiceState();
             removeParticipant(payload.userId);
             dispatchAppEvent("voice:user:left", payload);
+            if (vsLeave.isConnected && vsLeave.channelId === payload.channelId) {
+                playLeaveSound();
+            }
         }
     );
 

@@ -3,6 +3,7 @@ using Librecord.Application.Realtime.Voice;
 using Librecord.Domain.Guilds;
 using Librecord.Domain.Identity;
 using Librecord.Domain.Voice;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace Librecord.Application.Voice;
@@ -106,7 +107,17 @@ public class VoiceService : IVoiceService
         if (existing is null) return;
 
         await _voiceStates.RemoveAsync(userId);
-        await _voiceStates.SaveChangesAsync();
+
+        try
+        {
+            await _voiceStates.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Row was already deleted by a concurrent call (e.g. explicit leave
+            // racing with OnDisconnectedAsync). The desired state is achieved.
+            return;
+        }
 
         await _notifier.NotifyAsync(new VoiceUserLeft
         {

@@ -283,6 +283,9 @@ test.describe.serial("Full guild + WebRTC voice flow with media verification", (
 
     test("User A starts screen share and User B receives it with real frames", async () => {
         await pageA.locator("[title='Share Screen']").click();
+        // Screen share modal appears — click "Go Live" with defaults
+        await expect(pageA.getByText("Screen Share")).toBeVisible({ timeout: 5_000 });
+        await pageA.getByRole("button", { name: "Go Live" }).click();
         await expect(pageA.locator("[title='Stop Sharing']")).toBeVisible({
             timeout: 10_000,
         });
@@ -335,6 +338,9 @@ test.describe.serial("Full guild + WebRTC voice flow with media verification", (
 
         // Enable screen share
         await pageA.locator("[title='Share Screen']").click();
+        // Screen share modal appears — click "Go Live" with defaults
+        await expect(pageA.getByText("Screen Share")).toBeVisible({ timeout: 5_000 });
+        await pageA.getByRole("button", { name: "Go Live" }).click();
         await expect(pageA.locator("[title='Stop Sharing']")).toBeVisible({
             timeout: 10_000,
         });
@@ -409,6 +415,8 @@ test.describe.serial("Full guild + WebRTC voice flow with media verification", (
 
     test("User B starts screen share and User A sees real frames", async () => {
         await pageB.locator("[title='Share Screen']").click();
+        await expect(pageB.getByText("Screen Share")).toBeVisible({ timeout: 5_000 });
+        await pageB.getByRole("button", { name: "Go Live" }).click();
         await expect(pageB.locator("[title='Stop Sharing']")).toBeVisible({
             timeout: 10_000,
         });

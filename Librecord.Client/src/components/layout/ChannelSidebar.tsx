@@ -114,6 +114,19 @@ export default function ChannelSidebar({ guildId }: Props) {
         };
     }, []);
 
+    // Track speaking state for sidebar avatars
+    const [speakingMap, setSpeakingMap] = useState<Record<string, boolean>>({});
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const detail = (e as CustomEvent<{ identity: string; speaking: boolean }>).detail;
+            if (detail) {
+                setSpeakingMap(prev => ({ ...prev, [detail.identity]: detail.speaking }));
+            }
+        };
+        window.addEventListener("voice:speaking:changed", handler);
+        return () => window.removeEventListener("voice:speaking:changed", handler);
+    }, []);
+
     // Increment unread when a message ping arrives for a non-active channel
     useEffect(() => {
         const onPing = (e: CustomEvent<AppEventMap["guild:message:ping"]>) => {
@@ -251,22 +264,29 @@ export default function ChannelSidebar({ guildId }: Props) {
                                         </div>
                                         {voiceParticipants.length > 0 && (
                                             <div className="ml-[42px] mr-2 mt-0.5 mb-1 space-y-px">
-                                                {voiceParticipants.map(p => (
-                                                    <div key={p.userId} className="flex items-center gap-1.5 text-[13px] text-[#949ba4] py-[3px]">
-                                                        <img
-                                                            src={getAvatarUrl(p.avatarUrl)}
-                                                            alt=""
-                                                            className="w-5 h-5 rounded-full object-cover shrink-0"
-                                                        />
-                                                        <span className="truncate">{p.displayName}</span>
-                                                        {p.isMuted && (
-                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-400 shrink-0">
-                                                                <line x1="1" y1="1" x2="23" y2="23" />
-                                                                <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
-                                                            </svg>
-                                                        )}
-                                                    </div>
-                                                ))}
+                                                {voiceParticipants.map(p => {
+                                                    const isSpeaking = speakingMap[p.userId] ?? false;
+                                                    return (
+                                                        <div key={p.userId} className="flex items-center gap-1.5 text-[13px] text-[#949ba4] py-[3px]">
+                                                            <img
+                                                                src={getAvatarUrl(p.avatarUrl)}
+                                                                alt=""
+                                                                className={`
+                                                                    w-5 h-5 rounded-full object-cover shrink-0
+                                                                    transition-shadow duration-150
+                                                                    ${isSpeaking ? "shadow-[0_0_0_2px_#23a55a]" : ""}
+                                                                `}
+                                                            />
+                                                            <span className="truncate">{p.displayName}</span>
+                                                            {p.isMuted && (
+                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-400 shrink-0">
+                                                                    <line x1="1" y1="1" x2="23" y2="23" />
+                                                                    <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
+                                                                </svg>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         )}
                                     </div>

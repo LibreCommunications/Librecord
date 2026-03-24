@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useVoice } from "../../hooks/useVoice";
 import { useUserProfile } from "../../hooks/useUserProfile";
+import { useAuth } from "../../hooks/useAuth";
 import { voice } from "../../api/client";
 import { ParticipantTile } from "./ParticipantTile";
 import { ScreenShareTile } from "./ScreenShareTile";
@@ -79,14 +80,14 @@ function PreviewCard({
 }
 
 /* ------------------------------------------------------------------ */
-/* GRID COLUMNS — adapts to participant count                          */
+/* GRID COLUMNS — adapts to participant count (no screen share)        */
 /* ------------------------------------------------------------------ */
 function getGridClass(count: number): string {
-    if (count <= 1) return "grid-cols-1 max-w-lg mx-auto";
-    if (count <= 2) return "grid-cols-2 max-w-3xl mx-auto";
-    if (count <= 4) return "grid-cols-2 max-w-4xl mx-auto";
-    if (count <= 9) return "grid-cols-3 max-w-5xl mx-auto";
-    return "grid-cols-4 max-w-6xl mx-auto";
+    if (count <= 1) return "grid-cols-1 max-w-lg";
+    if (count <= 2) return "grid-cols-2 max-w-3xl";
+    if (count <= 4) return "grid-cols-2 max-w-4xl";
+    if (count <= 9) return "grid-cols-3 max-w-5xl";
+    return "grid-cols-4 max-w-6xl";
 }
 
 /* ------------------------------------------------------------------ */
@@ -95,8 +96,21 @@ function getGridClass(count: number): string {
 export function VoiceChannelView({ channelId }: Props) {
     const { voiceState } = useVoice();
     const { getAvatarUrl } = useUserProfile();
+    const { user } = useAuth();
     const [speakingMap, setSpeakingMap] = useState<Record<string, boolean>>({});
     const [previewParticipants, setPreviewParticipants] = useState<VoiceParticipant[]>([]);
+
+    // Track which users' streams the local user has opted into watching.
+    // Persists across screen share stop/restart so viewers don't need to re-click.
+    const [watchingStreams, setWatchingStreams] = useState<Set<string>>(new Set());
+    const toggleWatch = useCallback((userId: string, watching: boolean) => {
+        setWatchingStreams(prev => {
+            const next = new Set(prev);
+            if (watching) next.add(userId);
+            else next.delete(userId);
+            return next;
+        });
+    }, []);
 
     useEffect(() => {
         const handler = (e: Event) => {
@@ -154,48 +168,85 @@ export function VoiceChannelView({ channelId }: Props) {
 
     // When connected to this channel, use live state; otherwise use API preview
     const participants = isInThisChannel ? voiceState.participants : previewParticipants;
-    const screenSharers = participants.filter(p => p.isScreenSharing);
-    const totalTiles = participants.length + (isInThisChannel ? screenSharers.length : 0);
+    const screenSharers = isInThisChannel ? participants.filter(p => p.isScreenSharing) : [];
+    const hasScreenShare = screenSharers.length > 0;
 
-    return (
-        <div className="flex-1 flex flex-col bg-[#313338] overflow-hidden">
-            <div className="flex-1 p-6 overflow-auto flex items-center">
-                {participants.length === 0 && (
-                    <div className="flex flex-col items-center justify-center w-full text-[#949ba4] gap-3">
+    // Empty state
+    if (participants.length === 0) {
+        return (
+            <div className="flex-1 flex flex-col bg-[#313338] overflow-hidden">
+                <div className="flex-1 flex items-center justify-center">
+                    <div className="flex flex-col items-center text-[#949ba4] gap-3">
                         <SpeakerIcon size={48} />
                         <p className="text-lg font-medium">No one is here yet</p>
                         <p className="text-sm text-[#6d6f78]">Click a voice channel to join</p>
                     </div>
-                )}
+                </div>
+            </div>
+        );
+    }
 
-                {participants.length > 0 && (
-                    <div className={`grid ${getGridClass(totalTiles)} gap-3 w-full`}>
-                        {isInThisChannel && screenSharers.map(p => (
-                            <ScreenShareTile key={`screen-${p.userId}`} participant={p} />
-                        ))}
+    // ── SCREEN SHARE LAYOUT ──────────────────────────────────────────
+    // When someone is screen sharing: screen share takes primary space,
+    // participant tiles go in a strip on the right side.
+    if (hasScreenShare) {
+        return (
+            <div className="flex-1 flex bg-[#313338] overflow-hidden">
+                {/* Primary: screen share(s) */}
+                <div className="flex-1 flex flex-col gap-2 p-3 min-w-0 overflow-auto">
+                    {screenSharers.map(p => (
+                        <ScreenShareTile
+                            key={`screen-${p.userId}`}
+                            participant={p}
+                            isWatching={p.userId === user?.userId || watchingStreams.has(p.userId)}
+                            onToggleWatch={(watching) => toggleWatch(p.userId, watching)}
+                        />
+                    ))}
+                </div>
 
-                        {participants.map(p => {
-                            if (isInThisChannel) {
-                                return (
-                                    <ParticipantTile
-                                        key={p.userId}
-                                        participant={p}
-                                        isSpeaking={speakingMap[p.userId] ?? false}
-                                        getAvatarUrl={getAvatarUrl}
-                                    />
-                                );
-                            }
+                {/* Sidebar: participant tiles */}
+                <div className="w-56 shrink-0 bg-[#2b2d31] border-l border-black/20 overflow-y-auto dark-scrollbar p-2 space-y-2">
+                    {participants.map(p => (
+                        <ParticipantTile
+                            key={p.userId}
+                            participant={p}
+                            isSpeaking={speakingMap[p.userId] ?? false}
+                            getAvatarUrl={getAvatarUrl}
+                            compact
+                        />
+                    ))}
+                </div>
+            </div>
+        );
+    }
 
+    // ── NORMAL LAYOUT (no screen share) ──────────────────────────────
+    // Center the grid both horizontally and vertically.
+    return (
+        <div className="flex-1 flex flex-col bg-[#313338] overflow-hidden">
+            <div className="flex-1 p-6 overflow-auto flex items-center justify-center">
+                <div className={`grid ${getGridClass(participants.length)} gap-3 w-full mx-auto`}>
+                    {participants.map(p => {
+                        if (isInThisChannel) {
                             return (
-                                <PreviewCard
+                                <ParticipantTile
                                     key={p.userId}
                                     participant={p}
+                                    isSpeaking={speakingMap[p.userId] ?? false}
                                     getAvatarUrl={getAvatarUrl}
                                 />
                             );
-                        })}
-                    </div>
-                )}
+                        }
+
+                        return (
+                            <PreviewCard
+                                key={p.userId}
+                                participant={p}
+                                getAvatarUrl={getAvatarUrl}
+                            />
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );

@@ -304,11 +304,46 @@ export async function toggleCamera(): Promise<boolean> {
     return enabled;
 }
 
-export async function toggleScreenShare(): Promise<boolean> {
+export interface ScreenShareSettings {
+    resolution: "720p" | "1080p" | "1440p" | "source";
+    frameRate: 15 | 30 | 60 | "source";
+    audio: boolean;
+}
+
+const RESOLUTION_MAP: Record<string, { width: number; height: number } | undefined> = {
+    "720p": { width: 1280, height: 720 },
+    "1080p": { width: 1920, height: 1080 },
+    "1440p": { width: 2560, height: 1440 },
+};
+
+export async function startScreenShare(options: ScreenShareSettings): Promise<boolean> {
     if (!room) return false;
-    const sharing = !room.localParticipant.isScreenShareEnabled;
-    await room.localParticipant.setScreenShareEnabled(sharing, { audio: true });
-    return sharing;
+
+    const res = RESOLUTION_MAP[options.resolution];
+    const numericFps = options.frameRate === "source" ? undefined : options.frameRate;
+    const hint = numericFps === undefined || numericFps >= 30 ? "motion" : "detail";
+
+    // Build resolution constraint only when we have something to constrain.
+    // LiveKit's VideoResolution requires width+height, so we only pass it
+    // when a specific resolution preset is chosen. For "source" resolution
+    // with a specific FPS, we still set resolution to apply the frameRate cap.
+    let resolution: { width: number; height: number; frameRate?: number } | undefined;
+    if (res) {
+        resolution = { ...res, ...(numericFps ? { frameRate: numericFps } : {}) };
+    }
+
+    await room.localParticipant.setScreenShareEnabled(true, {
+        audio: options.audio,
+        contentHint: hint,
+        ...(resolution ? { resolution } : {}),
+    });
+    return true;
+}
+
+export async function stopScreenShare(): Promise<boolean> {
+    if (!room) return false;
+    await room.localParticipant.setScreenShareEnabled(false);
+    return false;
 }
 
 export function getRoom(): Room | null {
