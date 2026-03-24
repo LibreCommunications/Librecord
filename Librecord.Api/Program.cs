@@ -222,7 +222,7 @@ static void ConfigureRateLimiting(IServiceCollection services)
             return ip?.ToString() ?? "unknown";
         }
 
-        // Global default: 600 requests per minute per client IP
+        // Global default: 3000 requests per minute per client IP
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
         {
             var clientIp = GetClientIp(ctx);
@@ -233,13 +233,13 @@ static void ConfigureRateLimiting(IServiceCollection services)
                 clientIp,
                 _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = 600,
+                    PermitLimit = 3000,
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
                 });
         });
 
-        // Stricter policy for auth endpoints (login/register brute force protection)
+        // Auth endpoints: 60 per minute (brute force protection)
         options.AddPolicy("auth", ctx =>
         {
             var clientIp = GetClientIp(ctx);
@@ -249,13 +249,13 @@ static void ConfigureRateLimiting(IServiceCollection services)
                 clientIp,
                 _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = 20,
+                    PermitLimit = 60,
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
                 });
         });
 
-        // Stricter policy for file uploads
+        // File uploads: 120 per minute
         options.AddPolicy("upload", ctx =>
         {
             var clientIp = GetClientIp(ctx);
@@ -265,7 +265,7 @@ static void ConfigureRateLimiting(IServiceCollection services)
                 clientIp,
                 _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = 30,
+                    PermitLimit = 120,
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
                 });
