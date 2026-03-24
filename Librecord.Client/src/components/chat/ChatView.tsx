@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { MessageList } from "../message/MessageList";
 import { TypingIndicator } from "../messages/TypingIndicator";
 import { AttachmentUpload } from "../messages/AttachmentUpload";
@@ -13,6 +14,8 @@ interface ChatViewProps {
 }
 
 export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder }: ChatViewProps) {
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
     return (
         <>
             <MessageList
@@ -68,6 +71,7 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder }
                         </svg>
                     </button>
                     <textarea
+                        ref={textareaRef}
                         value={chat.content}
                         disabled={chat.sending}
                         maxLength={4000}
@@ -81,6 +85,7 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder }
                             if (e.key === "Enter" && !e.shiftKey) {
                                 e.preventDefault();
                                 chat.handleSend();
+                                requestAnimationFrame(() => textareaRef.current?.focus());
                             }
                         }}
                         placeholder={inputPlaceholder}
