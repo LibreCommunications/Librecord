@@ -6,9 +6,9 @@ namespace Librecord.Api.RealtimeNotifiers;
 
 public sealed class SignalRFriendshipNotifier : IFriendshipRealtimeNotifier
 {
-    private readonly IHubContext<DmHub> _hub;
+    private readonly IHubContext<AppHub> _hub;
 
-    public SignalRFriendshipNotifier(IHubContext<DmHub> hub)
+    public SignalRFriendshipNotifier(IHubContext<AppHub> hub)
     {
         _hub = hub;
     }

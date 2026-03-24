@@ -13,14 +13,14 @@ namespace Librecord.Api.Controllers.Messaging;
 public class DirectMessageChannelController : AuthenticatedController
 {
     private readonly IDirectMessageChannelService _dms;
-    private readonly IHubContext<DmHub> _dmHub;
+    private readonly IHubContext<AppHub> _hub;
 
     public DirectMessageChannelController(
         IDirectMessageChannelService dms,
-        IHubContext<DmHub> dmHub)
+        IHubContext<AppHub> hub)
     {
         _dms = dms;
-        _dmHub = dmHub;
+        _hub = hub;
     }
     // ---------------------------------------------------------
     // GET USER DM CHANNELS
@@ -116,7 +116,7 @@ public class DirectMessageChannelController : AuthenticatedController
         var channel = await _dms.StartDmAsync(UserId, targetUserId);
 
         // Notify both users so their DM sidebars update without refresh
-        await _dmHub.Clients.Users(UserId.ToString(), targetUserId.ToString()).SendAsync(
+        await _hub.Clients.Users(UserId.ToString(), targetUserId.ToString()).SendAsync(
             "dm:channel:created",
             new { channelId = channel.Id });
 
@@ -146,7 +146,7 @@ public class DirectMessageChannelController : AuthenticatedController
         // Notify all members so their DM sidebar updates without refresh
         foreach (var memberId in request.MemberIds)
         {
-            await _dmHub.Clients.User(memberId.ToString()).SendAsync(
+            await _hub.Clients.User(memberId.ToString()).SendAsync(
                 "dm:channel:created",
                 new { channelId = channel.Id });
         }
@@ -169,12 +169,12 @@ public class DirectMessageChannelController : AuthenticatedController
         await _dms.AddParticipantAsync(channelId, UserId, userId);
 
         // Notify the new user so they can join the channel's SignalR group
-        await _dmHub.Clients.User(userId.ToString()).SendAsync(
+        await _hub.Clients.User(userId.ToString()).SendAsync(
             "dm:channel:created",
             new { channelId });
 
         // Notify existing members that a new member was added
-        await _dmHub.Clients.Group(DmHub.ChannelGroup(channelId)).SendAsync(
+        await _hub.Clients.Group(AppHub.DmGroup(channelId)).SendAsync(
             "dm:member:added",
             new { channelId, userId });
 
@@ -190,12 +190,12 @@ public class DirectMessageChannelController : AuthenticatedController
 
         // Tell the leaving user to leave the SignalR group so they stop
         // receiving messages for this channel (#55)
-        await _dmHub.Clients.User(UserId.ToString()).SendAsync(
+        await _hub.Clients.User(UserId.ToString()).SendAsync(
             "dm:leave:ack",
             new { channelId });
 
         // Notify remaining members that this user left
-        await _dmHub.Clients.Group(DmHub.ChannelGroup(channelId)).SendAsync(
+        await _hub.Clients.Group(AppHub.DmGroup(channelId)).SendAsync(
             "dm:member:left",
             new { channelId, userId = UserId });
 
@@ -217,7 +217,7 @@ public class DirectMessageChannelController : AuthenticatedController
         await _dms.DeleteDmAsync(channelId, UserId);
 
         // Notify both users so their sidebars update
-        await _dmHub.Clients.Users(memberIds.Select(id => id.ToString()).ToArray()).SendAsync(
+        await _hub.Clients.Users(memberIds.Select(id => id.ToString()).ToArray()).SendAsync(
             "dm:channel:deleted",
             new { channelId });
 

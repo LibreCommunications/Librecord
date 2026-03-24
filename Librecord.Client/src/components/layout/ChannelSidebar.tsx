@@ -5,7 +5,7 @@ import { useReadState } from "../../hooks/useReadState";
 import { useVoice } from "../../hooks/useVoice";
 import { UnreadBadge } from "../ui/UnreadBadge";
 import CreateChannelModal from "../../pages/guild/CreateChannelModal";
-import type { GuildEventMap } from "../../realtime/guild/guildEvents";
+import type { AppEventMap } from "../../realtime/events";
 import { useAuth } from "../../hooks/useAuth";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { fetchWithAuth } from "../../api/fetchWithAuth";
@@ -124,14 +124,14 @@ export default function ChannelSidebar({ guildId }: Props) {
 
     // Update participant list on voice join/leave/state events
     useEffect(() => {
-        const onJoin = (e: CustomEvent<GuildEventMap["voice:user:joined"]>) => {
+        const onJoin = (e: CustomEvent<AppEventMap["voice:user:joined"]>) => {
             const p = e.detail;
             setChannelParticipants(prev => ({
                 ...prev,
                 [p.channelId]: [...(prev[p.channelId] ?? []).filter(x => x.userId !== p.userId), p],
             }));
         };
-        const onLeave = (e: CustomEvent<GuildEventMap["voice:user:left"]>) => {
+        const onLeave = (e: CustomEvent<AppEventMap["voice:user:left"]>) => {
             const { channelId: chId, userId } = e.detail;
             setChannelParticipants(prev => ({
                 ...prev,
@@ -148,7 +148,7 @@ export default function ChannelSidebar({ guildId }: Props) {
 
     // Increment unread when a message ping arrives for a non-active channel
     useEffect(() => {
-        const onPing = (e: CustomEvent<GuildEventMap["guild:message:ping"]>) => {
+        const onPing = (e: CustomEvent<AppEventMap["guild:message:ping"]>) => {
             const { channelId: pingChannel, authorId } = e.detail;
             if (pingChannel === channelId) return;
             if (authorId === user?.userId) return;

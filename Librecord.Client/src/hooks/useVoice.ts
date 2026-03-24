@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { guildConnection } from "../realtime/guild/guildConnection";
+import { appConnection } from "../realtime/connection";
 import * as livekitClient from "../voice/livekitClient";
 import {
     getVoiceState,
@@ -21,7 +21,7 @@ export function useVoice() {
     }, []);
 
     const joinVoice = useCallback(async (channelId: string, guildId: string) => {
-        const result = await guildConnection.invoke<{
+        const result = await appConnection.invoke<{
             token: string;
             wsUrl: string;
             participants: VoiceParticipant[];
@@ -44,7 +44,7 @@ export function useVoice() {
     const leaveVoice = useCallback(async () => {
         await livekitClient.disconnect();
         try {
-            await guildConnection.invoke("LeaveVoiceChannel");
+            await appConnection.invoke("LeaveVoiceChannel");
         } catch {
             // Connection may already be closed
         }
@@ -54,25 +54,25 @@ export function useVoice() {
     const toggleMute = useCallback(async () => {
         const isMuted = await livekitClient.toggleMute();
         setVoiceState({ isMuted });
-        await guildConnection.invoke("UpdateVoiceState", { isMuted });
+        await appConnection.invoke("UpdateVoiceState", { isMuted });
     }, []);
 
     const toggleDeafen = useCallback(async () => {
         const isDeafened = await livekitClient.toggleDeafen();
         setVoiceState({ isDeafened });
-        await guildConnection.invoke("UpdateVoiceState", { isDeafened });
+        await appConnection.invoke("UpdateVoiceState", { isDeafened });
     }, []);
 
     const toggleCamera = useCallback(async () => {
         const isCameraOn = await livekitClient.toggleCamera();
         setVoiceState({ isCameraOn });
-        await guildConnection.invoke("UpdateVoiceState", { isCameraOn });
+        await appConnection.invoke("UpdateVoiceState", { isCameraOn });
     }, []);
 
     const toggleScreenShare = useCallback(async () => {
         const isScreenSharing = await livekitClient.toggleScreenShare();
         setVoiceState({ isScreenSharing });
-        await guildConnection.invoke("UpdateVoiceState", { isScreenSharing });
+        await appConnection.invoke("UpdateVoiceState", { isScreenSharing });
     }, []);
 
     return {

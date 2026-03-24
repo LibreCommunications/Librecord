@@ -1,8 +1,6 @@
 import { useEffect, useRef } from "react";
-import { dmConnection } from "./dm/dmConnection";
-import { registerDmListeners } from "./dm/dmListeners";
-import { guildConnection } from "./guild/guildConnection";
-import { registerGuildListeners } from "./guild/guildListeners";
+import { appConnection } from "./connection";
+import { registerListeners } from "./listeners";
 import { initNotifications, cleanupNotifications } from "./notifications";
 import { resetVoiceState } from "../voice/voiceStore";
 import * as livekitClient from "../voice/livekitClient";
@@ -21,7 +19,7 @@ export function RealtimeRoot() {
     const { user } = useAuth();
     const userIdRef = useRef<string | null>(null);
 
-    // Start connections once when user is available
+    // Start connection once when user is available
     useEffect(() => {
         if (!user?.userId || started) return;
         started = true;
@@ -29,23 +27,14 @@ export function RealtimeRoot() {
 
         initNotifications(user.userId);
 
-        console.log('[Realtime] Starting DM + Guild connections...');
+        console.log('[Realtime] Starting connection...');
         const t0 = performance.now();
-        Promise.all([
-            dmConnection.start().then(() => {
-                console.log(`[Realtime] DM connected (${Math.round(performance.now() - t0)}ms)`);
-                registerDmListeners();
-            }).catch(err => console.error("[Realtime] DM connection failed", err)),
-
-            guildConnection.start().then(() => {
-                console.log(`[Realtime] Guild connected (${Math.round(performance.now() - t0)}ms)`);
-                registerGuildListeners();
-            }).catch(err => console.error("[Realtime] Guild connection failed", err)),
-        ]).then(() => {
-            console.log(`[Realtime] Both connections ready (${Math.round(performance.now() - t0)}ms)`);
+        appConnection.start().then(() => {
+            console.log(`[Realtime] Connected (${Math.round(performance.now() - t0)}ms)`);
+            registerListeners();
             window.__realtimeReady = true;
             window.dispatchEvent(new Event("realtime:ready"));
-        });
+        }).catch(err => console.error("[Realtime] Connection failed", err));
     });
 
     // Detect logout — user was set, now null
@@ -63,9 +52,7 @@ export function RealtimeRoot() {
             cleanupNotifications();
             livekitClient.disconnect().catch(() => {});
             resetVoiceState();
-            dmConnection.stop().catch(() => {});
-            guildConnection.stop().catch(() => {});
-            // Connections stopped
+            appConnection.stop().catch(() => {});
         }
     }, [user]);
 

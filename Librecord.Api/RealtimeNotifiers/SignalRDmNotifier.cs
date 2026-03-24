@@ -8,16 +8,16 @@ namespace Librecord.Api.RealtimeNotifiers;
 
 public sealed class SignalRDmRealtimeNotifier : IDmRealtimeNotifier
 {
-    private readonly IHubContext<DmHub> _hub;
+    private readonly IHubContext<AppHub> _hub;
 
-    public SignalRDmRealtimeNotifier(IHubContext<DmHub> hub)
+    public SignalRDmRealtimeNotifier(IHubContext<AppHub> hub)
     {
         _hub = hub;
     }
 
     public Task NotifyAsync(DmMessageEvent evt)
     {
-        var group = DmHub.ChannelGroup(evt.ChannelId);
+        var group = AppHub.DmGroup(evt.ChannelId);
 
         return evt switch
         {

@@ -20,18 +20,18 @@ public class ChannelController : AuthenticatedController
 {
     private readonly IChannelService _channels;
     private readonly IPermissionService _permissions;
-    private readonly IHubContext<GuildHub> _guildHub;
+    private readonly IHubContext<AppHub> _hub;
     private readonly IGuildService _guilds;
 
     public ChannelController(
         IChannelService channels,
         IPermissionService permissions,
-        IHubContext<GuildHub> guildHub,
+        IHubContext<AppHub> hub,
         IGuildService guilds)
     {
         _channels = channels;
         _permissions = permissions;
-        _guildHub = guildHub;
+        _hub = hub;
         _guilds = guilds;
     }
     // ---------------------------------------------------------
@@ -142,7 +142,7 @@ public class ChannelController : AuthenticatedController
         foreach (var ch in existingChannels)
         {
             if (ch.Id == channel.Id) continue; // skip the just-created channel
-            await _guildHub.Clients.Group(GuildHub.ChannelGroup(ch.Id)).SendAsync(
+            await _hub.Clients.Group(AppHub.GuildGroup(ch.Id)).SendAsync(
                 "guild:channel:created",
                 new
                 {

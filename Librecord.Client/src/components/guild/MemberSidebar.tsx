@@ -3,7 +3,7 @@ import { useGuildMembers, type GuildMember } from "../../hooks/useGuildMembers";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { StatusDot } from "../user/StatusDot";
 import { fetchWithAuth } from "../../api/fetchWithAuth";
-import type { GuildEventMap } from "../../realtime/guild/guildEvents";
+import type { AppEventMap } from "../../realtime/events";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -41,7 +41,7 @@ export function MemberSidebar({ guildId }: Props) {
 
     // Listen for realtime presence changes
     useEffect(() => {
-        const onPresence = (e: CustomEvent<GuildEventMap["guild:user:presence"]>) => {
+        const onPresence = (e: CustomEvent<AppEventMap["guild:user:presence"]>) => {
             setPresenceMap(prev => ({
                 ...prev,
                 [e.detail.userId]: e.detail.status,

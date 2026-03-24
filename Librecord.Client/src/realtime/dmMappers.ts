@@ -1,4 +1,4 @@
-import type { Message } from "../../types/message";
+import type { Message } from "../types/message";
 import type {
     DmRealtimeMessageTransport,
     DmRealtimeMessageEditedTransport,
@@ -14,7 +14,7 @@ export function mapDmRealtimeToMessage(
         id: msg.messageId,
         channelId: msg.channelId,
 
-        content: msg.content,        
+        content: msg.content,
         createdAt: msg.createdAt,
         editedAt: null,
 
@@ -36,7 +36,7 @@ export function mapDmRealtimeEdit(
         channelId: msg.channelId,
         messageId: msg.messageId,
 
-        content: msg.content,        
+        content: msg.content,
         editedAt: msg.editedAt,
     };
 }

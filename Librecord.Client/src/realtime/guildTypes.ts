@@ -2,7 +2,7 @@ import type {
     MessageAttachment,
     MessageReaction,
     MessageEdit,
-} from "../../types/message";
+} from "../types/message";
 
 export interface GuildRealtimeAuthor {
     id: string;

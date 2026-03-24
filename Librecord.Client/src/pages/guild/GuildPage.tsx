@@ -38,9 +38,35 @@ export default function GuildChannelPage() {
     const [showInvite, setShowInvite] = useState(false);
     const [showMembers, setShowMembers] = useState(true);
 
-    // ── Build config for the shared chat hook ────────────
+    // ── Load guild channel metadata FIRST ──────────────────
+    const [metadataReady, setMetadataReady] = useState(false);
+
+    const [prevChannelId, setPrevChannelId] = useState(channelId);
+    if (channelId !== prevChannelId) {
+        setPrevChannelId(channelId);
+        setChannelName(null);
+        setChannelTopic(null);
+        setMetadataReady(false);
+    }
+
+    useEffect(() => {
+        if (!channelId) return;
+        let stale = false;
+        console.log(`[GuildPage] loading channel metadata for ${channelId}`);
+        getChannel(channelId).then(ch => {
+            if (stale) { console.log(`[GuildPage] metadata load STALE for ${channelId}`); return; }
+            console.log(`[GuildPage] metadata loaded for ${channelId}: name=${ch?.name}`);
+            setChannelName(ch?.name ?? null);
+            setChannelTopic(ch?.topic ?? null);
+            setChannelType(ch?.type ?? 0);
+            setMetadataReady(true);
+        });
+        return () => { stale = true; };
+    }, [channelId, getChannel]);
+
+    // ── Build config — only set channelId once metadata is loaded ──
     const config: ChatChannelConfig = useMemo(() => ({
-        channelId,
+        channelId: metadataReady ? channelId : undefined,
         getMessages: getChannelMessages,
         sendTextMessage: async (chId, content, clientMsgId) => { await createMessage(chId, content, clientMsgId); },
         sendWithAttachments: sendGuildMessageWithAttachments,
@@ -55,31 +81,9 @@ export default function GuildChannelPage() {
             messageDeleted: "guild:message:deleted",
         },
         typingScope: "guild",
-    }), [channelId, getChannelMessages, createMessage, sendGuildMessageWithAttachments, guildEditMessage, guildDeleteMessage]);
+    }), [metadataReady, channelId, getChannelMessages, createMessage, sendGuildMessageWithAttachments, guildEditMessage, guildDeleteMessage]);
 
     const chat = useChatChannel(config);
-
-    // ── Load guild channel metadata ──────────────────────
-    const [prevChannelId, setPrevChannelId] = useState(channelId);
-    if (channelId !== prevChannelId) {
-        setPrevChannelId(channelId);
-        setChannelName(null);
-        setChannelTopic(null);
-    }
-
-    useEffect(() => {
-        if (!channelId) return;
-        let stale = false;
-        console.log(`[GuildPage] loading channel metadata for ${channelId}`);
-        getChannel(channelId).then(ch => {
-            if (stale) { console.log(`[GuildPage] metadata load STALE for ${channelId}`); return; }
-            console.log(`[GuildPage] metadata loaded for ${channelId}: name=${ch?.name}`);
-            setChannelName(ch?.name ?? null);
-            setChannelTopic(ch?.topic ?? null);
-            setChannelType(ch?.type ?? 0);
-        });
-        return () => { stale = true; };
-    }, [channelId, getChannel]);
 
     if (!channelId) {
         return (

@@ -72,8 +72,7 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapControllers();
-app.MapHub<DmHub>("/hubs/dms");
-app.MapHub<GuildHub>("/hubs/guilds");
+app.MapHub<AppHub>("/hubs/app");
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 // --------------------------------------------------

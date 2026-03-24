@@ -13,7 +13,7 @@ import { DmHeader } from "./DmHeader";
 import { ChatView } from "../../components/chat/ChatView";
 import { PinnedMessagesPanel } from "../../components/messages/PinnedMessagesPanel";
 
-import type { DmEventMap } from "../../realtime/dm/dmEvents";
+import type { AppEventMap } from "../../realtime/events";
 
 export default function DmConversationPage() {
     const { dmId } = useParams();
@@ -37,33 +37,17 @@ export default function DmConversationPage() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
-    // ── Build config for the shared chat hook ────────────
-    const config: ChatChannelConfig = useMemo(() => ({
-        channelId: dmId,
-        getMessages: getChannelMessages,
-        sendTextMessage: sendMessage,
-        sendWithAttachments: sendDmMessageWithAttachments,
-        editMessage: async (messageId, dto) => {
-            const updated = await dmEditMessage(messageId, dto.content);
-            return { content: updated.content, editedAt: updated.editedAt };
-        },
-        deleteMessage: dmDeleteMessage,
-        events: {
-            messageNew: "dm:message:new",
-            messageEdited: "dm:message:edited",
-            messageDeleted: "dm:message:deleted",
-        },
-        typingScope: "dm",
-    }), [dmId, getChannelMessages, sendMessage, sendDmMessageWithAttachments, dmEditMessage, dmDeleteMessage]);
+    // ── Load DM channel metadata FIRST, then let chat hook load messages ──
+    // We load metadata before messages to avoid 3 concurrent requests
+    // competing for browser connection slots (max 6, minus 2 WebSockets = 4 free)
+    const [metadataReady, setMetadataReady] = useState(false);
 
-    const chat = useChatChannel(config);
-
-    // ── Load DM channel metadata ─────────────────────────
     const [prevDmId, setPrevDmId] = useState(dmId);
     if (dmId !== prevDmId) {
         setPrevDmId(dmId);
         setChannel(null);
         setChannelName(null);
+        setMetadataReady(false);
     }
 
     useEffect(() => {
@@ -81,14 +65,36 @@ export default function DmConversationPage() {
                 const others = ch.members.filter(m => m.id !== user?.userId);
                 setChannelName(others.length ? others.map(o => o.displayName).join(", ") : "Direct Message");
             }
+            setMetadataReady(true);
         });
         return () => { stale = true; };
     }, [dmId, getDmChannel, user?.userId]);
 
+    // ── Build config — only set channelId once metadata is loaded ──
+    const config: ChatChannelConfig = useMemo(() => ({
+        channelId: metadataReady ? dmId : undefined,
+        getMessages: getChannelMessages,
+        sendTextMessage: sendMessage,
+        sendWithAttachments: sendDmMessageWithAttachments,
+        editMessage: async (messageId, dto) => {
+            const updated = await dmEditMessage(messageId, dto.content);
+            return { content: updated.content, editedAt: updated.editedAt };
+        },
+        deleteMessage: dmDeleteMessage,
+        events: {
+            messageNew: "dm:message:new",
+            messageEdited: "dm:message:edited",
+            messageDeleted: "dm:message:deleted",
+        },
+        typingScope: "dm",
+    }), [metadataReady, dmId, getChannelMessages, sendMessage, sendDmMessageWithAttachments, dmEditMessage, dmDeleteMessage]);
+
+    const chat = useChatChannel(config);
+
     // ── DM-specific: channel deleted ─────────────────────
     useEffect(() => {
         if (!dmId) return;
-        const handler = (event: CustomEvent<DmEventMap["dm:channel:deleted"]>) => {
+        const handler = (event: CustomEvent<AppEventMap["dm:channel:deleted"]>) => {
             if (event.detail.channelId !== dmId) return;
             navigate("/app/dm");
         };
@@ -100,11 +106,11 @@ export default function DmConversationPage() {
     useEffect(() => {
         if (!dmId) return;
 
-        const onLeft = (event: CustomEvent<DmEventMap["dm:member:left"]>) => {
+        const onLeft = (event: CustomEvent<AppEventMap["dm:member:left"]>) => {
             if (event.detail.channelId !== dmId) return;
             setChannel(prev => prev ? { ...prev, members: prev.members.filter(m => m.id !== event.detail.userId) } : prev);
         };
-        const onAdded = (event: CustomEvent<DmEventMap["dm:member:added"]>) => {
+        const onAdded = (event: CustomEvent<AppEventMap["dm:member:added"]>) => {
             if (event.detail.channelId !== dmId) return;
             // Re-fetch channel to get the new member's full info
             getDmChannel(dmId).then(ch => { if (ch) setChannel(ch); });

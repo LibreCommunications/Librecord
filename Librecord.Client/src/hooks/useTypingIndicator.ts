@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { dmConnection } from "../realtime/dm/dmConnection";
-import { guildConnection } from "../realtime/guild/guildConnection";
+import { appConnection } from "../realtime/connection";
 
 const TYPING_THROTTLE_MS = 3000;
 const TYPING_EXPIRE_MS = 5000;
@@ -91,8 +90,8 @@ export function useTypingIndicator(
         return () => {
             if (isTypingRef.current && channelId) {
                 isTypingRef.current = false;
-                const connection = hub === "dm" ? dmConnection : guildConnection;
-                connection.invoke("StopTyping", channelId).catch(() => {});
+                const method = hub === "dm" ? "DmStopTyping" : "GuildStopTyping";
+                appConnection.invoke(method, channelId).catch(() => {});
             }
         };
     }, [channelId, hub]);
@@ -107,8 +106,8 @@ export function useTypingIndicator(
         if (now - lastSentRef.current < TYPING_THROTTLE_MS) return;
         lastSentRef.current = now;
 
-        const connection = hub === "dm" ? dmConnection : guildConnection;
-        connection.invoke("StartTyping", channelId).catch((e) => console.warn("[Typing] SignalR invoke failed:", e));
+        const method = hub === "dm" ? "DmStartTyping" : "GuildStartTyping";
+        appConnection.invoke(method, channelId).catch((e) => console.warn("[Typing] SignalR invoke failed:", e));
     }, [channelId, hub]);
 
     // Send stop typing event (called when input is cleared or message is sent)
@@ -118,8 +117,8 @@ export function useTypingIndicator(
         isTypingRef.current = false;
         lastSentRef.current = 0; // reset throttle so next keystroke sends immediately
 
-        const connection = hub === "dm" ? dmConnection : guildConnection;
-        connection.invoke("StopTyping", channelId).catch((e) => console.warn("[Typing] SignalR invoke failed:", e));
+        const method = hub === "dm" ? "DmStopTyping" : "GuildStopTyping";
+        appConnection.invoke(method, channelId).catch((e) => console.warn("[Typing] SignalR invoke failed:", e));
     }, [channelId, hub]);
 
     // Filter by current channelId so stale typing users from previous channels are excluded

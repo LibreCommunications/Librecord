@@ -7,8 +7,7 @@ import CreateGuildModal from "../../pages/guild/CreateGuildModal";
 import { JoinGuildModal } from "../../components/guild/JoinGuildModal";
 import { StatusDot } from "../../components/user/StatusDot";
 import { usePresence } from "../../hooks/usePresence";
-import type { GuildEventMap } from "../../realtime/guild/guildEvents";
-import type { DmEventMap } from "../../realtime/dm/dmEvents";
+import type { AppEventMap } from "../../realtime/events";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -105,7 +104,7 @@ export default function GlobalSidebar() {
 
     // Handle guild deletion in realtime — remove from sidebar and redirect if viewing
     useEffect(() => {
-        const onGuildDeleted = (e: CustomEvent<GuildEventMap["guild:deleted"]>) => {
+        const onGuildDeleted = (e: CustomEvent<AppEventMap["guild:deleted"]>) => {
             const deletedId = e.detail.guildId;
             setGuilds(prev => prev.filter(g => g.id !== deletedId));
             setGuildUnreads(prev => {
@@ -125,7 +124,7 @@ export default function GlobalSidebar() {
 
     // Listen for guild message pings → increment guild unread
     useEffect(() => {
-        const onGuildPing = (e: CustomEvent<GuildEventMap["guild:message:ping"]>) => {
+        const onGuildPing = (e: CustomEvent<AppEventMap["guild:message:ping"]>) => {
             const { channelId: pingCh, authorId } = e.detail;
             if (authorId === user?.userId) return;
             const pingGuildId = channelToGuildRef.current[pingCh];
@@ -140,7 +139,7 @@ export default function GlobalSidebar() {
 
     // Listen for DM pings → set DM unread
     useEffect(() => {
-        const onDmPing = (e: CustomEvent<DmEventMap["dm:message:ping"]>) => {
+        const onDmPing = (e: CustomEvent<AppEventMap["dm:message:ping"]>) => {
             if (e.detail.authorId === user?.userId) return;
             if (isDmPage) return;
             setDmUnread(true);

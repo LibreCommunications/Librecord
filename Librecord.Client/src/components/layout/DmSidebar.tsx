@@ -10,7 +10,7 @@ import { useReadState } from "../../hooks/useReadState";
 import { UnreadBadge } from "../ui/UnreadBadge";
 import { StatusDot } from "../user/StatusDot";
 import { fetchWithAuth } from "../../api/fetchWithAuth";
-import type { DmEventMap } from "../../realtime/dm/dmEvents";
+import type { AppEventMap } from "../../realtime/events";
 import { CreateGroupModal } from "../dm/CreateGroupModal";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -115,7 +115,7 @@ export default function DmSidebar() {
 
     // Update DM list when a member leaves a group DM
     useEffect(() => {
-        const onMemberLeft = (e: CustomEvent<DmEventMap["dm:member:left"]>) => {
+        const onMemberLeft = (e: CustomEvent<AppEventMap["dm:member:left"]>) => {
             const { channelId, userId } = e.detail;
             if (userId === user?.userId) {
                 // Current user left — remove the DM from sidebar
@@ -136,7 +136,7 @@ export default function DmSidebar() {
 
     // Handle DM channel deletion (1-on-1 DM deleted by either member)
     useEffect(() => {
-        const onDeleted = (e: CustomEvent<DmEventMap["dm:channel:deleted"]>) => {
+        const onDeleted = (e: CustomEvent<AppEventMap["dm:channel:deleted"]>) => {
             const { channelId } = e.detail;
             setDms(prev => prev.filter(d => d.id !== channelId));
             if (dmId === channelId) navigate("/app/dm");
@@ -147,7 +147,7 @@ export default function DmSidebar() {
 
     // Update presence from real-time events
     useEffect(() => {
-        const onPresence = (e: CustomEvent<DmEventMap["dm:user:presence"]>) => {
+        const onPresence = (e: CustomEvent<AppEventMap["dm:user:presence"]>) => {
             setPresenceMap(prev => ({
                 ...prev,
                 [e.detail.userId]: e.detail.status,
@@ -161,7 +161,7 @@ export default function DmSidebar() {
     // Increment unread when a message ping arrives for a non-active channel.
     // If the channel was closed (not in dms list), re-fetch to restore it.
     useEffect(() => {
-        const onPing = (e: CustomEvent<DmEventMap["dm:message:ping"]>) => {
+        const onPing = (e: CustomEvent<AppEventMap["dm:message:ping"]>) => {
             const { channelId: pingChannel, authorId } = e.detail;
             if (pingChannel === dmId) return;
             if (authorId === user?.userId) return;

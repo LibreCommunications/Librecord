@@ -2,7 +2,7 @@ import type {
     MessageAttachment,
     MessageReaction,
     MessageEdit,
-} from "../../types/message";
+} from "../types/message";
 
 // -----------------------------
 // AUTHOR
@@ -22,7 +22,7 @@ export interface DmRealtimeMessageTransport {
     messageId: string;
     clientMessageId?: string;
 
-    content: string;     
+    content: string;
     createdAt: string;
 
     author: DmRealtimeAuthor;
@@ -36,7 +36,7 @@ export interface DmRealtimeMessageEditedTransport {
     channelId: string;
     messageId: string;
 
-    content: string;         
+    content: string;
     editedAt?: string;
 }
 

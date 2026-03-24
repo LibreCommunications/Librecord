@@ -12,17 +12,14 @@ namespace Librecord.Api.Controllers.Messaging;
 public class PinController : AuthenticatedController
 {
     private readonly IPinService _pins;
-    private readonly IHubContext<DmHub> _dmHub;
-    private readonly IHubContext<GuildHub> _guildHub;
+    private readonly IHubContext<AppHub> _hub;
 
     public PinController(
         IPinService pins,
-        IHubContext<DmHub> dmHub,
-        IHubContext<GuildHub> guildHub)
+        IHubContext<AppHub> hub)
     {
         _pins = pins;
-        _dmHub = dmHub;
-        _guildHub = guildHub;
+        _hub = hub;
     }
 
     [HttpPost("{messageId:guid}")]
@@ -36,8 +33,8 @@ public class PinController : AuthenticatedController
 
         var payload = new { channelId, messageId };
         await Task.WhenAll(
-            _dmHub.Clients.Group(DmHub.ChannelGroup(channelId)).SendAsync("channel:message:pinned", payload),
-            _guildHub.Clients.Group(GuildHub.ChannelGroup(channelId)).SendAsync("channel:message:pinned", payload));
+            _hub.Clients.Group(AppHub.DmGroup(channelId)).SendAsync("channel:message:pinned", payload),
+            _hub.Clients.Group(AppHub.GuildGroup(channelId)).SendAsync("channel:message:pinned", payload));
 
         return Ok();
     }
@@ -53,8 +50,8 @@ public class PinController : AuthenticatedController
 
         var payload = new { channelId, messageId };
         await Task.WhenAll(
-            _dmHub.Clients.Group(DmHub.ChannelGroup(channelId)).SendAsync("channel:message:unpinned", payload),
-            _guildHub.Clients.Group(GuildHub.ChannelGroup(channelId)).SendAsync("channel:message:unpinned", payload));
+            _hub.Clients.Group(AppHub.DmGroup(channelId)).SendAsync("channel:message:unpinned", payload),
+            _hub.Clients.Group(AppHub.GuildGroup(channelId)).SendAsync("channel:message:unpinned", payload));
 
         return Ok();
     }
