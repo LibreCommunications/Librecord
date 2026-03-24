@@ -3,6 +3,7 @@ using Librecord.Api.Hubs;
 using Librecord.Api.RealtimeNotifiers;
 using Librecord.Application.Realtime.DMs;
 using Librecord.Application.Realtime.Guild;
+using Librecord.Application.Realtime.Social;
 using Librecord.Application.Realtime.Voice;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,7 +27,13 @@ public static class DependencyInjection
         // ----------------------------
         // SignalR
         // ----------------------------
-        services.AddSignalR();
+        services.AddSignalR(options =>
+        {
+            // Send keepalive pings every 10s to prevent Cloudflare
+            // from killing idle WebSocket connections (100s timeout)
+            options.KeepAliveInterval = TimeSpan.FromSeconds(10);
+            options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+        });
 
         // ----------------------------
         // Realtime adapters
@@ -34,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IDmRealtimeNotifier, SignalRDmRealtimeNotifier>();
         services.AddScoped<IGuildRealtimeNotifier, SignalRGuildRealtimeNotifier>();
         services.AddScoped<IVoiceRealtimeNotifier, SignalRVoiceRealtimeNotifier>();
+        services.AddScoped<IFriendshipRealtimeNotifier, SignalRFriendshipNotifier>();
 
         // ----------------------------
         // CORS (frontend)

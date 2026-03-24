@@ -190,7 +190,7 @@ export async function connectToVoice(token: string, wsUrl: string) {
         },
     });
 
-    room.on(RoomEvent.ParticipantConnected, (_p: RemoteParticipant) => {
+    room.on(RoomEvent.ParticipantConnected, () => {
     });
 
     room.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {

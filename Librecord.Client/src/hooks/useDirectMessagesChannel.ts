@@ -1,105 +1,72 @@
-import { useAuth } from "../context/AuthContext";
-import { fetchWithAuth } from "../api/fetchWithAuth";
+import { useCallback } from "react";
+import { dms } from "../api/client";
+import type { DmChannel, DmUser } from "../types/dm";
 
-const API_URL = import.meta.env.VITE_API_URL;
+export type { DmChannel, DmUser };
 
-// --------------------------------------------------
-// TYPES
-// --------------------------------------------------
-export interface DmUser {
-    id: string;
-    username: string;
-    displayName: string;
-    avatarUrl: string | null;
-}
-
-export interface DmChannel {
-    id: string;
-    name?: string | null;
-    isGroup: boolean;
-    members: DmUser[];
-}
-
-// --------------------------------------------------
-// HOOK
-// --------------------------------------------------
 export function useDirectMessagesChannel() {
-    const auth = useAuth();
+    const getMyDms = useCallback((): Promise<DmChannel[]> => dms.list(), []);
 
-    async function getMyDms(): Promise<DmChannel[]> {
-        const res = await fetchWithAuth(`${API_URL}/dms`, {}, auth);
-        if (!res.ok) return [];
-        return await res.json();
-    }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const startDm = useCallback(async (targetUserId: string, _content: string): Promise<string | null> => {
+        try {
+            const data = await dms.start(targetUserId);
 
-    async function startDm(
-        targetUserId: string,
-        content: string
-    ): Promise<string | null> {
-        const res = await fetchWithAuth(
-            `${API_URL}/dms/start/${targetUserId}`,
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ content }),
-            },
-            auth
-        );
+            window.dispatchEvent(
+                new CustomEvent("dm:channel:created", { detail: { channelId: data.channelId } }),
+            );
 
-        if (!res.ok) return null;
-        const data = await res.json();
-        return data.channelId;
-    }
+            return data.channelId;
+        } catch {
+            return null;
+        }
+    }, []);
 
-    async function getDmChannel(channelId: string): Promise<DmChannel | null> {
-        const res = await fetchWithAuth(
-            `${API_URL}/dms/${channelId}`,
-            {},
-            auth
-        );
+    const getDmChannel = useCallback(
+        (channelId: string): Promise<DmChannel | null> => dms.get(channelId),
+        [],
+    );
 
-        if (!res.ok) return null;
-        return await res.json();
-    }
+    const addParticipant = useCallback(async (channelId: string, userId: string): Promise<boolean> => {
+        try {
+            await dms.addParticipant(channelId, userId);
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
 
-    async function addParticipant(
-        channelId: string,
-        userId: string
-    ): Promise<boolean> {
-        const res = await fetchWithAuth(
-            `${API_URL}/dms/${channelId}/participants/${userId}`,
-            { method: "POST" },
-            auth
-        );
+    const leaveChannel = useCallback(async (channelId: string): Promise<boolean> => {
+        try {
+            await dms.leave(channelId);
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
 
-        return res.ok;
-    }
+    const deleteDm = useCallback(async (channelId: string): Promise<boolean> => {
+        try {
+            await dms.delete(channelId);
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
 
-    async function leaveChannel(channelId: string): Promise<boolean> {
-        const res = await fetchWithAuth(
-            `${API_URL}/dms/${channelId}/leave`,
-            { method: "DELETE" },
-            auth
-        );
+    const createGroup = useCallback(async (memberIds: string[], name: string): Promise<string | null> => {
+        try {
+            const data = await dms.createGroup(name, memberIds);
 
-        return res.ok;
-    }
+            window.dispatchEvent(
+                new CustomEvent("dm:channel:created", { detail: { channelId: data.channelId } }),
+            );
 
-    async function createGroup(memberIds: string[]): Promise<string | null> {
-        const res = await fetchWithAuth(
-            `${API_URL}/dms/group`,
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ memberIds }),
-            },
-            auth
-        );
-
-        if (!res.ok) return null;
-        const data = await res.json();
-        return data.channelId;
-    }
+            return data.channelId;
+        } catch {
+            return null;
+        }
+    }, []);
 
     return {
         getMyDms,
@@ -107,6 +74,7 @@ export function useDirectMessagesChannel() {
         getDmChannel,
         addParticipant,
         leaveChannel,
+        deleteDm,
         createGroup,
     };
 }

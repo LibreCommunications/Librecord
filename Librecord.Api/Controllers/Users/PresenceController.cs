@@ -12,28 +12,24 @@ namespace Librecord.Api.Controllers.Users;
 [ApiController]
 [Authorize]
 [Route("presence")]
-public class PresenceController : ControllerBase
+public class PresenceController : AuthenticatedController
 {
     private readonly IPresenceService _presence;
     private readonly IConnectionTracker _connections;
     private readonly IDirectMessageChannelService _dmChannels;
-    private readonly IHubContext<DmHub> _dmHub;
+    private readonly IHubContext<AppHub> _hub;
 
     public PresenceController(
         IPresenceService presence,
         IConnectionTracker connections,
         IDirectMessageChannelService dmChannels,
-        IHubContext<DmHub> dmHub)
+        IHubContext<AppHub> hub)
     {
         _presence = presence;
         _connections = connections;
         _dmChannels = dmChannels;
-        _dmHub = dmHub;
+        _hub = hub;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     // ---------------------------------------------------------
     // SET STATUS
     // ---------------------------------------------------------
@@ -61,8 +57,8 @@ public class PresenceController : ControllerBase
         var channels = await _dmChannels.GetUserChannelsAsync(UserId);
         foreach (var channel in channels)
         {
-            await _dmHub.Clients
-                .Group(DmHub.ChannelGroup(channel.Id))
+            await _hub.Clients
+                .Group(AppHub.DmGroup(channel.Id))
                 .SendAsync("dm:user:presence", new { userId = UserId, status = broadcastStatus });
         }
 

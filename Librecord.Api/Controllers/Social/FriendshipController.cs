@@ -11,7 +11,7 @@ namespace Librecord.Api.Controllers.Social;
 [ApiController]
 [Authorize]
 [Route("friends")]
-public class FriendshipController : ControllerBase
+public class FriendshipController : AuthenticatedController
 {
     private readonly IFriendshipService _friends;
 
@@ -19,10 +19,6 @@ public class FriendshipController : ControllerBase
     {
         _friends = friends;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     // -------------------------------
     // SEND REQUEST
     // -------------------------------
@@ -48,8 +44,6 @@ public class FriendshipController : ControllerBase
 
         return Ok(new FriendshipActionDto { Success = true });
     }
-
-
     // -------------------------------
     // LIST FRIENDS
     // -------------------------------
@@ -60,8 +54,6 @@ public class FriendshipController : ControllerBase
 
         return Ok(friends.Select(FriendshipListDto.From));
     }
-
-
     // -------------------------------
     // INCOMING + OUTGOING REQUESTS
     // -------------------------------
@@ -101,6 +93,24 @@ public class FriendshipController : ControllerBase
     public async Task<ActionResult<FriendshipActionDto>> Decline(Guid requesterId)
     {
         var result = await _friends.DeclineRequestAsync(UserId, requesterId);
+
+        return result.Success
+            ? Ok(new FriendshipActionDto { Success = true })
+            : BadRequest(new FriendshipActionDto
+            {
+                Success = false,
+                Error = result.Error
+            });
+    }
+
+    // -------------------------------
+    // CANCEL OUTGOING REQUEST
+    // -------------------------------
+    [HttpPost("cancel/{targetId:guid}")]
+    public async Task<ActionResult<FriendshipActionDto>> Cancel(Guid targetId)
+    {
+        // Reuse decline logic — the repo checks both directions
+        var result = await _friends.DeclineRequestAsync(targetId, UserId);
 
         return result.Success
             ? Ok(new FriendshipActionDto { Success = true })

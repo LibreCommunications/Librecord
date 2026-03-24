@@ -27,7 +27,7 @@ export default function CreateGuildModal({
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-[fadeIn_0.15s_ease-out]"
+            className="modal-overlay-animated"
             onClick={onClose}
         >
             <div

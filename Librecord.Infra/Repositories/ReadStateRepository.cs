@@ -1,22 +1,34 @@
 using Librecord.Domain.Messaging.Common;
 using Librecord.Infra.Database;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Librecord.Infra.Repositories;
 
 public class ReadStateRepository : IReadStateRepository
 {
     private readonly LibrecordContext _db;
+    private readonly IMemoryCache _cache;
 
-    public ReadStateRepository(LibrecordContext db)
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(10);
+
+    public ReadStateRepository(LibrecordContext db, IMemoryCache cache)
     {
         _db = db;
+        _cache = cache;
     }
 
-    public Task<ChannelReadState?> GetAsync(Guid userId, Guid channelId)
+    public async Task<ChannelReadState?> GetAsync(Guid userId, Guid channelId)
     {
-        return _db.ChannelReadStates
+        var key = $"repo:readstate:{userId}:{channelId}";
+        if (_cache.TryGetValue(key, out ChannelReadState? cached))
+            return cached;
+
+        var result = await _db.ChannelReadStates
             .FirstOrDefaultAsync(r => r.UserId == userId && r.ChannelId == channelId);
+
+        _cache.Set(key, result, CacheTtl);
+        return result;
     }
 
     public Task<List<ChannelReadState>> GetForUserAsync(Guid userId)
@@ -28,7 +40,8 @@ public class ReadStateRepository : IReadStateRepository
 
     public async Task UpsertAsync(Guid userId, Guid channelId, Guid messageId)
     {
-        var state = await GetAsync(userId, channelId);
+        var state = await _db.ChannelReadStates
+            .FirstOrDefaultAsync(r => r.UserId == userId && r.ChannelId == channelId);
 
         if (state == null)
         {
@@ -45,6 +58,9 @@ public class ReadStateRepository : IReadStateRepository
             state.LastReadMessageId = messageId;
             state.LastReadAt = DateTime.UtcNow;
         }
+
+        // Invalidate cache after upsert
+        _cache.Remove($"repo:readstate:{userId}:{channelId}");
     }
 
     public async Task<Dictionary<Guid, int>> GetUnreadCountsAsync(Guid userId, List<Guid> channelIds)
@@ -104,6 +120,15 @@ public class ReadStateRepository : IReadStateRepository
         }
 
         return result;
+    }
+
+    public async Task DeleteByChannelIdAsync(Guid channelId)
+    {
+        var states = await _db.ChannelReadStates
+            .Where(r => r.ChannelId == channelId)
+            .ToListAsync();
+
+        _db.ChannelReadStates.RemoveRange(states);
     }
 
     public Task SaveChangesAsync()

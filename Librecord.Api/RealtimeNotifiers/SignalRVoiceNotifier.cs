@@ -6,16 +6,16 @@ namespace Librecord.Api.RealtimeNotifiers;
 
 public sealed class SignalRVoiceRealtimeNotifier : IVoiceRealtimeNotifier
 {
-    private readonly IHubContext<GuildHub> _hub;
+    private readonly IHubContext<AppHub> _hub;
 
-    public SignalRVoiceRealtimeNotifier(IHubContext<GuildHub> hub)
+    public SignalRVoiceRealtimeNotifier(IHubContext<AppHub> hub)
     {
         _hub = hub;
     }
 
     public Task NotifyAsync(VoiceEvent evt)
     {
-        var group = GuildHub.ChannelGroup(evt.ChannelId);
+        var group = AppHub.GuildGroup(evt.ChannelId);
 
         return evt switch
         {

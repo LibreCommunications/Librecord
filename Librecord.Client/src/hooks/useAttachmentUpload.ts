@@ -1,55 +1,53 @@
-import { useAuth } from "../context/AuthContext";
-import { fetchWithAuth } from "../api/fetchWithAuth";
+import { useCallback } from "react";
+import { uploads, ApiError } from "../api/client";
 import type { Message } from "../types/message";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const UPLOAD_TIMEOUT_MS = 60_000; // 60 seconds
+
+export type UploadResult =
+    | { ok: true; message: Message }
+    | { ok: false; status: number }; // 0 = timeout/network error
 
 export function useAttachmentUpload() {
-    const auth = useAuth();
-
-    async function sendGuildMessageWithAttachments(
+    const sendGuildMessageWithAttachments = useCallback(async (
         channelId: string,
         content: string,
         clientMessageId: string,
         files: File[]
-    ): Promise<Message | null> {
-        const form = new FormData();
-        form.append("content", content);
-        form.append("clientMessageId", clientMessageId);
-        for (const file of files) {
-            form.append("files", file);
+    ): Promise<UploadResult> => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+
+        try {
+            const message = await uploads.guildMessage(channelId, content, clientMessageId, files, controller.signal);
+            return { ok: true, message };
+        } catch (err) {
+            if (err instanceof ApiError) return { ok: false, status: err.status };
+            return { ok: false, status: 0 };
+        } finally {
+            clearTimeout(timeout);
         }
+    }, []);
 
-        const res = await fetchWithAuth(
-            `${API_URL}/guild-channels/${channelId}/messages/with-attachments`,
-            { method: "POST", body: form },
-            auth
-        );
-        if (!res.ok) return null;
-        return res.json();
-    }
-
-    async function sendDmMessageWithAttachments(
+    const sendDmMessageWithAttachments = useCallback(async (
         channelId: string,
         content: string,
         clientMessageId: string,
         files: File[]
-    ): Promise<Message | null> {
-        const form = new FormData();
-        form.append("content", content);
-        form.append("clientMessageId", clientMessageId);
-        for (const file of files) {
-            form.append("files", file);
-        }
+    ): Promise<UploadResult> => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
 
-        const res = await fetchWithAuth(
-            `${API_URL}/dm-messages/channel/${channelId}/with-attachments`,
-            { method: "POST", body: form },
-            auth
-        );
-        if (!res.ok) return null;
-        return res.json();
-    }
+        try {
+            const message = await uploads.dmMessage(channelId, content, clientMessageId, files, controller.signal);
+            return { ok: true, message };
+        } catch (err) {
+            if (err instanceof ApiError) return { ok: false, status: err.status };
+            return { ok: false, status: 0 };
+        } finally {
+            clearTimeout(timeout);
+        }
+    }, []);
 
     return { sendGuildMessageWithAttachments, sendDmMessageWithAttachments };
 }

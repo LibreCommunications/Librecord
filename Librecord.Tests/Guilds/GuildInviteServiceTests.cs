@@ -11,12 +11,25 @@ public class GuildInviteServiceTests
 
     private GuildInviteService CreateService() => new(_invites.Object, _guilds.Object);
 
-    private static Guild MakeGuild(Guid? id = null) => new()
+    private static Guild MakeGuild(Guid? id = null)
     {
-        Id = id ?? Guid.NewGuid(),
-        Name = "Test Guild",
-        CreatedAt = DateTime.UtcNow
-    };
+        var guildId = id ?? Guid.NewGuid();
+        return new Guild
+        {
+            Id = guildId,
+            Name = "Test Guild",
+            CreatedAt = DateTime.UtcNow,
+            Roles =
+            {
+                new GuildRole
+                {
+                    Id = Guid.NewGuid(),
+                    GuildId = guildId,
+                    Name = "@everyone"
+                }
+            }
+        };
+    }
 
     // ---------------------------------------------------------
     // CREATE INVITE

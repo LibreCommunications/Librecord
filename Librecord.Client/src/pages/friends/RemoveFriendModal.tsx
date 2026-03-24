@@ -27,12 +27,12 @@ export default function RemoveFriendModal({
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-[fadeIn_0.15s_ease-out]"
+            className="modal-overlay-animated"
             onClick={onClose}
         >
             <div
                 onClick={e => e.stopPropagation()}
-                className="w-[440px] bg-[#313338] rounded-lg shadow-xl overflow-hidden animate-[scaleIn_0.15s_ease-out]"
+                className="w-[440px] modal-card-animated"
             >
                 <div className="p-4">
                     <h2 className="text-xl font-semibold text-white mb-2">

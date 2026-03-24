@@ -7,4 +7,5 @@ public interface IReactionRepository
     Task AddAsync(MessageReaction reaction);
     Task RemoveAsync(Guid messageId, Guid userId, string emoji);
     Task SaveChangesAsync();
+    Task<Guid?> GetMessageChannelIdAsync(Guid messageId);
 }

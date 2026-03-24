@@ -2,11 +2,13 @@
 using Librecord.Api.Models.Auth;
 using Librecord.Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Librecord.Api.Controllers;
 
 [ApiController]
 [Route("auth")]
+[EnableRateLimiting("auth")]
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _auth;

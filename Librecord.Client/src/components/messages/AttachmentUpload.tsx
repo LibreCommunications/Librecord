@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useImperativeHandle, useRef, useState } from "react";
 
 interface Props {
     files: File[];
@@ -6,8 +6,53 @@ interface Props {
     triggerRef?: React.Ref<{ open: () => void }>;
 }
 
+/**
+ * Build a Map<File, objectURL> reusing existing URLs where possible.
+ * Revokes URLs for files no longer present.
+ */
+function reconcileUrls(
+    prev: Map<File, string>,
+    files: File[],
+): Map<File, string> {
+    const next = new Map<File, string>();
+    for (const file of files) {
+        next.set(file, prev.get(file) ?? URL.createObjectURL(file));
+    }
+    for (const [file, url] of prev) {
+        if (!next.has(file)) URL.revokeObjectURL(url);
+    }
+    return next;
+}
+
 export function AttachmentUpload({ files, onFilesChange, triggerRef }: Props) {
     const inputRef = useRef<HTMLInputElement>(null);
+
+    // Track which files array we last computed URLs for
+    const [urlState, setUrlState] = useState<{ files: File[]; urls: Map<File, string> }>({
+        files: [],
+        urls: new Map(),
+    });
+
+    // Synchronize preview URLs when files change (runs during render, no effect needed)
+    let previewUrls = urlState.urls;
+    if (files !== urlState.files) {
+        const next = reconcileUrls(urlState.urls, files);
+        previewUrls = next;
+        // Schedule state update — this is fine because we're computing derived state
+        // from changed props (the "if changed" pattern recommended by React docs)
+        setUrlState({ files, urls: next });
+    }
+
+    // Revoke all on unmount
+    useEffect(() => {
+        return () => {
+            // Read the latest state at unmount time via the setter
+            setUrlState(prev => {
+                for (const url of prev.urls.values()) URL.revokeObjectURL(url);
+                return prev;
+            });
+        };
+    }, []);
 
     function handleFiles(newFiles: FileList | null) {
         if (!newFiles) return;
@@ -28,9 +73,7 @@ export function AttachmentUpload({ files, onFilesChange, triggerRef }: Props) {
     }
 
     // Expose open() to parent via ref
-    if (triggerRef && typeof triggerRef === "object" && triggerRef !== null) {
-        (triggerRef as React.MutableRefObject<{ open: () => void }>).current = { open };
-    }
+    useImperativeHandle(triggerRef, () => ({ open }));
 
     return (
         <div
@@ -47,7 +90,7 @@ export function AttachmentUpload({ files, onFilesChange, triggerRef }: Props) {
                         >
                             {file.type.startsWith("image/") ? (
                                 <img
-                                    src={URL.createObjectURL(file)}
+                                    src={previewUrls.get(file)}
                                     className="w-10 h-10 rounded object-cover"
                                     alt=""
                                 />

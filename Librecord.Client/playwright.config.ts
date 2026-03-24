@@ -4,17 +4,15 @@ import { defineConfig } from "@playwright/test";
  * Environment-driven config:
  *   E2E_BASE_URL  — frontend URL  (default: https://localhost:5173)
  *   E2E_API_URL   — backend URL   (default: https://localhost:5111)
- *
- * Run against production:
- *   E2E_BASE_URL=https://librecord.gros-sans-dessein.com \
- *   E2E_API_URL=https://librecord.gros-sans-dessein.com/api \
- *   npm run test:e2e
  */
 export default defineConfig({
     testDir: "./e2e",
-    fullyParallel: false,
+
+    // Files run in parallel, tests within a serial block stay ordered
+    fullyParallel: true,
+    workers: process.env.CI ? 2 : 4,
+
     retries: 0,
-    workers: 1,
     timeout: 120_000,
     expect: { timeout: 15_000 },
 

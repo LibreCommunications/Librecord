@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePins, type PinnedMessage } from "../../hooks/usePins";
 
 interface Props {
@@ -9,15 +9,43 @@ interface Props {
 export function PinnedMessagesPanel({ channelId, onClose }: Props) {
     const { getPins, unpinMessage } = usePins();
     const [pins, setPins] = useState<PinnedMessage[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loadedChannel, setLoadedChannel] = useState<string | null>(null);
 
-    useEffect(() => {
-        setLoading(true);
+    // Derive loading from whether we've loaded this channel's pins yet
+    const loading = loadedChannel !== channelId;
+
+    const loadPins = useCallback(() => {
         getPins(channelId).then(p => {
             setPins(p);
-            setLoading(false);
+            setLoadedChannel(channelId);
         });
-    }, [channelId]);
+    }, [getPins, channelId]);
+
+    useEffect(() => {
+        let cancelled = false;
+        getPins(channelId).then(p => {
+            if (!cancelled) {
+                setPins(p);
+                setLoadedChannel(channelId);
+            }
+        });
+        return () => { cancelled = true; };
+    }, [getPins, channelId]);
+
+    // Refresh pin list on realtime pin/unpin events
+    useEffect(() => {
+        const onPinChanged = (e: CustomEvent<{ channelId: string; messageId: string }>) => {
+            if (e.detail.channelId !== channelId) return;
+            loadPins();
+        };
+
+        window.addEventListener("channel:message:pinned", onPinChanged as EventListener);
+        window.addEventListener("channel:message:unpinned", onPinChanged as EventListener);
+        return () => {
+            window.removeEventListener("channel:message:pinned", onPinChanged as EventListener);
+            window.removeEventListener("channel:message:unpinned", onPinChanged as EventListener);
+        };
+    }, [channelId, loadPins]);
 
     async function handleUnpin(messageId: string) {
         if (await unpinMessage(channelId, messageId)) {
@@ -40,7 +68,7 @@ export function PinnedMessagesPanel({ channelId, onClose }: Props) {
                 )}
 
                 {pins.map(pin => (
-                    <div key={pin.messageId} className="bg-[#1e1f22] rounded p-3 text-sm">
+                    <div key={pin.messageId} className="bg-[#1e1f22] rounded p-3 text-sm" data-testid="pin-card">
                         <div className="flex items-center justify-between mb-1">
                             <span className="font-medium text-gray-200">{pin.author.displayName}</span>
                             <button

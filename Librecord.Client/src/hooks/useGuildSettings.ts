@@ -1,49 +1,58 @@
-import { useAuth } from "../context/AuthContext";
-import { fetchWithAuth } from "../api/fetchWithAuth";
+import { useCallback } from "react";
+import { guilds, guildModeration, type GuildBanEntry } from "../api/client";
 
-const API_URL = import.meta.env.VITE_API_URL;
+export type { GuildBanEntry };
 
 export function useGuildSettings() {
-    const auth = useAuth();
+    const updateGuild = useCallback(async (guildId: string, data: { name?: string }): Promise<boolean> => {
+        try {
+            await guilds.update(guildId, data as { name: string });
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
 
-    async function updateGuild(guildId: string, data: { name?: string }): Promise<boolean> {
-        const res = await fetchWithAuth(`${API_URL}/guilds/${guildId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data),
-        }, auth);
-        return res.ok;
-    }
+    const deleteGuild = useCallback(async (guildId: string): Promise<boolean> => {
+        try {
+            await guilds.delete(guildId);
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
 
-    async function deleteGuild(guildId: string): Promise<boolean> {
-        const res = await fetchWithAuth(`${API_URL}/guilds/${guildId}`, { method: "DELETE" }, auth);
-        return res.ok;
-    }
+    const kickMember = useCallback(async (guildId: string, userId: string): Promise<boolean> => {
+        try {
+            await guildModeration.kick(guildId, userId);
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
 
-    async function kickMember(guildId: string, userId: string): Promise<boolean> {
-        const res = await fetchWithAuth(`${API_URL}/guilds/${guildId}/kick/${userId}`, { method: "POST" }, auth);
-        return res.ok;
-    }
+    const banMember = useCallback(async (guildId: string, userId: string, reason?: string): Promise<boolean> => {
+        try {
+            await guildModeration.ban(guildId, userId, reason);
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
 
-    async function banMember(guildId: string, userId: string, reason?: string): Promise<boolean> {
-        const res = await fetchWithAuth(`${API_URL}/guilds/${guildId}/bans/${userId}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ reason }),
-        }, auth);
-        return res.ok;
-    }
+    const unbanMember = useCallback(async (guildId: string, userId: string): Promise<boolean> => {
+        try {
+            await guildModeration.unban(guildId, userId);
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
 
-    async function unbanMember(guildId: string, userId: string): Promise<boolean> {
-        const res = await fetchWithAuth(`${API_URL}/guilds/${guildId}/bans/${userId}`, { method: "DELETE" }, auth);
-        return res.ok;
-    }
-
-    async function getBans(guildId: string): Promise<any[]> {
-        const res = await fetchWithAuth(`${API_URL}/guilds/${guildId}/bans`, {}, auth);
-        if (!res.ok) return [];
-        return res.json();
-    }
+    const getBans = useCallback(
+        (guildId: string): Promise<GuildBanEntry[]> => guildModeration.getBans(guildId),
+        [],
+    );
 
     return { updateGuild, deleteGuild, kickMember, banMember, unbanMember, getBans };
 }

@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { MessageMenu } from "./MessageMenu";
 import { ReactionBar } from "../messages/ReactionBar";
 import { ImageLightbox } from "../ui/ImageLightbox";
 import { renderMarkdown } from "../../utils/markdown";
 import type { MessageItemProps } from "./MessageItemProps";
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { API_URL } from "../../api/client";
 
 function resolveAttachmentUrl(url: string): string {
     if (url.startsWith("http://") || url.startsWith("https://")) return url;
@@ -28,7 +27,7 @@ function formatTimestamp(iso: string): string {
     return `${date.toLocaleDateString()} ${time}`;
 }
 
-export function MessageItem({
+export const MessageItem = memo(function MessageItem({
                                 msg,
                                 isAuthor,
                                 isEditing,
@@ -49,9 +48,10 @@ export function MessageItem({
     const [lightboxSrc, setLightboxSrc] = useState<{ src: string; alt: string } | null>(null);
 
     return (
-        <div className="flex gap-4 px-4 py-1.5 group relative hover:bg-[#2e3035] transition-colors">
+        <div className="flex gap-4 px-4 py-1.5 group relative hover:bg-[#2e3035] transition-colors" data-testid={`message-${msg.id}`}>
             <img
                 src={getAvatarUrl(msg.author.avatarUrl)}
+                loading="lazy"
                 className="w-10 h-10 rounded-full object-cover mt-0.5 cursor-pointer hover:opacity-80 transition-opacity"
                 alt=""
             />
@@ -92,6 +92,7 @@ export function MessageItem({
                                 }
                             }}
                             className="w-full bg-[#383a40] rounded-lg px-3 py-2 text-[#dbdee1] outline-none border border-[#5865F2] resize-none"
+                        data-testid="edit-message-input"
                             rows={Math.min(editContent.split("\n").length, 6)}
                         />
                         <div className="text-xs text-[#949ba4] mt-1">
@@ -104,6 +105,7 @@ export function MessageItem({
                 ) : (
                     <div
                         className="leading-relaxed text-[#dbdee1] message-content [&_a]:text-[#00a8fc] [&_a:hover]:underline [&_code]:bg-[#2b2d31] [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-sm"
+                        data-testid="message-content"
                         dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
                     />
                 )}
@@ -120,6 +122,7 @@ export function MessageItem({
                                         key={att.id}
                                         src={src}
                                         alt={att.fileName}
+                                        loading="lazy"
                                         onClick={() => setLightboxSrc({ src, alt: att.fileName })}
                                         className="max-w-md max-h-80 rounded-lg object-contain border border-[#1e1f22] cursor-zoom-in hover:brightness-110 transition"
                                     />
@@ -132,6 +135,7 @@ export function MessageItem({
                                         key={att.id}
                                         src={src}
                                         controls
+                                        preload="metadata"
                                         className="max-w-md max-h-80 rounded-lg"
                                     />
                                 );
@@ -140,7 +144,7 @@ export function MessageItem({
                             if (att.contentType.startsWith("audio/")) {
                                 return (
                                     <div key={att.id} className="flex items-center gap-2 bg-[#2b2d31] rounded-lg p-3 max-w-md border border-[#1e1f22]">
-                                        <audio src={src} controls className="flex-1" />
+                                        <audio src={src} controls preload="none" className="flex-1" />
                                         <span className="text-xs text-[#949ba4] shrink-0">{att.fileName}</span>
                                     </div>
                                 );
@@ -241,4 +245,4 @@ export function MessageItem({
             )}
         </div>
     );
-}
+});

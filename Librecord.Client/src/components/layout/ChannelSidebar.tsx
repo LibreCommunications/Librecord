@@ -1,16 +1,15 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useChannels, type GuildChannel } from "../../hooks/useChannels";
 import { useReadState } from "../../hooks/useReadState";
 import { useVoice } from "../../hooks/useVoice";
 import { UnreadBadge } from "../ui/UnreadBadge";
 import CreateChannelModal from "../../pages/guild/CreateChannelModal";
-import type { GuildEventMap } from "../../realtime/guild/guildEvents";
-import { useAuth } from "../../context/AuthContext";
+import type { AppEventMap } from "../../realtime/events";
+import { useAuth } from "../../hooks/useAuth";
 import { useUserProfile } from "../../hooks/useUserProfile";
-import { fetchWithAuth } from "../../api/fetchWithAuth";
+import { guilds as guildsApi, roles as rolesApi, voice } from "../../api/client";
 
-const API_URL = import.meta.env.VITE_API_URL;
 const MANAGE_CHANNELS_PERMISSION_ID = "11111111-1111-1111-1111-111111111104";
 
 interface Props {
@@ -23,22 +22,21 @@ export default function ChannelSidebar({ guildId }: Props) {
     const { getGuildChannels, createChannel } = useChannels();
     const { getUnreadCounts } = useReadState();
     const { voiceState, joinVoice } = useVoice();
-    const auth = useAuth();
-    const { user } = auth;
+    const { user } = useAuth();
     const { getAvatarUrl } = useUserProfile();
 
     const [channels, setChannels] = useState<GuildChannel[]>([]);
     const [unreads, setUnreads] = useState<Record<string, number>>({});
-    const [loading, setLoading] = useState(true);
+    const [loadedGuildId, setLoadedGuildId] = useState<string | null>(null);
+    const loading = loadedGuildId !== guildId;
     const [showCreate, setShowCreate] = useState(false);
     const [canManageChannels, setCanManageChannels] = useState(false);
     const [channelParticipants, setChannelParticipants] = useState<Record<string, { userId: string; username: string; displayName: string; avatarUrl: string | null; isMuted: boolean; isDeafened: boolean }[]>>({});
 
-    async function loadChannels() {
-        setLoading(true);
+    const loadChannels = useCallback(async function loadChannels() {
         const list = await getGuildChannels(guildId);
         setChannels(list);
-        setLoading(false);
+        setLoadedGuildId(guildId);
 
         if (list.length > 0) {
             const counts = await getUnreadCounts(list.map(c => c.id));
@@ -47,31 +45,34 @@ export default function ChannelSidebar({ guildId }: Props) {
 
         // Check if current user can manage channels
         try {
-            const [membersRes, rolesRes] = await Promise.all([
-                fetchWithAuth(`${API_URL}/guilds/${guildId}/members`, {}, auth),
-                fetchWithAuth(`${API_URL}/guilds/${guildId}/roles`, {}, auth),
+            const [members, guildRoles] = await Promise.all([
+                guildsApi.members(guildId),
+                rolesApi.list(guildId),
             ]);
-            if (membersRes.ok && rolesRes.ok) {
-                const members = await membersRes.json();
-                const roles = await rolesRes.json();
-                const me = members.find((m: { userId: string }) => m.userId === user?.userId);
-                const myRoleIds = new Set((me?.roles ?? []).map((r: { id: string }) => r.id));
-                const hasManage = roles
-                    .filter((r: { id: string }) => myRoleIds.has(r.id))
-                    .some((r: { permissions: { permissionId: string; allow: boolean }[] }) =>
-                        r.permissions.some(p => p.permissionId === MANAGE_CHANNELS_PERMISSION_ID && p.allow)
-                    );
-                setCanManageChannels(hasManage);
-            }
+            const me = members.find(m => m.userId === user?.userId);
+            const myRoleIds = new Set((me?.roles ?? []).map(r => r.id));
+            const hasManage = guildRoles
+                .filter(r => myRoleIds.has(r.id))
+                .some(r =>
+                    (r.permissions ?? []).some(p => p.permissionId === MANAGE_CHANNELS_PERMISSION_ID && p.allow)
+                );
+            setCanManageChannels(hasManage);
         } catch {
             setCanManageChannels(false);
         }
-    }
+    }, [guildId, getGuildChannels, getUnreadCounts, user?.userId]);
 
     useEffect(() => {
         if (!guildId) return;
-        loadChannels();
-    }, [guildId]);
+        Promise.resolve().then(loadChannels);
+    }, [guildId, loadChannels]);
+
+    // Re-fetch channels after a reconnect to catch anything missed
+    useEffect(() => {
+        const refresh = () => { loadChannels(); };
+        window.addEventListener("realtime:reconnected", refresh);
+        return () => window.removeEventListener("realtime:reconnected", refresh);
+    }, [loadChannels]);
 
     // Fetch voice participants for all voice channels
     useEffect(() => {
@@ -79,8 +80,7 @@ export default function ChannelSidebar({ guildId }: Props) {
         if (voiceChs.length === 0) return;
         Promise.all(
             voiceChs.map(ch =>
-                fetchWithAuth(`${API_URL}/voice/channels/${ch.id}/participants`, {}, auth)
-                    .then(r => r.ok ? r.json() : [])
+                voice.participants(ch.id)
                     .then(participants => [ch.id, participants] as const)
             )
         ).then(results => {
@@ -92,14 +92,14 @@ export default function ChannelSidebar({ guildId }: Props) {
 
     // Update participant list on voice join/leave/state events
     useEffect(() => {
-        const onJoin = (e: CustomEvent<GuildEventMap["voice:user:joined"]>) => {
+        const onJoin = (e: CustomEvent<AppEventMap["voice:user:joined"]>) => {
             const p = e.detail;
             setChannelParticipants(prev => ({
                 ...prev,
                 [p.channelId]: [...(prev[p.channelId] ?? []).filter(x => x.userId !== p.userId), p],
             }));
         };
-        const onLeave = (e: CustomEvent<GuildEventMap["voice:user:left"]>) => {
+        const onLeave = (e: CustomEvent<AppEventMap["voice:user:left"]>) => {
             const { channelId: chId, userId } = e.detail;
             setChannelParticipants(prev => ({
                 ...prev,
@@ -116,7 +116,7 @@ export default function ChannelSidebar({ guildId }: Props) {
 
     // Increment unread when a message ping arrives for a non-active channel
     useEffect(() => {
-        const onPing = (e: CustomEvent<GuildEventMap["guild:message:ping"]>) => {
+        const onPing = (e: CustomEvent<AppEventMap["guild:message:ping"]>) => {
             const { channelId: pingChannel, authorId } = e.detail;
             if (pingChannel === channelId) return;
             if (authorId === user?.userId) return;
@@ -131,16 +131,16 @@ export default function ChannelSidebar({ guildId }: Props) {
         return () => window.removeEventListener("guild:message:ping", onPing as EventListener);
     }, [channelId, user?.userId]);
 
-    // Clear unread when navigating into a channel
-    useEffect(() => {
-        if (!channelId) return;
-        setUnreads(prev => {
-            if (!prev[channelId]) return prev;
-            const next = { ...prev };
+    // Clear unread count when navigating into a channel (render-phase)
+    const [prevActiveChannelId, setPrevActiveChannelId] = useState(channelId);
+    if (channelId && channelId !== prevActiveChannelId) {
+        setPrevActiveChannelId(channelId);
+        if (unreads[channelId]) {
+            const next = { ...unreads };
             delete next[channelId];
-            return next;
-        });
-    }, [channelId]);
+            setUnreads(next);
+        }
+    }
 
     async function handleCreateChannel(data: {
         name: string;

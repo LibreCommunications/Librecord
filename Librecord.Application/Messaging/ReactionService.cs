@@ -39,4 +39,9 @@ public class ReactionService : IReactionService
         await _reactions.RemoveAsync(messageId, userId, emoji);
         await _reactions.SaveChangesAsync();
     }
+
+    public Task<Guid?> GetMessageChannelIdAsync(Guid messageId)
+    {
+        return _reactions.GetMessageChannelIdAsync(messageId);
+    }
 }

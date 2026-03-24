@@ -1,33 +1,32 @@
 import { useState, useEffect } from "react";
 import { useFriends, type FriendSuggestion } from "../../hooks/useFriends";
-import { useToast } from "../../context/ToastContext";
+import { useToast } from "../../hooks/useToast";
 import { Spinner } from "../../components/ui/Spinner";
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { API_URL } from "../../api/client";
 
 export default function FriendsAddPage() {
     const { sendRequest, suggestUsernames } = useFriends();
     const { toast } = useToast();
 
     const [username, setUsername] = useState("");
-    const [suggestions, setSuggestions] = useState<FriendSuggestion[]>([]);
+    const [rawSuggestions, setRawSuggestions] = useState<FriendSuggestion[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [loading, setLoading] = useState(false);
 
+    // Derive suggestions — empty when input is blank
+    const suggestions = username.trim() ? rawSuggestions : [];
+
     useEffect(() => {
-        if (!username.trim()) {
-            setSuggestions([]);
-            return;
-        }
+        if (!username.trim()) return;
 
         const timeout = setTimeout(async () => {
             const results = await suggestUsernames(username.trim());
-            setSuggestions(results);
+            setRawSuggestions(results);
             setShowSuggestions(true);
         }, 250);
 
         return () => clearTimeout(timeout);
-    }, [username]);
+    }, [username, suggestUsernames]);
 
     function handleSelect(name: string) {
         setUsername(name);

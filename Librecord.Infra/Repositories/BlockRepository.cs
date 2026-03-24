@@ -22,11 +22,36 @@ public class BlockRepository : IBlockRepository
 
     public async Task<HashSet<Guid>> GetAllBlockedUserIdsAsync(Guid userId)
     {
-        var blocked = await _db.UserBlocks
+        return await _db.UserBlocks
             .Where(b => b.BlockerId == userId || b.BlockedId == userId)
             .Select(b => b.BlockerId == userId ? b.BlockedId : b.BlockerId)
             .ToHashSetAsync();
-
-        return blocked;
     }
+
+    public Task<UserBlock?> GetBlockAsync(Guid blockerId, Guid blockedId)
+        => _db.UserBlocks.FirstOrDefaultAsync(b => b.BlockerId == blockerId && b.BlockedId == blockedId);
+
+    public Task<List<UserBlock>> GetBlocksForUserAsync(Guid blockerId)
+        => _db.UserBlocks
+            .Where(b => b.BlockerId == blockerId)
+            .Include(b => b.Blocked)
+            .OrderByDescending(b => b.CreatedAt)
+            .ToListAsync();
+
+    public Task<bool> IsBlockedAsync(Guid blockerId, Guid blockedId)
+        => _db.UserBlocks.AnyAsync(b => b.BlockerId == blockerId && b.BlockedId == blockedId);
+
+    public Task AddBlockAsync(UserBlock block)
+    {
+        _db.UserBlocks.Add(block);
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveBlockAsync(UserBlock block)
+    {
+        _db.UserBlocks.Remove(block);
+        return Task.CompletedTask;
+    }
+
+    public Task SaveChangesAsync() => _db.SaveChangesAsync();
 }

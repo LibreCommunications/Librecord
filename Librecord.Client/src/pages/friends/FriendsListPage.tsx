@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     useFriends,
     type FriendshipListDto
@@ -7,11 +7,10 @@ import {
 import RemoveFriendModal from "../../pages/friends/RemoveFriendModal";
 import { useNavigate } from "react-router-dom";
 import { useDirectMessagesChannel } from "../../hooks/useDirectMessagesChannel";
-import { useToast } from "../../context/ToastContext";
+import { useToast } from "../../hooks/useToast";
 import { Spinner } from "../../components/ui/Spinner";
 import { EmptyState } from "../../components/ui/EmptyState";
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { API_URL } from "../../api/client";
 
 export default function FriendsListPage() {
     const {
@@ -19,13 +18,15 @@ export default function FriendsListPage() {
         getRequests,
         acceptRequest,
         declineRequest,
+        cancelRequest,
         removeFriend
     } = useFriends();
 
     const [friends, setFriends] = useState<FriendshipListDto[]>([]);
     const [incoming, setIncoming] = useState<FriendshipListDto[]>([]);
     const [outgoing, setOutgoing] = useState<FriendshipListDto[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [dataLoaded, setDataLoaded] = useState(false);
+    const loading = !dataLoaded;
 
     const navigate = useNavigate();
     const { startDm } = useDirectMessagesChannel();
@@ -34,22 +35,41 @@ export default function FriendsListPage() {
     const [removeTarget, setRemoveTarget] =
         useState<FriendshipListDto | null>(null);
 
+    const loadData = useCallback(async function loadData() {
+        try {
+            const friendsList = await getFriends();
+            const requestData = await getRequests();
+
+            setFriends(friendsList ?? []);
+            setIncoming(requestData?.incoming ?? []);
+            setOutgoing(requestData?.outgoing ?? []);
+        } catch {
+            // Show whatever we have — empty lists are fine
+        } finally {
+            setDataLoaded(true);
+        }
+    }, [getFriends, getRequests]);
+
     useEffect(() => {
-        loadData();
-    }, []);
+        Promise.resolve().then(loadData);
+    }, [loadData]);
 
-    async function loadData() {
-        setLoading(true);
+    // Refresh friend list on realtime friendship events
+    useEffect(() => {
+        const refresh = () => { loadData(); };
 
-        const friendsList = await getFriends();
-        const requestData = await getRequests();
+        window.addEventListener("friend:request:received", refresh as EventListener);
+        window.addEventListener("friend:request:accepted", refresh as EventListener);
+        window.addEventListener("friend:request:declined", refresh as EventListener);
+        window.addEventListener("friend:removed", refresh as EventListener);
 
-        setFriends(friendsList ?? []);
-        setIncoming(requestData?.incoming ?? []);
-        setOutgoing(requestData?.outgoing ?? []);
-
-        setLoading(false);
-    }
+        return () => {
+            window.removeEventListener("friend:request:received", refresh as EventListener);
+            window.removeEventListener("friend:request:accepted", refresh as EventListener);
+            window.removeEventListener("friend:request:declined", refresh as EventListener);
+            window.removeEventListener("friend:removed", refresh as EventListener);
+        };
+    }, [loadData]);
 
     function avatar(url: string | null) {
         return url ? `${API_URL}${url}` : "/default-avatar.png";
@@ -229,9 +249,20 @@ export default function FriendsListPage() {
                                     </div>
                                 </div>
 
-                                <span className="text-xs text-[#949ba4] bg-[#2b2d31] px-2.5 py-1 rounded-full">
-                                    Pending
-                                </span>
+                                <button
+                                    onClick={async () => {
+                                        await cancelRequest(req.otherUserId);
+                                        toast("Friend request cancelled.", "info");
+                                        loadData();
+                                    }}
+                                    className="w-9 h-9 rounded-full bg-[#2b2d31] hover:bg-[#da373c] text-[#949ba4] hover:text-white flex items-center justify-center transition-colors"
+                                    title="Cancel request"
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18" />
+                                        <line x1="6" y1="6" x2="18" y2="18" />
+                                    </svg>
+                                </button>
                             </div>
                         ))}
                     </div>

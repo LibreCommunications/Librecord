@@ -7,16 +7,16 @@ namespace Librecord.Api.RealtimeNotifiers;
 
 public sealed class SignalRGuildRealtimeNotifier : IGuildRealtimeNotifier
 {
-    private readonly IHubContext<GuildHub> _hub;
+    private readonly IHubContext<AppHub> _hub;
 
-    public SignalRGuildRealtimeNotifier(IHubContext<GuildHub> hub)
+    public SignalRGuildRealtimeNotifier(IHubContext<AppHub> hub)
     {
         _hub = hub;
     }
 
     public Task NotifyAsync(GuildMessageEvent evt)
     {
-        var group = GuildHub.ChannelGroup(evt.ChannelId);
+        var group = AppHub.GuildGroup(evt.ChannelId);
 
         return evt switch
         {
@@ -42,7 +42,8 @@ public sealed class SignalRGuildRealtimeNotifier : IGuildRealtimeNotifier
                             Content = created.Content,
                             CreatedAt = created.CreatedAt,
                             Author = created.Author,
-                            ClientMessageId = created.ClientMessageId
+                            ClientMessageId = created.ClientMessageId,
+                            Attachments = created.Attachments
                         })
                 ),
 
@@ -68,5 +69,15 @@ public sealed class SignalRGuildRealtimeNotifier : IGuildRealtimeNotifier
 
             _ => Task.CompletedTask
         };
+    }
+
+    public Task NotifyGuildDeletedAsync(GuildDeleted evt)
+    {
+        // Broadcast to every channel group in the guild so all connected members see it
+        var tasks = evt.ChannelIds.Select(channelId =>
+            _hub.Clients.Group(AppHub.GuildGroup(channelId))
+                .SendAsync("guild:deleted", new { guildId = evt.GuildId }));
+
+        return Task.WhenAll(tasks);
     }
 }

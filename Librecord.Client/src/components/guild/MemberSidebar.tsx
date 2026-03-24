@@ -2,18 +2,14 @@ import { useEffect, useState } from "react";
 import { useGuildMembers, type GuildMember } from "../../hooks/useGuildMembers";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { StatusDot } from "../user/StatusDot";
-import { useAuth } from "../../context/AuthContext";
-import { fetchWithAuth } from "../../api/fetchWithAuth";
-import type { GuildEventMap } from "../../realtime/guild/guildEvents";
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { presence } from "../../api/client";
+import type { AppEventMap } from "../../realtime/events";
 
 interface Props {
     guildId: string;
 }
 
 export function MemberSidebar({ guildId }: Props) {
-    const auth = useAuth();
     const { getMembers } = useGuildMembers();
     const { getAvatarUrl } = useUserProfile();
     const [members, setMembers] = useState<GuildMember[]>([]);
@@ -25,26 +21,14 @@ export function MemberSidebar({ guildId }: Props) {
 
             // Fetch bulk presence
             const userIds = m.map(member => member.userId);
-            const res = await fetchWithAuth(
-                `${API_URL}/presence/bulk`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ userIds }),
-                },
-                auth
-            );
-
-            if (res.ok) {
-                const data = await res.json();
-                setPresenceMap(data);
-            }
+            const map = await presence.bulk(userIds);
+            setPresenceMap(map);
         });
-    }, [guildId]);
+    }, [guildId, getMembers]);
 
     // Listen for realtime presence changes
     useEffect(() => {
-        const onPresence = (e: CustomEvent<GuildEventMap["guild:user:presence"]>) => {
+        const onPresence = (e: CustomEvent<AppEventMap["guild:user:presence"]>) => {
             setPresenceMap(prev => ({
                 ...prev,
                 [e.detail.userId]: e.detail.status,

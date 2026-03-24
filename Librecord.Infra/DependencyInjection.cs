@@ -25,6 +25,9 @@ public static class DependencyInjection
             .Bind(config.GetSection("Jwt"))
             .ValidateDataAnnotations();
 
+        // In-memory cache for repository query results (short TTL)
+        services.AddMemoryCache();
+
         //
         // ─── REPOSITORIES ──────────────────────────────────────────────────────────
         //
@@ -47,6 +50,11 @@ public static class DependencyInjection
         services.AddScoped<IReactionRepository, ReactionRepository>();
         services.AddScoped<IReadStateRepository, ReadStateRepository>();
         services.AddScoped<IVoiceStateRepository, VoiceStateRepository>();
+        services.AddScoped<IPinRepository, PinRepository>();
+        services.AddScoped<IMessageSearchRepository, MessageSearchRepository>();
+        services.AddScoped<IAttachmentRepository, AttachmentRepository>();
+        services.AddScoped<IAttachmentAccessRepository, AttachmentAccessRepository>();
+        services.AddScoped<IThreadRepository, ThreadRepository>();
 
         //
         // ─── SERVICES (INFRA) ─────────────────────────────────────────────────────

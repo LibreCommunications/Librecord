@@ -1,106 +1,77 @@
-using System.Security.Claims;
-using Librecord.Api.Dtos.Messages;
-using Librecord.Domain.Messaging.Common;
-using Librecord.Infra.Database;
+using Librecord.Api.Hubs;
+using Librecord.Application.Messaging;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
 
 namespace Librecord.Api.Controllers.Messaging;
 
 [ApiController]
 [Authorize]
 [Route("channels/{channelId:guid}/pins")]
-public class PinController : ControllerBase
+public class PinController : AuthenticatedController
 {
-    private readonly LibrecordContext _db;
+    private readonly IPinService _pins;
+    private readonly IHubContext<AppHub> _hub;
 
-    public PinController(LibrecordContext db)
+    public PinController(
+        IPinService pins,
+        IHubContext<AppHub> hub)
     {
-        _db = db;
+        _pins = pins;
+        _hub = hub;
     }
 
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
-    // ---------------------------------------------------------
-    // PIN MESSAGE
-    // ---------------------------------------------------------
     [HttpPost("{messageId:guid}")]
     public async Task<IActionResult> Pin(Guid channelId, Guid messageId)
     {
-        var existing = await _db.PinnedMessages
-            .FirstOrDefaultAsync(p => p.ChannelId == channelId && p.MessageId == messageId);
+        if (!await _pins.IsChannelMemberAsync(channelId, UserId))
+            return Forbid();
 
-        if (existing != null) return Ok();
+        var pinned = await _pins.PinMessageAsync(channelId, messageId, UserId);
+        if (!pinned) return NotFound("Message not in this channel.");
 
-        // Verify message belongs to channel
-        var inChannel = await _db.DmChannelMessages
-            .AnyAsync(m => m.ChannelId == channelId && m.MessageId == messageId)
-            || await _db.GuildChannelMessages
-            .AnyAsync(m => m.ChannelId == channelId && m.MessageId == messageId);
+        var payload = new { channelId, messageId };
+        await Task.WhenAll(
+            _hub.Clients.Group(AppHub.DmGroup(channelId)).SendAsync("channel:message:pinned", payload),
+            _hub.Clients.Group(AppHub.GuildGroup(channelId)).SendAsync("channel:message:pinned", payload));
 
-        if (!inChannel) return NotFound("Message not in this channel.");
-
-        _db.PinnedMessages.Add(new PinnedMessage
-        {
-            ChannelId = channelId,
-            MessageId = messageId,
-            PinnedById = UserId,
-            PinnedAt = DateTime.UtcNow
-        });
-
-        await _db.SaveChangesAsync();
         return Ok();
     }
 
-    // ---------------------------------------------------------
-    // UNPIN MESSAGE
-    // ---------------------------------------------------------
     [HttpDelete("{messageId:guid}")]
     public async Task<IActionResult> Unpin(Guid channelId, Guid messageId)
     {
-        var pin = await _db.PinnedMessages
-            .FirstOrDefaultAsync(p => p.ChannelId == channelId && p.MessageId == messageId);
+        if (!await _pins.IsChannelMemberAsync(channelId, UserId))
+            return Forbid();
 
-        if (pin == null) return NotFound();
+        var unpinned = await _pins.UnpinMessageAsync(channelId, messageId);
+        if (!unpinned) return NotFound();
 
-        _db.PinnedMessages.Remove(pin);
-        await _db.SaveChangesAsync();
+        var payload = new { channelId, messageId };
+        await Task.WhenAll(
+            _hub.Clients.Group(AppHub.DmGroup(channelId)).SendAsync("channel:message:unpinned", payload),
+            _hub.Clients.Group(AppHub.GuildGroup(channelId)).SendAsync("channel:message:unpinned", payload));
+
         return Ok();
     }
 
-    // ---------------------------------------------------------
-    // LIST PINNED MESSAGES
-    // ---------------------------------------------------------
     [HttpGet]
     public async Task<IActionResult> List(Guid channelId)
     {
-        var pins = await _db.PinnedMessages
-            .Where(p => p.ChannelId == channelId)
-            .Include(p => p.Message)
-                .ThenInclude(m => m.User)
-            .Include(p => p.PinnedBy)
-            .OrderByDescending(p => p.PinnedAt)
-            .ToListAsync();
+        if (!await _pins.IsChannelMemberAsync(channelId, UserId))
+            return Forbid();
+
+        var pins = await _pins.GetPinnedMessagesAsync(channelId);
 
         return Ok(pins.Select(p => new
         {
             messageId = p.MessageId,
             channelId = p.ChannelId,
-            content = p.Message.ContentText,
-            createdAt = p.Message.CreatedAt,
-            author = new
-            {
-                id = p.Message.User.Id,
-                username = p.Message.User.UserName,
-                displayName = p.Message.User.DisplayName
-            },
-            pinnedBy = new
-            {
-                id = p.PinnedBy.Id,
-                displayName = p.PinnedBy.DisplayName
-            },
+            content = p.Content,
+            createdAt = p.CreatedAt,
+            author = new { id = p.Author.Id, username = p.Author.Username, displayName = p.Author.DisplayName },
+            pinnedBy = new { id = p.PinnedBy.Id, displayName = p.PinnedBy.DisplayName },
             pinnedAt = p.PinnedAt
         }));
     }

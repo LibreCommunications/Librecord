@@ -1,7 +1,9 @@
 using Librecord.Application.Messaging;
+using Librecord.Domain.Messaging.Common;
 using Librecord.Domain.Messaging.Direct;
 using Librecord.Domain.Social;
 using Librecord.Domain.Storage;
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace Librecord.Tests.Messaging;
@@ -12,13 +14,23 @@ public class DirectMessageChannelServiceTests
     private readonly Mock<IFriendshipRepository> _friendships = new();
     private readonly Mock<IBlockRepository> _blocks = new();
     private readonly Mock<IAttachmentStorageService> _storage = new();
+    private readonly Mock<IReadStateRepository> _readStates = new();
 
     private DirectMessageChannelService CreateService() =>
-        new(_dms.Object, _friendships.Object, _blocks.Object, _storage.Object);
+        new(_dms.Object, _friendships.Object, _blocks.Object, _storage.Object, _readStates.Object,
+            Mock.Of<ILogger<DirectMessageChannelService>>());
 
     private static DmChannel MakeChannel(Guid channelId, params Guid[] memberIds)
     {
         var channel = new DmChannel { Id = channelId };
+        foreach (var uid in memberIds)
+            channel.Members.Add(new DmChannelMember { ChannelId = channelId, UserId = uid });
+        return channel;
+    }
+
+    private static DmChannel MakeGroupChannel(Guid channelId, params Guid[] memberIds)
+    {
+        var channel = new DmChannel { Id = channelId, IsGroup = true };
         foreach (var uid in memberIds)
             channel.Members.Add(new DmChannelMember { ChannelId = channelId, UserId = uid });
         return channel;
@@ -135,7 +147,7 @@ public class DirectMessageChannelServiceTests
         var requesterId = Guid.NewGuid();
         var newUserId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
-        var channel = MakeChannel(channelId, requesterId, Guid.NewGuid());
+        var channel = MakeGroupChannel(channelId, requesterId, Guid.NewGuid());
 
         _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
         _friendships.Setup(f => f.UsersAreConfirmedFriendsAsync(requesterId, newUserId))
@@ -154,7 +166,7 @@ public class DirectMessageChannelServiceTests
         var requesterId = Guid.NewGuid();
         var newUserId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
-        var channel = MakeChannel(channelId, requesterId);
+        var channel = MakeGroupChannel(channelId, requesterId);
 
         _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
         _friendships.Setup(f => f.UsersAreConfirmedFriendsAsync(requesterId, newUserId))
@@ -170,7 +182,7 @@ public class DirectMessageChannelServiceTests
     public async Task AddParticipant_RequesterNotMember_Throws()
     {
         var channelId = Guid.NewGuid();
-        var channel = MakeChannel(channelId, Guid.NewGuid());
+        var channel = MakeGroupChannel(channelId, Guid.NewGuid());
         _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
 
         var svc = CreateService();
@@ -185,7 +197,7 @@ public class DirectMessageChannelServiceTests
         var requesterId = Guid.NewGuid();
         var newUserId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
-        var channel = MakeChannel(channelId, requesterId);
+        var channel = MakeGroupChannel(channelId, requesterId);
 
         _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
         _blocks.Setup(b => b.IsEitherBlockedAsync(requesterId, newUserId)).ReturnsAsync(true);
@@ -204,7 +216,7 @@ public class DirectMessageChannelServiceTests
         var requesterId = Guid.NewGuid();
         var existingId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
-        var channel = MakeChannel(channelId, requesterId, existingId);
+        var channel = MakeGroupChannel(channelId, requesterId, existingId);
 
         _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
 
@@ -224,7 +236,7 @@ public class DirectMessageChannelServiceTests
         var userId = Guid.NewGuid();
         var otherId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
-        var channel = MakeChannel(channelId, userId, otherId);
+        var channel = MakeGroupChannel(channelId, userId, otherId);
 
         _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
 
@@ -241,7 +253,7 @@ public class DirectMessageChannelServiceTests
     {
         var userId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
-        var channel = MakeChannel(channelId, userId);
+        var channel = MakeGroupChannel(channelId, userId);
 
         _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
 
@@ -255,7 +267,7 @@ public class DirectMessageChannelServiceTests
     public async Task LeaveChannel_NotAMember_NoOp()
     {
         var channelId = Guid.NewGuid();
-        var channel = MakeChannel(channelId, Guid.NewGuid());
+        var channel = MakeGroupChannel(channelId, Guid.NewGuid());
 
         _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
 

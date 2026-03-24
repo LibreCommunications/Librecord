@@ -16,10 +16,8 @@ namespace Librecord.Api.Controllers.Messaging;
 public sealed class GuildChannelMessagesController(
     IGuildChannelMessageService guildChannelMessages,
     IPermissionService permissions)
-    : ControllerBase
+    : AuthenticatedController
 {
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     // ---------------------------------------------------------
     // GET SINGLE MESSAGE

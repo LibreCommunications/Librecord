@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useGuildSettings } from "../../hooks/useGuildSettings";
 import { ConfirmModal } from "../ui/ConfirmModal";
-import { useToast } from "../../context/ToastContext";
+import { useToast } from "../../hooks/useToast";
 
 interface Props {
     guildId: string;
@@ -75,26 +75,26 @@ export function MemberContextMenu({ guildId, userId, displayName, onClose, onMem
 
             {confirmAction === "ban" && (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-[fadeIn_0.15s_ease-out]"
+                    className="modal-overlay-animated"
                     onClick={() => setConfirmAction(null)}
                 >
                     <div
                         onClick={e => e.stopPropagation()}
-                        className="w-[440px] bg-[#313338] rounded-lg shadow-xl overflow-hidden animate-[scaleIn_0.15s_ease-out]"
+                        className="w-[440px] modal-card-animated"
                     >
                         <div className="p-4">
                             <h2 className="text-xl font-semibold text-white mb-2">Ban {displayName}</h2>
                             <p className="text-sm text-[#b5bac1] mb-4">
                                 Are you sure you want to ban {displayName}? They will not be able to rejoin unless unbanned.
                             </p>
-                            <label className="block text-xs font-bold uppercase text-[#b5bac1] tracking-wide mb-2">
+                            <label className="block section-label mb-2">
                                 Reason (optional)
                             </label>
                             <input
                                 value={banReason}
                                 onChange={e => setBanReason(e.target.value)}
                                 placeholder="Enter a reason..."
-                                className="w-full px-3 py-2.5 rounded-[4px] bg-[#1e1f22] text-white outline-none border border-[#1e1f22] focus:border-[#5865F2] transition-colors"
+                                className="input-field"
                             />
                         </div>
                         <div className="flex justify-end gap-3 px-4 py-3 bg-[#2b2d31]">

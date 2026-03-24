@@ -1,30 +1,14 @@
-import { useAuth } from "../context/AuthContext";
-import { fetchWithAuth } from "../api/fetchWithAuth";
+import { useCallback } from "react";
+import { guilds } from "../api/client";
+import type { GuildMember } from "../types/guild";
 
-const API_URL = import.meta.env.VITE_API_URL;
-
-export interface GuildMember {
-    userId: string;
-    username: string;
-    displayName: string;
-    avatarUrl: string | null;
-    joinedAt: string;
-    roles: { id: string; name: string }[];
-}
+export type { GuildMember };
 
 export function useGuildMembers() {
-    const auth = useAuth();
-
-    async function getMembers(guildId: string): Promise<GuildMember[]> {
-        const res = await fetchWithAuth(
-            `${API_URL}/guilds/${guildId}/members`,
-            {},
-            auth
-        );
-
-        if (!res.ok) return [];
-        return res.json();
-    }
+    const getMembers = useCallback(
+        (guildId: string): Promise<GuildMember[]> => guilds.members(guildId),
+        [],
+    );
 
     return { getMembers };
 }

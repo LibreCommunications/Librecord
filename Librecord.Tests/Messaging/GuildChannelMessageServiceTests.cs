@@ -67,12 +67,40 @@ public class GuildChannelMessageServiceTests
     }
 
     [Fact]
-    public async Task CreateMessage_EmptyContent_Throws()
+    public async Task CreateMessage_EmptyContent_NoAttachments_Throws()
     {
         var svc = CreateService();
 
         await Assert.ThrowsAsync<ArgumentException>(
             () => svc.CreateMessageAsync(Guid.NewGuid(), Guid.NewGuid(), "  "));
+    }
+
+    [Fact]
+    public async Task CreateMessage_EmptyContent_WithAttachments_Succeeds()
+    {
+        var userId = Guid.NewGuid();
+        var channelId = Guid.NewGuid();
+
+        _messages.Setup(m => m.GetMessageAsync(It.IsAny<Guid>()))
+            .ReturnsAsync((Guid id) => MakeHydratedMessage(id, userId, channelId));
+
+        var svc = CreateService();
+        var result = await svc.CreateMessageAsync(channelId, userId, "", "client-456", hasAttachments: true);
+
+        Assert.NotNull(result);
+        _messages.Verify(m => m.AddMessageAsync(It.Is<Message>(msg =>
+            msg.ContentText == ""
+        ), channelId), Times.Once);
+        _messages.Verify(m => m.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateMessage_EmptyContent_NoAttachmentFlag_Throws()
+    {
+        var svc = CreateService();
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => svc.CreateMessageAsync(Guid.NewGuid(), Guid.NewGuid(), "", hasAttachments: false));
     }
 
     [Fact]

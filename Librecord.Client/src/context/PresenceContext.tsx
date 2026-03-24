@@ -1,8 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { useAuth } from "./AuthContext";
-import { fetchWithAuth } from "../api/fetchWithAuth";
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { createContext, useCallback, useEffect, useState, type ReactNode } from "react";
+import { useAuth } from "../hooks/useAuth";
+import { presence } from "../api/client";
 
 interface PresenceContextValue {
     myStatus: string;
@@ -15,28 +13,20 @@ const PresenceContext = createContext<PresenceContextValue>({
 });
 
 export function PresenceProvider({ children }: { children: ReactNode }) {
-    const auth = useAuth();
+    const { user } = useAuth();
     const [myStatus, setStatus] = useState("online");
 
     useEffect(() => {
-        if (!auth.user) return;
-        fetchWithAuth(`${API_URL}/presence/me`, {}, auth)
-            .then(res => res.ok ? res.json() : null)
-            .then(data => { if (data?.status) setStatus(data.status); });
-    }, [auth.user?.userId]);
+        if (!user) return;
+        presence.me()
+            .then(data => { if (data?.status) setStatus(data.status); })
+            .catch(() => {});
+    }, [user?.userId]);
 
     const setMyStatus = useCallback(async (status: string) => {
-        await fetchWithAuth(
-            `${API_URL}/presence`,
-            {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status }),
-            },
-            auth
-        );
+        await presence.set(status);
         setStatus(status);
-    }, [auth]);
+    }, []);
 
     return (
         <PresenceContext.Provider value={{ myStatus, setMyStatus }}>
@@ -45,6 +35,4 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     );
 }
 
-export function usePresence() {
-    return useContext(PresenceContext);
-}
+export { PresenceContext };

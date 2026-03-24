@@ -26,10 +26,18 @@ export function renderMarkdown(text: string): string {
     // Block quotes (> ...)
     html = html.replace(/^&gt; (.+)$/gm, '<blockquote class="border-l-3 border-gray-500 pl-2 text-gray-300">$1</blockquote>');
 
-    // Links (auto-detect URLs)
+    // Links (auto-detect URLs — only http/https, no javascript: or data:)
     html = html.replace(
-        /(https?:\/\/[^\s<]+)/g,
-        '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-[#5865F2] hover:underline">$1</a>'
+        /(https?:\/\/[^\s<"']+)/g,
+        (url) => {
+            try {
+                const parsed = new URL(url);
+                if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return url;
+                return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-[#5865F2] hover:underline">${url}</a>`;
+            } catch {
+                return url;
+            }
+        }
     );
 
     return html;

@@ -1,36 +1,32 @@
-import { useAuth } from "../context/AuthContext";
-import { fetchWithAuth } from "../api/fetchWithAuth";
+import { useCallback } from "react";
+import { pins } from "../api/client";
+import type { PinnedMessage } from "../types/pin";
 
-const API_URL = import.meta.env.VITE_API_URL;
-
-export interface PinnedMessage {
-    messageId: string;
-    channelId: string;
-    content: string;
-    createdAt: string;
-    author: { id: string; username: string; displayName: string };
-    pinnedBy: { id: string; displayName: string };
-    pinnedAt: string;
-}
+export type { PinnedMessage };
 
 export function usePins() {
-    const auth = useAuth();
+    const pinMessage = useCallback(async (channelId: string, messageId: string): Promise<boolean> => {
+        try {
+            await pins.pin(channelId, messageId);
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
 
-    async function pinMessage(channelId: string, messageId: string): Promise<boolean> {
-        const res = await fetchWithAuth(`${API_URL}/channels/${channelId}/pins/${messageId}`, { method: "POST" }, auth);
-        return res.ok;
-    }
+    const unpinMessage = useCallback(async (channelId: string, messageId: string): Promise<boolean> => {
+        try {
+            await pins.unpin(channelId, messageId);
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
 
-    async function unpinMessage(channelId: string, messageId: string): Promise<boolean> {
-        const res = await fetchWithAuth(`${API_URL}/channels/${channelId}/pins/${messageId}`, { method: "DELETE" }, auth);
-        return res.ok;
-    }
-
-    async function getPins(channelId: string): Promise<PinnedMessage[]> {
-        const res = await fetchWithAuth(`${API_URL}/channels/${channelId}/pins`, {}, auth);
-        if (!res.ok) return [];
-        return res.json();
-    }
+    const getPins = useCallback(
+        (channelId: string): Promise<PinnedMessage[]> => pins.list(channelId),
+        [],
+    );
 
     return { pinMessage, unpinMessage, getPins };
 }

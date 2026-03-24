@@ -10,7 +10,7 @@ namespace Librecord.Api.Controllers.Messaging;
 [ApiController]
 [Route("dm-messages")]
 [Authorize]
-public sealed class DirectMessageController : ControllerBase
+public sealed class DirectMessageController : AuthenticatedController
 {
     private readonly IDirectMessageService _dms;
 
@@ -18,10 +18,6 @@ public sealed class DirectMessageController : ControllerBase
     {
         _dms = dms;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     // ---------------------------------------------------------
     // GET CHANNEL MESSAGES
     // ---------------------------------------------------------

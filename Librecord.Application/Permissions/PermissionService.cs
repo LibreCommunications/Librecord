@@ -1,4 +1,4 @@
-﻿using Librecord.Domain.Guilds;
+using Librecord.Domain.Guilds;
 using Librecord.Domain.Permissions;
 
 namespace Librecord.Application.Permissions;
@@ -24,26 +24,34 @@ public class PermissionService : IPermissionService
         Guid guildId,
         PermissionCapability required)
     {
-        var member = await _guilds.GetGuildMemberAsync(guildId, userId);
-        if (member == null)
+        var granted = await GetGrantedGuildPermissionsAsync(userId, guildId);
+        if (granted == null)
             return PermissionResult.Deny("User is not a guild member.");
-
-        var granted = new HashSet<PermissionCapability>();
-
-        foreach (var roleLink in member.Roles)
-        {
-            var rolePerms = await _guilds.GetRolePermissionsAsync(roleLink.RoleId);
-
-            foreach (var perm in rolePerms)
-            {
-                var capability = _registry.Resolve(perm.Name, perm.Type);
-                granted.Add(capability);
-            }
-        }
 
         return granted.Contains(required)
             ? PermissionResult.Allow()
             : PermissionResult.Deny($"Missing guild permission: {required.Key}");
+    }
+
+    /// <summary>
+    /// Returns all guild-level permissions granted to a user via their roles,
+    /// or null if the user is not a guild member. Uses a single batched query
+    /// for all role permissions instead of one query per role.
+    /// </summary>
+    public async Task<HashSet<PermissionCapability>?> GetGrantedGuildPermissionsAsync(
+        Guid userId, Guid guildId)
+    {
+        var member = await _guilds.GetGuildMemberAsync(guildId, userId);
+        if (member == null) return null;
+
+        var roleIds = member.Roles.Select(r => r.RoleId);
+        var perms = await _guilds.GetRolesPermissionsBatchAsync(roleIds);
+
+        var granted = new HashSet<PermissionCapability>();
+        foreach (var perm in perms)
+            granted.Add(_registry.Resolve(perm.Name, perm.Type));
+
+        return granted;
     }
 
     // ---------------------------------------------------------
@@ -96,8 +104,57 @@ public class PermissionService : IPermissionService
         }
 
         // -----------------------------------------------------
-        // FALL BACK TO GUILD PERMISSIONS
+        // FALL BACK TO GUILD PERMISSIONS (reuse already-fetched member)
         // -----------------------------------------------------
-        return await HasGuildPermissionAsync(userId, channel.GuildId, required);
+        var roleIds = member.Roles.Select(r => r.RoleId);
+        var perms = await _guilds.GetRolesPermissionsBatchAsync(roleIds);
+
+        var granted = new HashSet<PermissionCapability>();
+        foreach (var perm in perms)
+            granted.Add(_registry.Resolve(perm.Name, perm.Type));
+
+        return granted.Contains(required)
+            ? PermissionResult.Allow()
+            : PermissionResult.Deny($"Missing guild permission: {required.Key}");
+    }
+
+    // ---------------------------------------------------------
+    // SET CHANNEL OVERRIDE
+    // ---------------------------------------------------------
+    public async Task SetChannelOverrideAsync(
+        Guid channelId, Guid? roleId, Guid? userId,
+        Guid permissionId, bool? allow)
+    {
+        var existing = await _guilds.GetChannelOverrideAsync(channelId, permissionId, roleId, userId);
+
+        if (allow == null)
+        {
+            // Remove override (inherit)
+            if (existing != null)
+            {
+                await _guilds.RemoveChannelOverrideAsync(existing);
+                await _guilds.SaveChangesAsync();
+            }
+            return;
+        }
+
+        if (existing != null)
+        {
+            existing.Allow = allow;
+        }
+        else
+        {
+            await _guilds.AddChannelOverrideAsync(new GuildChannelPermissionOverride
+            {
+                Id = Guid.NewGuid(),
+                ChannelId = channelId,
+                RoleId = roleId,
+                UserId = userId,
+                PermissionId = permissionId,
+                Allow = allow,
+            });
+        }
+
+        await _guilds.SaveChangesAsync();
     }
 }

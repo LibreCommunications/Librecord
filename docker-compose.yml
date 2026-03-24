@@ -60,7 +60,7 @@ services:
       - postgres_data:/var/lib/postgresql
 
   minio:
-    image: docker.io/minio/minio:latest
+    image: docker.io/minio/minio:RELEASE.2025-03-12T18-04-18Z
     container_name: ${COMPOSE_PROJECT_NAME:-librecord}-minio
     restart: unless-stopped
     environment:
@@ -74,7 +74,7 @@ services:
       - minio_data:/data
 
   livekit:
-    image: livekit/livekit-server:latest
+    image: livekit/livekit-server:v1.8.3
     container_name: ${COMPOSE_PROJECT_NAME:-librecord}-livekit
     restart: unless-stopped
     profiles: [livekit]

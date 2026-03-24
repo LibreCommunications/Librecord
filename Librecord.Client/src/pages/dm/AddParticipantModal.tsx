@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { useFriends } from "../../hooks/useFriends";
+import { useFriends, type FriendshipListDto } from "../../hooks/useFriends";
 import {
     useDirectMessagesChannel,
     type DmUser
@@ -21,14 +21,18 @@ export function AddParticipantModal({
     const { getFriends } = useFriends();
     const { addParticipant } = useDirectMessagesChannel();
 
-    const [friends, setFriends] = useState<any[]>([]);
+    const [friends, setFriends] = useState<FriendshipListDto[]>([]);
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(false);
 
     // ---------------- LOAD FRIENDS ----------------
-    useEffect(() => {
+    const loadFriends = useCallback(() => {
         getFriends().then(setFriends);
-    }, []);
+    }, [getFriends]);
+
+    useEffect(() => {
+        loadFriends();
+    }, [loadFriends]);
 
     // Existing member IDs
     const memberIds = useMemo(
@@ -57,7 +61,7 @@ export function AddParticipantModal({
     }
 
     return createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-[fadeIn_0.15s_ease-out]">
+        <div className="modal-overlay-animated">
             <div className="w-full max-w-md rounded-lg bg-[#313338] p-5 shadow-xl animate-[scaleIn_0.15s_ease-out]">
 
                 {/* HEADER */}

@@ -15,7 +15,8 @@ import type { BrowserContext, Page } from "@playwright/test";
 let userA: TestUser;
 let userB: TestUser;
 let ctxA: BrowserContext;
-let ctxB: BrowserContext;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+let _ctxB: BrowserContext;
 let pageA: Page;
 let pageB: Page;
 
@@ -29,7 +30,7 @@ test.describe.serial("User status — set, persist, broadcast, invisible", () =>
 
     test("Register User B", async ({ browser }) => {
         userB = makeUser("statusB");
-        ({ context: ctxB, page: pageB } = await registerUser(browser, userB));
+        ({ context: _ctxB, page: pageB } = await registerUser(browser, userB));
     });
 
     test("Users become friends and open a DM", async () => {
@@ -73,6 +74,7 @@ test.describe.serial("User status — set, persist, broadcast, invisible", () =>
                 const res = await fetch(`${api}/friends/list`, { credentials: "include" });
                 if (!res.ok) return null;
                 const friends = await res.json();
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const friend = friends.find((f: any) => f.otherUsername === username);
                 return friend?.otherUserId;
             },

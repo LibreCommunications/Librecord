@@ -5,6 +5,7 @@ using Librecord.Domain.Messaging.Common;
 using Librecord.Domain.Messaging.Direct;
 using Librecord.Domain.Social;
 using Librecord.Domain.Storage;
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace Librecord.Tests.Messaging;
@@ -22,12 +23,14 @@ public class DmDualUserScenarioTests
     private readonly Mock<IBlockRepository> _blocks = new();
     private readonly Mock<IFriendshipRepository> _friendships = new();
     private readonly Mock<IAttachmentStorageService> _storage = new();
+    private readonly Mock<IReadStateRepository> _readStates = new();
 
     private DirectMessageService CreateMessageService() =>
         new(_messages.Object, _channels.Object, _realtime.Object, _blocks.Object);
 
     private DirectMessageChannelService CreateChannelService() =>
-        new(_channels.Object, _friendships.Object, _blocks.Object, _storage.Object);
+        new(_channels.Object, _friendships.Object, _blocks.Object, _storage.Object, _readStates.Object,
+            Mock.Of<ILogger<DirectMessageChannelService>>());
 
     private static User MakeUser(Guid id, string name) => new()
     {
@@ -340,7 +343,8 @@ public class DmDualUserScenarioTests
         Assert.NotNull(msg);
         _realtime.Verify(r => r.NotifyAsync(It.IsAny<DmMessageCreated>()), Times.Once);
 
-        // Step 3: Bob leaves
+        // Step 3: Bob leaves (only group DMs can be left)
+        ch.IsGroup = true;
         _channels.Setup(c => c.GetChannelAsync(newChannel.Id)).ReturnsAsync(ch);
         await channelSvc.LeaveChannelAsync(newChannel.Id, bob);
 

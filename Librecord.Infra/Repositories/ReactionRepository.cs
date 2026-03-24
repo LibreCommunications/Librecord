@@ -47,4 +47,19 @@ public class ReactionRepository : IReactionRepository
     {
         return _db.SaveChangesAsync();
     }
+
+    public async Task<Guid?> GetMessageChannelIdAsync(Guid messageId)
+    {
+        // Check guild context first, then DM context
+        var guildCtx = await _db.GuildChannelMessages
+            .Where(g => g.MessageId == messageId)
+            .Select(g => (Guid?)g.ChannelId)
+            .FirstOrDefaultAsync();
+        if (guildCtx.HasValue) return guildCtx.Value;
+
+        return await _db.DmChannelMessages
+            .Where(d => d.MessageId == messageId)
+            .Select(d => (Guid?)d.ChannelId)
+            .FirstOrDefaultAsync();
+    }
 }

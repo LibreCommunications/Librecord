@@ -1,119 +1,67 @@
-import { useAuth } from "../context/AuthContext";
-import { fetchWithAuth } from "../api/fetchWithAuth";
+import { useCallback } from "react";
+import { friends } from "../api/client";
+import type { Friend, FriendRequests } from "../types/friend";
 
-const API_URL = import.meta.env.VITE_API_URL;
-
-export interface FriendshipListDto {
-    id: string;
-    status: number;
-    otherUserId: string;
-    otherUsername: string;
-    otherDisplayName: string;
-    otherAvatarUrl: string | null;
-}
-
-export interface FriendSuggestion {
-    id: string;
-    username: string;
-    displayName: string;
-    avatarUrl: string | null;
-}
+export type FriendshipListDto = Friend;
+export type FriendSuggestion = { id: string; username: string; displayName: string; avatarUrl: string | null };
 
 export function useFriends() {
-    const auth = useAuth();
+    const getFriends = useCallback((): Promise<Friend[]> => friends.list(), []);
 
-    // -----------------------------
-    // FRIEND LIST
-    // -----------------------------
-    async function getFriends(): Promise<FriendshipListDto[]> {
-        const res = await fetchWithAuth(
-            `${API_URL}/friends/list`,
-            {},
-            auth
-        );
+    const getRequests = useCallback(async (): Promise<FriendRequests> => {
+        const result = await friends.requests();
+        return result ?? { incoming: [], outgoing: [] };
+    }, []);
 
-        if (!res.ok) return [];
-        return await res.json();
-    }
-
-    // -----------------------------
-    // REQUESTS
-    // -----------------------------
-    async function getRequests(): Promise<{
-        incoming: FriendshipListDto[];
-        outgoing: FriendshipListDto[];
-    }> {
-        const res = await fetchWithAuth(
-            `${API_URL}/friends/requests`,
-            {},
-            auth
-        );
-
-        if (!res.ok)
-            return { incoming: [], outgoing: [] };
-
-        return await res.json();
-    }
-
-    // -----------------------------
-    // USERNAME SUGGESTIONS
-    // -----------------------------
-    async function suggestUsernames(query: string): Promise<FriendSuggestion[]> {
+    const suggestUsernames = useCallback(async (query: string): Promise<FriendSuggestion[]> => {
         if (!query.trim()) return [];
+        return friends.suggest(query);
+    }, []);
 
-        const res = await fetchWithAuth(
-            `${API_URL}/friends/suggest?query=${encodeURIComponent(query)}`,
-            {},
-            auth
-        );
+    const sendRequest = useCallback(async (username: string): Promise<boolean> => {
+        try {
+            await friends.sendRequest(username);
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
 
-        if (!res.ok) return [];
-        return await res.json();
-    }
+    const acceptRequest = useCallback(async (requesterId: string): Promise<boolean> => {
+        try {
+            await friends.accept(requesterId);
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
 
-    async function sendRequest(username: string) {
-        return (
-            await fetchWithAuth(
-                `${API_URL}/friends/request`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ username }),
-                },
-                auth
-            )
-        ).ok;
-    }
+    const declineRequest = useCallback(async (requesterId: string): Promise<boolean> => {
+        try {
+            await friends.decline(requesterId);
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
 
-    async function acceptRequest(requesterId: string) {
-        return (
-            await fetchWithAuth(
-                `${API_URL}/friends/accept/${requesterId}`,
-                { method: "POST" },
-                auth
-            )
-        ).ok;
-    }
+    const removeFriend = useCallback(async (friendId: string): Promise<boolean> => {
+        try {
+            await friends.remove(friendId);
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
 
-    async function declineRequest(requesterId: string) {
-        return (
-            await fetchWithAuth(
-                `${API_URL}/friends/decline/${requesterId}`,
-                { method: "POST" },
-                auth
-            )
-        ).ok;
-    }
-
-    async function removeFriend(friendId: string) {
-        return (
-            await fetchWithAuth(
-                `${API_URL}/friends/remove/${friendId}`,
-                { method: "DELETE" },
-                auth
-            )
-        ).ok;
-    }
+    const cancelRequest = useCallback(async (targetId: string): Promise<boolean> => {
+        try {
+            await friends.cancel(targetId);
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
 
     return {
         getFriends,
@@ -121,6 +69,7 @@ export function useFriends() {
         sendRequest,
         acceptRequest,
         declineRequest,
+        cancelRequest,
         removeFriend,
         suggestUsernames,
     };

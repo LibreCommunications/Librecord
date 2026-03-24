@@ -1,40 +1,37 @@
-import { useAuth } from "../context/AuthContext";
-import { fetchWithAuth } from "../api/fetchWithAuth";
+import { useCallback } from "react";
+import { blocks } from "../api/client";
+import type { BlockedUser } from "../types/block";
 
-const API_URL = import.meta.env.VITE_API_URL;
-
-export interface BlockedUser {
-    userId: string;
-    username: string;
-    displayName: string;
-    blockedAt: string;
-}
+export type { BlockedUser };
 
 export function useBlocks() {
-    const auth = useAuth();
+    const blockUser = useCallback(async (userId: string): Promise<boolean> => {
+        try {
+            await blocks.block(userId);
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
 
-    async function blockUser(userId: string): Promise<boolean> {
-        const res = await fetchWithAuth(`${API_URL}/blocks/${userId}`, { method: "PUT" }, auth);
-        return res.ok;
-    }
+    const unblockUser = useCallback(async (userId: string): Promise<boolean> => {
+        try {
+            await blocks.unblock(userId);
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
 
-    async function unblockUser(userId: string): Promise<boolean> {
-        const res = await fetchWithAuth(`${API_URL}/blocks/${userId}`, { method: "DELETE" }, auth);
-        return res.ok;
-    }
+    const getBlockedUsers = useCallback(
+        (): Promise<BlockedUser[]> => blocks.list() as Promise<BlockedUser[]>,
+        [],
+    );
 
-    async function getBlockedUsers(): Promise<BlockedUser[]> {
-        const res = await fetchWithAuth(`${API_URL}/blocks`, {}, auth);
-        if (!res.ok) return [];
-        return res.json();
-    }
-
-    async function isBlocked(userId: string): Promise<boolean> {
-        const res = await fetchWithAuth(`${API_URL}/blocks/${userId}`, {}, auth);
-        if (!res.ok) return false;
-        const data = await res.json();
-        return data.blocked;
-    }
+    const isBlocked = useCallback(
+        (userId: string): Promise<boolean> => blocks.isBlocked(userId),
+        [],
+    );
 
     return { blockUser, unblockUser, getBlockedUsers, isBlocked };
 }

@@ -1,10 +1,9 @@
 import { useRef, useState } from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../hooks/useAuth";
 import { useUserProfile } from "../../hooks/useUserProfile";
-import { usePresence } from "../../context/PresenceContext";
+import { usePresence } from "../../hooks/usePresence";
 import { StatusDot } from "../../components/user/StatusDot";
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { API_URL } from "../../api/client";
 
 export default function ProfileSettings() {
     const { user, logout } = useAuth();
@@ -31,6 +30,7 @@ export default function ProfileSettings() {
         if (!file) return;
 
         setAvatarFile(file);
+        if (avatarPreview) URL.revokeObjectURL(avatarPreview);
         setAvatarPreview(URL.createObjectURL(file));
     }
 
@@ -41,6 +41,7 @@ export default function ProfileSettings() {
         await uploadAvatar(avatarFile);
         setUploadingAvatar(false);
 
+        if (avatarPreview) URL.revokeObjectURL(avatarPreview);
         setAvatarPreview(null);
         setAvatarFile(null);
     }

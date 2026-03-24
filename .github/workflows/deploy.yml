@@ -49,6 +49,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: Librecord.Client/node_modules
+          key: npm-${{ hashFiles('Librecord.Client/package-lock.json') }}
+          restore-keys: npm-
+
       - name: Write .env
         run: |
           cat > .env <<EOF
@@ -74,11 +88,19 @@ jobs:
       - name: Write frontend .env
         run: echo "VITE_API_URL=https://${{ secrets.DOMAIN }}/api" > Librecord.Client/.env
 
+      - name: Run backend tests
+        run: dotnet test Librecord.Tests/Librecord.Tests.csproj --verbosity minimal
+
       - name: Install and build frontend
         run: |
           cd Librecord.Client
           npm ci
           npm run build
+
+      - name: Lint frontend
+        run: |
+          cd Librecord.Client
+          npm run lint
 
       - name: Deploy frontend
         run: |

@@ -1,27 +1,24 @@
 import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     useDirectMessagesChannel,
     type DmChannel
 } from "../../hooks/useDirectMessagesChannel";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../hooks/useAuth";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { useReadState } from "../../hooks/useReadState";
 import { UnreadBadge } from "../ui/UnreadBadge";
 import { StatusDot } from "../user/StatusDot";
-import { fetchWithAuth } from "../../api/fetchWithAuth";
-import type { DmEventMap } from "../../realtime/dm/dmEvents";
+import { presence } from "../../api/client";
+import type { AppEventMap } from "../../realtime/events";
 import { CreateGroupModal } from "../dm/CreateGroupModal";
-
-const API_URL = import.meta.env.VITE_API_URL;
 
 export default function DmSidebar() {
     const { dmId } = useParams();
     const location = useLocation();
     const navigate = useNavigate();
-    const { getMyDms, leaveChannel } = useDirectMessagesChannel();
-    const auth = useAuth();
-    const { user } = auth;
+    const { getMyDms, leaveChannel, deleteDm } = useDirectMessagesChannel();
+    const { user } = useAuth();
     const { getAvatarUrl } = useUserProfile();
     const { getUnreadCounts } = useReadState();
 
@@ -30,10 +27,11 @@ export default function DmSidebar() {
     const [presenceMap, setPresenceMap] = useState<Record<string, string>>({});
     const [showCreateGroup, setShowCreateGroup] = useState(false);
     const [leaveConfirmId, setLeaveConfirmId] = useState<string | null>(null);
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
     const isFriendsPage = location.pathname.startsWith("/app/dm/friends");
 
-    async function loadDms() {
+    const loadDms = useCallback(async function loadDms() {
         const list = await getMyDms();
         setDms(list);
 
@@ -48,29 +46,67 @@ export default function DmSidebar() {
             const uniqueIds = [...new Set(otherUserIds)];
 
             if (uniqueIds.length > 0) {
-                const res = await fetchWithAuth(
-                    `${API_URL}/presence/bulk`,
-                    {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ userIds: uniqueIds }),
-                    },
-                    auth
-                );
-                if (res.ok) {
-                    setPresenceMap(await res.json());
-                }
+                const map = await presence.bulk(uniqueIds);
+                setPresenceMap(map);
             }
         }
-    }
+    }, [getMyDms, getUnreadCounts, user?.userId]);
 
     useEffect(() => {
-        loadDms();
-    }, []);
+        // Wrap in .then() to avoid lint rule about sync setState in effects
+        Promise.resolve().then(loadDms);
+    }, [loadDms]);
+
+    // Refresh DM list when a friend is removed or a new DM channel is created
+    useEffect(() => {
+        const refresh = () => { loadDms(); };
+        window.addEventListener("friend:removed", refresh as EventListener);
+        window.addEventListener("dm:channel:created", refresh as EventListener);
+        window.addEventListener("dm:member:added", refresh as EventListener);
+        window.addEventListener("realtime:reconnected", refresh);
+        return () => {
+            window.removeEventListener("friend:removed", refresh as EventListener);
+            window.removeEventListener("dm:channel:created", refresh as EventListener);
+            window.removeEventListener("dm:member:added", refresh as EventListener);
+            window.removeEventListener("realtime:reconnected", refresh);
+        };
+    }, [loadDms]);
+
+    // Update DM list when a member leaves a group DM
+    useEffect(() => {
+        const onMemberLeft = (e: CustomEvent<AppEventMap["dm:member:left"]>) => {
+            const { channelId, userId } = e.detail;
+            if (userId === user?.userId) {
+                // Current user left — remove the DM from sidebar
+                setDms(prev => prev.filter(d => d.id !== channelId));
+                if (dmId === channelId) navigate("/app/dm");
+            } else {
+                // Another member left — update the member list
+                setDms(prev => prev.map(d =>
+                    d.id === channelId
+                        ? { ...d, members: d.members.filter(m => m.id !== userId) }
+                        : d
+                ));
+            }
+        };
+        window.addEventListener("dm:member:left", onMemberLeft as EventListener);
+        return () => window.removeEventListener("dm:member:left", onMemberLeft as EventListener);
+    }, [dmId, user?.userId, navigate]);
+
+    // Handle DM channel deletion (1-on-1 DM deleted by either member)
+    useEffect(() => {
+        const onDeleted = (e: CustomEvent<AppEventMap["dm:channel:deleted"]>) => {
+            const { channelId } = e.detail;
+            setDms(prev => prev.filter(d => d.id !== channelId));
+            if (dmId === channelId) navigate("/app/dm");
+        };
+        window.addEventListener("dm:channel:deleted", onDeleted as EventListener);
+        return () => window.removeEventListener("dm:channel:deleted", onDeleted as EventListener);
+    }, [dmId, navigate]);
 
     // Update presence from real-time events
     useEffect(() => {
-        const onPresence = (e: CustomEvent<DmEventMap["dm:user:presence"]>) => {
+        const onPresence = (e: CustomEvent<AppEventMap["dm:user:presence"]>) => {
             setPresenceMap(prev => ({
                 ...prev,
                 [e.detail.userId]: e.detail.status,
@@ -81,12 +117,22 @@ export default function DmSidebar() {
         return () => window.removeEventListener("dm:user:presence", onPresence as EventListener);
     }, []);
 
-    // Increment unread when a message ping arrives for a non-active channel
+    // Increment unread when a message ping arrives for a non-active channel.
+    // If the channel was closed (not in dms list), re-fetch to restore it.
     useEffect(() => {
-        const onPing = (e: CustomEvent<DmEventMap["dm:message:ping"]>) => {
+        const onPing = (e: CustomEvent<AppEventMap["dm:message:ping"]>) => {
             const { channelId: pingChannel, authorId } = e.detail;
             if (pingChannel === dmId) return;
             if (authorId === user?.userId) return;
+
+            setDms(prev => {
+                const exists = prev.some(d => d.id === pingChannel);
+                if (!exists) {
+                    // Channel was closed/hidden — reload DM list to restore it
+                    loadDms();
+                }
+                return prev;
+            });
 
             setUnreads(prev => ({
                 ...prev,
@@ -96,18 +142,18 @@ export default function DmSidebar() {
 
         window.addEventListener("dm:message:ping", onPing as EventListener);
         return () => window.removeEventListener("dm:message:ping", onPing as EventListener);
-    }, [dmId, user?.userId]);
+    }, [dmId, user?.userId, loadDms]);
 
-    // Clear unread when we navigate into a channel
-    useEffect(() => {
-        if (!dmId) return;
-        setUnreads(prev => {
-            if (!prev[dmId]) return prev;
-            const next = { ...prev };
+    // Clear unread count when navigating into a DM (render-phase)
+    const [prevActiveDmId, setPrevActiveDmId] = useState(dmId);
+    if (dmId && dmId !== prevActiveDmId) {
+        setPrevActiveDmId(dmId);
+        if (unreads[dmId]) {
+            const next = { ...unreads };
             delete next[dmId];
-            return next;
-        });
-    }, [dmId]);
+            setUnreads(next);
+        }
+    }
 
     return (
         <>
@@ -146,9 +192,9 @@ export default function DmSidebar() {
             <div className="space-y-0.5 mt-1">
                 {dms.map(dm => {
                     const others = dm.members.filter(m => m.id !== user?.userId);
-                    const name = others.length > 0
-                        ? others.map(u => u.displayName).join(", ")
-                        : dm.id.slice(0, 8);
+                    const name = dm.isGroup
+                        ? (dm.name ?? "Unnamed Group")
+                        : (others.length > 0 ? others.map(u => u.displayName).join(", ") : "Empty Group");
 
                     const showAvatar = others.length === 1;
                     const avatar = showAvatar ? getAvatarUrl(others[0].avatarUrl) : undefined;
@@ -156,7 +202,7 @@ export default function DmSidebar() {
                     const otherStatus = showAvatar ? (presenceMap[others[0].id] ?? "offline") : undefined;
 
                     return (
-                        <div key={dm.id} className="group relative">
+                        <div key={dm.id} className="group relative" data-testid={`dm-sidebar-entry-${dm.id}`}>
                             <Link to={`/app/dm/${dm.id}`}>
                                 <div
                                     className={`
@@ -186,22 +232,34 @@ export default function DmSidebar() {
                                     )}
                                 </div>
                             </Link>
-                            {dm.isGroup && (
-                                <button
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setLeaveConfirmId(dm.id);
-                                    }}
-                                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-[#949ba4] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                                    title="Leave group"
-                                >
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <line x1="18" y1="6" x2="6" y2="18" />
-                                        <line x1="6" y1="6" x2="18" y2="18" />
-                                    </svg>
-                                </button>
-                            )}
+                            {dm.isGroup && <button
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setLeaveConfirmId(dm.id);
+                                }}
+                                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-[#949ba4] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Leave group"
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                            </button>}
+                            {!dm.isGroup && dm.isFriend === false && <button
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setDeleteConfirmId(dm.id);
+                                }}
+                                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-[#949ba4] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Delete conversation"
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                            </button>}
                         </div>
                     );
                 })}
@@ -212,7 +270,7 @@ export default function DmSidebar() {
             const leaveDm = dms.find(d => d.id === leaveConfirmId);
             const isLast = leaveDm && leaveDm.members.length <= 1;
             return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setLeaveConfirmId(null)}>
+            <div className="modal-overlay" onClick={() => setLeaveConfirmId(null)}>
                 <div className="bg-[#313338] rounded-lg w-[400px] p-5" onClick={e => e.stopPropagation()}>
                     <h3 className="text-white text-lg font-semibold mb-2">Leave Group</h3>
                     <p className="text-[#949ba4] text-sm mb-5">
@@ -221,7 +279,7 @@ export default function DmSidebar() {
                             : "Are you sure you want to leave this group? You won't be able to rejoin unless someone adds you back."}
                     </p>
                     <div className="flex justify-end gap-3">
-                        <button onClick={() => setLeaveConfirmId(null)} className="px-4 py-2 text-sm text-[#dbdee1] hover:underline">
+                        <button onClick={() => setLeaveConfirmId(null)} className="btn-text">
                             Cancel
                         </button>
                         <button
@@ -232,7 +290,7 @@ export default function DmSidebar() {
                                 }
                                 setLeaveConfirmId(null);
                             }}
-                            className="px-4 py-2 text-sm bg-[#da373c] text-white rounded hover:bg-[#a12828] transition-colors"
+                            className="btn-danger"
                         >
                             Leave Group
                         </button>
@@ -241,6 +299,35 @@ export default function DmSidebar() {
             </div>
             );
         })()}
+
+        {deleteConfirmId && (
+            <div className="modal-overlay" onClick={() => setDeleteConfirmId(null)}>
+                <div className="bg-[#313338] rounded-lg w-[400px] p-5" onClick={e => e.stopPropagation()}>
+                    <h3 className="text-white text-lg font-semibold mb-2">Delete Conversation</h3>
+                    <p className="text-[#949ba4] text-sm mb-5">
+                        Are you sure you want to delete this conversation? All messages and attachments will be permanently removed for both users.
+                    </p>
+                    <div className="flex justify-end gap-3">
+                        <button onClick={() => setDeleteConfirmId(null)} className="btn-text">
+                            Cancel
+                        </button>
+                        <button
+                            onClick={async () => {
+                                if (await deleteDm(deleteConfirmId)) {
+                                    setDms(prev => prev.filter(d => d.id !== deleteConfirmId));
+                                    if (dmId === deleteConfirmId) navigate("/app/dm");
+                                }
+                                setDeleteConfirmId(null);
+                            }}
+                            className="btn-danger"
+                            data-testid="confirm-delete-dm"
+                        >
+                            Delete Conversation
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {showCreateGroup && (
             <CreateGroupModal

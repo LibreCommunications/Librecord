@@ -2,27 +2,41 @@ using Librecord.Domain.Guilds;
 using Librecord.Domain.Permissions;
 using Librecord.Infra.Database;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Librecord.Infra.Repositories;
 
 public class RoleRepository : IRoleRepository
 {
     private readonly LibrecordContext _db;
+    private readonly IMemoryCache _cache;
 
-    public RoleRepository(LibrecordContext db)
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromSeconds(30);
+
+    public RoleRepository(LibrecordContext db, IMemoryCache cache)
     {
         _db = db;
+        _cache = cache;
     }
 
     // ---------------------------------------------------------
     // GET ROLE (WITH PERMISSIONS)
     // ---------------------------------------------------------
-    public Task<GuildRole?> GetRoleAsync(Guid id)
+    public async Task<GuildRole?> GetRoleAsync(Guid id)
     {
-        return _db.GuildRoles
+        var key = $"repo:role:{id}";
+        if (_cache.TryGetValue(key, out GuildRole? cached))
+            return cached;
+
+        var result = await _db.GuildRoles
             .Include(r => r.Permissions)
             .ThenInclude(rp => rp.Permission)
             .FirstOrDefaultAsync(r => r.Id == id);
+
+        if (result != null)
+            _cache.Set(key, result, CacheTtl);
+
+        return result;
     }
 
     // ---------------------------------------------------------
@@ -37,12 +51,15 @@ public class RoleRepository : IRoleRepository
     public Task UpdateRoleAsync(GuildRole role)
     {
         _db.GuildRoles.Update(role);
+        _cache.Remove($"repo:role:{role.Id}");
         return Task.CompletedTask;
     }
 
     public Task DeleteRoleAsync(GuildRole role)
     {
         _db.GuildRoles.Remove(role);
+        _cache.Remove($"repo:role:{role.Id}");
+        InvalidateRolePermsGeneration();
         return Task.CompletedTask;
     }
 
@@ -67,6 +84,11 @@ public class RoleRepository : IRoleRepository
             PermissionId = permissionId,
             Allow = allow
         });
+
+        // Invalidate caches for this role's permissions
+        _cache.Remove($"repo:role:{roleId}");
+        _cache.Remove($"repo:role-perms-single:{roleId}");
+        InvalidateRolePermsGeneration();
     }
 
     public async Task RemovePermissionFromRoleAsync(
@@ -79,6 +101,11 @@ public class RoleRepository : IRoleRepository
 
         if (rp != null)
             _db.RolePermissions.Remove(rp);
+
+        // Invalidate caches for this role's permissions
+        _cache.Remove($"repo:role:{roleId}");
+        _cache.Remove($"repo:role-perms-single:{roleId}");
+        InvalidateRolePermsGeneration();
     }
 
     // ---------------------------------------------------------
@@ -87,5 +114,16 @@ public class RoleRepository : IRoleRepository
     public Task SaveChangesAsync()
     {
         return _db.SaveChangesAsync();
+    }
+
+    // ---------------------------------------------------------
+    // CACHE HELPERS
+    // ---------------------------------------------------------
+    private void InvalidateRolePermsGeneration()
+    {
+        // Bump the generation counter used by GuildRepository's
+        // batch role-permissions cache keys
+        var gen = _cache.Get<long>("repo:role-perms-gen");
+        _cache.Set("repo:role-perms-gen", gen + 1);
     }
 }

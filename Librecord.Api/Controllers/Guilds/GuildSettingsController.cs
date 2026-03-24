@@ -1,9 +1,7 @@
-using System.Security.Claims;
-using Librecord.Application.Interfaces;
+using Librecord.Application.Guilds;
 using Librecord.Application.Permissions;
+using Librecord.Application.Realtime.Guild;
 using Librecord.Domain.Permissions;
-using Librecord.Domain.Storage;
-using Librecord.Infra.Database;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,88 +9,54 @@ namespace Librecord.Api.Controllers;
 
 [ApiController]
 [Route("guilds")]
-public class GuildSettingsController : ControllerBase
+public class GuildSettingsController : AuthenticatedController
 {
-    private readonly LibrecordContext _db;
+    private readonly IGuildSettingsService _settings;
     private readonly IPermissionService _permissions;
-    private readonly IAttachmentStorageService _storage;
+    private readonly IGuildRealtimeNotifier _guildNotifier;
 
     public GuildSettingsController(
-        IAttachmentStorageService storage,
-        LibrecordContext db,
-        IPermissionService permissions)
+        IGuildSettingsService settings,
+        IPermissionService permissions,
+        IGuildRealtimeNotifier guildNotifier)
     {
-        _storage = storage;
-        _db = db;
+        _settings = settings;
         _permissions = permissions;
+        _guildNotifier = guildNotifier;
     }
 
     [Authorize]
     [HttpPost("{guildId}/icon")]
-    public async Task<IActionResult> UploadGuildIcon(
-        Guid guildId,
-        IFormFile? file)
+    public async Task<IActionResult> UploadGuildIcon(Guid guildId, IFormFile? file)
     {
         if (file == null || file.Length == 0)
             return BadRequest("Invalid file");
 
-        var userId = Guid.Parse(
-            User.FindFirstValue(ClaimTypes.NameIdentifier)!
-        );
-
-        // Permission check
         var permission = await _permissions.HasGuildPermissionAsync(
-            userId,
-            guildId,
-            GuildPermission.ManageGuild
-        );
+            UserId, guildId, GuildPermission.ManageGuild);
 
         if (!permission.Allowed)
             return Forbid(permission.Error ?? "Missing permission");
 
-        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-        var objectName = $"guild-icons/{guildId}{ext}";
-
-        var guild = await _db.Guilds.FindAsync(guildId);
-        if (guild == null)
-            return NotFound();
-
         await using var stream = file.OpenReadStream();
-        await _storage.UploadAsync(objectName, stream, file.ContentType);
+        var iconUrl = await _settings.UploadGuildIconAsync(guildId, stream, file.FileName, file.ContentType);
+        if (iconUrl == null) return NotFound();
 
-        
-        guild.IconUrl = $"/cdn/public/{objectName}";
-        await _db.SaveChangesAsync();
-
-        return Ok(new { iconUrl = guild.IconUrl });
+        return Ok(new { iconUrl });
     }
 
-    // ---------------------------------------------------------
-    // UPDATE GUILD NAME
-    // ---------------------------------------------------------
     [Authorize]
     [HttpPut("{guildId:guid}")]
-    public async Task<IActionResult> UpdateGuild(
-        Guid guildId,
-        [FromBody] UpdateGuildRequest request)
+    public async Task<IActionResult> UpdateGuild(Guid guildId, [FromBody] UpdateGuildRequest request)
     {
-        var userId = Guid.Parse(
-            User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
         var permission = await _permissions.HasGuildPermissionAsync(
-            userId, guildId, GuildPermission.ManageGuild);
+            UserId, guildId, GuildPermission.ManageGuild);
 
         if (!permission.Allowed)
             return Forbid();
 
-        var guild = await _db.Guilds.FindAsync(guildId);
-        if (guild == null)
-            return NotFound();
-
-        if (!string.IsNullOrWhiteSpace(request.Name))
-            guild.Name = request.Name.Trim();
-
-        await _db.SaveChangesAsync();
+        var guild = await _settings.UpdateGuildAsync(guildId, request.Name);
+        if (guild == null) return NotFound();
 
         return Ok(new
         {
@@ -102,28 +66,25 @@ public class GuildSettingsController : ControllerBase
         });
     }
 
-    // ---------------------------------------------------------
-    // DELETE GUILD (owner only)
-    // ---------------------------------------------------------
     [Authorize]
     [HttpDelete("{guildId:guid}")]
     public async Task<IActionResult> DeleteGuild(Guid guildId)
     {
-        var userId = Guid.Parse(
-            User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
         var permission = await _permissions.HasGuildPermissionAsync(
-            userId, guildId, GuildPermission.ManageGuild);
+            UserId, guildId, GuildPermission.ManageGuild);
 
         if (!permission.Allowed)
             return Forbid();
 
-        var guild = await _db.Guilds.FindAsync(guildId);
-        if (guild == null)
-            return NotFound();
+        var (success, channelIds) = await _settings.DeleteGuildAsync(guildId);
+        if (!success) return NotFound();
 
-        _db.Guilds.Remove(guild);
-        await _db.SaveChangesAsync();
+        // Notify all connected members after deletion
+        await _guildNotifier.NotifyGuildDeletedAsync(new GuildDeleted
+        {
+            GuildId = guildId,
+            ChannelIds = channelIds
+        });
 
         return Ok();
     }

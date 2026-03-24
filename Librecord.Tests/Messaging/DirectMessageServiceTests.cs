@@ -81,12 +81,59 @@ public class DirectMessageServiceTests
     }
 
     [Fact]
-    public async Task SendMessage_EmptyContent_Throws()
+    public async Task SendMessage_EmptyContent_NoAttachments_Throws()
     {
         var svc = CreateService();
 
         await Assert.ThrowsAsync<ArgumentException>(
             () => svc.SendMessageAsync(Guid.NewGuid(), Guid.NewGuid(), "  "));
+    }
+
+    [Fact]
+    public async Task SendMessage_EmptyContent_WithAttachments_Succeeds()
+    {
+        var userId = Guid.NewGuid();
+        var channelId = Guid.NewGuid();
+        var channel = MakeChannel(channelId, userId, Guid.NewGuid());
+
+        _channels.Setup(c => c.GetChannelAsync(channelId)).ReturnsAsync(channel);
+        _messages.Setup(m => m.GetMessageAsync(It.IsAny<Guid>()))
+            .ReturnsAsync((Guid id) => MakeHydratedMessage(id, userId, channelId));
+
+        var svc = CreateService();
+        var result = await svc.SendMessageAsync(channelId, userId, "", "client-456", hasAttachments: true);
+
+        Assert.NotNull(result);
+        _messages.Verify(m => m.AddMessageAsync(It.Is<Message>(msg =>
+            msg.ContentText == ""
+        ), channelId), Times.Once);
+        _messages.Verify(m => m.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task SendMessage_WhitespaceContent_WithAttachments_Succeeds()
+    {
+        var userId = Guid.NewGuid();
+        var channelId = Guid.NewGuid();
+        var channel = MakeChannel(channelId, userId, Guid.NewGuid());
+
+        _channels.Setup(c => c.GetChannelAsync(channelId)).ReturnsAsync(channel);
+        _messages.Setup(m => m.GetMessageAsync(It.IsAny<Guid>()))
+            .ReturnsAsync((Guid id) => MakeHydratedMessage(id, userId, channelId));
+
+        var svc = CreateService();
+        var result = await svc.SendMessageAsync(channelId, userId, "  ", "client-789", hasAttachments: true);
+
+        Assert.NotNull(result);
+    }
+
+    [Fact]
+    public async Task SendMessage_EmptyContent_NoAttachmentFlag_Throws()
+    {
+        var svc = CreateService();
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => svc.SendMessageAsync(Guid.NewGuid(), Guid.NewGuid(), "", hasAttachments: false));
     }
 
     [Fact]

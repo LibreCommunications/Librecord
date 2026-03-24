@@ -2,6 +2,7 @@ using Librecord.Application.Friendships;
 using Librecord.Application.Interfaces;
 using Librecord.Application.Models;
 using Librecord.Application.Models.Results;
+using Librecord.Application.Realtime.Social;
 using Librecord.Domain.Identity;
 using Librecord.Domain.Social;
 
@@ -12,15 +13,18 @@ public class FriendshipService : IFriendshipService
     private readonly IFriendshipRepository _repo;
     private readonly IUserRepository _users;
     private readonly IBlockRepository _blocks;
+    private readonly IFriendshipRealtimeNotifier _notifier;
 
     public FriendshipService(
         IFriendshipRepository repo,
         IUserRepository users,
-        IBlockRepository blocks)
+        IBlockRepository blocks,
+        IFriendshipRealtimeNotifier notifier)
     {
         _repo = repo;
         _users = users;
         _blocks = blocks;
+        _notifier = notifier;
     }
 
     // ---------------------------------------------------------
@@ -61,6 +65,19 @@ public class FriendshipService : IFriendshipService
         await _repo.AddAsync(fs);
         await _repo.SaveChangesAsync();
 
+        var requester = await _users.GetByIdAsync(requesterId);
+        if (requester != null)
+        {
+            await _notifier.NotifyAsync(new FriendRequestReceived
+            {
+                UserId = targetUser.Id,
+                FromUserId = requesterId,
+                FromUsername = requester.UserName ?? "",
+                FromDisplayName = requester.DisplayName,
+                FromAvatarUrl = requester.AvatarUrl
+            });
+        }
+
         return FriendResult.FromFriendship(fs);
     }
 
@@ -78,6 +95,19 @@ public class FriendshipService : IFriendshipService
 
         await _repo.UpdateAsync(fs);
         await _repo.SaveChangesAsync();
+
+        var acceptor = await _users.GetByIdAsync(userId);
+        if (acceptor != null)
+        {
+            await _notifier.NotifyAsync(new FriendRequestAccepted
+            {
+                UserId = requesterId,
+                FriendUserId = userId,
+                FriendUsername = acceptor.UserName ?? "",
+                FriendDisplayName = acceptor.DisplayName,
+                FriendAvatarUrl = acceptor.AvatarUrl
+            });
+        }
 
         return FriendResult.FromFriendship(fs);
     }
@@ -98,6 +128,20 @@ public class FriendshipService : IFriendshipService
         await _repo.DeleteAsync(fs);
         await _repo.SaveChangesAsync();
 
+        // Notify the original requester that their request was declined/cancelled
+        await _notifier.NotifyAsync(new FriendRequestDeclined
+        {
+            UserId = fs.RequesterId,
+            DeclinedByUserId = userId
+        });
+
+        // Also notify the target so their incoming requests list updates
+        await _notifier.NotifyAsync(new FriendRequestDeclined
+        {
+            UserId = fs.TargetId,
+            DeclinedByUserId = userId
+        });
+
         return FriendResult.SuccessOnly();
     }
 
@@ -113,6 +157,18 @@ public class FriendshipService : IFriendshipService
 
         await _repo.DeleteAsync(fs);
         await _repo.SaveChangesAsync();
+
+        // Notify both users so DM sidebars refresh isFriend status
+        await _notifier.NotifyAsync(new FriendRemoved
+        {
+            UserId = friendId,
+            RemovedByUserId = userId
+        });
+        await _notifier.NotifyAsync(new FriendRemoved
+        {
+            UserId = userId,
+            RemovedByUserId = userId
+        });
 
         return FriendResult.SuccessOnly();
     }

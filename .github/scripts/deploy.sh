@@ -21,7 +21,13 @@ case "$ENV" in
     ;;
 esac
 
-STATE_FILE="/tmp/${PROJECT}-active-slot"
+STATE_DIR="/var/lib/${PROJECT}"
+sudo mkdir -p "$STATE_DIR" && sudo chown "$(id -u):$(id -g)" "$STATE_DIR" 2>/dev/null || {
+    # Fallback to home directory if /var/lib is not writable
+    STATE_DIR="$HOME/.${PROJECT}"
+    mkdir -p "$STATE_DIR"
+}
+STATE_FILE="${STATE_DIR}/active-slot"
 UPSTREAM_FILE="/etc/nginx/conf.d/${PROJECT}-upstream.conf"
 
 # Determine current active slot
@@ -63,6 +69,9 @@ for i in $(seq 1 $ATTEMPTS); do
   fi
   if [ "$i" -eq "$ATTEMPTS" ]; then
     echo "ERROR: Health check failed after $ATTEMPTS attempts"
+    echo "=== Container logs (last 50 lines) ==="
+    docker logs "${PROJECT}-backend-${NEW_SLOT}" --tail 50 2>&1 || true
+    echo "=== End of logs ==="
     echo "Rolling back: stopping backend-$NEW_SLOT"
     docker compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" --profile "$NEW_SLOT" stop "backend-$NEW_SLOT"
     exit 1

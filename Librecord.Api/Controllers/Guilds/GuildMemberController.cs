@@ -1,40 +1,30 @@
-using System.Security.Claims;
 using Librecord.Application.Guilds;
 using Librecord.Application.Permissions;
-using Librecord.Domain.Guilds;
 using Librecord.Domain.Permissions;
-using Librecord.Infra.Database;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace Librecord.Api.Controllers.Guilds;
 
 [ApiController]
 [Authorize]
 [Route("guilds/{guildId:guid}")]
-public class GuildMemberController : ControllerBase
+public class GuildMemberController : AuthenticatedController
 {
     private readonly IGuildService _guilds;
+    private readonly IGuildMemberService _members;
     private readonly IPermissionService _permissions;
-    private readonly LibrecordContext _db;
 
     public GuildMemberController(
         IGuildService guilds,
-        IPermissionService permissions,
-        LibrecordContext db)
+        IGuildMemberService members,
+        IPermissionService permissions)
     {
         _guilds = guilds;
+        _members = members;
         _permissions = permissions;
-        _db = db;
     }
 
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
-    // ---------------------------------------------------------
-    // LIST MEMBERS
-    // ---------------------------------------------------------
     [HttpGet("members")]
     public async Task<IActionResult> List(Guid guildId)
     {
@@ -58,9 +48,23 @@ public class GuildMemberController : ControllerBase
         }));
     }
 
-    // ---------------------------------------------------------
-    // KICK MEMBER
-    // ---------------------------------------------------------
+    [HttpGet("permissions/me")]
+    public async Task<IActionResult> MyPermissions(Guid guildId)
+    {
+        var granted = await _permissions.GetGrantedGuildPermissionsAsync(UserId, guildId);
+        if (granted == null) return Forbid();
+
+        return Ok(new
+        {
+            manageGuild = granted.Contains(GuildPermission.ManageGuild),
+            manageChannels = granted.Contains(GuildPermission.ManageChannels),
+            manageRoles = granted.Contains(GuildPermission.ManageRoles),
+            kickMembers = granted.Contains(GuildPermission.KickMembers),
+            banMembers = granted.Contains(GuildPermission.BanMembers),
+            inviteMembers = granted.Contains(GuildPermission.InviteMembers),
+        });
+    }
+
     [HttpPost("kick/{userId:guid}")]
     public async Task<IActionResult> Kick(Guid guildId, Guid userId)
     {
@@ -70,21 +74,10 @@ public class GuildMemberController : ControllerBase
         if (userId == UserId)
             return BadRequest("Cannot kick yourself.");
 
-        var member = await _db.GuildMembers
-            .FirstOrDefaultAsync(m => m.GuildId == guildId && m.UserId == userId);
-
-        if (member == null)
-            return NotFound("Member not found.");
-
-        _db.GuildMembers.Remove(member);
-        await _db.SaveChangesAsync();
-
-        return Ok();
+        var kicked = await _members.KickMemberAsync(guildId, userId);
+        return kicked ? Ok() : NotFound("Member not found.");
     }
 
-    // ---------------------------------------------------------
-    // BAN MEMBER
-    // ---------------------------------------------------------
     [HttpPost("bans/{userId:guid}")]
     public async Task<IActionResult> Ban(Guid guildId, Guid userId, [FromBody] BanRequest? request = null)
     {
@@ -94,67 +87,27 @@ public class GuildMemberController : ControllerBase
         if (userId == UserId)
             return BadRequest("Cannot ban yourself.");
 
-        var existing = await _db.GuildBans
-            .FirstOrDefaultAsync(b => b.GuildId == guildId && b.UserId == userId);
-
-        if (existing != null)
-            return Ok();
-
-        // Remove from guild if member
-        var member = await _db.GuildMembers
-            .FirstOrDefaultAsync(m => m.GuildId == guildId && m.UserId == userId);
-
-        if (member != null)
-            _db.GuildMembers.Remove(member);
-
-        _db.GuildBans.Add(new GuildBan
-        {
-            GuildId = guildId,
-            UserId = userId,
-            ModeratorId = UserId,
-            Reason = request?.Reason,
-            CreatedAt = DateTime.UtcNow
-        });
-
-        await _db.SaveChangesAsync();
+        await _members.BanMemberAsync(guildId, userId, UserId, request?.Reason);
         return Ok();
     }
 
-    // ---------------------------------------------------------
-    // UNBAN MEMBER
-    // ---------------------------------------------------------
     [HttpDelete("bans/{userId:guid}")]
     public async Task<IActionResult> Unban(Guid guildId, Guid userId)
     {
         var perm = await _permissions.HasGuildPermissionAsync(UserId, guildId, GuildPermission.BanMembers);
         if (!perm.Allowed) return Forbid();
 
-        var ban = await _db.GuildBans
-            .FirstOrDefaultAsync(b => b.GuildId == guildId && b.UserId == userId);
-
-        if (ban == null) return NotFound();
-
-        _db.GuildBans.Remove(ban);
-        await _db.SaveChangesAsync();
-
-        return Ok();
+        var unbanned = await _members.UnbanMemberAsync(guildId, userId);
+        return unbanned ? Ok() : NotFound();
     }
 
-    // ---------------------------------------------------------
-    // LIST BANS
-    // ---------------------------------------------------------
     [HttpGet("bans")]
     public async Task<IActionResult> ListBans(Guid guildId)
     {
         var perm = await _permissions.HasGuildPermissionAsync(UserId, guildId, GuildPermission.BanMembers);
         if (!perm.Allowed) return Forbid();
 
-        var bans = await _db.GuildBans
-            .Where(b => b.GuildId == guildId)
-            .Include(b => b.User)
-            .Include(b => b.Moderator)
-            .OrderByDescending(b => b.CreatedAt)
-            .ToListAsync();
+        var bans = await _members.GetBansAsync(guildId);
 
         return Ok(bans.Select(b => new
         {

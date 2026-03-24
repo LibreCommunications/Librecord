@@ -9,7 +9,7 @@ namespace Librecord.Api.Controllers.Messaging;
 [ApiController]
 [Authorize]
 [Route("channels")]
-public class ReadStateController : ControllerBase
+public class ReadStateController : AuthenticatedController
 {
     private readonly IReadStateRepository _readStates;
     private readonly IDmRealtimeNotifier _realtime;
@@ -19,10 +19,6 @@ public class ReadStateController : ControllerBase
         _readStates = readStates;
         _realtime = realtime;
     }
-
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
     // ---------------------------------------------------------
     // MARK CHANNEL AS READ
     // ---------------------------------------------------------
@@ -49,7 +45,7 @@ public class ReadStateController : ControllerBase
     [HttpPost("unread")]
     public async Task<IActionResult> GetUnreadCounts([FromBody] UnreadRequest request)
     {
-        if (request.ChannelIds == null || request.ChannelIds.Count == 0)
+        if (request.ChannelIds.Count == 0)
             return Ok(new { });
 
         var counts = await _readStates.GetUnreadCountsAsync(UserId, request.ChannelIds);

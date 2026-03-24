@@ -32,15 +32,11 @@ public sealed class MessageDto
     // -------------------------------------------------
     public static MessageDto From(Message message, string? clientMessageId = null)
     {
-        if (string.IsNullOrEmpty(message.ContentText))
-            throw new InvalidOperationException(
-                "Message is missing ContentText.");
-
         return new MessageDto
         {
             Id = message.Id,
             ClientMessageId = clientMessageId,
-            Content = message.ContentText,
+            Content = message.ContentText ?? "",
             CreatedAt = message.CreatedAt,
             EditedAt = message.EditedAt,
 
