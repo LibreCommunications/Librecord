@@ -27,7 +27,13 @@ public static class DependencyInjection
         // ----------------------------
         // SignalR
         // ----------------------------
-        services.AddSignalR();
+        services.AddSignalR(options =>
+        {
+            // Send keepalive pings every 10s to prevent Cloudflare
+            // from killing idle WebSocket connections (100s timeout)
+            options.KeepAliveInterval = TimeSpan.FromSeconds(10);
+            options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+        });
 
         // ----------------------------
         // Realtime adapters
