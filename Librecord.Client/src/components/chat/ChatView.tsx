@@ -36,6 +36,12 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder }
                 loadingMore={chat.loadingMore}
             />
 
+            {chat.error && (
+                <div className="px-4 py-2 bg-[#f23f43]/10 text-[#f23f43] text-sm text-center">
+                    {chat.error} — <button onClick={() => window.location.reload()} className="underline">Reload</button>
+                </div>
+            )}
+
             <TypingIndicator typingNames={chat.typingNames} />
 
             <div className="px-4 py-3 shrink-0">

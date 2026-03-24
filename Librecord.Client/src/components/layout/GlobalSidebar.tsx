@@ -99,7 +99,7 @@ export default function GlobalSidebar() {
                 for (const ch of channels) map[ch.id] = g.id;
             }
             channelToGuildRef.current = map;
-        });
+        }).catch(() => {});
     }, [getGuilds, getGuildChannels]);
 
     // Handle guild deletion in realtime — remove from sidebar and redirect if viewing

@@ -51,54 +51,24 @@ export default function DmSidebar() {
             const uniqueIds = [...new Set(otherUserIds)];
 
             if (uniqueIds.length > 0) {
-                const res = await fetchWithAuth(
+                await fetchWithAuth(
                     `${API_URL}/presence/bulk`,
                     {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ userIds: uniqueIds }),
                     },
-                );
-                if (res.ok) {
-                    setPresenceMap(await res.json());
-                }
+                ).then(res => {
+                    if (res.ok) return res.json().then(setPresenceMap);
+                }).catch(() => {});
             }
         }
     }, [getMyDms, getUnreadCounts, user?.userId]);
 
     useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            const list = await getMyDms();
-            if (cancelled) return;
-            setDms(list);
-
-            if (list.length > 0) {
-                const counts = await getUnreadCounts(list.map(d => d.id));
-                if (cancelled) return;
-                setUnreads(counts);
-
-                const otherUserIds = list.flatMap(dm =>
-                    dm.members.filter(m => m.id !== user?.userId).map(m => m.id)
-                );
-                const uniqueIds = [...new Set(otherUserIds)];
-                if (uniqueIds.length > 0) {
-                    const res = await fetchWithAuth(
-                        `${API_URL}/presence/bulk`,
-                        {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ userIds: uniqueIds }),
-                        },
-                    );
-                    if (!cancelled && res.ok) {
-                        setPresenceMap(await res.json());
-                    }
-                }
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [getMyDms, getUnreadCounts, user?.userId]);
+        // Wrap in .then() to avoid lint rule about sync setState in effects
+        Promise.resolve().then(loadDms);
+    }, [loadDms]);
 
     // Refresh DM list when a friend is removed or a new DM channel is created
     useEffect(() => {

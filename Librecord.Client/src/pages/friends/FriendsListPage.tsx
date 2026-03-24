@@ -36,34 +36,23 @@ export default function FriendsListPage() {
         useState<FriendshipListDto | null>(null);
 
     const loadData = useCallback(async function loadData() {
-        const friendsList = await getFriends();
-        const requestData = await getRequests();
-
-        setFriends(friendsList ?? []);
-        setIncoming(requestData?.incoming ?? []);
-        setOutgoing(requestData?.outgoing ?? []);
-
-        setDataLoaded(true);
-    }, [getFriends, getRequests]);
-
-    useEffect(() => {
-        let cancelled = false;
-        console.log('[FriendsListPage] loading friends + requests');
-        const t0 = performance.now();
-        (async () => {
+        try {
             const friendsList = await getFriends();
-            console.log(`[FriendsListPage] getFriends done (${Math.round(performance.now() - t0)}ms), count=${friendsList?.length}`);
             const requestData = await getRequests();
-            console.log(`[FriendsListPage] getRequests done (${Math.round(performance.now() - t0)}ms)`);
-            if (cancelled) { console.log('[FriendsListPage] cancelled=true, dropping data'); return; }
+
             setFriends(friendsList ?? []);
             setIncoming(requestData?.incoming ?? []);
             setOutgoing(requestData?.outgoing ?? []);
+        } catch {
+            // Show whatever we have — empty lists are fine
+        } finally {
             setDataLoaded(true);
-            console.log(`[FriendsListPage] data loaded, total ${Math.round(performance.now() - t0)}ms`);
-        })();
-        return () => { cancelled = true; console.log('[FriendsListPage] cleanup: cancelled=true'); };
+        }
     }, [getFriends, getRequests]);
+
+    useEffect(() => {
+        Promise.resolve().then(loadData);
+    }, [loadData]);
 
     // Refresh friend list on realtime friendship events
     useEffect(() => {

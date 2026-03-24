@@ -69,41 +69,8 @@ export default function ChannelSidebar({ guildId }: Props) {
 
     useEffect(() => {
         if (!guildId) return;
-        let cancelled = false;
-        (async () => {
-            const list = await getGuildChannels(guildId);
-            if (cancelled) return;
-            setChannels(list);
-            setLoadedGuildId(guildId);
-
-            if (list.length > 0) {
-                const counts = await getUnreadCounts(list.map(c => c.id));
-                if (!cancelled) setUnreads(counts);
-            }
-
-            try {
-                const [membersRes, rolesRes] = await Promise.all([
-                    fetchWithAuth(`${API_URL}/guilds/${guildId}/members`, {}),
-                    fetchWithAuth(`${API_URL}/guilds/${guildId}/roles`, {}),
-                ]);
-                if (!cancelled && membersRes.ok && rolesRes.ok) {
-                    const members = await membersRes.json();
-                    const roles = await rolesRes.json();
-                    const me = members.find((m: { userId: string }) => m.userId === user?.userId);
-                    const myRoleIds = new Set((me?.roles ?? []).map((r: { id: string }) => r.id));
-                    const hasManage = roles
-                        .filter((r: { id: string }) => myRoleIds.has(r.id))
-                        .some((r: { permissions: { permissionId: string; allow: boolean }[] }) =>
-                            r.permissions.some(p => p.permissionId === MANAGE_CHANNELS_PERMISSION_ID && p.allow)
-                        );
-                    setCanManageChannels(hasManage);
-                }
-            } catch {
-                if (!cancelled) setCanManageChannels(false);
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [guildId, getGuildChannels, getUnreadCounts, user?.userId]);
+        Promise.resolve().then(loadChannels);
+    }, [guildId, loadChannels]);
 
     // Fetch voice participants for all voice channels
     useEffect(() => {

@@ -61,6 +61,7 @@ export function useChatChannel(config: ChatChannelConfig) {
     const [messages, setMessages] = useState<OptimisticMessage[]>([]);
     const [content, setContent] = useState("");
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [sending, setSending] = useState(false);
     const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -85,6 +86,7 @@ export function useChatChannel(config: ChatChannelConfig) {
         console.log(`[useChatChannel] channel changed: ${prevChannelId} → ${channelId}`);
         setPrevChannelId(channelId);
         setLoading(true);
+        setError(null);
         setMessages([]);
     }
 
@@ -233,6 +235,7 @@ export function useChatChannel(config: ChatChannelConfig) {
                     return;
                 }
                 console.log(`[useChatChannel] loaded ${msgs.length} msgs + ${pins.length} pins for ${channelId} (${ms}ms)`);
+                setError(null);
                 const reversed = msgs.slice().reverse();
                 setMessages(reversed);
                 setHasMore(msgs.length >= 50);
@@ -240,7 +243,10 @@ export function useChatChannel(config: ChatChannelConfig) {
                 if (reversed.length > 0) markAsRead(channelId, reversed[reversed.length - 1].id);
             })
             .catch((err) => {
-                if (err?.name !== 'AbortError') console.error(`[useChatChannel] load ERROR for ${channelId}:`, err);
+                if (err?.name !== 'AbortError') {
+                    console.error(`[useChatChannel] load ERROR for ${channelId}:`, err);
+                    setError("Failed to load messages");
+                }
             })
             .finally(() => {
                 if (!ac.signal.aborted) {
@@ -327,11 +333,15 @@ export function useChatChannel(config: ChatChannelConfig) {
     };
 
     const handleEdit = async (messageId: string, dto: { content: string }) => {
-        const updated = await config.editMessage(messageId, dto);
-        if (!updated) return;
-        setMessages(prev => prev.map(m =>
-            m.id === messageId ? { ...m, content: updated.content, editedAt: updated.editedAt } : m
-        ));
+        try {
+            const updated = await config.editMessage(messageId, dto);
+            if (!updated) return;
+            setMessages(prev => prev.map(m =>
+                m.id === messageId ? { ...m, content: updated.content, editedAt: updated.editedAt } : m
+            ));
+        } catch {
+            toast("Failed to edit message.", "error");
+        }
     };
 
     const handleLoadMore = async () => {
@@ -375,17 +385,39 @@ export function useChatChannel(config: ChatChannelConfig) {
                 ? { ...m, reactions: m.reactions.filter(r => !(r.userId === user.userId && r.emoji === emoji)) }
                 : m
         ));
-        await removeReaction(messageId, emoji);
+        try {
+            await removeReaction(messageId, emoji);
+        } catch {
+            // Rollback
+            setMessages(prev => prev.map(m => {
+                if (m.id !== messageId) return m;
+                return { ...m, reactions: [...m.reactions, { userId: user.userId, emoji, createdAt: new Date().toISOString() }] };
+            }));
+        }
     };
 
     const handlePin = async (messageId: string) => {
         if (!channelId) return;
-        if (pinnedIds.has(messageId)) {
-            await unpinMessage(channelId, messageId);
+        const isPinned = pinnedIds.has(messageId);
+        // Optimistic update
+        if (isPinned) {
             setPinnedIds(prev => { const next = new Set(prev); next.delete(messageId); return next; });
         } else {
-            await pinMessage(channelId, messageId);
             setPinnedIds(prev => new Set(prev).add(messageId));
+        }
+        try {
+            if (isPinned) {
+                await unpinMessage(channelId, messageId);
+            } else {
+                await pinMessage(channelId, messageId);
+            }
+        } catch {
+            // Rollback
+            if (isPinned) {
+                setPinnedIds(prev => new Set(prev).add(messageId));
+            } else {
+                setPinnedIds(prev => { const next = new Set(prev); next.delete(messageId); return next; });
+            }
         }
     };
 
@@ -393,6 +425,7 @@ export function useChatChannel(config: ChatChannelConfig) {
         messages,
         content, setContent,
         loading,
+        error,
         sending,
         menuOpenId, setMenuOpenId,
         editingId, setEditingId,
