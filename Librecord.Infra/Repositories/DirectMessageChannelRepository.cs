@@ -12,9 +12,19 @@ public class DirectMessageChannelRepository : IDirectMessageChannelRepository
     {
         _db = db;
     }
-    
 
+    /// <summary>Lightweight: members + user info only. No messages loaded.</summary>
     public Task<DmChannel?> GetChannelAsync(Guid id)
+    {
+        return _db.DmChannels
+            .Include(c => c.Members)
+            .ThenInclude(m => m.User)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(c => c.Id == id);
+    }
+
+    /// <summary>Heavy: includes all messages with attachments. Only for deletion/cleanup.</summary>
+    public Task<DmChannel?> GetChannelWithMessagesAsync(Guid id)
     {
         return _db.DmChannels
             .Include(c => c.Members)
@@ -22,12 +32,7 @@ public class DirectMessageChannelRepository : IDirectMessageChannelRepository
             .Include(c => c.Messages)
             .ThenInclude(cm => cm.Message)
             .ThenInclude(m => m.Attachments)
-            .Include(c => c.Messages)
-            .ThenInclude(cm => cm.Message)
-            .ThenInclude(m => m.Reactions)
-            .Include(c => c.Messages)
-            .ThenInclude(cm => cm.Message)
-            .ThenInclude(m => m.Edits)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(c => c.Id == id);
     }
 
@@ -37,6 +42,7 @@ public class DirectMessageChannelRepository : IDirectMessageChannelRepository
             .Include(c => c.Members)
             .ThenInclude(m => m.User)
             .Where(c => c.Members.Any(m => m.UserId == userId))
+            .AsSplitQuery()
             .ToListAsync();
     }
 

@@ -45,6 +45,7 @@ public class GuildRepository : IGuildRepository
             .Where(m => m.UserId == userId)
             .Include(m => m.Guild)
                 .ThenInclude(g => g.Channels)
+            .AsSplitQuery()
             .Select(m => m.Guild)
             .ToListAsync();
 
@@ -139,6 +140,7 @@ public class GuildRepository : IGuildRepository
         return _db.Guilds
             .Include(g => g.Roles)
             .ThenInclude(r => r.Permissions)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(g => g.Id == id);
     }
 
@@ -149,6 +151,7 @@ public class GuildRepository : IGuildRepository
             .Include(m => m.User)
             .Include(m => m.Roles)
                 .ThenInclude(r => r.Role)
+            .AsSplitQuery()
             .OrderBy(m => m.JoinedAt)
             .ToListAsync();
     }

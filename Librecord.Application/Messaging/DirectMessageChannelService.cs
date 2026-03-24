@@ -219,15 +219,19 @@ public class DirectMessageChannelService : IDirectMessageChannelService
         // Delete channel, messages, and stored files when last member leaves
         if (channel.Members.Count == 0)
         {
-            // Delete attachment files from storage
-            foreach (var dm in channel.Messages)
+            // Re-fetch with messages for attachment cleanup
+            var fullChannel = await _dms.GetChannelWithMessagesAsync(channelId);
+            if (fullChannel != null)
             {
-                foreach (var att in dm.Message.Attachments)
+                foreach (var dm in fullChannel.Messages)
                 {
-                    try { await _storage.DeleteAsync(att.Url); }
-                    catch (Exception ex)
+                    foreach (var att in dm.Message.Attachments)
                     {
-                        _logger.LogWarning(ex, "Failed to delete attachment {Url} during channel cleanup", att.Url);
+                        try { await _storage.DeleteAsync(att.Url); }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to delete attachment {Url} during channel cleanup", att.Url);
+                        }
                     }
                 }
             }
@@ -259,15 +263,19 @@ public class DirectMessageChannelService : IDirectMessageChannelService
         if (otherUser != null && await _friendships.UsersAreConfirmedFriendsAsync(userId, otherUser.UserId))
             throw new InvalidOperationException("Cannot delete a DM with a current friend. Remove them as a friend first.");
 
-        // Delete attachment files from MinIO storage
-        foreach (var dm in channel.Messages)
+        // Re-fetch with messages for attachment cleanup
+        var fullChannel = await _dms.GetChannelWithMessagesAsync(channelId);
+        if (fullChannel != null)
         {
-            foreach (var att in dm.Message.Attachments)
+            foreach (var dm in fullChannel.Messages)
             {
-                try { await _storage.DeleteAsync(att.Url); }
-                catch (Exception ex)
+                foreach (var att in dm.Message.Attachments)
                 {
-                    _logger.LogWarning(ex, "Failed to delete attachment {Url} during DM cleanup", att.Url);
+                    try { await _storage.DeleteAsync(att.Url); }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to delete attachment {Url} during DM cleanup", att.Url);
+                    }
                 }
             }
         }
