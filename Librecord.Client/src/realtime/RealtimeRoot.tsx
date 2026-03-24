@@ -29,17 +29,20 @@ export function RealtimeRoot() {
 
         initNotifications(user.userId);
 
+        console.log('[Realtime] Starting DM + Guild connections...');
+        const t0 = performance.now();
         Promise.all([
             dmConnection.start().then(() => {
-                // DM connected
+                console.log(`[Realtime] DM connected (${Math.round(performance.now() - t0)}ms)`);
                 registerDmListeners();
             }).catch(err => console.error("[Realtime] DM connection failed", err)),
 
             guildConnection.start().then(() => {
-                // Guild connected
+                console.log(`[Realtime] Guild connected (${Math.round(performance.now() - t0)}ms)`);
                 registerGuildListeners();
             }).catch(err => console.error("[Realtime] Guild connection failed", err)),
         ]).then(() => {
+            console.log(`[Realtime] Both connections ready (${Math.round(performance.now() - t0)}ms)`);
             window.__realtimeReady = true;
             window.dispatchEvent(new Event("realtime:ready"));
         });

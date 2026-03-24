@@ -48,16 +48,21 @@ export default function FriendsListPage() {
 
     useEffect(() => {
         let cancelled = false;
+        console.log('[FriendsListPage] loading friends + requests');
+        const t0 = performance.now();
         (async () => {
             const friendsList = await getFriends();
+            console.log(`[FriendsListPage] getFriends done (${Math.round(performance.now() - t0)}ms), count=${friendsList?.length}`);
             const requestData = await getRequests();
-            if (cancelled) return;
+            console.log(`[FriendsListPage] getRequests done (${Math.round(performance.now() - t0)}ms)`);
+            if (cancelled) { console.log('[FriendsListPage] cancelled=true, dropping data'); return; }
             setFriends(friendsList ?? []);
             setIncoming(requestData?.incoming ?? []);
             setOutgoing(requestData?.outgoing ?? []);
             setDataLoaded(true);
+            console.log(`[FriendsListPage] data loaded, total ${Math.round(performance.now() - t0)}ms`);
         })();
-        return () => { cancelled = true; };
+        return () => { cancelled = true; console.log('[FriendsListPage] cleanup: cancelled=true'); };
     }, [getFriends, getRequests]);
 
     // Refresh friend list on realtime friendship events

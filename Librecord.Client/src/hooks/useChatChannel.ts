@@ -82,6 +82,7 @@ export function useChatChannel(config: ChatChannelConfig) {
     // ── Channel change reset (render-phase) ─────────────
     const [prevChannelId, setPrevChannelId] = useState(channelId);
     if (channelId !== prevChannelId) {
+        console.log(`[useChatChannel] channel changed: ${prevChannelId} → ${channelId}`);
         setPrevChannelId(channelId);
         setLoading(true);
         setMessages([]);
@@ -221,19 +222,37 @@ export function useChatChannel(config: ChatChannelConfig) {
         const ac = new AbortController();
         abortRef.current = ac;
 
+        console.log(`[useChatChannel] loading messages + pins for ${channelId}`);
+        const t0 = performance.now();
+
         Promise.all([config.getMessages(channelId), getPins(channelId)])
             .then(([msgs, pins]) => {
-                if (ac.signal.aborted) return;
+                const ms = Math.round(performance.now() - t0);
+                if (ac.signal.aborted) {
+                    console.log(`[useChatChannel] load ABORTED for ${channelId} (${ms}ms)`);
+                    return;
+                }
+                console.log(`[useChatChannel] loaded ${msgs.length} msgs + ${pins.length} pins for ${channelId} (${ms}ms)`);
                 const reversed = msgs.slice().reverse();
                 setMessages(reversed);
                 setHasMore(msgs.length >= 50);
                 setPinnedIds(new Set(pins.map(p => p.messageId)));
                 if (reversed.length > 0) markAsRead(channelId, reversed[reversed.length - 1].id);
             })
-            .catch(() => {}) // AbortError is expected
-            .finally(() => { if (!ac.signal.aborted) setLoading(false); });
+            .catch((err) => {
+                if (err?.name !== 'AbortError') console.error(`[useChatChannel] load ERROR for ${channelId}:`, err);
+            })
+            .finally(() => {
+                if (!ac.signal.aborted) {
+                    console.log(`[useChatChannel] setLoading(false) for ${channelId}`);
+                    setLoading(false);
+                }
+            });
 
-        return () => { ac.abort(); };
+        return () => {
+            console.log(`[useChatChannel] cleanup: aborting load for ${channelId}`);
+            ac.abort();
+        };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [channelId]);
 
