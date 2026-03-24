@@ -27,10 +27,7 @@ export function RealtimeRoot() {
 
         initNotifications(user.userId);
 
-        console.log('[Realtime] Starting connection...');
-        const t0 = performance.now();
         appConnection.start().then(() => {
-            console.log(`[Realtime] Connected (${Math.round(performance.now() - t0)}ms)`);
             registerListeners();
             window.__realtimeReady = true;
             window.dispatchEvent(new Event("realtime:ready"));

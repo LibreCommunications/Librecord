@@ -34,10 +34,7 @@ export default function DmSidebar() {
     const isFriendsPage = location.pathname.startsWith("/app/dm/friends");
 
     const loadDms = useCallback(async function loadDms() {
-        console.log('[DmSidebar] loadDms called');
-        const t0 = performance.now();
         const list = await getMyDms();
-        console.log(`[DmSidebar] loadDms got ${list.length} DMs (${Math.round(performance.now() - t0)}ms)`);
         setDms(list);
 
         if (list.length > 0) {

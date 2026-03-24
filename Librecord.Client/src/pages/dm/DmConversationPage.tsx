@@ -53,11 +53,9 @@ export default function DmConversationPage() {
     useEffect(() => {
         if (!dmId) return;
         let stale = false;
-        console.log(`[DmPage] loading channel metadata for ${dmId}`);
         getDmChannel(dmId).then(ch => {
-            if (stale) { console.log(`[DmPage] metadata load STALE for ${dmId}`); return; }
-            if (!ch) { console.warn(`[DmPage] getDmChannel returned null for ${dmId}`); return; }
-            console.log(`[DmPage] metadata loaded for ${dmId}: isGroup=${ch.isGroup}, members=${ch.members.length}`);
+            if (stale) return;
+            if (!ch) return;
             setChannel(ch);
             if (ch.isGroup) {
                 setChannelName(ch.name ?? "Unnamed Group");

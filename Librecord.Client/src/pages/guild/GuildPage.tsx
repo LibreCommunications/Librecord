@@ -52,10 +52,8 @@ export default function GuildChannelPage() {
     useEffect(() => {
         if (!channelId) return;
         let stale = false;
-        console.log(`[GuildPage] loading channel metadata for ${channelId}`);
         getChannel(channelId).then(ch => {
-            if (stale) { console.log(`[GuildPage] metadata load STALE for ${channelId}`); return; }
-            console.log(`[GuildPage] metadata loaded for ${channelId}: name=${ch?.name}`);
+            if (stale) return;
             setChannelName(ch?.name ?? null);
             setChannelTopic(ch?.topic ?? null);
             setChannelType(ch?.type ?? 0);
