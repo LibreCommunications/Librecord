@@ -80,13 +80,13 @@ export default function GuildSettingsPage() {
                 {tab === "general" && canManageGuild && (
                     <div className="space-y-6">
                         <div>
-                            <label className="block text-xs font-bold uppercase text-[#b5bac1] tracking-wide mb-2">
+                            <label className="block section-label mb-2">
                                 Server Name
                             </label>
                             <input
                                 value={name}
                                 onChange={e => setName(e.target.value)}
-                                className="w-full px-3 py-2.5 rounded-[4px] bg-[#1e1f22] text-white outline-none border border-[#1e1f22] focus:border-[#5865F2] transition-colors"
+                                className="input-field"
                             />
                         </div>
 

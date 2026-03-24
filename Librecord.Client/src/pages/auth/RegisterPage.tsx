@@ -48,7 +48,7 @@ export default function RegisterPage() {
                 )}
 
                 <label className="block mb-4">
-                    <span className="text-xs font-bold uppercase text-[#b5bac1] tracking-wide">
+                    <span className="section-label">
                         Email
                         <span className="text-[#f23f43] ml-0.5">*</span>
                     </span>
@@ -57,12 +57,12 @@ export default function RegisterPage() {
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full mt-2 px-3 py-2.5 rounded-[4px] bg-[#1e1f22] text-white outline-none border border-[#1e1f22] focus:border-[#5865F2] transition-colors"
+                        className="input-field mt-2"
                     />
                 </label>
 
                 <label className="block mb-4">
-                    <span className="text-xs font-bold uppercase text-[#b5bac1] tracking-wide">
+                    <span className="section-label">
                         Username
                         <span className="text-[#f23f43] ml-0.5">*</span>
                     </span>
@@ -73,24 +73,24 @@ export default function RegisterPage() {
                         maxLength={32}
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
-                        className="w-full mt-2 px-3 py-2.5 rounded-[4px] bg-[#1e1f22] text-white outline-none border border-[#1e1f22] focus:border-[#5865F2] transition-colors"
+                        className="input-field mt-2"
                     />
                 </label>
 
                 <label className="block mb-4">
-                    <span className="text-xs font-bold uppercase text-[#b5bac1] tracking-wide">
+                    <span className="section-label">
                         Display Name
                     </span>
                     <input
                         type="text"
                         value={displayName}
                         onChange={(e) => setDisplayName(e.target.value)}
-                        className="w-full mt-2 px-3 py-2.5 rounded-[4px] bg-[#1e1f22] text-white outline-none border border-[#1e1f22] focus:border-[#5865F2] transition-colors"
+                        className="input-field mt-2"
                     />
                 </label>
 
                 <label className="block mb-6">
-                    <span className="text-xs font-bold uppercase text-[#b5bac1] tracking-wide">
+                    <span className="section-label">
                         Password
                         <span className="text-[#f23f43] ml-0.5">*</span>
                     </span>
@@ -101,7 +101,7 @@ export default function RegisterPage() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && handleRegister()}
-                        className="w-full mt-2 px-3 py-2.5 rounded-[4px] bg-[#1e1f22] text-white outline-none border border-[#1e1f22] focus:border-[#5865F2] transition-colors"
+                        className="input-field mt-2"
                     />
                 </label>
 

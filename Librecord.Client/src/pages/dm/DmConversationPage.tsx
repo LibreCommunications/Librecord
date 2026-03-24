@@ -166,7 +166,7 @@ export default function DmConversationPage() {
                 {showLeaveConfirm && (() => {
                     const isLast = channel && channel.members.length <= 1;
                     return (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setShowLeaveConfirm(false)}>
+                        <div className="modal-overlay" onClick={() => setShowLeaveConfirm(false)}>
                             <div className="bg-[#313338] rounded-lg w-[400px] p-5" onClick={e => e.stopPropagation()}>
                                 <h3 className="text-white text-lg font-semibold mb-2">Leave Group</h3>
                                 <p className="text-[#949ba4] text-sm mb-5">
@@ -175,7 +175,7 @@ export default function DmConversationPage() {
                                         : "Are you sure you want to leave this group? You won't be able to rejoin unless someone adds you back."}
                                 </p>
                                 <div className="flex justify-end gap-3">
-                                    <button onClick={() => setShowLeaveConfirm(false)} className="px-4 py-2 text-sm text-[#dbdee1] hover:underline">
+                                    <button onClick={() => setShowLeaveConfirm(false)} className="btn-text">
                                         Cancel
                                     </button>
                                     <button
@@ -183,7 +183,7 @@ export default function DmConversationPage() {
                                             setShowLeaveConfirm(false);
                                             if (await leaveChannel(dmId)) navigate("/app/dm");
                                         }}
-                                        className="px-4 py-2 text-sm bg-[#da373c] text-white rounded hover:bg-[#a12828] transition-colors"
+                                        className="btn-danger"
                                     >
                                         Leave Group
                                     </button>

@@ -15,7 +15,7 @@ export interface GuildChannel {
     id: string;
     name: string;
     type: number;
-    topic?: string | null;
+    topic?: string | null | undefined;
     position?: number;
     parentId?: string | null;
 }

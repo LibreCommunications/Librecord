@@ -63,10 +63,12 @@ export default function DmSidebar() {
         window.addEventListener("friend:removed", refresh as EventListener);
         window.addEventListener("dm:channel:created", refresh as EventListener);
         window.addEventListener("dm:member:added", refresh as EventListener);
+        window.addEventListener("realtime:reconnected", refresh);
         return () => {
             window.removeEventListener("friend:removed", refresh as EventListener);
             window.removeEventListener("dm:channel:created", refresh as EventListener);
             window.removeEventListener("dm:member:added", refresh as EventListener);
+            window.removeEventListener("realtime:reconnected", refresh);
         };
     }, [loadDms]);
 
@@ -268,7 +270,7 @@ export default function DmSidebar() {
             const leaveDm = dms.find(d => d.id === leaveConfirmId);
             const isLast = leaveDm && leaveDm.members.length <= 1;
             return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setLeaveConfirmId(null)}>
+            <div className="modal-overlay" onClick={() => setLeaveConfirmId(null)}>
                 <div className="bg-[#313338] rounded-lg w-[400px] p-5" onClick={e => e.stopPropagation()}>
                     <h3 className="text-white text-lg font-semibold mb-2">Leave Group</h3>
                     <p className="text-[#949ba4] text-sm mb-5">
@@ -277,7 +279,7 @@ export default function DmSidebar() {
                             : "Are you sure you want to leave this group? You won't be able to rejoin unless someone adds you back."}
                     </p>
                     <div className="flex justify-end gap-3">
-                        <button onClick={() => setLeaveConfirmId(null)} className="px-4 py-2 text-sm text-[#dbdee1] hover:underline">
+                        <button onClick={() => setLeaveConfirmId(null)} className="btn-text">
                             Cancel
                         </button>
                         <button
@@ -288,7 +290,7 @@ export default function DmSidebar() {
                                 }
                                 setLeaveConfirmId(null);
                             }}
-                            className="px-4 py-2 text-sm bg-[#da373c] text-white rounded hover:bg-[#a12828] transition-colors"
+                            className="btn-danger"
                         >
                             Leave Group
                         </button>
@@ -299,14 +301,14 @@ export default function DmSidebar() {
         })()}
 
         {deleteConfirmId && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDeleteConfirmId(null)}>
+            <div className="modal-overlay" onClick={() => setDeleteConfirmId(null)}>
                 <div className="bg-[#313338] rounded-lg w-[400px] p-5" onClick={e => e.stopPropagation()}>
                     <h3 className="text-white text-lg font-semibold mb-2">Delete Conversation</h3>
                     <p className="text-[#949ba4] text-sm mb-5">
                         Are you sure you want to delete this conversation? All messages and attachments will be permanently removed for both users.
                     </p>
                     <div className="flex justify-end gap-3">
-                        <button onClick={() => setDeleteConfirmId(null)} className="px-4 py-2 text-sm text-[#dbdee1] hover:underline">
+                        <button onClick={() => setDeleteConfirmId(null)} className="btn-text">
                             Cancel
                         </button>
                         <button
@@ -317,7 +319,7 @@ export default function DmSidebar() {
                                 }
                                 setDeleteConfirmId(null);
                             }}
-                            className="px-4 py-2 text-sm bg-[#da373c] text-white rounded hover:bg-[#a12828] transition-colors"
+                            className="btn-danger"
                             data-testid="confirm-delete-dm"
                         >
                             Delete Conversation

@@ -54,7 +54,7 @@ export default function ChannelSidebar({ guildId }: Props) {
             const hasManage = guildRoles
                 .filter(r => myRoleIds.has(r.id))
                 .some(r =>
-                    r.permissions.some(p => p.permissionId === MANAGE_CHANNELS_PERMISSION_ID && p.allow)
+                    (r.permissions ?? []).some(p => p.permissionId === MANAGE_CHANNELS_PERMISSION_ID && p.allow)
                 );
             setCanManageChannels(hasManage);
         } catch {
@@ -66,6 +66,13 @@ export default function ChannelSidebar({ guildId }: Props) {
         if (!guildId) return;
         Promise.resolve().then(loadChannels);
     }, [guildId, loadChannels]);
+
+    // Re-fetch channels after a reconnect to catch anything missed
+    useEffect(() => {
+        const refresh = () => { loadChannels(); };
+        window.addEventListener("realtime:reconnected", refresh);
+        return () => window.removeEventListener("realtime:reconnected", refresh);
+    }, [loadChannels]);
 
     // Fetch voice participants for all voice channels
     useEffect(() => {

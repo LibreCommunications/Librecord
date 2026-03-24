@@ -72,7 +72,7 @@ export function GuildRoleSettings({ guildId }: Props) {
     }
 
     function hasPermission(permId: string): boolean {
-        return selected?.permissions.some(p => p.permissionId === permId && p.allow) ?? false;
+        return selected?.permissions?.some(p => p.permissionId === permId && p.allow) ?? false;
     }
 
     async function togglePermission(permId: string) {
@@ -82,8 +82,8 @@ export function GuildRoleSettings({ guildId }: Props) {
         setRoles(prev => prev.map(r => {
             if (r.id !== selectedId) return r;
             const perms = current
-                ? r.permissions.filter(p => p.permissionId !== permId)
-                : [...r.permissions, { permissionId: permId, allow: true }];
+                ? (r.permissions ?? []).filter(p => p.permissionId !== permId)
+                : [...(r.permissions ?? []), { roleId: r.id, permissionId: permId, allow: true }];
             return { ...r, permissions: perms };
         }));
     }

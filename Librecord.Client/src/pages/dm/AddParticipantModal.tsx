@@ -61,7 +61,7 @@ export function AddParticipantModal({
     }
 
     return createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-[fadeIn_0.15s_ease-out]">
+        <div className="modal-overlay-animated">
             <div className="w-full max-w-md rounded-lg bg-[#313338] p-5 shadow-xl animate-[scaleIn_0.15s_ease-out]">
 
                 {/* HEADER */}

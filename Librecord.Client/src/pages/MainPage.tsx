@@ -3,6 +3,7 @@ import GlobalSidebar from "../components/layout/GlobalSidebar";
 import ChannelSidebar from "../components/layout/ChannelSidebar";
 import DmSidebar from "../components/layout/DmSidebar";
 import { VoiceControls } from "../components/voice/VoiceControls";
+import { ConnectionBanner } from "../components/ui/ConnectionBanner";
 
 import { RealtimeRoot } from "../realtime/RealtimeRoot";
 
@@ -18,6 +19,7 @@ export default function MainPage() {
 
             {/* REALTIME BOOTSTRAP (AUTHENTICATED ONLY) */}
             <RealtimeRoot />
+            <ConnectionBanner />
 
             {/* LEFT: GUILD LIST */}
             <GlobalSidebar />

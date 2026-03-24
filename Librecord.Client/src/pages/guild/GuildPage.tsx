@@ -97,7 +97,7 @@ export default function GuildChannelPage() {
         <div className="flex-1 flex bg-[#313338] overflow-hidden">
             <div className="flex-1 flex flex-col min-w-0 min-h-0">
                 {/* HEADER */}
-                <div className="h-12 flex items-center justify-between border-b border-black/20 px-4 shrink-0">
+                <div className="page-header">
                     <span className="font-semibold flex items-center gap-1.5">
                         {isVoice ? (
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
@@ -121,7 +121,7 @@ export default function GuildChannelPage() {
                     <div className="flex items-center gap-0.5">
                         <button
                             onClick={() => setShowInvite(true)}
-                            className="p-2 rounded hover:bg-white/10 text-gray-400 hover:text-white"
+                            className="icon-btn"
                             title="Invite People"
                         >
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -161,7 +161,7 @@ export default function GuildChannelPage() {
                         {guildId && channelId && (
                             <Link
                                 to={`/app/guild/${guildId}/${channelId}/permissions`}
-                                className="p-2 rounded hover:bg-white/10 text-gray-400 hover:text-white"
+                                className="icon-btn"
                                 title="Channel Permissions"
                             >
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -173,7 +173,7 @@ export default function GuildChannelPage() {
                         {guildId && (permissions.manageGuild || permissions.manageRoles) && (
                             <Link
                                 to={`/app/guild/${guildId}/settings`}
-                                className="p-2 rounded hover:bg-white/10 text-gray-400 hover:text-white"
+                                className="icon-btn"
                                 title="Server Settings"
                             >
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

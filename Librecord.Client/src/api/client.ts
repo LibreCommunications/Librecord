@@ -8,13 +8,16 @@ export const API_URL: string = import.meta.env.VITE_API_URL;
  */
 
 export class ApiError extends Error {
-    constructor(
-        public status: number,
-        public statusText: string,
-        public url: string,
-    ) {
+    status: number;
+    statusText: string;
+    url: string;
+
+    constructor(status: number, statusText: string, url: string) {
         super(`API ${status} ${statusText}: ${url}`);
         this.name = "ApiError";
+        this.status = status;
+        this.statusText = statusText;
+        this.url = url;
     }
 }
 
@@ -74,7 +77,7 @@ export const auth = {
 // GUILDS
 // ──────────────────────────────────────────────────────────
 
-import type { GuildSummary, Guild, GuildChannel } from "../types/guild";
+import type { GuildSummary, Guild, GuildChannel, GuildMember, GuildPermissions } from "../types/guild";
 
 export const guilds = {
     list: () => request<GuildSummary[]>("/guilds").catch(() => [] as GuildSummary[]),
@@ -96,7 +99,7 @@ export const guilds = {
 export const channels = {
     create: (guildId: string, data: { name: string; type: number; position: number }) =>
         request<GuildChannel>(`/channels/guild/${guildId}`, { method: "POST", ...json(data) }),
-    update: (channelId: string, data: { name?: string; topic?: string }) =>
+    update: (channelId: string, data: { name?: string; topic?: string | null }) =>
         request<GuildChannel>(`/channels/${channelId}`, { method: "PUT", ...json(data) }),
     delete: (channelId: string) =>
         request<void>(`/channels/${channelId}`, { method: "DELETE" }),

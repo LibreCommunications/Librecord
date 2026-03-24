@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { useGuilds, type GuildSummary } from "../../hooks/useGuilds";
 import { useChannels } from "../../hooks/useChannels";
@@ -88,7 +88,7 @@ export default function GlobalSidebar() {
 
     const isDmPage = !guildId && location.pathname.startsWith("/app/dm");
 
-    useEffect(() => {
+    const loadGuilds = useCallback(() => {
         getGuilds().then(async (list) => {
             setGuilds(list);
             // Build channelId → guildId map
@@ -100,6 +100,15 @@ export default function GlobalSidebar() {
             channelToGuildRef.current = map;
         }).catch(() => {});
     }, [getGuilds, getGuildChannels]);
+
+    useEffect(() => { loadGuilds(); }, [loadGuilds]);
+
+    // Re-fetch guilds after a reconnect
+    useEffect(() => {
+        const refresh = () => { loadGuilds(); };
+        window.addEventListener("realtime:reconnected", refresh);
+        return () => window.removeEventListener("realtime:reconnected", refresh);
+    }, [loadGuilds]);
 
     // Handle guild deletion in realtime — remove from sidebar and redirect if viewing
     useEffect(() => {

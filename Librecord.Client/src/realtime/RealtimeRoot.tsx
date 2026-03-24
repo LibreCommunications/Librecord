@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { appConnection } from "./connection";
+import { appConnection, setConnectionState } from "./connection";
 import { registerListeners } from "./listeners";
 import { initNotifications, cleanupNotifications } from "./notifications";
 import { resetVoiceState } from "../voice/voiceStore";
@@ -27,11 +27,16 @@ export function RealtimeRoot() {
 
         initNotifications(user.userId);
 
+        setConnectionState("connecting");
         appConnection.start().then(() => {
             registerListeners();
+            setConnectionState("connected");
             window.__realtimeReady = true;
             window.dispatchEvent(new Event("realtime:ready"));
-        }).catch(err => console.error("[Realtime] Connection failed", err));
+        }).catch(err => {
+            console.error("[Realtime] Connection failed", err);
+            setConnectionState("disconnected");
+        });
     });
 
     // Detect logout — user was set, now null

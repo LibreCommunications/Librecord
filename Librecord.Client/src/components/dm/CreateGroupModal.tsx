@@ -44,7 +44,7 @@ export function CreateGroupModal({ onClose, onCreated }: Props) {
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+        <div className="modal-overlay" onClick={onClose}>
             <div className="bg-[#313338] rounded-lg w-[440px] max-h-[500px] flex flex-col" onClick={e => e.stopPropagation()}>
                 <div className="p-4 border-b border-[#1e1f22]">
                     <h2 className="text-white text-lg font-semibold">Create Group DM</h2>
@@ -105,14 +105,14 @@ export function CreateGroupModal({ onClose, onCreated }: Props) {
                 <div className="p-4 border-t border-[#1e1f22] flex justify-end gap-3">
                     <button
                         onClick={onClose}
-                        className="px-4 py-2 text-sm text-[#dbdee1] hover:underline"
+                        className="btn-text"
                     >
                         Cancel
                     </button>
                     <button
                         onClick={handleCreate}
                         disabled={selected.size === 0 || !groupName.trim() || creating}
-                        className="px-4 py-2 text-sm bg-[#5865F2] text-white rounded hover:bg-[#4752c4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="btn-primary"
                     >
                         {creating ? "Creating..." : `Create Group (${selected.size})`}
                     </button>

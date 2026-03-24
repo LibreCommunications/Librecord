@@ -18,7 +18,7 @@ export default function AppSettings() {
 
             {/* Notifications */}
             <section>
-                <h2 className="text-xs font-bold uppercase text-[#b5bac1] tracking-wide mb-4">
+                <h2 className="section-label mb-4">
                     Notifications
                 </h2>
                 <div className="space-y-3">
