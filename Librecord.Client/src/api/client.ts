@@ -1,0 +1,350 @@
+import { fetchWithAuth } from "./fetchWithAuth";
+
+const API_URL = import.meta.env.VITE_API_URL;
+
+/**
+ * Typed API client. All backend calls go through here.
+ * Returns parsed JSON on success, throws ApiError on failure.
+ */
+
+export class ApiError extends Error {
+    constructor(
+        public status: number,
+        public statusText: string,
+        public url: string,
+    ) {
+        super(`API ${status} ${statusText}: ${url}`);
+        this.name = "ApiError";
+    }
+}
+
+async function request<T>(
+    path: string,
+    options: RequestInit = {},
+): Promise<T> {
+    const res = await fetchWithAuth(`${API_URL}${path}`, options);
+
+    if (!res.ok) {
+        throw new ApiError(res.status, res.statusText, path);
+    }
+
+    const text = await res.text();
+    if (!text) return undefined as T;
+
+    return JSON.parse(text) as T;
+}
+
+async function requestOptional<T>(
+    path: string,
+    options: RequestInit = {},
+): Promise<T | null> {
+    try {
+        return await request<T>(path, options);
+    } catch (err) {
+        if (err instanceof ApiError && (err.status === 404 || err.status === 403)) {
+            return null;
+        }
+        throw err;
+    }
+}
+
+function json(body: unknown): RequestInit {
+    return {
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+    };
+}
+
+// ──────────────────────────────────────────────────────────
+// AUTH
+// ──────────────────────────────────────────────────────────
+
+export const auth = {
+    me: () => request<{
+        userId: string;
+        username: string;
+        displayName: string;
+        email: string;
+        avatarUrl?: string | null;
+        guilds?: { guildId: string; name: string; iconUrl: string | null }[];
+    }>("/users/me"),
+};
+
+// ──────────────────────────────────────────────────────────
+// GUILDS
+// ──────────────────────────────────────────────────────────
+
+import type { GuildSummary, Guild, GuildChannel } from "../types/guild";
+
+export const guilds = {
+    list: () => request<GuildSummary[]>("/guilds").catch(() => [] as GuildSummary[]),
+    get: (id: string) => requestOptional<Guild>(`/guilds/${id}`),
+    create: (name: string) => request<Guild>("/guilds", { method: "POST", ...json({ name }) }),
+    update: (id: string, data: { name: string }) => request<Guild>(`/guilds/${id}`, { method: "PUT", ...json(data) }),
+    delete: (id: string) => request<void>(`/guilds/${id}`, { method: "DELETE" }),
+
+    channels: (guildId: string) => request<GuildChannel[]>(`/guilds/${guildId}/channels`).catch(() => [] as GuildChannel[]),
+    getChannel: (channelId: string) => requestOptional<GuildChannel & { topic?: string }>(`/channels/${channelId}`),
+    members: (guildId: string) => request<GuildMember[]>(`/guilds/${guildId}/members`).catch(() => [] as GuildMember[]),
+    myPermissions: (guildId: string) => requestOptional<GuildPermissions>(`/guilds/${guildId}/permissions/me`),
+};
+
+// ──────────────────────────────────────────────────────────
+// CHANNELS
+// ──────────────────────────────────────────────────────────
+
+export const channels = {
+    create: (guildId: string, data: { name: string; type: number; position: number }) =>
+        request<GuildChannel>(`/channels/guild/${guildId}`, { method: "POST", ...json(data) }),
+    update: (channelId: string, data: { name?: string; topic?: string }) =>
+        request<GuildChannel>(`/channels/${channelId}`, { method: "PUT", ...json(data) }),
+    delete: (channelId: string) =>
+        request<void>(`/channels/${channelId}`, { method: "DELETE" }),
+};
+
+// ──────────────────────────────────────────────────────────
+// GUILD MESSAGES
+// ──────────────────────────────────────────────────────────
+
+import type { Message } from "../types/message";
+
+export const guildMessages = {
+    list: (channelId: string, limit = 50, before?: string) => {
+        const params = new URLSearchParams({ limit: String(limit) });
+        if (before) params.set("before", before);
+        return request<Message[]>(`/guild-channels/${channelId}/messages?${params}`).catch(() => [] as Message[]);
+    },
+    get: (channelId: string, messageId: string) =>
+        requestOptional<Message>(`/guild-channels/${channelId}/messages/${messageId}`),
+    create: (channelId: string, content: string, clientMessageId?: string) =>
+        request<Message>(`/guild-channels/${channelId}/messages`, { method: "POST", ...json({ content, clientMessageId }) }),
+    edit: (channelId: string, messageId: string, content: string) =>
+        request<Message>(`/guild-channels/${channelId}/messages/${messageId}`, { method: "PUT", ...json({ content }) }),
+    delete: (channelId: string, messageId: string) =>
+        request<void>(`/guild-channels/${channelId}/messages/${messageId}`, { method: "DELETE" }),
+};
+
+// ──────────────────────────────────────────────────────────
+// DM CHANNELS
+// ──────────────────────────────────────────────────────────
+
+import type { DmChannel } from "../types/dm";
+
+export const dms = {
+    list: () => request<DmChannel[]>("/dms").catch(() => [] as DmChannel[]),
+    get: (channelId: string) => requestOptional<DmChannel>(`/dms/${channelId}`),
+    start: (targetUserId: string) =>
+        request<{ channelId: string }>(`/dms/start/${targetUserId}`, { method: "POST", ...json({ content: "" }) }),
+    createGroup: (name: string, memberIds: string[]) =>
+        request<{ channelId: string; isGroup: boolean }>("/dms/group", { method: "POST", ...json({ name, memberIds }) }),
+    addParticipant: (channelId: string, userId: string) =>
+        request<void>(`/dms/${channelId}/participants/${userId}`, { method: "POST" }),
+    leave: (channelId: string) =>
+        request<void>(`/dms/${channelId}/leave`, { method: "DELETE" }),
+    delete: (channelId: string) =>
+        request<void>(`/dms/${channelId}`, { method: "DELETE" }),
+};
+
+// ──────────────────────────────────────────────────────────
+// DM MESSAGES
+// ──────────────────────────────────────────────────────────
+
+import type { TransportMessage } from "../types/message";
+
+function mapTransport(msg: TransportMessage): Message {
+    return {
+        id: msg.id,
+        channelId: msg.channelId,
+        content: msg.content,
+        createdAt: msg.createdAt,
+        editedAt: msg.editedAt ?? null,
+        author: msg.author,
+        attachments: msg.attachments,
+        reactions: msg.reactions,
+        edits: msg.edits,
+    };
+}
+
+export const dmMessages = {
+    list: async (channelId: string, limit = 50, before?: string): Promise<Message[]> => {
+        const params = new URLSearchParams({ limit: String(limit) });
+        if (before) params.set("before", before);
+        try {
+            const data = await request<TransportMessage[]>(`/dm-messages/channel/${channelId}?${params}`);
+            return data.map(mapTransport);
+        } catch {
+            return [];
+        }
+    },
+    send: (channelId: string, content: string, clientMessageId: string) =>
+        request<void>(`/dm-messages/channel/${channelId}`, { method: "POST", ...json({ content, clientMessageId }) }),
+    edit: async (messageId: string, content: string): Promise<Message> => {
+        const msg = await request<TransportMessage>(`/dm-messages/${messageId}`, { method: "PUT", ...json({ content }) });
+        return mapTransport(msg);
+    },
+    delete: (messageId: string) =>
+        request<void>(`/dm-messages/${messageId}`, { method: "DELETE" }),
+};
+
+// ──────────────────────────────────────────────────────────
+// FRIENDS
+// ──────────────────────────────────────────────────────────
+
+import type { Friend, FriendRequests } from "../types/friend";
+
+export const friends = {
+    list: () => request<Friend[]>("/friends/list").catch(() => [] as Friend[]),
+    requests: () => requestOptional<FriendRequests>("/friends/requests"),
+    sendRequest: (username: string) =>
+        request<{ success: boolean }>("/friends/request", { method: "POST", ...json({ username }) }),
+    accept: (requesterId: string) =>
+        request<{ success: boolean }>(`/friends/accept/${requesterId}`, { method: "POST" }),
+    decline: (requesterId: string) =>
+        request<{ success: boolean }>(`/friends/decline/${requesterId}`, { method: "POST" }),
+    cancel: (targetId: string) =>
+        request<{ success: boolean }>(`/friends/cancel/${targetId}`, { method: "POST" }),
+    remove: (friendId: string) =>
+        request<{ success: boolean }>(`/friends/remove/${friendId}`, { method: "DELETE" }),
+    suggest: (input: string) =>
+        request<{ id: string; username: string; displayName: string; avatarUrl: string | null }[]>(
+            `/friends/suggest?input=${encodeURIComponent(input)}`
+        ).catch(() => []),
+};
+
+// ──────────────────────────────────────────────────────────
+// PINS
+// ──────────────────────────────────────────────────────────
+
+import type { PinnedMessage } from "../types/pin";
+
+export const pins = {
+    list: (channelId: string) =>
+        request<PinnedMessage[]>(`/channels/${channelId}/pins`).catch(() => [] as PinnedMessage[]),
+    pin: (channelId: string, messageId: string) =>
+        request<void>(`/channels/${channelId}/pins/${messageId}`, { method: "POST" }),
+    unpin: (channelId: string, messageId: string) =>
+        request<void>(`/channels/${channelId}/pins/${messageId}`, { method: "DELETE" }),
+};
+
+// ──────────────────────────────────────────────────────────
+// REACTIONS
+// ──────────────────────────────────────────────────────────
+
+export const reactions = {
+    add: (messageId: string, emoji: string) =>
+        request<void>(`/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`, { method: "PUT" }),
+    remove: (messageId: string, emoji: string) =>
+        request<void>(`/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`, { method: "DELETE" }),
+};
+
+// ──────────────────────────────────────────────────────────
+// READ STATE
+// ──────────────────────────────────────────────────────────
+
+export const readState = {
+    markAsRead: (channelId: string, messageId: string) =>
+        request<void>(`/channels/${channelId}/ack`, { method: "POST", ...json({ messageId }) }),
+    getUnreadCounts: (channelIds: string[]) =>
+        request<Record<string, number>>("/channels/unread", { method: "POST", ...json({ channelIds }) })
+            .catch(() => ({} as Record<string, number>)),
+};
+
+// ──────────────────────────────────────────────────────────
+// PRESENCE
+// ──────────────────────────────────────────────────────────
+
+export const presence = {
+    me: () => requestOptional<{ status: string }>("/presence/me"),
+    set: (status: string) =>
+        request<{ status: string }>("/presence", { method: "PUT", ...json({ status }) }),
+    bulk: (userIds: string[]) =>
+        request<Record<string, string>>("/presence/bulk", { method: "POST", ...json({ userIds }) })
+            .catch(() => ({} as Record<string, string>)),
+};
+
+// ──────────────────────────────────────────────────────────
+// USER PROFILE
+// ──────────────────────────────────────────────────────────
+
+export const userProfile = {
+    updateDisplayName: (displayName: string) =>
+        request<void>("/users/display-name", { method: "POST", ...json({ displayName }) }),
+    updateAvatar: (file: File) => {
+        const form = new FormData();
+        form.append("file", file);
+        return request<{ avatarUrl: string }>("/users/avatar", { method: "POST", body: form });
+    },
+};
+
+// ──────────────────────────────────────────────────────────
+// SEARCH
+// ──────────────────────────────────────────────────────────
+
+export const search = {
+    messages: (query: string, opts: { channelId?: string; guildId?: string; limit?: number }) => {
+        const params = new URLSearchParams({ q: query });
+        if (opts.channelId) params.set("channelId", opts.channelId);
+        if (opts.guildId) params.set("guildId", opts.guildId);
+        if (opts.limit) params.set("limit", String(opts.limit));
+        return request<{ id: string; channelId: string; content: string; createdAt: string; author: { id: string; username: string; displayName: string; avatarUrl: string | null } }[]>(
+            `/search?${params}`
+        ).catch(() => []);
+    },
+};
+
+// ──────────────────────────────────────────────────────────
+// BLOCKS
+// ──────────────────────────────────────────────────────────
+
+export const blocks = {
+    list: () => request<{ userId: string; username: string; displayName: string; blockedAt: string }[]>("/blocks").catch(() => []),
+    block: (userId: string) => request<void>(`/blocks/${userId}`, { method: "PUT" }),
+    unblock: (userId: string) => request<void>(`/blocks/${userId}`, { method: "DELETE" }),
+};
+
+// ──────────────────────────────────────────────────────────
+// ROLES
+// ──────────────────────────────────────────────────────────
+
+import type { GuildRole, RolePermission } from "../types/guild";
+
+export const roles = {
+    list: (guildId: string) => request<GuildRole[]>(`/guilds/${guildId}/roles`).catch(() => [] as GuildRole[]),
+    create: (guildId: string, name: string) =>
+        request<GuildRole>(`/guilds/${guildId}/roles`, { method: "POST", ...json({ name }) }),
+    update: (guildId: string, roleId: string, data: { name?: string; position?: number }) =>
+        request<GuildRole>(`/guilds/${guildId}/roles/${roleId}`, { method: "PUT", ...json(data) }),
+    delete: (guildId: string, roleId: string) =>
+        request<void>(`/guilds/${guildId}/roles/${roleId}`, { method: "DELETE" }),
+    setPermission: (guildId: string, roleId: string, permissionId: string, allow: boolean) =>
+        request<void>(`/guilds/${guildId}/roles/${roleId}/permissions/${permissionId}`, { method: "PUT", ...json({ allow }) }),
+    assign: (guildId: string, roleId: string, userId: string) =>
+        request<void>(`/guilds/${guildId}/roles/${roleId}/members/${userId}`, { method: "POST" }),
+    unassign: (guildId: string, roleId: string, userId: string) =>
+        request<void>(`/guilds/${guildId}/roles/${roleId}/members/${userId}`, { method: "DELETE" }),
+};
+
+// ──────────────────────────────────────────────────────────
+// INVITES
+// ──────────────────────────────────────────────────────────
+
+import type { GuildInvite } from "../types/guild";
+
+export const invites = {
+    create: (guildId: string, opts?: { maxUses?: number; expiresInHours?: number }) =>
+        request<GuildInvite>(`/guilds/${guildId}/invites`, { method: "POST", ...json(opts ?? {}) }),
+    list: (guildId: string) => request<GuildInvite[]>(`/guilds/${guildId}/invites`).catch(() => [] as GuildInvite[]),
+    getByCode: (code: string) => requestOptional<{ code: string; guild: { id: string; name: string; iconUrl: string | null } }>(`/invites/${code}`),
+    join: (code: string) => request<{ id: string; name: string; iconUrl: string | null }>(`/invites/${code}/join`, { method: "POST" }),
+    revoke: (inviteId: string) => request<void>(`/invites/${inviteId}`, { method: "DELETE" }),
+};
+
+// ──────────────────────────────────────────────────────────
+// EXPORTED TYPES FOR CONSUMERS
+// ──────────────────────────────────────────────────────────
+
+export type { GuildSummary, Guild, GuildChannel, GuildMember, GuildPermissions, GuildRole, RolePermission, GuildInvite } from "../types/guild";
+export type { DmChannel, DmUser } from "../types/dm";
+export type { Message, MessageAttachment, MessageReaction, MessageEdit, TransportMessage } from "../types/message";
+export type { Friend, FriendRequests } from "../types/friend";
+export type { PinnedMessage } from "../types/pin";
