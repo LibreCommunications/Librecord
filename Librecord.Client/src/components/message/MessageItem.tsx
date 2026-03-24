@@ -51,6 +51,7 @@ export const MessageItem = memo(function MessageItem({
         <div className="flex gap-4 px-4 py-1.5 group relative hover:bg-[#2e3035] transition-colors" data-testid={`message-${msg.id}`}>
             <img
                 src={getAvatarUrl(msg.author.avatarUrl)}
+                loading="lazy"
                 className="w-10 h-10 rounded-full object-cover mt-0.5 cursor-pointer hover:opacity-80 transition-opacity"
                 alt=""
             />
@@ -121,6 +122,7 @@ export const MessageItem = memo(function MessageItem({
                                         key={att.id}
                                         src={src}
                                         alt={att.fileName}
+                                        loading="lazy"
                                         onClick={() => setLightboxSrc({ src, alt: att.fileName })}
                                         className="max-w-md max-h-80 rounded-lg object-contain border border-[#1e1f22] cursor-zoom-in hover:brightness-110 transition"
                                     />
@@ -133,6 +135,7 @@ export const MessageItem = memo(function MessageItem({
                                         key={att.id}
                                         src={src}
                                         controls
+                                        preload="none"
                                         className="max-w-md max-h-80 rounded-lg"
                                     />
                                 );
@@ -141,7 +144,7 @@ export const MessageItem = memo(function MessageItem({
                             if (att.contentType.startsWith("audio/")) {
                                 return (
                                     <div key={att.id} className="flex items-center gap-2 bg-[#2b2d31] rounded-lg p-3 max-w-md border border-[#1e1f22]">
-                                        <audio src={src} controls className="flex-1" />
+                                        <audio src={src} controls preload="none" className="flex-1" />
                                         <span className="text-xs text-[#949ba4] shrink-0">{att.fileName}</span>
                                     </div>
                                 );
