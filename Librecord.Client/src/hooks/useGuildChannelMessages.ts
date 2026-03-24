@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 import type { Message } from "../types/message";
 
@@ -9,7 +8,6 @@ const API_URL = import.meta.env.VITE_API_URL;
 // GUILD CHANNEL MESSAGES HOOK
 // --------------------------------------------------
 export function useGuildChannelMessages() {
-    const auth = useAuth();
 
     // ----------------------------------------------
     // GET SINGLE MESSAGE
@@ -22,12 +20,11 @@ export function useGuildChannelMessages() {
         const res = await fetchWithAuth(
             `${API_URL}/guild-channels/${channelId}/messages/${messageId}`,
             {},
-            auth
         );
 
         if (!res.ok) return null;
         return res.json();
-    }, [auth]);
+    }, []);
 
     // ----------------------------------------------
     // GET CHANNEL MESSAGES
@@ -47,12 +44,11 @@ export function useGuildChannelMessages() {
         const res = await fetchWithAuth(
             `${API_URL}/guild-channels/${channelId}/messages?${params}`,
             {},
-            auth
         );
 
         if (!res.ok) return [];
         return res.json();
-    }, [auth]);
+    }, []);
 
     // ----------------------------------------------
     // CREATE MESSAGE
@@ -70,12 +66,11 @@ export function useGuildChannelMessages() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ content, clientMessageId }),
             },
-            auth
         );
 
         if (!res.ok) return null;
         return res.json();
-    }, [auth]);
+    }, []);
 
     // ----------------------------------------------
     // EDIT MESSAGE
@@ -93,7 +88,6 @@ export function useGuildChannelMessages() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ content }),
             },
-            auth
         );
 
         if (!res.ok) {
@@ -101,7 +95,7 @@ export function useGuildChannelMessages() {
         }
 
         return res.json();
-    }, [auth]);
+    }, []);
 
     // ----------------------------------------------
     // DELETE MESSAGE
@@ -114,13 +108,12 @@ export function useGuildChannelMessages() {
         const res = await fetchWithAuth(
             `${API_URL}/guild-channels/${channelId}/messages/${messageId}`,
             { method: "DELETE" },
-            auth
         );
 
         if (!res.ok) {
             throw new Error("Failed to delete message");
         }
-    }, [auth]);
+    }, []);
 
     return {
         getMessage,

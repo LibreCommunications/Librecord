@@ -1,12 +1,9 @@
 import { useCallback } from "react";
-import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 export function useReadState() {
-    const auth = useAuth();
-
     const markAsRead = useCallback(async (channelId: string, messageId: string): Promise<boolean> => {
         console.log(`[ReadState] markAsRead called — channel=${channelId} message=${messageId}`);
         try {
@@ -17,7 +14,6 @@ export function useReadState() {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ messageId }),
                 },
-                auth
             );
             if (!res.ok) {
                 console.warn(`[ReadState] markAsRead failed: ${res.status} for channel=${channelId} message=${messageId}`);
@@ -29,7 +25,7 @@ export function useReadState() {
             console.warn("[ReadState] markAsRead error:", err);
             return false;
         }
-    }, [auth]);
+    }, []);
 
     const getUnreadCounts = useCallback(async (channelIds: string[]): Promise<Record<string, number>> => {
         console.log(`[ReadState] getUnreadCounts called — channels=${JSON.stringify(channelIds)}`);
@@ -42,14 +38,13 @@ export function useReadState() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ channelIds }),
             },
-            auth
         );
 
         if (!res.ok) return {};
         const counts = await res.json();
         console.log(`[ReadState] getUnreadCounts result —`, counts);
         return counts;
-    }, [auth]);
+    }, []);
 
     return { markAsRead, getUnreadCounts };
 }

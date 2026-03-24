@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -33,7 +32,6 @@ export interface UpdateChannelDto {
 /* HOOK                                                                */
 /* ------------------------------------------------------------------ */
 export function useChannels() {
-    const auth = useAuth();
 
     /* ------------------------------------------------------------------ */
     /* GET SINGLE CHANNEL                                                  */
@@ -43,12 +41,11 @@ export function useChannels() {
         const res = await fetchWithAuth(
             `${API_URL}/channels/${channelId}`,
             {},
-            auth
         );
 
         if (!res.ok) return null;
         return await res.json();
-    }, [auth]);
+    }, []);
 
     /* ------------------------------------------------------------------ */
     /* LIST CHANNELS FOR GUILD                                             */
@@ -58,12 +55,11 @@ export function useChannels() {
         const res = await fetchWithAuth(
             `${API_URL}/channels/guild/${guildId}`,
             {},
-            auth
         );
 
         if (!res.ok) return [];
         return await res.json();
-    }, [auth]);
+    }, []);
 
     /* ------------------------------------------------------------------ */
     /* CREATE CHANNEL                                                      */
@@ -80,12 +76,11 @@ export function useChannels() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(dto),
             },
-            auth
         );
 
         if (!res.ok) return null;
         return await res.json();
-    }, [auth]);
+    }, []);
 
     /* ------------------------------------------------------------------ */
     /* UPDATE CHANNEL                                                      */
@@ -102,12 +97,11 @@ export function useChannels() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(dto),
             },
-            auth
         );
 
         if (!res.ok) return null;
         return await res.json();
-    }, [auth]);
+    }, []);
 
     /* ------------------------------------------------------------------ */
     /* DELETE CHANNEL                                                      */
@@ -117,11 +111,10 @@ export function useChannels() {
         const res = await fetchWithAuth(
             `${API_URL}/channels/${channelId}`,
             { method: "DELETE" },
-            auth
         );
 
         return res.ok;
-    }, [auth]);
+    }, []);
 
     return {
         getChannel,

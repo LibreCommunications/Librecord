@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 import type { Message } from "../types/message";
 
@@ -11,8 +10,6 @@ export type UploadResult =
     | { ok: false; status: number }; // 0 = timeout/network error
 
 export function useAttachmentUpload() {
-    const auth = useAuth();
-
     const sendGuildMessageWithAttachments = useCallback(async (
         channelId: string,
         content: string,
@@ -33,7 +30,6 @@ export function useAttachmentUpload() {
             const res = await fetchWithAuth(
                 `${API_URL}/guild-channels/${channelId}/messages/with-attachments`,
                 { method: "POST", body: form, signal: controller.signal },
-                auth
             );
             if (!res.ok) return { ok: false, status: res.status };
             return { ok: true, message: await res.json() };
@@ -42,7 +38,7 @@ export function useAttachmentUpload() {
         } finally {
             clearTimeout(timeout);
         }
-    }, [auth]);
+    }, []);
 
     const sendDmMessageWithAttachments = useCallback(async (
         channelId: string,
@@ -64,7 +60,6 @@ export function useAttachmentUpload() {
             const res = await fetchWithAuth(
                 `${API_URL}/dm-messages/channel/${channelId}/with-attachments`,
                 { method: "POST", body: form, signal: controller.signal },
-                auth
             );
             if (!res.ok) return { ok: false, status: res.status };
             return { ok: true, message: await res.json() };
@@ -73,7 +68,7 @@ export function useAttachmentUpload() {
         } finally {
             clearTimeout(timeout);
         }
-    }, [auth]);
+    }, []);
 
     return { sendGuildMessageWithAttachments, sendDmMessageWithAttachments };
 }

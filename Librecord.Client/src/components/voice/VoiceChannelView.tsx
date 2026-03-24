@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useVoice } from "../../hooks/useVoice";
 import { useUserProfile } from "../../hooks/useUserProfile";
-import { useAuth } from "../../hooks/useAuth";
 import { fetchWithAuth } from "../../api/fetchWithAuth";
 import { ParticipantTile } from "./ParticipantTile";
 import { ScreenShareTile } from "./ScreenShareTile";
@@ -110,7 +109,6 @@ function getGridClass(count: number): string {
 export function VoiceChannelView({ channelId }: Props) {
     const { voiceState } = useVoice();
     const { getAvatarUrl } = useUserProfile();
-    const auth = useAuth();
     const [speakingMap, setSpeakingMap] = useState<Record<string, boolean>>({});
     const [previewParticipants, setPreviewParticipants] = useState<VoiceParticipant[]>([]);
 
@@ -139,7 +137,6 @@ export function VoiceChannelView({ channelId }: Props) {
                 const res = await fetchWithAuth(
                     `${API_URL}/voice/channels/${channelId}/participants`,
                     {},
-                    auth,
                 );
                 if (!res.ok || cancelled) return;
                 const data: VoiceParticipantPayload[] = await res.json();
@@ -172,7 +169,7 @@ export function VoiceChannelView({ channelId }: Props) {
             window.removeEventListener("voice:user:joined", onVoiceChange);
             window.removeEventListener("voice:user:left", onVoiceChange);
         };
-    }, [channelId, isInThisChannel, auth]);
+    }, [channelId, isInThisChannel]);
 
     // When connected to this channel, use live state; otherwise use API preview
     const participants = isInThisChannel ? voiceState.participants : previewParticipants;

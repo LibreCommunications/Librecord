@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -23,7 +22,6 @@ const NONE: GuildPermissions = {
 };
 
 export function useGuildPermissions(guildId: string | undefined) {
-    const auth = useAuth();
     const [permissions, setPermissions] = useState<GuildPermissions>(NONE);
     const [loaded, setLoaded] = useState(false);
     const [prevGuildId, setPrevGuildId] = useState(guildId);
@@ -39,7 +37,7 @@ export function useGuildPermissions(guildId: string | undefined) {
         if (!guildId) return;
         let stale = false;
 
-        fetchWithAuth(`${API_URL}/guilds/${guildId}/permissions/me`, {}, auth)
+        fetchWithAuth(`${API_URL}/guilds/${guildId}/permissions/me`, {})
             .then(async (res) => {
                 if (stale) return;
                 if (res.ok) setPermissions(await res.json());
@@ -47,7 +45,7 @@ export function useGuildPermissions(guildId: string | undefined) {
             });
 
         return () => { stale = true; };
-    }, [guildId, auth]);
+    }, [guildId]);
 
     return { permissions, loaded };
 }

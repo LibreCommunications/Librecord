@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -15,23 +14,22 @@ export interface PinnedMessage {
 }
 
 export function usePins() {
-    const auth = useAuth();
 
     const pinMessage = useCallback(async (channelId: string, messageId: string): Promise<boolean> => {
-        const res = await fetchWithAuth(`${API_URL}/channels/${channelId}/pins/${messageId}`, { method: "POST" }, auth);
+        const res = await fetchWithAuth(`${API_URL}/channels/${channelId}/pins/${messageId}`, { method: "POST" });
         return res.ok;
-    }, [auth]);
+    }, []);
 
     const unpinMessage = useCallback(async (channelId: string, messageId: string): Promise<boolean> => {
-        const res = await fetchWithAuth(`${API_URL}/channels/${channelId}/pins/${messageId}`, { method: "DELETE" }, auth);
+        const res = await fetchWithAuth(`${API_URL}/channels/${channelId}/pins/${messageId}`, { method: "DELETE" });
         return res.ok;
-    }, [auth]);
+    }, []);
 
     const getPins = useCallback(async (channelId: string): Promise<PinnedMessage[]> => {
-        const res = await fetchWithAuth(`${API_URL}/channels/${channelId}/pins`, {}, auth);
+        const res = await fetchWithAuth(`${API_URL}/channels/${channelId}/pins`, {});
         if (!res.ok) return [];
         return res.json();
-    }, [auth]);
+    }, []);
 
     return { pinMessage, unpinMessage, getPins };
 }

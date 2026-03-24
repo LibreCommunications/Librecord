@@ -6,8 +6,7 @@ const API_URL = import.meta.env.VITE_API_URL;
 const DEFAULT_AVATAR = "/default-avatar.png";
 
 export function useUserProfile() {
-    const auth = useAuth();
-    const { user, loadUser } = auth;
+    const { user, loadUser } = useAuth();
 
     // ---------------------------
     // Resolve avatar URL
@@ -28,14 +27,13 @@ export function useUserProfile() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ displayName: newName }),
             },
-            auth
         );
 
         if (!res.ok) return false;
 
         await loadUser();
         return true;
-    }, [auth, loadUser]);
+    }, [loadUser]);
 
     // ---------------------------
     // Upload avatar
@@ -50,7 +48,6 @@ export function useUserProfile() {
                 method: "POST",
                 body: form,
             },
-            auth
         );
 
         if (!res.ok) return null;
@@ -61,7 +58,7 @@ export function useUserProfile() {
         await loadUser();
 
         return data.avatarUrl;
-    }, [auth, loadUser]);
+    }, [loadUser]);
 
     return {
         user,

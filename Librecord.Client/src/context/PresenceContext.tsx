@@ -15,15 +15,15 @@ const PresenceContext = createContext<PresenceContextValue>({
 });
 
 export function PresenceProvider({ children }: { children: ReactNode }) {
-    const auth = useAuth();
+    const { user } = useAuth();
     const [myStatus, setStatus] = useState("online");
 
     useEffect(() => {
-        if (!auth.user) return;
-        fetchWithAuth(`${API_URL}/presence/me`, {}, auth)
+        if (!user) return;
+        fetchWithAuth(`${API_URL}/presence/me`, {})
             .then(res => res.ok ? res.json() : null)
             .then(data => { if (data?.status) setStatus(data.status); });
-    }, [auth, auth.user?.userId]);
+    }, [user?.userId]);
 
     const setMyStatus = useCallback(async (status: string) => {
         await fetchWithAuth(
@@ -33,10 +33,9 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ status }),
             },
-            auth
         );
         setStatus(status);
-    }, [auth]);
+    }, []);
 
     return (
         <PresenceContext.Provider value={{ myStatus, setMyStatus }}>

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useAuth } from "../../hooks/useAuth";
 import { fetchWithAuth } from "../../api/fetchWithAuth";
 import { StatusDot } from "./StatusDot";
 
@@ -18,7 +17,6 @@ interface Props {
 }
 
 export function StatusSelector({ currentStatus, onStatusChange }: Props) {
-    const auth = useAuth();
     const [open, setOpen] = useState(false);
 
     async function handleSelect(status: string) {
@@ -31,7 +29,6 @@ export function StatusSelector({ currentStatus, onStatusChange }: Props) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ status }),
             },
-            auth
         );
 
         onStatusChange(status);

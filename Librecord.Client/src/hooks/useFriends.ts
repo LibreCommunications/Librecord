@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -21,7 +20,6 @@ export interface FriendSuggestion {
 }
 
 export function useFriends() {
-    const auth = useAuth();
 
     // -----------------------------
     // FRIEND LIST
@@ -30,12 +28,11 @@ export function useFriends() {
         const res = await fetchWithAuth(
             `${API_URL}/friends/list`,
             {},
-            auth
         );
 
         if (!res.ok) return [];
         return await res.json();
-    }, [auth]);
+    }, []);
 
     // -----------------------------
     // REQUESTS
@@ -47,14 +44,13 @@ export function useFriends() {
         const res = await fetchWithAuth(
             `${API_URL}/friends/requests`,
             {},
-            auth
         );
 
         if (!res.ok)
             return { incoming: [], outgoing: [] };
 
         return await res.json();
-    }, [auth]);
+    }, []);
 
     // -----------------------------
     // USERNAME SUGGESTIONS
@@ -65,12 +61,11 @@ export function useFriends() {
         const res = await fetchWithAuth(
             `${API_URL}/friends/suggest?query=${encodeURIComponent(query)}`,
             {},
-            auth
         );
 
         if (!res.ok) return [];
         return await res.json();
-    }, [auth]);
+    }, []);
 
     const sendRequest = useCallback(async (username: string) => {
         return (
@@ -81,50 +76,45 @@ export function useFriends() {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ username }),
                 },
-                auth
             )
         ).ok;
-    }, [auth]);
+    }, []);
 
     const acceptRequest = useCallback(async (requesterId: string) => {
         return (
             await fetchWithAuth(
                 `${API_URL}/friends/accept/${requesterId}`,
                 { method: "POST" },
-                auth
             )
         ).ok;
-    }, [auth]);
+    }, []);
 
     const declineRequest = useCallback(async (requesterId: string) => {
         return (
             await fetchWithAuth(
                 `${API_URL}/friends/decline/${requesterId}`,
                 { method: "POST" },
-                auth
             )
         ).ok;
-    }, [auth]);
+    }, []);
 
     const removeFriend = useCallback(async (friendId: string) => {
         return (
             await fetchWithAuth(
                 `${API_URL}/friends/remove/${friendId}`,
                 { method: "DELETE" },
-                auth
             )
         ).ok;
-    }, [auth]);
+    }, []);
 
     const cancelRequest = useCallback(async (targetId: string) => {
         return (
             await fetchWithAuth(
                 `${API_URL}/friends/cancel/${targetId}`,
                 { method: "POST" },
-                auth
             )
         ).ok;
-    }, [auth]);
+    }, []);
 
     return {
         getFriends,

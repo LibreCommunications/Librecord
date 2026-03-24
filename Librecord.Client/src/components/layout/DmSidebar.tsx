@@ -20,8 +20,7 @@ export default function DmSidebar() {
     const location = useLocation();
     const navigate = useNavigate();
     const { getMyDms, leaveChannel, deleteDm } = useDirectMessagesChannel();
-    const auth = useAuth();
-    const { user } = auth;
+    const { user } = useAuth();
     const { getAvatarUrl } = useUserProfile();
     const { getUnreadCounts } = useReadState();
 
@@ -56,14 +55,13 @@ export default function DmSidebar() {
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ userIds: uniqueIds }),
                     },
-                    auth
                 );
                 if (res.ok) {
                     setPresenceMap(await res.json());
                 }
             }
         }
-    }, [getMyDms, getUnreadCounts, user?.userId, auth]);
+    }, [getMyDms, getUnreadCounts, user?.userId]);
 
     useEffect(() => {
         let cancelled = false;
@@ -89,7 +87,6 @@ export default function DmSidebar() {
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ userIds: uniqueIds }),
                         },
-                        auth
                     );
                     if (!cancelled && res.ok) {
                         setPresenceMap(await res.json());
@@ -98,7 +95,7 @@ export default function DmSidebar() {
             }
         })();
         return () => { cancelled = true; };
-    }, [getMyDms, getUnreadCounts, user?.userId, auth]);
+    }, [getMyDms, getUnreadCounts, user?.userId]);
 
     // Refresh DM list when a friend is removed or a new DM channel is created
     useEffect(() => {

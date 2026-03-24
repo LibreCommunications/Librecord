@@ -23,8 +23,7 @@ export default function ChannelSidebar({ guildId }: Props) {
     const { getGuildChannels, createChannel } = useChannels();
     const { getUnreadCounts } = useReadState();
     const { voiceState, joinVoice } = useVoice();
-    const auth = useAuth();
-    const { user } = auth;
+    const { user } = useAuth();
     const { getAvatarUrl } = useUserProfile();
 
     const [channels, setChannels] = useState<GuildChannel[]>([]);
@@ -48,8 +47,8 @@ export default function ChannelSidebar({ guildId }: Props) {
         // Check if current user can manage channels
         try {
             const [membersRes, rolesRes] = await Promise.all([
-                fetchWithAuth(`${API_URL}/guilds/${guildId}/members`, {}, auth),
-                fetchWithAuth(`${API_URL}/guilds/${guildId}/roles`, {}, auth),
+                fetchWithAuth(`${API_URL}/guilds/${guildId}/members`, {}),
+                fetchWithAuth(`${API_URL}/guilds/${guildId}/roles`, {}),
             ]);
             if (membersRes.ok && rolesRes.ok) {
                 const members = await membersRes.json();
@@ -66,7 +65,7 @@ export default function ChannelSidebar({ guildId }: Props) {
         } catch {
             setCanManageChannels(false);
         }
-    }, [guildId, getGuildChannels, getUnreadCounts, auth, user?.userId]);
+    }, [guildId, getGuildChannels, getUnreadCounts, user?.userId]);
 
     useEffect(() => {
         if (!guildId) return;
@@ -84,8 +83,8 @@ export default function ChannelSidebar({ guildId }: Props) {
 
             try {
                 const [membersRes, rolesRes] = await Promise.all([
-                    fetchWithAuth(`${API_URL}/guilds/${guildId}/members`, {}, auth),
-                    fetchWithAuth(`${API_URL}/guilds/${guildId}/roles`, {}, auth),
+                    fetchWithAuth(`${API_URL}/guilds/${guildId}/members`, {}),
+                    fetchWithAuth(`${API_URL}/guilds/${guildId}/roles`, {}),
                 ]);
                 if (!cancelled && membersRes.ok && rolesRes.ok) {
                     const members = await membersRes.json();
@@ -104,7 +103,7 @@ export default function ChannelSidebar({ guildId }: Props) {
             }
         })();
         return () => { cancelled = true; };
-    }, [guildId, getGuildChannels, getUnreadCounts, auth, user?.userId]);
+    }, [guildId, getGuildChannels, getUnreadCounts, user?.userId]);
 
     // Fetch voice participants for all voice channels
     useEffect(() => {
@@ -112,7 +111,7 @@ export default function ChannelSidebar({ guildId }: Props) {
         if (voiceChs.length === 0) return;
         Promise.all(
             voiceChs.map(ch =>
-                fetchWithAuth(`${API_URL}/voice/channels/${ch.id}/participants`, {}, auth)
+                fetchWithAuth(`${API_URL}/voice/channels/${ch.id}/participants`, {})
                     .then(r => r.ok ? r.json() : [])
                     .then(participants => [ch.id, participants] as const)
             )
@@ -121,7 +120,7 @@ export default function ChannelSidebar({ guildId }: Props) {
             for (const [id, p] of results) map[id] = p;
             setChannelParticipants(map);
         });
-    }, [channels, auth]);
+    }, [channels]);
 
     // Update participant list on voice join/leave/state events
     useEffect(() => {

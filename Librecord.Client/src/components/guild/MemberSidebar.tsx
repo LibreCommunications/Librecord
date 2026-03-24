@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useGuildMembers, type GuildMember } from "../../hooks/useGuildMembers";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { StatusDot } from "../user/StatusDot";
-import { useAuth } from "../../hooks/useAuth";
 import { fetchWithAuth } from "../../api/fetchWithAuth";
 import type { GuildEventMap } from "../../realtime/guild/guildEvents";
 
@@ -13,7 +12,6 @@ interface Props {
 }
 
 export function MemberSidebar({ guildId }: Props) {
-    const auth = useAuth();
     const { getMembers } = useGuildMembers();
     const { getAvatarUrl } = useUserProfile();
     const [members, setMembers] = useState<GuildMember[]>([]);
@@ -32,7 +30,6 @@ export function MemberSidebar({ guildId }: Props) {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ userIds }),
                 },
-                auth
             );
 
             if (res.ok) {
@@ -40,7 +37,7 @@ export function MemberSidebar({ guildId }: Props) {
                 setPresenceMap(data);
             }
         });
-    }, [guildId, auth, getMembers]);
+    }, [guildId, getMembers]);
 
     // Listen for realtime presence changes
     useEffect(() => {

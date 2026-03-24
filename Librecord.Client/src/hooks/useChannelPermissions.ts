@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -14,17 +13,14 @@ export interface ChannelOverride {
 }
 
 export function useChannelPermissions() {
-    const auth = useAuth();
-
     const getOverrides = useCallback(async (channelId: string): Promise<ChannelOverride[]> => {
         const res = await fetchWithAuth(
             `${API_URL}/channels/${channelId}/permissions`,
             {},
-            auth
         );
         if (!res.ok) return [];
         return res.json();
-    }, [auth]);
+    }, []);
 
     const setOverride = useCallback(async (
         channelId: string,
@@ -42,10 +38,9 @@ export function useChannelPermissions() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(opts),
             },
-            auth
         );
         return res.ok;
-    }, [auth]);
+    }, []);
 
     return { getOverrides, setOverride };
 }

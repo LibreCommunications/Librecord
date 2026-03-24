@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -18,7 +17,6 @@ export interface SearchResult {
 }
 
 export function useSearch() {
-    const auth = useAuth();
 
     const search = useCallback(async (
         query: string,
@@ -32,12 +30,11 @@ export function useSearch() {
         const res = await fetchWithAuth(
             `${API_URL}/search?${params}`,
             {},
-            auth
         );
 
         if (!res.ok) return [];
         return res.json();
-    }, [auth]);
+    }, []);
 
     return { search };
 }

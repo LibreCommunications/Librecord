@@ -1,4 +1,5 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { setRefreshFunction } from "../api/fetchWithAuth";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -53,6 +54,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         return res.ok;
     }, []);
+
+    // Register globally so fetchWithAuth can use it without passing auth around
+    useEffect(() => {
+        setRefreshFunction(refreshAccessToken);
+    }, [refreshAccessToken]);
 
     const loadUser = useCallback(async () => {
         let res = await fetch(`${API_URL}/users/me`, {

@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -31,7 +30,6 @@ export interface GuildChannel {
 // HOOK
 // -----------------------------
 export function useGuilds() {
-    const auth = useAuth();
 
     // ------------------------------------------------------------------
     // GET USER GUILDS (SIDEBAR)
@@ -40,12 +38,11 @@ export function useGuilds() {
         const res = await fetchWithAuth(
             `${API_URL}/guilds`,
             {},
-            auth
         );
 
         if (!res.ok) return [];
         return await res.json();
-    }, [auth]);
+    }, []);
 
     // ------------------------------------------------------------------
     // GET SINGLE GUILD
@@ -54,12 +51,11 @@ export function useGuilds() {
         const res = await fetchWithAuth(
             `${API_URL}/guilds/${guildId}`,
             {},
-            auth
         );
 
         if (!res.ok) return null;
         return await res.json();
-    }, [auth]);
+    }, []);
 
     // ------------------------------------------------------------------
     // CREATE GUILD
@@ -74,12 +70,11 @@ export function useGuilds() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name })
             },
-            auth
         );
 
         if (!res.ok) return null;
         return await res.json();
-    }, [auth]);
+    }, []);
 
     // ------------------------------------------------------------------
     // GET GUILD CHANNELS
@@ -88,12 +83,11 @@ export function useGuilds() {
         const res = await fetchWithAuth(
             `${API_URL}/guilds/${guildId}/channels`,
             {},
-            auth
         );
 
         if (!res.ok) return [];
         return await res.json();
-    }, [auth]);
+    }, []);
 
     // ------------------------------------------------------------------
     // GET SINGLE CHANNEL (ACCESS-CHECKED)
@@ -102,12 +96,11 @@ export function useGuilds() {
         const res = await fetchWithAuth(
             `${API_URL}/guilds/channels/${channelId}`,
             {},
-            auth
         );
 
         if (!res.ok) return null;
         return await res.json();
-    }, [auth]);
+    }, []);
 
     return {
         getGuilds,

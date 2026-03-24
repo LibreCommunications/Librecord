@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { useAuth } from "./useAuth";
 import { fetchWithAuth } from "../api/fetchWithAuth";
 import type {Message, TransportMessage} from "../types/message";
 
@@ -32,7 +31,6 @@ function mapTransportToUi(msg: TransportMessage): Message {
 // DIRECT MESSAGES HOOK
 // --------------------------------------------------
 export function useDirectMessages() {
-    const auth = useAuth();
 
     // --------------------------------------------------
     // GET CHANNEL MESSAGES
@@ -52,14 +50,13 @@ export function useDirectMessages() {
         const res = await fetchWithAuth(
             `${API_URL}/dm-messages/channel/${channelId}?${params}`,
             {},
-            auth
         );
 
         if (!res.ok) return [];
 
         const data: TransportMessage[] = await res.json();
         return data.map(mapTransportToUi);
-    }, [auth]);
+    }, []);
 
     // --------------------------------------------------
     // SEND MESSAGE
@@ -80,13 +77,12 @@ export function useDirectMessages() {
                     clientMessageId,
                 }),
             },
-            auth
         );
 
         if (!res.ok) {
             throw new Error("Failed to send message");
         }
-    }, [auth]);
+    }, []);
 
 
 
@@ -108,7 +104,6 @@ export function useDirectMessages() {
                     content,
                 }),
             },
-            auth
         );
 
         if (!res.ok) {
@@ -117,7 +112,7 @@ export function useDirectMessages() {
 
         const msg: TransportMessage = await res.json();
         return mapTransportToUi(msg);
-    }, [auth]);
+    }, []);
 
 
     // --------------------------------------------------
@@ -128,13 +123,12 @@ export function useDirectMessages() {
         const res = await fetchWithAuth(
             `${API_URL}/dm-messages/${messageId}`,
             { method: "DELETE" },
-            auth
         );
 
         if (!res.ok) {
             throw new Error("Failed to delete message");
         }
-    }, [auth]);
+    }, []);
 
     return {
         getChannelMessages,
