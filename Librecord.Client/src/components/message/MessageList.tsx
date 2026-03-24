@@ -27,6 +27,7 @@ export function MessageList({
                             }: MessageListProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const isAtBottomRef = useRef(true);
+    const stickyBottomUntilRef = useRef(0); // timestamp: force isAtBottom=true until this time
     const sentinelRef = useRef<HTMLDivElement | null>(null);
     const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
     const [newMsgCount, setNewMsgCount] = useState(0);
@@ -51,6 +52,13 @@ export function MessageList({
         function onScroll() {
             const el = containerRef.current;
             if (!el) return;
+
+            // During the sticky period after initial load, always consider at bottom
+            // so media load events keep re-scrolling
+            if (Date.now() < stickyBottomUntilRef.current) {
+                isAtBottomRef.current = true;
+                return;
+            }
 
             const threshold = 20;
             const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
@@ -94,9 +102,9 @@ export function MessageList({
         if (!el) return;
 
         if (forceScrollOnNextUpdateRef?.current) {
-            // Mark as at-bottom so the media load handler will re-scroll
-            // when images/videos finish loading after this initial scroll
+            // Keep isAtBottom=true for 3s so lazy-loaded media triggers re-scroll
             isAtBottomRef.current = true;
+            stickyBottomUntilRef.current = Date.now() + 3000;
             requestAnimationFrame(() => {
                 el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
             });
@@ -127,6 +135,9 @@ export function MessageList({
                 // realtime messages arriving before smooth animation completes
                 const isInitial = prevMsgCountRef.current === 0;
                 if (isInitial) {
+                    // Keep isAtBottom=true for 3s so lazy-loaded images
+                    // trigger re-scroll as they load
+                    stickyBottomUntilRef.current = Date.now() + 3000;
                     // Wait for DOM layout to complete before scrolling
                     requestAnimationFrame(() => {
                         el.scrollTo({ top: el.scrollHeight, behavior: "instant" });

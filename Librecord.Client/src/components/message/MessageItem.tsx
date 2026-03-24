@@ -135,7 +135,7 @@ export const MessageItem = memo(function MessageItem({
                                         key={att.id}
                                         src={src}
                                         controls
-                                        preload="none"
+                                        preload="metadata"
                                         className="max-w-md max-h-80 rounded-lg"
                                     />
                                 );
