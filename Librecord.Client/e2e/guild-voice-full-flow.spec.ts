@@ -290,6 +290,10 @@ test.describe.serial("Full guild + WebRTC voice flow with media verification", (
             timeout: 10_000,
         });
 
+        // Screen shares are opt-in — Bob must click "Watch Stream"
+        await expect(pageB.getByRole("button", { name: "Watch Stream" })).toBeVisible({ timeout: 10_000 });
+        await pageB.getByRole("button", { name: "Watch Stream" }).click();
+
         // Verify video bytes flowing (screen share is a video track over WebRTC)
         await expectVideoReceiving(
             pageB,
@@ -344,6 +348,10 @@ test.describe.serial("Full guild + WebRTC voice flow with media verification", (
         await expect(pageA.locator("[title='Stop Sharing']")).toBeVisible({
             timeout: 10_000,
         });
+
+        // Screen shares are opt-in — Bob must click "Watch Stream"
+        await expect(pageB.getByRole("button", { name: "Watch Stream" })).toBeVisible({ timeout: 10_000 });
+        await pageB.getByRole("button", { name: "Watch Stream" }).click();
 
         // Bob should have 2 active video elements:
         //   1. ParticipantTile <video> for Alice's camera
@@ -420,6 +428,10 @@ test.describe.serial("Full guild + WebRTC voice flow with media verification", (
         await expect(pageB.locator("[title='Stop Sharing']")).toBeVisible({
             timeout: 10_000,
         });
+
+        // Screen shares are opt-in — Alice must click "Watch Stream"
+        await expect(pageA.getByRole("button", { name: "Watch Stream" })).toBeVisible({ timeout: 10_000 });
+        await pageA.getByRole("button", { name: "Watch Stream" }).click();
 
         await expectVideoReceiving(
             pageA,

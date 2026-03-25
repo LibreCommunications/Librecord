@@ -207,8 +207,9 @@ test.describe.serial("Screen Share Modal — settings & WebRTC verification", ()
         const selectedRes = modal.locator("button").filter({ hasText: "1080p" }).first();
         await expect(selectedRes).toHaveClass(/border-\[#5865F2\]/);
 
-        // "Source" FPS should be selected by default
-        const selectedFps = modal.locator("button").filter({ hasText: "Source" }).first();
+        // "Source" FPS should be selected by default.
+        // Use .last() because the resolution "Source" button comes first in the DOM.
+        const selectedFps = modal.locator("button").filter({ hasText: /^Source$/ }).last();
         await expect(selectedFps).toHaveClass(/border-\[#5865F2\]/);
 
         // Audio toggle should be on (blue bg)

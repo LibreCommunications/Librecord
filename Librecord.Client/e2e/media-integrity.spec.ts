@@ -402,9 +402,15 @@ test.describe.serial("Media integrity — sender/receiver data consistency", () 
         await pageA.locator("[title='Turn On Camera']").click();
         await expect(pageA.locator("[title='Turn Off Camera']")).toBeVisible({ timeout: 10_000 });
 
-        // Start screen share
+        // Start screen share (goes through modal)
         await pageA.locator("[title='Share Screen']").click();
+        await expect(pageA.getByText("Screen Share")).toBeVisible({ timeout: 5_000 });
+        await pageA.getByRole("button", { name: "Go Live" }).click();
         await expect(pageA.locator("[title='Stop Sharing']")).toBeVisible({ timeout: 10_000 });
+
+        // Screen shares are opt-in — Bob must click "Watch Stream"
+        await expect(pageB.getByRole("button", { name: "Watch Stream" })).toBeVisible({ timeout: 10_000 });
+        await pageB.getByRole("button", { name: "Watch Stream" }).click();
 
         // Wait for tracks to propagate
         await expectVideoPlaying(pageB, "screen share stabilize on B");
