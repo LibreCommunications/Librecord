@@ -9,9 +9,11 @@ interface Props {
     isWatching: boolean;
     /** Toggle watching on/off — state is owned by VoiceChannelView. */
     onToggleWatch: (watching: boolean) => void;
+    /** Whether this is the local user's own screen share. */
+    isSelf: boolean;
 }
 
-export function ScreenShareTile({ participant, isWatching, onToggleWatch }: Props) {
+export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf }: Props) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const attachedTrackRef = useRef<MediaStreamTrack | null>(null);
@@ -24,17 +26,29 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch }: Prop
             return;
         }
 
-        function tryAttach() {
+        function tryAttach(): boolean {
             const { screen } = getParticipantTracks(participant.userId);
             const mediaTrack = screen?.mediaStreamTrack ?? null;
 
             if (mediaTrack && videoRef.current && attachedTrackRef.current !== mediaTrack) {
                 videoRef.current.srcObject = new MediaStream([mediaTrack]);
                 attachedTrackRef.current = mediaTrack;
+                return true;
             }
+            return !!attachedTrackRef.current;
         }
 
-        tryAttach();
+        // Try immediately
+        if (!tryAttach()) {
+            // Track may not be subscribed yet — retry a few times
+            let retries = 0;
+            const interval = setInterval(() => {
+                if (tryAttach() || ++retries > 10) clearInterval(interval);
+            }, 500);
+            // Clean up on unmount
+            const cleanup = () => clearInterval(interval);
+            window.addEventListener("voice:track:changed", cleanup, { once: true });
+        }
 
         const onTrackChanged = (e: Event) => {
             const detail = (e as CustomEvent<{ identity: string }>).detail;
@@ -124,17 +138,19 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch }: Prop
 
             {/* Bottom-right: controls (visible on hover) */}
             <div className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 group-hover/screen:opacity-100 transition-opacity">
-                {/* Stop watching */}
-                <button
-                    onClick={() => onToggleWatch(false)}
-                    title="Stop watching"
-                    className="p-1.5 rounded-md bg-black/60 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/80"
-                >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                </button>
+                {/* Stop watching — only for viewers, not the sharer */}
+                {!isSelf && (
+                    <button
+                        onClick={() => onToggleWatch(false)}
+                        title="Stop watching"
+                        className="p-1.5 rounded-md bg-black/60 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/80"
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                    </button>
+                )}
                 {/* Fullscreen */}
                 <button
                     onClick={toggleFullscreen}

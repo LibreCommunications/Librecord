@@ -194,14 +194,18 @@ export function VoiceChannelView({ channelId }: Props) {
             <div className="flex-1 flex bg-[#313338] overflow-hidden">
                 {/* Primary: screen share(s) */}
                 <div className="flex-1 flex flex-col gap-2 p-3 min-w-0 overflow-auto">
-                    {screenSharers.map(p => (
-                        <ScreenShareTile
-                            key={`screen-${p.userId}`}
-                            participant={p}
-                            isWatching={p.userId === user?.userId || watchingStreams.has(p.userId)}
-                            onToggleWatch={(watching) => toggleWatch(p.userId, watching)}
-                        />
-                    ))}
+                    {screenSharers.map(p => {
+                        const isSelf = p.userId === user?.userId;
+                        return (
+                            <ScreenShareTile
+                                key={`screen-${p.userId}`}
+                                participant={p}
+                                isWatching={isSelf || watchingStreams.has(p.userId)}
+                                onToggleWatch={(watching) => toggleWatch(p.userId, watching)}
+                                isSelf={isSelf}
+                            />
+                        );
+                    })}
                 </div>
 
                 {/* Sidebar: participant tiles */}
