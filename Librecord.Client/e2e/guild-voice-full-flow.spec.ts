@@ -349,9 +349,8 @@ test.describe.serial("Full guild + WebRTC voice flow with media verification", (
             timeout: 10_000,
         });
 
-        // Screen shares are opt-in — Bob must click "Watch Stream"
-        await expect(pageB.getByRole("button", { name: "Watch Stream" })).toBeVisible({ timeout: 10_000 });
-        await pageB.getByRole("button", { name: "Watch Stream" }).click();
+        // Bob already opted into Alice's stream in the previous test —
+        // watchingStreams persists, so he auto-watches without re-clicking.
 
         // Bob should have 2 active video elements:
         //   1. ParticipantTile <video> for Alice's camera
