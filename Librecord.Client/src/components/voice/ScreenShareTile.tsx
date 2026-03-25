@@ -38,26 +38,24 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
             return !!attachedTrackRef.current;
         }
 
-        // Try immediately
-        if (!tryAttach()) {
-            // Track may not be subscribed yet — retry a few times
-            let retries = 0;
-            const interval = setInterval(() => {
-                if (tryAttach() || ++retries > 10) clearInterval(interval);
-            }, 500);
-            // Clean up on unmount
-            const cleanup = () => clearInterval(interval);
-            window.addEventListener("voice:track:changed", cleanup, { once: true });
-        }
+        // Try immediately, then poll until track appears
+        tryAttach();
+        let retries = 0;
+        const interval = setInterval(() => {
+            if (tryAttach() || ++retries > 20) clearInterval(interval);
+        }, 500);
 
         const onTrackChanged = (e: Event) => {
             const detail = (e as CustomEvent<{ identity: string }>).detail;
             if (detail?.identity === participant.userId) {
-                tryAttach();
+                if (tryAttach()) clearInterval(interval);
             }
         };
         window.addEventListener("voice:track:changed", onTrackChanged);
-        return () => window.removeEventListener("voice:track:changed", onTrackChanged);
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener("voice:track:changed", onTrackChanged);
+        };
     }, [participant.userId, participant.isScreenSharing, isWatching]);
 
     // Track fullscreen state changes (user may exit via Escape)

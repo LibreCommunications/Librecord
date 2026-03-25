@@ -321,22 +321,43 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
 
     const res = RESOLUTION_MAP[options.resolution];
     const numericFps = options.frameRate === "source" ? undefined : options.frameRate;
-    const hint = numericFps === undefined || numericFps >= 30 ? "motion" : "detail";
 
     // Build resolution constraint only when we have something to constrain.
-    // LiveKit's VideoResolution requires width+height, so we only pass it
-    // when a specific resolution preset is chosen. For "source" resolution
-    // with a specific FPS, we still set resolution to apply the frameRate cap.
     let resolution: { width: number; height: number; frameRate?: number } | undefined;
     if (res) {
         resolution = { ...res, ...(numericFps ? { frameRate: numericFps } : {}) };
     }
 
-    await room.localParticipant.setScreenShareEnabled(true, {
-        audio: options.audio,
-        contentHint: hint,
-        ...(resolution ? { resolution } : {}),
-    });
+    try {
+        await room.localParticipant.setScreenShareEnabled(true, {
+            audio: options.audio,
+            ...(resolution ? { resolution } : {}),
+        });
+    } catch (e) {
+        console.warn("[Voice] Screen share failed, retrying without constraints:", e);
+        try {
+            // Fallback: no constraints at all — maximum browser compatibility
+            await room.localParticipant.setScreenShareEnabled(true, {
+                audio: options.audio,
+            });
+        } catch (e2) {
+            console.warn("[Voice] Screen share failed entirely:", e2);
+            return false;
+        }
+    }
+
+    // Apply content hint after capture (some browsers reject it in constraints)
+    try {
+        const hint = numericFps === undefined || numericFps >= 30 ? "motion" : "detail";
+        room.localParticipant.videoTrackPublications.forEach(pub => {
+            if (pub.source === Track.Source.ScreenShare && pub.track?.mediaStreamTrack) {
+                pub.track.mediaStreamTrack.contentHint = hint;
+            }
+        });
+    } catch {
+        // contentHint not supported — fine
+    }
+
     return true;
 }
 

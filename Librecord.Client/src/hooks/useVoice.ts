@@ -88,6 +88,7 @@ export function useVoice() {
 
     const startScreenShare = useCallback(async (options: ScreenShareSettings) => {
         const isScreenSharing = await livekitClient.startScreenShare(options);
+        if (!isScreenSharing) return; // User cancelled or browser rejected
         setVoiceState({ isScreenSharing });
         const uid = getLocalUserId();
         if (uid) updateParticipantState(uid, { isScreenSharing });
