@@ -25,11 +25,6 @@ export default function ChannelPermissionsPage() {
     const { getOverrides, setOverride } = useChannelPermissions();
     const { permissions, loaded: permsLoaded } = useGuildPermissions(guildId);
 
-    if (permsLoaded && !permissions.manageChannels) {
-        navigate(`/app/guild/${guildId}${channelId ? `/${channelId}` : ""}`, { replace: true });
-        return null;
-    }
-
     const [channelName, setChannelName] = useState("");
     const [roles, setRoles] = useState<GuildRole[]>([]);
     const [overrides, setOverrides] = useState<ChannelOverride[]>([]);
@@ -96,6 +91,11 @@ export default function ChannelPermissionsPage() {
     }
 
     if (!channelId || !guildId) return null;
+
+    if (permsLoaded && !permissions.manageChannels) {
+        navigate(`/app/guild/${guildId}/${channelId}`, { replace: true });
+        return null;
+    }
 
     return (
         <div className="flex-1 flex flex-col bg-[#313338] overflow-y-auto">
