@@ -1,4 +1,4 @@
-﻿using Librecord.Domain.Auditing;
+using Librecord.Domain.Auditing;
 using Librecord.Domain.Guilds;
 using Librecord.Domain.Identity;
 using Librecord.Domain.Messaging.Common;
@@ -21,10 +21,8 @@ public class LibrecordContext
     {
     }
 
-    // -------------------- Identity --------------------
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
-    // -------------------- Guilds --------------------
     public DbSet<Guild> Guilds => Set<Guild>();
     public DbSet<GuildMember> GuildMembers => Set<GuildMember>();
     public DbSet<GuildMemberRole> GuildMemberRoles => Set<GuildMemberRole>();
@@ -32,25 +30,21 @@ public class LibrecordContext
     public DbSet<GuildBan> GuildBans => Set<GuildBan>();
     public DbSet<GuildInvite> GuildInvites => Set<GuildInvite>();
 
-    // -------------------- Guild Channels --------------------
     public DbSet<GuildChannel> GuildChannels => Set<GuildChannel>();
     public DbSet<GuildChannelMember> GuildChannelMembers =>
         Set<GuildChannelMember>();
     public DbSet<GuildChannelPermissionOverride> GuildChannelPermissionOverrides =>
         Set<GuildChannelPermissionOverride>();
 
-    // -------------------- Direct Messaging --------------------
     public DbSet<DmChannel> DmChannels => Set<DmChannel>();
     public DbSet<DmChannelMember> DmChannelMembers =>
         Set<DmChannelMember>();
     public DbSet<DmChannelMessage> DmChannelMessages =>
         Set<DmChannelMessage>();
 
-    // -------------------- Guild Messages --------------------
     public DbSet<GuildChannelMessage> GuildChannelMessages =>
         Set<GuildChannelMessage>();
 
-    // -------------------- Core Message (shared) --------------------
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<MessageAttachment> MessageAttachments =>
         Set<MessageAttachment>();
@@ -67,32 +61,26 @@ public class LibrecordContext
     public DbSet<ThreadMessage> ThreadMessages =>
         Set<ThreadMessage>();
 
-    // -------------------- Permissions --------------------
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> RolePermissions =>
         Set<RolePermission>();
 
-    // -------------------- Auditing --------------------
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
-    // -------------------- Social / Presence --------------------
     public DbSet<UserPresence> UserPresences => Set<UserPresence>();
     public DbSet<Friendship> Friendships => Set<Friendship>();
     public DbSet<UserBlock> UserBlocks => Set<UserBlock>();
 
-    // -------------------- Voice --------------------
     public DbSet<VoiceState> VoiceStates => Set<VoiceState>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // Apply IEntityTypeConfiguration<T>
         modelBuilder.ApplyConfigurationsFromAssembly(
             typeof(LibrecordContext).Assembly
         );
 
-        // Seed deterministic permissions
         PermissionSeeder.Seed(modelBuilder);
     }
 }

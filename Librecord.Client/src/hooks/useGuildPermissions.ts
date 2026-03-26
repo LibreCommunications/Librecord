@@ -18,7 +18,6 @@ export function useGuildPermissions(guildId: string | undefined) {
     const [loaded, setLoaded] = useState(false);
     const [prevGuildId, setPrevGuildId] = useState(guildId);
 
-    // Reset synchronously during render when guild changes
     if (guildId !== prevGuildId) {
         setPrevGuildId(guildId);
         setPermissions(NONE);

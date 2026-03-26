@@ -19,9 +19,6 @@ public class RoleRepository : IRoleRepository
         _cache = cache;
     }
 
-    // ---------------------------------------------------------
-    // GET ROLE (WITH PERMISSIONS)
-    // ---------------------------------------------------------
     public async Task<GuildRole?> GetRoleAsync(Guid id)
     {
         var key = $"repo:role:{id}";
@@ -39,9 +36,6 @@ public class RoleRepository : IRoleRepository
         return result;
     }
 
-    // ---------------------------------------------------------
-    // CREATE / UPDATE / DELETE ROLE
-    // ---------------------------------------------------------
     public Task AddRoleAsync(GuildRole role)
     {
         _db.GuildRoles.Add(role);
@@ -63,9 +57,6 @@ public class RoleRepository : IRoleRepository
         return Task.CompletedTask;
     }
 
-    // ---------------------------------------------------------
-    // PERMISSIONS
-    // ---------------------------------------------------------
     public async Task AddPermissionToRoleAsync(
         Guid roleId,
         Guid permissionId,
@@ -85,7 +76,6 @@ public class RoleRepository : IRoleRepository
             Allow = allow
         });
 
-        // Invalidate caches for this role's permissions
         _cache.Remove($"repo:role:{roleId}");
         _cache.Remove($"repo:role-perms-single:{roleId}");
         InvalidateRolePermsGeneration();
@@ -102,27 +92,18 @@ public class RoleRepository : IRoleRepository
         if (rp != null)
             _db.RolePermissions.Remove(rp);
 
-        // Invalidate caches for this role's permissions
         _cache.Remove($"repo:role:{roleId}");
         _cache.Remove($"repo:role-perms-single:{roleId}");
         InvalidateRolePermsGeneration();
     }
 
-    // ---------------------------------------------------------
-    // SAVE
-    // ---------------------------------------------------------
     public Task SaveChangesAsync()
     {
         return _db.SaveChangesAsync();
     }
 
-    // ---------------------------------------------------------
-    // CACHE HELPERS
-    // ---------------------------------------------------------
     private void InvalidateRolePermsGeneration()
     {
-        // Bump the generation counter used by GuildRepository's
-        // batch role-permissions cache keys
         var gen = _cache.Get<long>("repo:role-perms-gen");
         _cache.Set("repo:role-perms-gen", gen + 1);
     }

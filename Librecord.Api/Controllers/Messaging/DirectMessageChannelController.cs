@@ -22,9 +22,6 @@ public class DirectMessageChannelController : AuthenticatedController
         _dms = dms;
         _hub = hub;
     }
-    // ---------------------------------------------------------
-    // GET USER DM CHANNELS
-    // ---------------------------------------------------------
     [HttpGet]
     public async Task<IActionResult> GetMyDms()
     {
@@ -69,9 +66,6 @@ public class DirectMessageChannelController : AuthenticatedController
         return Ok(result);
     }
 
-    // ---------------------------------------------------------
-    // GET DM CHANNEL (DETAIL)
-    // ---------------------------------------------------------
     [HttpGet("{channelId:guid}")]
     public async Task<IActionResult> GetChannel(Guid channelId)
     {
@@ -107,21 +101,14 @@ public class DirectMessageChannelController : AuthenticatedController
         });
     }
 
-    // ---------------------------------------------------------
-    // START OR REUSE DM
-    // ---------------------------------------------------------
     [HttpPost("start/{targetUserId:guid}")]
     public async Task<IActionResult> StartDm(Guid targetUserId)
     {
         var channel = await _dms.StartDmAsync(UserId, targetUserId);
 
-        // Notify both users so their DM sidebars update without refresh
         await _hub.Clients.Users(UserId.ToString(), targetUserId.ToString()).SendAsync(
             "dm:channel:created",
             new { channelId = channel.Id });
-
-        // Also make the target join the new channel's SignalR group
-        // (they connected before this channel existed)
 
         return Ok(new
         {
@@ -129,9 +116,6 @@ public class DirectMessageChannelController : AuthenticatedController
         });
     }
 
-    // ---------------------------------------------------------
-    // CREATE GROUP DM
-    // ---------------------------------------------------------
     [HttpPost("group")]
     public async Task<IActionResult> CreateGroup([FromBody] CreateGroupRequest request)
     {
@@ -143,7 +127,6 @@ public class DirectMessageChannelController : AuthenticatedController
 
         var channel = await _dms.CreateGroupAsync(UserId, request.MemberIds, request.Name);
 
-        // Notify all members so their DM sidebar updates without refresh
         foreach (var memberId in request.MemberIds)
         {
             await _hub.Clients.User(memberId.ToString()).SendAsync(
@@ -158,9 +141,6 @@ public class DirectMessageChannelController : AuthenticatedController
         });
     }
 
-    // ---------------------------------------------------------
-    // ADD PARTICIPANT
-    // ---------------------------------------------------------
     [HttpPost("{channelId:guid}/participants/{userId:guid}")]
     public async Task<IActionResult> AddParticipant(
         Guid channelId,
@@ -168,21 +148,16 @@ public class DirectMessageChannelController : AuthenticatedController
     {
         await _dms.AddParticipantAsync(channelId, UserId, userId);
 
-        // Notify the new user so they can join the channel's SignalR group
         await _hub.Clients.User(userId.ToString()).SendAsync(
             "dm:channel:created",
             new { channelId });
 
-        // Notify existing members that a new member was added
         await _hub.Clients.Group(AppHub.DmGroup(channelId)).SendAsync(
             "dm:member:added",
             new { channelId, userId });
 
         return Ok();
     }
-    // ---------------------------------------------------------
-    // LEAVE CHANNEL
-    // ---------------------------------------------------------
     [HttpDelete("{channelId:guid}/leave")]
     public async Task<IActionResult> LeaveChannel(Guid channelId)
     {
@@ -194,7 +169,6 @@ public class DirectMessageChannelController : AuthenticatedController
             "dm:leave:ack",
             new { channelId });
 
-        // Notify remaining members that this user left
         await _hub.Clients.Group(AppHub.DmGroup(channelId)).SendAsync(
             "dm:member:left",
             new { channelId, userId = UserId });
@@ -202,13 +176,9 @@ public class DirectMessageChannelController : AuthenticatedController
         return Ok();
     }
 
-    // ---------------------------------------------------------
-    // DELETE 1-ON-1 DM (only when not friends)
-    // ---------------------------------------------------------
     [HttpDelete("{channelId:guid}")]
     public async Task<IActionResult> DeleteDm(Guid channelId)
     {
-        // Get the channel members before deleting so we can notify them
         var channel = await _dms.GetChannelAsync(channelId);
         if (channel == null) return NotFound();
 
@@ -216,7 +186,6 @@ public class DirectMessageChannelController : AuthenticatedController
 
         await _dms.DeleteDmAsync(channelId, UserId);
 
-        // Notify both users so their sidebars update
         await _hub.Clients.Users(memberIds.Select(id => id.ToString()).ToArray()).SendAsync(
             "dm:channel:deleted",
             new { channelId });

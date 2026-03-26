@@ -11,15 +11,11 @@ public class FriendshipResult
     public Guid? FriendshipId { get; set; }
     public FriendshipStatus? Status { get; set; }
 
-    // Info about the OTHER user
     public Guid? OtherUserId { get; set; }
     public string? OtherUsername { get; set; }
     public string? OtherDisplayName { get; set; }
     public string? OtherAvatarUrl { get; set; }
 
-    // -------------------------------------
-    // Factories
-    // -------------------------------------
     public static FriendshipResult Fail(string error)
     {
         return new FriendshipResult { Success = false, Error = error };

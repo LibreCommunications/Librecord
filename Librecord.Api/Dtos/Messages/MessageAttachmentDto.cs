@@ -16,9 +16,6 @@ public sealed class MessageAttachmentDto
     public int? Height { get; init; }
     public double? Duration { get; init; }
 
-    // -------------------------------------------------
-    // DOMAIN → DTO
-    // -------------------------------------------------
     public static MessageAttachmentDto From(MessageAttachment a)
         => new()
         {
@@ -33,9 +30,6 @@ public sealed class MessageAttachmentDto
             Duration = a.Duration
         };
 
-    // -------------------------------------------------
-    // APPLICATION SNAPSHOT → DTO
-    // -------------------------------------------------
     public static MessageAttachmentDto From(MessageAttachmentSnapshot a)
         => new()
         {

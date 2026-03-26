@@ -1,11 +1,3 @@
-/**
- * Voice SFX system — independent from the notification audio.
- *
- * Uses pre-generated WAV data URIs played via HTMLAudioElement.
- * No AudioContext needed — works immediately on user gesture,
- * no unlock dance, no suspended-state race conditions.
- */
-
 const VOLUME = 0.4;
 
 /**
@@ -18,22 +10,19 @@ function makeWav(samples: Uint8Array, sampleRate = 22050): string {
     const buf = new ArrayBuffer(44 + numSamples);
     const view = new DataView(buf);
 
-    // RIFF header
     writeStr(view, 0, "RIFF");
     view.setUint32(4, 36 + numSamples, true);
     writeStr(view, 8, "WAVE");
 
-    // fmt chunk
     writeStr(view, 12, "fmt ");
-    view.setUint32(16, 16, true);          // chunk size
-    view.setUint16(20, 1, true);           // PCM
-    view.setUint16(22, 1, true);           // mono
-    view.setUint32(24, sampleRate, true);   // sample rate
-    view.setUint32(28, byteRate, true);     // byte rate
-    view.setUint16(32, 1, true);           // block align
-    view.setUint16(34, 8, true);           // bits per sample
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, 1, true);
+    view.setUint16(34, 8, true);
 
-    // data chunk
     writeStr(view, 36, "data");
     view.setUint32(40, numSamples, true);
 
@@ -50,9 +39,6 @@ function writeStr(view: DataView, offset: number, str: string) {
     }
 }
 
-/**
- * Synthesize samples for a tone with attack/decay envelope.
- */
 function synth(opts: {
     freq: number | ((t: number) => number);
     duration: number;
@@ -73,7 +59,6 @@ function synth(opts: {
         const freq = typeof opts.freq === "function" ? opts.freq(t) : opts.freq;
         const sample = Math.sin(2 * Math.PI * freq * t);
 
-        // Envelope
         let env = 1;
         if (t < attack) {
             env = t / attack;
@@ -81,7 +66,7 @@ function synth(opts: {
             const decayStart = opts.duration - decay;
             if (t > decayStart) {
                 env = Math.max(0, 1 - (t - decayStart) / decay);
-                env = env * env; // quadratic decay — smoother
+                env = env * env;
             }
         }
 
@@ -91,11 +76,9 @@ function synth(opts: {
     return samples;
 }
 
-// ─── PRE-GENERATE ALL SOUNDS ─────────────────────────────────────────
-
 const joinWav = makeWav(
     synth({
-        freq: (t) => 420 + t * 2000, // quick rising chirp
+        freq: (t) => 420 + t * 2000,
         duration: 0.08,
         attack: 0.003,
         decay: 0.05,
@@ -105,7 +88,7 @@ const joinWav = makeWav(
 
 const leaveWav = makeWav(
     synth({
-        freq: (t) => 520 - t * 2200, // quick falling chirp
+        freq: (t) => 520 - t * 2200,
         duration: 0.08,
         attack: 0.003,
         decay: 0.05,
@@ -113,7 +96,6 @@ const leaveWav = makeWav(
     }),
 );
 
-// Stream start: two-note rising chime
 const streamStartWav = (() => {
     const sr = 22050;
     const note1 = synth({ freq: 523, duration: 0.12, attack: 0.005, decay: 0.08, volume: 0.5, sampleRate: sr });
@@ -127,7 +109,6 @@ const streamStartWav = (() => {
     return makeWav(combined, sr);
 })();
 
-// Stream stop: falling tone
 const streamStopWav = makeWav(
     synth({
         freq: (t) => 580 - t * 1200,
@@ -137,8 +118,6 @@ const streamStopWav = makeWav(
         volume: 0.5,
     }),
 );
-
-// ─── PLAYBACK ────────────────────────────────────────────────────────
 
 function play(uri: string) {
     const audio = new Audio(uri);

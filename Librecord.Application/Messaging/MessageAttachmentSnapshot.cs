@@ -10,11 +10,10 @@ public sealed class MessageAttachmentSnapshot
 
     public string Url { get; init; } = null!;
 
-    // ---- presentation metadata ----
     public bool IsSpoiler { get; init; }
 
-    public int? Width { get; init; }      // images / video
+    public int? Width { get; init; }
     public int? Height { get; init; }
 
-    public double? Duration { get; init; } // audio / video (seconds)
+    public double? Duration { get; init; }
 }

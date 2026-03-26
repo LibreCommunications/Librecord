@@ -14,7 +14,6 @@ public class ConnectionTracker : IConnectionTracker
     public void Disconnect(Guid userId)
     {
         _connections.AddOrUpdate(userId, 0, (_, count) => Math.Max(0, count - 1));
-        // Clean up if no connections left
         if (_connections.TryGetValue(userId, out var c) && c <= 0)
             _connections.TryRemove(userId, out _);
     }

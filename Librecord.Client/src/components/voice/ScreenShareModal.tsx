@@ -40,7 +40,6 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
                 onClick={(e) => e.stopPropagation()}
                 className="w-[480px] modal-card-animated"
             >
-                {/* Header */}
                 <div className="p-5 pb-0">
                     <div className="flex items-center gap-3 mb-1">
                         <div className="p-2 rounded-lg bg-[#5865F2]/15">
@@ -55,9 +54,7 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
                     </p>
                 </div>
 
-                {/* Settings */}
                 <div className="p-5 space-y-5">
-                    {/* Resolution */}
                     <div>
                         <label className="text-xs font-semibold uppercase tracking-wide text-[#b5bac1] mb-2 block">
                             Stream Quality
@@ -95,7 +92,6 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
                         </div>
                     </div>
 
-                    {/* Frame Rate */}
                     <div>
                         <label className="text-xs font-semibold uppercase tracking-wide text-[#b5bac1] mb-2 block">
                             Frame Rate
@@ -120,7 +116,6 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
                         </div>
                     </div>
 
-                    {/* Audio toggle */}
                     <div
                         className="flex items-center justify-between p-3 rounded-lg bg-[#2b2d31] cursor-pointer"
                         onClick={() => setAudio(!audio)}
@@ -149,7 +144,6 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
                     </div>
                 </div>
 
-                {/* Footer */}
                 <div className="flex justify-end gap-3 px-5 py-4 bg-[#2b2d31]">
                     <button
                         onClick={onCancel}

@@ -19,13 +19,10 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
     const containerRef = useRef<HTMLDivElement>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
 
-    // ── Reactive track from LiveKit RoomEvents (no polling) ──────
     const track = useTrackBySource(participant.userId, Track.Source.ScreenShare);
 
-    // ── Attach / detach following @livekit/components-react ──────
-    // Canonical pattern: effect depends on [track, isWatching].
-    // attach() in body, detach() in cleanup.  The SDK handles
-    // MediaStream wrapping, Safari/Firefox quirks, and autoplay.
+    // attach() / detach() following @livekit/components-react pattern.
+    // The SDK handles MediaStream wrapping, Safari/Firefox quirks, and autoplay.
     useEffect(() => {
         const el = videoRef.current;
         if (!el) return;
@@ -42,7 +39,6 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
         };
     }, [track, isWatching]);
 
-    // Derive status from track + isWatching (no separate state)
     const trackStatus: "loading" | "active" =
         isWatching && track ? "active" : "loading";
 
@@ -65,7 +61,6 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
         }
     }, []);
 
-    // ── OPT-IN CARD (not watching yet) ───────────────────────────────
     if (!isWatching) {
         return (
             <div
@@ -98,7 +93,6 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
         );
     }
 
-    // ── WATCHING ──────────────────────────────────────────────────────
     return (
         <div
             ref={containerRef}
@@ -109,7 +103,6 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
                 ${isFullscreen ? "rounded-none" : "aspect-video"}
             `}
         >
-            {/* Loading spinner — waiting for LiveKit track subscription */}
             {trackStatus === "loading" && (
                 <div className="absolute inset-0 flex items-center justify-center z-10">
                     <div className="flex flex-col items-center gap-3">
@@ -126,7 +119,6 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
                 className={`w-full h-full ${isFullscreen ? "object-contain bg-black" : "object-contain"}`}
             />
 
-            {/* Bottom-left: sharer name */}
             {trackStatus === "active" && (
                 <div className="absolute bottom-2 left-2 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm rounded-md px-2 py-1">
                     <span className="text-[#5865f2]"><ScreenShareIcon size={12} /></span>
@@ -134,10 +126,8 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
                 </div>
             )}
 
-            {/* Bottom-right: controls (visible on hover) */}
             {trackStatus === "active" && (
                 <div className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 group-hover/screen:opacity-100 transition-opacity">
-                    {/* Stop watching — only for viewers, not the sharer */}
                     {!isSelf && (
                         <button
                             onClick={() => onToggleWatch(false)}
@@ -150,7 +140,6 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
                             </svg>
                         </button>
                     )}
-                    {/* Fullscreen */}
                     <button
                         onClick={toggleFullscreen}
                         title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}

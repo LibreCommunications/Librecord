@@ -24,11 +24,7 @@ import type { AppEventMap } from "./events";
 
 export function registerListeners() {
 
-    /* ------------------------------------------------------------------ */
-    /* CLEAN UP (important for StrictMode & reconnects)                    */
-    /* ------------------------------------------------------------------ */
-
-    // DM events
+    // Important for StrictMode & reconnects
     appConnection.off("dm:message:ping");
     appConnection.off("dm:message:new");
     appConnection.off("dm:message:edited");
@@ -47,7 +43,6 @@ export function registerListeners() {
     appConnection.off("dm:member:added");
     appConnection.off("dm:leave:ack");
 
-    // Guild events
     appConnection.off("guild:message:ping");
     appConnection.off("guild:message:new");
     appConnection.off("guild:message:edited");
@@ -61,19 +56,11 @@ export function registerListeners() {
     appConnection.off("voice:user:left");
     appConnection.off("voice:user:state");
 
-    // Shared events
     appConnection.off("channel:message:pinned");
     appConnection.off("channel:message:unpinned");
     appConnection.off("channel:reaction:added");
     appConnection.off("channel:reaction:removed");
 
-    /* ================================================================== */
-    /* DM LISTENERS                                                        */
-    /* ================================================================== */
-
-    /* ------------------------------------------------------------------ */
-    /* MESSAGE PING (lightweight — for unread badges + notifications)      */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "dm:message:ping",
         (payload: { channelId: string; messageId: string; authorId: string; authorName: string }) => {
@@ -81,9 +68,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* MESSAGE CREATED (full payload — consumed by active channel view)    */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "dm:message:new",
         (payload: DmRealtimeMessageTransport) => {
@@ -94,9 +78,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* MESSAGE EDITED                                                      */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "dm:message:edited",
         (payload: DmRealtimeMessageEditedTransport) => {
@@ -107,9 +88,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* MESSAGE DELETED                                                     */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "dm:message:deleted",
         (payload: DmRealtimeMessageDeletedTransport) => {
@@ -117,9 +95,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* TYPING                                                              */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "dm:user:typing",
         (payload: { channelId: string; userId: string; username: string }) => {
@@ -134,9 +109,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* PRESENCE                                                            */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "dm:user:presence",
         (payload: { userId: string; status: string }) => {
@@ -144,9 +116,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* READ STATE UPDATED                                                   */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "dm:readstate:updated",
         (payload: DmRealtimeReadStateUpdatedTransport) => {
@@ -154,9 +123,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* FRIENDSHIP EVENTS                                                    */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "friend:request:received",
         (payload: { fromUserId: string; fromUsername: string; fromDisplayName: string; fromAvatarUrl: string | null }) => {
@@ -185,9 +151,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* DM CHANNEL CREATED (new DM started by another user)                  */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "dm:channel:created",
         (payload: { channelId: string }) => {
@@ -199,9 +162,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* DM CHANNEL DELETED (1-on-1 DM deleted by a member)                    */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "dm:channel:deleted",
         (payload: { channelId: string }) => {
@@ -209,9 +169,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* DM MEMBER ADDED (new participant in group DM)                         */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "dm:member:added",
         (payload: { channelId: string; userId: string }) => {
@@ -219,9 +176,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* DM MEMBER LEFT (group DM membership change)                          */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "dm:member:left",
         (payload: { channelId: string; userId: string }) => {
@@ -229,9 +183,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* DM LEAVE ACK — server tells THIS user to leave a SignalR group (#55) */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "dm:leave:ack",
         (payload: { channelId: string }) => {
@@ -239,13 +190,6 @@ export function registerListeners() {
         }
     );
 
-    /* ================================================================== */
-    /* GUILD LISTENERS                                                      */
-    /* ================================================================== */
-
-    /* ------------------------------------------------------------------ */
-    /* MESSAGE PING (lightweight — for unread badges + notifications)      */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "guild:message:ping",
         (payload: { channelId: string; messageId: string; authorId: string; authorName: string }) => {
@@ -253,9 +197,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* MESSAGE CREATED (full payload — consumed by active channel view)    */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "guild:message:new",
         (payload: GuildRealtimeMessageTransport) => {
@@ -283,9 +224,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* TYPING                                                              */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "guild:user:typing",
         (payload: { channelId: string; userId: string; username: string }) => {
@@ -300,9 +238,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* PRESENCE                                                            */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "guild:user:presence",
         (payload: { userId: string; status: string }) => {
@@ -310,9 +245,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* CHANNEL CREATED — auto-join the new channel's SignalR group          */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "guild:channel:created",
         (payload: { channelId: string; guildId: string; name: string; type: number; position: number }) => {
@@ -324,9 +256,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* GUILD DELETED                                                        */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "guild:deleted",
         (payload: { guildId: string }) => {
@@ -334,9 +263,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* VOICE                                                               */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "voice:user:joined",
         (payload: AppEventMap["voice:user:joined"]) => {
@@ -384,13 +310,6 @@ export function registerListeners() {
         }
     );
 
-    /* ================================================================== */
-    /* SHARED LISTENERS (channel:* events — used by both DM and Guild)     */
-    /* ================================================================== */
-
-    /* ------------------------------------------------------------------ */
-    /* PIN / UNPIN                                                          */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "channel:message:pinned",
         (payload: { channelId: string; messageId: string }) => {
@@ -405,9 +324,6 @@ export function registerListeners() {
         }
     );
 
-    /* ------------------------------------------------------------------ */
-    /* REACTIONS                                                            */
-    /* ------------------------------------------------------------------ */
     appConnection.on(
         "channel:reaction:added",
         (payload: AppEventMap["channel:reaction:added"]) => {

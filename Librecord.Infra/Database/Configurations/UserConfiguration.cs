@@ -9,9 +9,6 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 {
     public void Configure(EntityTypeBuilder<User> builder)
     {
-        // -------------------------
-        // Custom profile fields
-        // -------------------------
         builder.Property(u => u.DisplayName)
             .HasMaxLength(64)
             .IsRequired();
@@ -22,9 +19,6 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.CreatedAt)
             .IsRequired();
 
-        // -------------------------
-        // Relationships
-        // -------------------------
         builder.HasMany(u => u.GuildMemberships)
             .WithOne(m => m.User)
             .HasForeignKey(m => m.UserId)
@@ -40,9 +34,6 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .HasForeignKey<UserPresence>(p => p.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // -------------------------
-        // Identity indexes (optional but recommended)
-        // -------------------------
         builder.HasIndex(u => u.UserName)
             .IsUnique();
 

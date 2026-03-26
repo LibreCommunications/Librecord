@@ -13,9 +13,6 @@ interface Props {
     channelName?: string;
 }
 
-/* ------------------------------------------------------------------ */
-/* PREVIEW CARD (not connected — shows who's in the channel)           */
-/* ------------------------------------------------------------------ */
 function PreviewCard({
     participant,
     getAvatarUrl,
@@ -46,7 +43,6 @@ function PreviewCard({
                 </span>
             </div>
 
-            {/* Status badges */}
             <div className="absolute bottom-2 left-2 flex items-center gap-1">
                 {participant.isMuted && (
                     <span className="p-1 rounded bg-black/40 text-red-400">
@@ -79,9 +75,6 @@ function PreviewCard({
     );
 }
 
-/* ------------------------------------------------------------------ */
-/* GRID COLUMNS — adapts to participant count (no screen share)        */
-/* ------------------------------------------------------------------ */
 function getGridClass(count: number): string {
     if (count <= 1) return "grid-cols-1 max-w-lg";
     if (count <= 2) return "grid-cols-2 max-w-3xl";
@@ -90,9 +83,6 @@ function getGridClass(count: number): string {
     return "grid-cols-4 max-w-6xl";
 }
 
-/* ------------------------------------------------------------------ */
-/* MAIN VIEW                                                           */
-/* ------------------------------------------------------------------ */
 export function VoiceChannelView({ channelId }: Props) {
     const { voiceState } = useVoice();
     const { getAvatarUrl } = useUserProfile();
@@ -100,8 +90,7 @@ export function VoiceChannelView({ channelId }: Props) {
     const [speakingMap, setSpeakingMap] = useState<Record<string, boolean>>({});
     const [previewParticipants, setPreviewParticipants] = useState<VoiceParticipant[]>([]);
 
-    // Track which users' streams the local user has opted into watching.
-    // Persists across screen share stop/restart so viewers don't need to re-click.
+    // Persists across screen share stop/restart so viewers don't need to re-click
     const [watchingStreams, setWatchingStreams] = useState<Set<string>>(new Set());
     const toggleWatch = useCallback((userId: string, watching: boolean) => {
         setWatchingStreams(prev => {
@@ -123,8 +112,6 @@ export function VoiceChannelView({ channelId }: Props) {
         return () => window.removeEventListener("voice:speaking:changed", handler);
     }, []);
 
-    // When not connected to this channel, fetch participants from the API
-    // so users can see who's in the call before joining.
     const isInThisChannel = voiceState.isConnected && voiceState.channelId === channelId;
 
     useEffect(() => {
@@ -155,7 +142,6 @@ export function VoiceChannelView({ channelId }: Props) {
 
         fetchParticipants();
 
-        // Refresh when voice events arrive (someone joins/leaves)
         const onVoiceChange = () => { if (!cancelled) fetchParticipants(); };
         window.addEventListener("voice:user:joined", onVoiceChange);
         window.addEventListener("voice:user:left", onVoiceChange);
@@ -166,12 +152,10 @@ export function VoiceChannelView({ channelId }: Props) {
         };
     }, [channelId, isInThisChannel]);
 
-    // When connected to this channel, use live state; otherwise use API preview
     const participants = isInThisChannel ? voiceState.participants : previewParticipants;
     const screenSharers = isInThisChannel ? participants.filter(p => p.isScreenSharing) : [];
     const hasScreenShare = screenSharers.length > 0;
 
-    // Empty state
     if (participants.length === 0) {
         return (
             <div className="flex-1 flex flex-col bg-[#313338] overflow-hidden">
@@ -186,13 +170,9 @@ export function VoiceChannelView({ channelId }: Props) {
         );
     }
 
-    // ── SCREEN SHARE LAYOUT ──────────────────────────────────────────
-    // When someone is screen sharing: screen share takes primary space,
-    // participant tiles go in a strip on the right side.
     if (hasScreenShare) {
         return (
             <div className="flex-1 flex bg-[#313338] overflow-hidden">
-                {/* Primary: screen share(s) */}
                 <div className="flex-1 flex flex-col gap-2 p-3 min-w-0 overflow-auto">
                     {screenSharers.map(p => {
                         const isSelf = p.userId === user?.userId;
@@ -208,7 +188,6 @@ export function VoiceChannelView({ channelId }: Props) {
                     })}
                 </div>
 
-                {/* Sidebar: participant tiles */}
                 <div className="w-56 shrink-0 bg-[#2b2d31] border-l border-black/20 overflow-y-auto dark-scrollbar p-2 space-y-2">
                     {participants.map(p => (
                         <ParticipantTile
@@ -224,8 +203,6 @@ export function VoiceChannelView({ channelId }: Props) {
         );
     }
 
-    // ── NORMAL LAYOUT (no screen share) ──────────────────────────────
-    // Center the grid both horizontally and vertically.
     return (
         <div className="flex-1 flex flex-col bg-[#313338] overflow-hidden">
             <div className="flex-1 p-6 overflow-auto flex items-center justify-center">

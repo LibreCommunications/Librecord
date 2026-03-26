@@ -37,9 +37,8 @@ export default function DmConversationPage() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
-    // ── Load DM channel metadata FIRST, then let chat hook load messages ──
-    // We load metadata before messages to avoid 3 concurrent requests
-    // competing for browser connection slots (max 6, minus 2 WebSockets = 4 free)
+    // Load metadata before messages to avoid concurrent requests competing
+    // for browser connection slots (max 6, minus 2 WebSockets = 4 free)
     const [metadataReady, setMetadataReady] = useState(false);
 
     const [prevDmId, setPrevDmId] = useState(dmId);
@@ -68,7 +67,6 @@ export default function DmConversationPage() {
         return () => { stale = true; };
     }, [dmId, getDmChannel, user?.userId]);
 
-    // ── Build config — only set channelId once metadata is loaded ──
     const config: ChatChannelConfig = useMemo(() => ({
         channelId: metadataReady ? dmId : undefined,
         getMessages: getChannelMessages,
@@ -89,7 +87,6 @@ export default function DmConversationPage() {
 
     const chat = useChatChannel(config);
 
-    // ── DM-specific: channel deleted ─────────────────────
     useEffect(() => {
         if (!dmId) return;
         const handler = (event: CustomEvent<AppEventMap["dm:channel:deleted"]>) => {
@@ -100,7 +97,6 @@ export default function DmConversationPage() {
         return () => window.removeEventListener("dm:channel:deleted", handler as EventListener);
     }, [dmId, navigate]);
 
-    // ── DM-specific: member left/added (#56) ─────────────
     useEffect(() => {
         if (!dmId) return;
 
@@ -110,7 +106,6 @@ export default function DmConversationPage() {
         };
         const onAdded = (event: CustomEvent<AppEventMap["dm:member:added"]>) => {
             if (event.detail.channelId !== dmId) return;
-            // Re-fetch channel to get the new member's full info
             getDmChannel(dmId).then(ch => { if (ch) setChannel(ch); });
         };
 

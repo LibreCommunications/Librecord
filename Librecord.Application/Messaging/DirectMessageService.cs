@@ -24,9 +24,6 @@ public sealed class DirectMessageService : IDirectMessageService
         _blocks = blocks;
     }
 
-    // ---------------------------------------------------------
-    // SEND MESSAGE
-    // ---------------------------------------------------------
     public async Task<Message> SendMessageAsync(
         Guid channelId,
         Guid userId,
@@ -47,7 +44,6 @@ public sealed class DirectMessageService : IDirectMessageService
         if (channel.Members.All(m => m.UserId != userId))
             throw new UnauthorizedAccessException("Not a DM member.");
 
-        // In 1-on-1 DMs, check if either user has blocked the other
         var otherMembers = channel.Members
             .Where(m => m.UserId != userId)
             .Select(m => m.UserId)
@@ -97,17 +93,11 @@ public sealed class DirectMessageService : IDirectMessageService
         return hydrated;
     }
 
-    // ---------------------------------------------------------
-    // GET SINGLE MESSAGE
-    // ---------------------------------------------------------
     public async Task<Message?> GetMessageAsync(Guid messageId)
     {
         return await _messages.GetMessageAsync(messageId);
     }
 
-    // ---------------------------------------------------------
-    // GET CHANNEL MESSAGES
-    // ---------------------------------------------------------
     public async Task<IReadOnlyList<Message>> GetMessagesAsync(
         Guid channelId,
         Guid userId,
@@ -127,9 +117,6 @@ public sealed class DirectMessageService : IDirectMessageService
             before);
     }
 
-    // ---------------------------------------------------------
-    // EDIT MESSAGE
-    // ---------------------------------------------------------
     public async Task<Message?> EditMessageAsync(
         Guid messageId,
         Guid userId,
@@ -159,9 +146,6 @@ public sealed class DirectMessageService : IDirectMessageService
         return message;
     }
 
-    // ---------------------------------------------------------
-    // DELETE MESSAGE
-    // ---------------------------------------------------------
     public async Task<bool> DeleteMessageAsync(
         Guid messageId,
         Guid userId)

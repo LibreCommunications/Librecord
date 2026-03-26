@@ -12,13 +12,6 @@ type TypingUser = {
     expiresAt: number;
 };
 
-/**
- * Hook for typing indicators on a channel.
- *
- * @param channelId - current channel
- * @param hub - "dm" or "guild"
- * @param currentUserId - the logged-in user (to exclude self)
- */
 export function useTypingIndicator(
     channelId: string | undefined,
     hub: "dm" | "guild",
@@ -31,7 +24,6 @@ export function useTypingIndicator(
     const typingEvent = hub === "dm" ? "dm:user:typing" : "guild:user:typing";
     const stopTypingEvent = hub === "dm" ? "dm:user:stop-typing" : "guild:user:stop-typing";
 
-    // Listen for typing / stop-typing events
     useEffect(() => {
         if (!channelId) return;
 
@@ -54,7 +46,6 @@ export function useTypingIndicator(
             setTypingUsers(prev => prev.filter(t => t.userId !== userId));
         };
 
-        // Clear typing when a message arrives from that user
         const messageEvent = hub === "dm" ? "dm:message:new" : "guild:message:new";
         const onMessage = (e: CustomEvent<{ message: { channelId: string; author: { id: string } } }>) => {
             const { message } = e.detail;
@@ -73,7 +64,6 @@ export function useTypingIndicator(
         };
     }, [channelId, currentUserId, typingEvent, stopTypingEvent, hub]);
 
-    // Expire stale typing entries
     useEffect(() => {
         if (typingUsers.length === 0) return;
 
@@ -85,7 +75,6 @@ export function useTypingIndicator(
         return () => clearInterval(interval);
     }, [typingUsers.length]);
 
-    // Stop typing on unmount/channel switch
     useEffect(() => {
         return () => {
             if (isTypingRef.current && channelId) {
@@ -96,7 +85,6 @@ export function useTypingIndicator(
         };
     }, [channelId, hub]);
 
-    // Send typing event (throttled)
     const sendTyping = useCallback(() => {
         if (!channelId) return;
 
@@ -110,18 +98,16 @@ export function useTypingIndicator(
         appConnection.invoke(method, channelId).catch((e) => console.warn("[Typing] SignalR invoke failed:", e));
     }, [channelId, hub]);
 
-    // Send stop typing event (called when input is cleared or message is sent)
     const stopTyping = useCallback(() => {
         if (!channelId || !isTypingRef.current) return;
 
         isTypingRef.current = false;
-        lastSentRef.current = 0; // reset throttle so next keystroke sends immediately
+        lastSentRef.current = 0;
 
         const method = hub === "dm" ? "DmStopTyping" : "GuildStopTyping";
         appConnection.invoke(method, channelId).catch((e) => console.warn("[Typing] SignalR invoke failed:", e));
     }, [channelId, hub]);
 
-    // Filter by current channelId so stale typing users from previous channels are excluded
     const typingNames = typingUsers
         .filter(t => t.channelId === channelId)
         .map(t => t.displayName);

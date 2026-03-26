@@ -43,7 +43,6 @@ export default function ChannelSidebar({ guildId }: Props) {
             setUnreads(counts);
         }
 
-        // Check if current user can manage channels
         try {
             const [members, guildRoles] = await Promise.all([
                 guildsApi.members(guildId),
@@ -67,14 +66,12 @@ export default function ChannelSidebar({ guildId }: Props) {
         Promise.resolve().then(loadChannels);
     }, [guildId, loadChannels]);
 
-    // Re-fetch channels after a reconnect to catch anything missed
     useEffect(() => {
         const refresh = () => { loadChannels(); };
         window.addEventListener("realtime:reconnected", refresh);
         return () => window.removeEventListener("realtime:reconnected", refresh);
     }, [loadChannels]);
 
-    // Fetch voice participants for all voice channels
     useEffect(() => {
         const voiceChs = channels.filter(c => c.type === 1);
         if (voiceChs.length === 0) return;
@@ -90,7 +87,6 @@ export default function ChannelSidebar({ guildId }: Props) {
         });
     }, [channels]);
 
-    // Update participant list on voice join/leave/state events
     useEffect(() => {
         const onJoin = (e: CustomEvent<AppEventMap["voice:user:joined"]>) => {
             const p = e.detail;
@@ -114,7 +110,6 @@ export default function ChannelSidebar({ guildId }: Props) {
         };
     }, []);
 
-    // Track speaking state for sidebar avatars
     const [speakingMap, setSpeakingMap] = useState<Record<string, boolean>>({});
     useEffect(() => {
         const handler = (e: Event) => {
@@ -127,7 +122,6 @@ export default function ChannelSidebar({ guildId }: Props) {
         return () => window.removeEventListener("voice:speaking:changed", handler);
     }, []);
 
-    // Increment unread when a message ping arrives for a non-active channel
     useEffect(() => {
         const onPing = (e: CustomEvent<AppEventMap["guild:message:ping"]>) => {
             const { channelId: pingChannel, authorId } = e.detail;
@@ -144,7 +138,6 @@ export default function ChannelSidebar({ guildId }: Props) {
         return () => window.removeEventListener("guild:message:ping", onPing as EventListener);
     }, [channelId, user?.userId]);
 
-    // Clear unread count when navigating into a channel (render-phase)
     const [prevActiveChannelId, setPrevActiveChannelId] = useState(channelId);
     if (channelId && channelId !== prevActiveChannelId) {
         setPrevActiveChannelId(channelId);

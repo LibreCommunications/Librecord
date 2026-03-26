@@ -41,13 +41,11 @@ export default function GuildSettingsPage() {
     const canManageGuild = permissions.manageGuild;
     const canManageRoles = permissions.manageRoles;
 
-    // Auto-select first available tab
     if (permsLoaded && tab === null) {
         if (canManageGuild) setTab("general");
         else if (canManageRoles) setTab("roles");
     }
 
-    // No permissions at all — redirect back
     if (permsLoaded && !canManageGuild && !canManageRoles) {
         navigate(`/app/guild/${guildId}`, { replace: true });
         return null;

@@ -16,9 +16,6 @@ public class GuildInviteService : IGuildInviteService
         _guilds = guilds;
     }
 
-    // ---------------------------------------------------------
-    // CREATE INVITE
-    // ---------------------------------------------------------
     public async Task<GuildInvite> CreateInviteAsync(
         Guid guildId,
         Guid creatorId,
@@ -48,25 +45,16 @@ public class GuildInviteService : IGuildInviteService
         return (await _invites.GetByIdAsync(invite.Id))!;
     }
 
-    // ---------------------------------------------------------
-    // LIST INVITES
-    // ---------------------------------------------------------
     public Task<List<GuildInvite>> GetGuildInvitesAsync(Guid guildId)
     {
         return _invites.GetByGuildIdAsync(guildId);
     }
 
-    // ---------------------------------------------------------
-    // GET BY CODE
-    // ---------------------------------------------------------
     public Task<GuildInvite?> GetByCodeAsync(string code)
     {
         return _invites.GetByCodeAsync(code);
     }
 
-    // ---------------------------------------------------------
-    // JOIN BY INVITE CODE
-    // ---------------------------------------------------------
     public async Task<Guild> JoinByCodeAsync(string code, Guid userId)
     {
         var invite = await _invites.GetByCodeAsync(code)
@@ -111,9 +99,6 @@ public class GuildInviteService : IGuildInviteService
         return guild;
     }
 
-    // ---------------------------------------------------------
-    // REVOKE INVITE
-    // ---------------------------------------------------------
     public async Task RevokeInviteAsync(Guid inviteId, Guid userId)
     {
         var invite = await _invites.GetByIdAsync(inviteId)
@@ -126,9 +111,6 @@ public class GuildInviteService : IGuildInviteService
         await _invites.SaveChangesAsync();
     }
 
-    // ---------------------------------------------------------
-    // HELPERS
-    // ---------------------------------------------------------
     private static string GenerateCode()
     {
         const string chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";

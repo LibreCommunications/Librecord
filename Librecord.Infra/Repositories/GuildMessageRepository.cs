@@ -19,9 +19,7 @@ public sealed class GuildMessageRepository : IGuildMessageRepository
         _encryption = encryption;
     }
 
-    // ---------------------------------------------------------
-    // READS
-    // ---------------------------------------------------------
+
     public async Task<Message?> GetMessageAsync(Guid messageId)
     {
         var entity = await LoadMessage(messageId);
@@ -68,9 +66,7 @@ public sealed class GuildMessageRepository : IGuildMessageRepository
     }
 
 
-    // ---------------------------------------------------------
-    // WRITES
-    // ---------------------------------------------------------
+
     public async Task AddMessageAsync(Message message, Guid channelId)
     {
         var encrypted = _encryption.Encrypt(message.ContentText);
@@ -111,9 +107,7 @@ public sealed class GuildMessageRepository : IGuildMessageRepository
     public Task SaveChangesAsync()
         => _db.SaveChangesAsync();
 
-    // ---------------------------------------------------------
-    // HELPERS
-    // ---------------------------------------------------------
+
     private async Task<Message?> LoadMessage(Guid id)
         => await _db.Messages
             .Include(m => m.User)

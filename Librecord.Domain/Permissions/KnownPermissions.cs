@@ -4,9 +4,6 @@ public static class KnownPermissions
 {
     public static readonly IReadOnlyCollection<(PermissionCapability Perm, Guid Id, string Type)> All =
     [
-        // -------------------------
-        // GUILD
-        // -------------------------
         (GuildPermission.ViewGuild, PermissionIds.GuildViewGuild, "Guild"),
         (GuildPermission.ReadMessages, PermissionIds.GuildReadMessages, "Guild"),
         (GuildPermission.ManageGuild, PermissionIds.GuildManageGuild, "Guild"),
@@ -16,9 +13,6 @@ public static class KnownPermissions
         (GuildPermission.KickMembers, PermissionIds.GuildKickMembers, "Guild"),
         (GuildPermission.BanMembers, PermissionIds.GuildBanMembers, "Guild"),
 
-        // -------------------------
-        // CHANNEL
-        // -------------------------
         (ChannelPermission.ViewChannel, PermissionIds.ChannelViewChannel, "Channel"),
         (ChannelPermission.ReadMessages, PermissionIds.ChannelReadMessages, "Channel"),
         (ChannelPermission.SendMessages, PermissionIds.ChannelSendMessages, "Channel"),

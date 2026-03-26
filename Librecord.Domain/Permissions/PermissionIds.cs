@@ -2,9 +2,6 @@ namespace Librecord.Domain.Permissions;
 
 public static class PermissionIds
 {
-    // ---------------------------------------------------------
-    // GUILD
-    // ---------------------------------------------------------
     public static readonly Guid GuildViewGuild =
         Guid.Parse("11111111-1111-1111-1111-111111111101");
 
@@ -29,9 +26,6 @@ public static class PermissionIds
     public static readonly Guid GuildBanMembers =
         Guid.Parse("11111111-1111-1111-1111-111111111108");
 
-    // ---------------------------------------------------------
-    // CHANNEL
-    // ---------------------------------------------------------
     public static readonly Guid ChannelViewChannel =
         Guid.Parse("22222222-2222-2222-2222-222222222201");
 

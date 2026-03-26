@@ -23,9 +23,6 @@ public class GuildService : IGuildService
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Guild name is required.");
 
-        // ---------------------------------------------------------
-        // GUILD
-        // ---------------------------------------------------------
         var guild = new Guild
         {
             Id = Guid.NewGuid(),
@@ -33,9 +30,6 @@ public class GuildService : IGuildService
             CreatedAt = DateTime.UtcNow
         };
 
-        // ---------------------------------------------------------
-        // ROLES
-        // ---------------------------------------------------------
         var everyoneRole = new GuildRole
         {
             Id = Guid.NewGuid(),
@@ -52,9 +46,6 @@ public class GuildService : IGuildService
             Position = 1
         };
 
-        // -----------------------------------------
-        // @EVERYONE → BASIC PERMISSIONS
-        // -----------------------------------------
         var everyonePerms = new[]
         {
             PermissionIds.GuildViewGuild,
@@ -75,9 +66,6 @@ public class GuildService : IGuildService
                 Allow = true
             });
 
-        // -----------------------------------------
-        // OWNER → ALL PERMISSIONS
-        // -----------------------------------------
         foreach (var perm in KnownPermissions.All)
             ownerRole.Permissions.Add(new RolePermission
             {
@@ -86,16 +74,10 @@ public class GuildService : IGuildService
                 Allow = true
             });
 
-        // -----------------------------------------
-        // ADD ROLES TO GUILD
-        // -----------------------------------------
         guild.Roles.Add(everyoneRole);
         guild.Roles.Add(ownerRole);
 
 
-        // ---------------------------------------------------------
-        // OWNER MEMBERSHIP
-        // ---------------------------------------------------------
         guild.Members.Add(new GuildMember
         {
             UserId = ownerId,
@@ -118,9 +100,6 @@ public class GuildService : IGuildService
             }
         });
 
-        // ---------------------------------------------------------
-        // PERSIST
-        // ---------------------------------------------------------
         await _guilds.AddGuildAsync(guild);
         await _guilds.SaveChangesAsync();
 
@@ -128,9 +107,6 @@ public class GuildService : IGuildService
     }
 
 
-    // ---------------------------------------------------------
-    // GUILD / MEMBER
-    // ---------------------------------------------------------
     public Task<Guild?> GetGuildAsync(Guid guildId)
     {
         return _guilds.GetGuildAsync(guildId);
@@ -156,9 +132,6 @@ public class GuildService : IGuildService
         return _guilds.GetGuildMembersAsync(guildId);
     }
 
-    // ---------------------------------------------------------
-    // CHANNEL
-    // ---------------------------------------------------------
     public Task<GuildChannel?> GetChannelAsync(Guid channelId)
     {
         return _guilds.GetChannelAsync(channelId);
@@ -169,9 +142,6 @@ public class GuildService : IGuildService
         return _guilds.GetChannelOverridesAsync(channelId);
     }
 
-    // ---------------------------------------------------------
-    // ACCESS CHECK (DELEGATED)
-    // ---------------------------------------------------------
     public async Task<bool> CanAccessChannelAsync(Guid channelId, Guid userId)
     {
         var result = await _permissions.HasChannelPermissionAsync(

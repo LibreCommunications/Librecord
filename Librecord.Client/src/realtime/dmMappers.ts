@@ -4,9 +4,6 @@ import type {
     DmRealtimeMessageEditedTransport,
 } from "./dmTypes";
 
-// --------------------------------------------------
-// MESSAGE CREATED
-// --------------------------------------------------
 export function mapDmRealtimeToMessage(
     msg: DmRealtimeMessageTransport
 ): Message {
@@ -26,9 +23,6 @@ export function mapDmRealtimeToMessage(
     };
 }
 
-// --------------------------------------------------
-// MESSAGE EDITED
-// --------------------------------------------------
 export function mapDmRealtimeEdit(
     msg: DmRealtimeMessageEditedTransport
 ) {

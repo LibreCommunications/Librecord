@@ -19,7 +19,6 @@ export function RealtimeRoot() {
     const { user } = useAuth();
     const userIdRef = useRef<string | null>(null);
 
-    // Start connection once when user is available
     useEffect(() => {
         if (!user?.userId || started) return;
         started = true;
@@ -39,14 +38,12 @@ export function RealtimeRoot() {
         });
     });
 
-    // Detect logout — user was set, now null
     useEffect(() => {
         if (user?.userId) {
             userIdRef.current = user.userId;
             return;
         }
         if (!user && userIdRef.current) {
-            // User logged out
             userIdRef.current = null;
             started = false;
             window.__realtimeReady = false;

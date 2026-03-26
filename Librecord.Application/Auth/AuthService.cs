@@ -19,15 +19,12 @@ public class AuthService : IAuthService
 
     public async Task<AuthResult> RegisterAsync(string email, string username, string displayName, string password)
     {
-        // Email exists?
         if (await _repo.GetUserByEmailAsync(email) != null)
             return AuthResult.Fail("Email already in use.");
 
-        // Username exists?
         if (await _repo.GetUserByUserNameAsync(username) != null)
             return AuthResult.Fail("Username already in use.");
 
-        // Create new user
         var user = new User
         {
             Id = Guid.NewGuid(),
@@ -112,14 +109,11 @@ public class AuthService : IAuthService
         if (user == null)
             return AuthResult.Fail("User not found.");
 
-        // Generate new tokens
         var newAccess = _jwt.GenerateAccessToken(user);
         var newRefresh = _jwt.GenerateRefreshToken();
 
-        // Revoke old refresh token
         existing.IsRevoked = true;
 
-        // Save new refresh token
         await _repo.AddRefreshTokenAsync(new RefreshToken
         {
             Id = Guid.NewGuid(),

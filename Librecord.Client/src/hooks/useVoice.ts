@@ -12,7 +12,6 @@ import {
 } from "../voice/voiceStore";
 import { playJoinSound, playLeaveSound, playStreamStartSound, playStreamStopSound } from "../voice/sounds";
 
-/** Get the local user's ID from the current voice state participants or auth. */
 function getLocalUserId(): string | null {
     const lp = livekitClient.getLocalParticipant();
     return lp?.identity ?? null;
@@ -88,15 +87,15 @@ export function useVoice() {
 
     const startScreenShare = useCallback(async (options: ScreenShareSettings) => {
         const started = await livekitClient.startScreenShare(options);
-        if (!started) return; // User cancelled or browser rejected
+        if (!started) return;
 
         setVoiceState({ isScreenSharing: true });
         const uid = getLocalUserId();
         if (uid) updateParticipantState(uid, { isScreenSharing: true });
         playStreamStartSound();
 
-        // Notify server — if this fails, LiveKit is still sharing so we
-        // keep the local state consistent and log rather than rolling back.
+        // If this fails, LiveKit is still sharing so we keep local state
+        // consistent and log rather than rolling back.
         try {
             await appConnection.invoke("UpdateVoiceState", { isScreenSharing: true });
         } catch (e) {
@@ -105,14 +104,11 @@ export function useVoice() {
     }, []);
 
     const stopScreenShare = useCallback(async () => {
-        // Update local state first — even if LiveKit or SignalR fails,
-        // the user sees an immediate response.
         setVoiceState({ isScreenSharing: false });
         const uid = getLocalUserId();
         if (uid) updateParticipantState(uid, { isScreenSharing: false });
         playStreamStopSound();
 
-        // Best-effort cleanup — errors are logged, not thrown.
         try {
             await livekitClient.stopScreenShare();
         } catch (e) {

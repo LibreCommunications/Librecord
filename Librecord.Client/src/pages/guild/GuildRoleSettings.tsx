@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGuildRoles, type GuildRole } from "../../hooks/useGuildRoles";
 
-// Known permission IDs (must match backend PermissionIds.cs)
+// Must match backend PermissionIds.cs
 const GUILD_PERMISSIONS = [
     { id: "11111111-1111-1111-1111-111111111101", name: "View Guild" },
     { id: "11111111-1111-1111-1111-111111111102", name: "Manage Guild" },
@@ -43,7 +43,6 @@ export function GuildRoleSettings({ guildId }: Props) {
 
     const selected = roles.find(r => r.id === selectedId);
 
-    // Derive editName from selected role — reset when selection changes
     const derivedEditName = selected?.name ?? "";
     const [editNameOverride, setEditNameOverride] = useState<{ id: string | null; name: string } | null>(null);
     const editName = editNameOverride?.id === selectedId ? editNameOverride.name : derivedEditName;
@@ -90,7 +89,6 @@ export function GuildRoleSettings({ guildId }: Props) {
 
     return (
         <div className="flex gap-4">
-            {/* Role list */}
             <div className="w-48 space-y-1">
                 {roles.map(r => (
                     <button
@@ -111,7 +109,6 @@ export function GuildRoleSettings({ guildId }: Props) {
                 </button>
             </div>
 
-            {/* Role editor */}
             {selected && (
                 <div className="flex-1 space-y-4">
                     {selected.name !== "@everyone" && selected.name !== "Owner" && (

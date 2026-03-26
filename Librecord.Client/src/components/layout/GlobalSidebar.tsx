@@ -31,7 +31,6 @@ function SidebarIcon({
 }) {
     const inner = (
         <div className="relative group flex items-center" data-testid={testId}>
-            {/* Active / unread indicator pill */}
             <span
                 className={`
                     absolute -left-3 w-1 rounded-r-full bg-white transition-all
@@ -54,7 +53,6 @@ function SidebarIcon({
                 )}
             </div>
 
-            {/* Tooltip */}
             {tooltip && (
                 <div className="absolute left-[60px] px-3 py-1.5 bg-[#111214] text-white text-sm font-medium rounded-md shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
                     {tooltip}
@@ -81,7 +79,6 @@ export default function GlobalSidebar() {
     const [showJoin, setShowJoin] = useState(false);
     const { myStatus } = usePresence();
 
-    // Unread tracking
     const [guildUnreads, setGuildUnreads] = useState<Record<string, number>>({});
     const [dmUnread, setDmUnread] = useState(false);
     const channelToGuildRef = useRef<Record<string, string>>({});
@@ -91,7 +88,6 @@ export default function GlobalSidebar() {
     const loadGuilds = useCallback(() => {
         getGuilds().then(async (list) => {
             setGuilds(list);
-            // Build channelId → guildId map
             const map: Record<string, string> = {};
             for (const g of list) {
                 const channels = await getGuildChannels(g.id);
@@ -103,14 +99,12 @@ export default function GlobalSidebar() {
 
     useEffect(() => { loadGuilds(); }, [loadGuilds]);
 
-    // Re-fetch guilds after a reconnect
     useEffect(() => {
         const refresh = () => { loadGuilds(); };
         window.addEventListener("realtime:reconnected", refresh);
         return () => window.removeEventListener("realtime:reconnected", refresh);
     }, [loadGuilds]);
 
-    // Handle guild deletion in realtime — remove from sidebar and redirect if viewing
     useEffect(() => {
         const onGuildDeleted = (e: CustomEvent<AppEventMap["guild:deleted"]>) => {
             const deletedId = e.detail.guildId;
@@ -120,7 +114,6 @@ export default function GlobalSidebar() {
                 delete next[deletedId];
                 return next;
             });
-            // If currently viewing the deleted guild, redirect to DMs
             if (guildId === deletedId) {
                 navigate("/app/dm");
             }
@@ -130,14 +123,12 @@ export default function GlobalSidebar() {
         return () => window.removeEventListener("guild:deleted", onGuildDeleted as EventListener);
     }, [guildId, navigate]);
 
-    // Listen for guild message pings → increment guild unread
     useEffect(() => {
         const onGuildPing = (e: CustomEvent<AppEventMap["guild:message:ping"]>) => {
             const { channelId: pingCh, authorId } = e.detail;
             if (authorId === user?.userId) return;
             const pingGuildId = channelToGuildRef.current[pingCh];
             if (!pingGuildId) return;
-            // Don't count if we're currently viewing this guild
             if (guildId === pingGuildId) return;
             setGuildUnreads(prev => ({ ...prev, [pingGuildId]: (prev[pingGuildId] ?? 0) + 1 }));
         };
@@ -145,7 +136,6 @@ export default function GlobalSidebar() {
         return () => window.removeEventListener("guild:message:ping", onGuildPing as EventListener);
     }, [guildId, user?.userId]);
 
-    // Listen for DM pings → set DM unread
     useEffect(() => {
         const onDmPing = (e: CustomEvent<AppEventMap["dm:message:ping"]>) => {
             if (e.detail.authorId === user?.userId) return;
@@ -156,12 +146,10 @@ export default function GlobalSidebar() {
         return () => window.removeEventListener("dm:message:ping", onDmPing as EventListener);
     }, [isDmPage, user?.userId]);
 
-    // Derive effective guild unreads — clear count for the active guild
     const effectiveGuildUnreads = guildId
         ? Object.fromEntries(Object.entries(guildUnreads).filter(([k]) => k !== guildId))
         : guildUnreads;
 
-    // Derive effective DM unread — clear when on DM page
     const effectiveDmUnread = isDmPage ? false : dmUnread;
 
     const avatarSrc =
@@ -182,17 +170,14 @@ export default function GlobalSidebar() {
         <>
             <aside id="global-sidebar" className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 gap-2 overflow-y-auto no-scrollbar">
 
-                {/* DM */}
                 <SidebarIcon to="/app/dm" active={isDmPage} unread={effectiveDmUnread} tooltip="Direct Messages" className="bg-[#313338] hover:bg-[#5865F2] text-white">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                     </svg>
                 </SidebarIcon>
 
-                {/* Divider */}
                 <div className="w-8 h-0.5 bg-[#35373c] rounded-full" />
 
-                {/* GUILDS */}
                 {guilds.map(g => (
                     <SidebarIcon
                         key={g.id}
@@ -217,7 +202,6 @@ export default function GlobalSidebar() {
                     </SidebarIcon>
                 ))}
 
-                {/* ADD GUILD */}
                 <SidebarIcon
                     onClick={() => setShowCreate(true)}
                     tooltip="Create a Server"
@@ -230,7 +214,6 @@ export default function GlobalSidebar() {
                     </svg>
                 </SidebarIcon>
 
-                {/* JOIN GUILD */}
                 <SidebarIcon
                     onClick={() => setShowJoin(true)}
                     tooltip="Join a Server"
@@ -246,7 +229,6 @@ export default function GlobalSidebar() {
 
                 <div className="flex-1" />
 
-                {/* SETTINGS / USER AVATAR */}
                 <Link to="/app/settings/user/profile">
                     <div className="relative group flex items-center">
                         <img

@@ -13,7 +13,6 @@ public class DirectMessageChannelRepository : IDirectMessageChannelRepository
         _db = db;
     }
 
-    /// <summary>Lightweight: members + user info only. No messages loaded.</summary>
     public Task<DmChannel?> GetChannelAsync(Guid id)
     {
         return _db.DmChannels
@@ -23,7 +22,6 @@ public class DirectMessageChannelRepository : IDirectMessageChannelRepository
             .FirstOrDefaultAsync(c => c.Id == id);
     }
 
-    /// <summary>Heavy: includes all messages with attachments. Only for deletion/cleanup.</summary>
     public Task<DmChannel?> GetChannelWithMessagesAsync(Guid id)
     {
         return _db.DmChannels

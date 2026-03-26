@@ -79,7 +79,6 @@ public class GuildSettingsController : AuthenticatedController
         var (success, channelIds) = await _settings.DeleteGuildAsync(guildId);
         if (!success) return NotFound();
 
-        // Notify all connected members after deletion
         await _guildNotifier.NotifyGuildDeletedAsync(new GuildDeleted
         {
             GuildId = guildId,

@@ -9,7 +9,6 @@ public sealed class GuildChannelMemberConfiguration
 {
     public void Configure(EntityTypeBuilder<GuildChannelMember> builder)
     {
-        // Composite primary key
         builder.HasKey(x => new { x.UserId, x.ChannelId });
 
         builder.Property(x => x.JoinedAt)

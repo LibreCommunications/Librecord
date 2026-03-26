@@ -19,9 +19,6 @@ public class ReadStateController : AuthenticatedController
         _readStates = readStates;
         _realtime = realtime;
     }
-    // ---------------------------------------------------------
-    // MARK CHANNEL AS READ
-    // ---------------------------------------------------------
     [HttpPost("{channelId:guid}/ack")]
     public async Task<IActionResult> Acknowledge(Guid channelId, [FromBody] AckRequest request)
     {
@@ -39,9 +36,6 @@ public class ReadStateController : AuthenticatedController
         return Ok();
     }
 
-    // ---------------------------------------------------------
-    // GET UNREAD COUNTS (bulk)
-    // ---------------------------------------------------------
     [HttpPost("unread")]
     public async Task<IActionResult> GetUnreadCounts([FromBody] UnreadRequest request)
     {

@@ -25,9 +25,6 @@ public sealed class AesGcmMessageEncryptionService : IMessageEncryptionService
         _masterKey = masterKey;
     }
 
-    // -------------------------------------------------
-    // Encrypt
-    // -------------------------------------------------
     public EncryptedPayload Encrypt(string plaintext)
     {
         var salt = RandomNumberGenerator.GetBytes(SaltSize);
@@ -57,9 +54,6 @@ public sealed class AesGcmMessageEncryptionService : IMessageEncryptionService
         };
     }
 
-    // -------------------------------------------------
-    // Decrypt
-    // -------------------------------------------------
     public string Decrypt(
         byte[] payload,
         byte[] salt,
@@ -91,18 +85,13 @@ public sealed class AesGcmMessageEncryptionService : IMessageEncryptionService
         return Encoding.UTF8.GetString(plaintext);
     }
 
-    // -------------------------------------------------
-    // HKDF (Extract-only, SHA-256)
-    // -------------------------------------------------
+    // HKDF Extract-only (SHA-256)
     private static byte[] DeriveKey(byte[] masterKey, byte[] salt)
     {
         using var hmac = new HMACSHA256(salt);
         return hmac.ComputeHash(masterKey)[..DerivedKeySize];
     }
 
-    // -------------------------------------------------
-    // Utils
-    // -------------------------------------------------
     private static byte[] Concat(params byte[][] arrays)
     {
         var length = arrays.Sum(a => a.Length);

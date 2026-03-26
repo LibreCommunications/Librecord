@@ -16,9 +16,6 @@ public class PermissionService : IPermissionService
         _registry = registry;
     }
 
-    // ---------------------------------------------------------
-    // GUILD PERMISSION
-    // ---------------------------------------------------------
     public async Task<PermissionResult> HasGuildPermissionAsync(
         Guid userId,
         Guid guildId,
@@ -33,11 +30,6 @@ public class PermissionService : IPermissionService
             : PermissionResult.Deny($"Missing guild permission: {required.Key}");
     }
 
-    /// <summary>
-    /// Returns all guild-level permissions granted to a user via their roles,
-    /// or null if the user is not a guild member. Uses a single batched query
-    /// for all role permissions instead of one query per role.
-    /// </summary>
     public async Task<HashSet<PermissionCapability>?> GetGrantedGuildPermissionsAsync(
         Guid userId, Guid guildId)
     {
@@ -54,9 +46,6 @@ public class PermissionService : IPermissionService
         return granted;
     }
 
-    // ---------------------------------------------------------
-    // CHANNEL PERMISSION
-    // ---------------------------------------------------------
     public async Task<PermissionResult> HasChannelPermissionAsync(
         Guid userId,
         Guid channelId,
@@ -72,9 +61,7 @@ public class PermissionService : IPermissionService
 
         var overrides = await _guilds.GetChannelOverridesAsync(channelId);
 
-        // -----------------------------------------------------
-        // USER OVERRIDES (highest priority)
-        // -----------------------------------------------------
+        // User overrides take highest priority
         var userOverride = overrides.FirstOrDefault(o =>
             o.UserId == userId &&
             _registry.Resolve(o.Permission.Name, o.Permission.Type)
@@ -86,9 +73,7 @@ public class PermissionService : IPermissionService
         if (userOverride?.Allow == false)
             return PermissionResult.Deny("User override denies permission.");
 
-        // -----------------------------------------------------
-        // ROLE OVERRIDES
-        // -----------------------------------------------------
+        // Role overrides next
         foreach (var roleLink in member.Roles)
         {
             var roleOverride = overrides.FirstOrDefault(o =>
@@ -103,9 +88,7 @@ public class PermissionService : IPermissionService
                 return PermissionResult.Deny("Role override denies permission.");
         }
 
-        // -----------------------------------------------------
-        // FALL BACK TO GUILD PERMISSIONS (reuse already-fetched member)
-        // -----------------------------------------------------
+        // Fall back to guild-level permissions
         var roleIds = member.Roles.Select(r => r.RoleId);
         var perms = await _guilds.GetRolesPermissionsBatchAsync(roleIds);
 
@@ -118,9 +101,6 @@ public class PermissionService : IPermissionService
             : PermissionResult.Deny($"Missing guild permission: {required.Key}");
     }
 
-    // ---------------------------------------------------------
-    // SET CHANNEL OVERRIDE
-    // ---------------------------------------------------------
     public async Task SetChannelOverrideAsync(
         Guid channelId, Guid? roleId, Guid? userId,
         Guid permissionId, bool? allow)
@@ -129,7 +109,6 @@ public class PermissionService : IPermissionService
 
         if (allow == null)
         {
-            // Remove override (inherit)
             if (existing != null)
             {
                 await _guilds.RemoveChannelOverrideAsync(existing);

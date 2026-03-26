@@ -17,14 +17,11 @@ export default function MainPage() {
     return (
         <div className="flex h-screen bg-[#2f3136] text-gray-200 overflow-hidden">
 
-            {/* REALTIME BOOTSTRAP (AUTHENTICATED ONLY) */}
             <RealtimeRoot />
             <ConnectionBanner />
 
-            {/* LEFT: GUILD LIST */}
             <GlobalSidebar />
 
-            {/* DM SIDEBAR */}
             {isDm && (
                 <div className="flex flex-col h-full bg-[#2a2c31]">
                     <div className="flex-1 min-h-0 overflow-auto">
@@ -34,7 +31,6 @@ export default function MainPage() {
                 </div>
             )}
 
-            {/* GUILD CHANNEL SIDEBAR */}
             {isGuild && guildId && (
                 <div className="flex flex-col h-full bg-[#2a2c31]">
                     <div className="flex-1 min-h-0 overflow-auto">
@@ -44,7 +40,6 @@ export default function MainPage() {
                 </div>
             )}
 
-            {/* MAIN PANEL */}
             <div className="flex flex-1 min-w-0 min-h-0 overflow-hidden">
                 <Outlet />
             </div>

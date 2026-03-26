@@ -38,7 +38,6 @@ export default function GuildChannelPage() {
     const [showInvite, setShowInvite] = useState(false);
     const [showMembers, setShowMembers] = useState(true);
 
-    // ── Load guild channel metadata FIRST ──────────────────
     const [metadataReady, setMetadataReady] = useState(false);
 
     const [prevChannelId, setPrevChannelId] = useState(channelId);
@@ -62,7 +61,6 @@ export default function GuildChannelPage() {
         return () => { stale = true; };
     }, [channelId, getChannel]);
 
-    // ── Build config — only set channelId once metadata is loaded ──
     const config: ChatChannelConfig = useMemo(() => ({
         channelId: metadataReady ? channelId : undefined,
         getMessages: getChannelMessages,
@@ -96,7 +94,6 @@ export default function GuildChannelPage() {
     return (
         <div className="flex-1 flex bg-[#313338] overflow-hidden">
             <div className="flex-1 flex flex-col min-w-0 min-h-0">
-                {/* HEADER */}
                 <div className="page-header">
                     <span className="font-semibold flex items-center gap-1.5">
                         {isVoice ? (
@@ -187,7 +184,6 @@ export default function GuildChannelPage() {
                     </div>
                 </div>
 
-                {/* CONTENT: voice grid or text messages */}
                 {isVoice ? (
                     <VoiceChannelView
                         channelId={channelId}

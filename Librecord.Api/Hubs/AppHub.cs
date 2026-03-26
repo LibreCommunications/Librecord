@@ -39,9 +39,6 @@ public class AppHub : Hub
             Context.User!
                 .FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-    // -----------------------------------------
-    // CONNECT
-    // -----------------------------------------
     public override async Task OnConnectedAsync()
     {
         _logger.LogInformation(
@@ -49,7 +46,6 @@ public class AppHub : Hub
             Context.ConnectionId,
             UserId);
 
-        // Join all DM channel groups
         var dmChannels = await _channels.GetUserChannelsAsync(UserId);
 
         _logger.LogInformation(
@@ -60,7 +56,6 @@ public class AppHub : Hub
         await Task.WhenAll(dmChannels.Select(channel =>
             Groups.AddToGroupAsync(Context.ConnectionId, DmGroup(channel.Id))));
 
-        // Join all guild channel groups
         var guilds = await _guilds.GetGuildsForUserAsync(UserId);
         var allGuildChannelIds = guilds.SelectMany(g => (g.Channels ?? []).Select(c => c.Id)).ToList();
 
@@ -73,7 +68,6 @@ public class AppHub : Hub
 
         _connections.Connect(UserId);
 
-        // Broadcast online presence (unless invisible)
         var currentPresence = await _presence.GetPresenceAsync(UserId);
         var isInvisible = currentPresence?.Status == Domain.Identity.UserStatus.Invisible;
 
@@ -88,11 +82,9 @@ public class AppHub : Hub
 
             var presencePayload = new { userId = UserId, status = broadcastStatus };
 
-            // Broadcast to DM groups
             await Task.WhenAll(dmChannels.Select(channel =>
                 Clients.OthersInGroup(DmGroup(channel.Id)).SendAsync("dm:user:presence", presencePayload)));
 
-            // Broadcast to guild groups
             await Task.WhenAll(allGuildChannelIds.Select(channelId =>
                 Clients.OthersInGroup(GuildGroup(channelId)).SendAsync("guild:user:presence", presencePayload)));
         }
@@ -100,9 +92,6 @@ public class AppHub : Hub
         await base.OnConnectedAsync();
     }
 
-    // -----------------------------------------
-    // DM: JOIN CHANNEL
-    // -----------------------------------------
     public async Task JoinDmChannel(Guid channelId)
     {
         _logger.LogInformation(
@@ -137,9 +126,6 @@ public class AppHub : Hub
             group);
     }
 
-    // -----------------------------------------
-    // DM: LEAVE CHANNEL
-    // -----------------------------------------
     public async Task LeaveDmChannel(Guid channelId)
     {
         var group = DmGroup(channelId);
@@ -154,9 +140,6 @@ public class AppHub : Hub
             group);
     }
 
-    // -----------------------------------------
-    // GUILD: JOIN CHANNEL
-    // -----------------------------------------
     public async Task JoinGuildChannel(Guid channelId)
     {
         _logger.LogInformation(
@@ -182,9 +165,6 @@ public class AppHub : Hub
             GuildGroup(channelId));
     }
 
-    // -----------------------------------------
-    // GUILD: LEAVE CHANNEL
-    // -----------------------------------------
     public async Task LeaveGuildChannel(Guid channelId)
     {
         _logger.LogInformation(
@@ -197,9 +177,6 @@ public class AppHub : Hub
             GuildGroup(channelId));
     }
 
-    // -----------------------------------------
-    // DM: TYPING
-    // -----------------------------------------
     public async Task DmStartTyping(Guid channelId)
     {
         var isMember = await _channels.IsMemberAsync(channelId, UserId);
@@ -232,9 +209,6 @@ public class AppHub : Hub
             new { channelId, userId = UserId });
     }
 
-    // -----------------------------------------
-    // GUILD: TYPING
-    // -----------------------------------------
     public async Task GuildStartTyping(Guid channelId)
     {
         var canAccess = await _guilds.CanAccessChannelAsync(channelId, UserId);
@@ -266,9 +240,6 @@ public class AppHub : Hub
             new { channelId, userId = UserId });
     }
 
-    // -----------------------------------------
-    // VOICE: JOIN
-    // -----------------------------------------
     public async Task<VoiceJoinResult> JoinVoiceChannel(Guid channelId)
     {
         _logger.LogInformation(
@@ -282,9 +253,6 @@ public class AppHub : Hub
         return await _voice.JoinVoiceChannelAsync(channelId, UserId);
     }
 
-    // -----------------------------------------
-    // VOICE: LEAVE
-    // -----------------------------------------
     public async Task LeaveVoiceChannel()
     {
         _logger.LogInformation(
@@ -294,17 +262,11 @@ public class AppHub : Hub
         await _voice.LeaveVoiceChannelAsync(UserId);
     }
 
-    // -----------------------------------------
-    // VOICE: UPDATE STATE
-    // -----------------------------------------
     public async Task UpdateVoiceState(VoiceStateUpdateDto update)
     {
         await _voice.UpdateVoiceStateAsync(UserId, update);
     }
 
-    // -----------------------------------------
-    // DISCONNECT
-    // -----------------------------------------
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         if (exception != null)
@@ -323,7 +285,6 @@ public class AppHub : Hub
                 UserId);
         }
 
-        // Leave voice channel on disconnect
         try
         {
             await _voice.LeaveVoiceChannelAsync(UserId);
@@ -347,12 +308,10 @@ public class AppHub : Hub
             {
                 var offlinePayload = new { userId = UserId, status = "offline" };
 
-                // Broadcast to DM groups
                 var dmChannels = await _channels.GetUserChannelsAsync(UserId);
                 await Task.WhenAll(dmChannels.Select(channel =>
                     Clients.OthersInGroup(DmGroup(channel.Id)).SendAsync("dm:user:presence", offlinePayload)));
 
-                // Broadcast to guild groups
                 var guilds = await _guilds.GetGuildsForUserAsync(UserId);
                 var offlineChannelIds = guilds.SelectMany(g => (g.Channels ?? []).Select(c => c.Id)).ToList();
                 await Task.WhenAll(offlineChannelIds.Select(chId =>
@@ -363,9 +322,6 @@ public class AppHub : Hub
         await base.OnDisconnectedAsync(exception);
     }
 
-    // -----------------------------------------
-    // GROUP NAMES
-    // -----------------------------------------
     internal static string DmGroup(Guid channelId)
         => $"dm:{channelId}";
 

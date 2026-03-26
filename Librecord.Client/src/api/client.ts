@@ -2,11 +2,6 @@ import { fetchWithAuth } from "./fetchWithAuth";
 
 export const API_URL: string = import.meta.env.VITE_API_URL;
 
-/**
- * Typed API client. All backend calls go through here.
- * Returns parsed JSON on success, throws ApiError on failure.
- */
-
 export class ApiError extends Error {
     status: number;
     statusText: string;
@@ -58,10 +53,6 @@ function json(body: unknown): RequestInit {
     };
 }
 
-// ──────────────────────────────────────────────────────────
-// AUTH
-// ──────────────────────────────────────────────────────────
-
 export const auth = {
     me: () => request<{
         userId: string;
@@ -72,10 +63,6 @@ export const auth = {
         guilds?: { guildId: string; name: string; iconUrl: string | null }[];
     }>("/users/me"),
 };
-
-// ──────────────────────────────────────────────────────────
-// GUILDS
-// ──────────────────────────────────────────────────────────
 
 import type { GuildSummary, Guild, GuildChannel, GuildMember, GuildPermissions } from "../types/guild";
 
@@ -92,10 +79,6 @@ export const guilds = {
     myPermissions: (guildId: string) => requestOptional<GuildPermissions>(`/guilds/${guildId}/permissions/me`),
 };
 
-// ──────────────────────────────────────────────────────────
-// CHANNELS
-// ──────────────────────────────────────────────────────────
-
 export const channels = {
     create: (guildId: string, data: { name: string; type: number; position: number }) =>
         request<GuildChannel>(`/channels/guild/${guildId}`, { method: "POST", ...json(data) }),
@@ -104,10 +87,6 @@ export const channels = {
     delete: (channelId: string) =>
         request<void>(`/channels/${channelId}`, { method: "DELETE" }),
 };
-
-// ──────────────────────────────────────────────────────────
-// GUILD MESSAGES
-// ──────────────────────────────────────────────────────────
 
 import type { Message } from "../types/message";
 
@@ -127,10 +106,6 @@ export const guildMessages = {
         request<void>(`/guild-channels/${channelId}/messages/${messageId}`, { method: "DELETE" }),
 };
 
-// ──────────────────────────────────────────────────────────
-// DM CHANNELS
-// ──────────────────────────────────────────────────────────
-
 import type { DmChannel } from "../types/dm";
 
 export const dms = {
@@ -147,10 +122,6 @@ export const dms = {
     delete: (channelId: string) =>
         request<void>(`/dms/${channelId}`, { method: "DELETE" }),
 };
-
-// ──────────────────────────────────────────────────────────
-// DM MESSAGES
-// ──────────────────────────────────────────────────────────
 
 import type { TransportMessage } from "../types/message";
 
@@ -189,10 +160,6 @@ export const dmMessages = {
         request<void>(`/dm-messages/${messageId}`, { method: "DELETE" }),
 };
 
-// ──────────────────────────────────────────────────────────
-// FRIENDS
-// ──────────────────────────────────────────────────────────
-
 import type { Friend, FriendRequests } from "../types/friend";
 
 export const friends = {
@@ -214,10 +181,6 @@ export const friends = {
         ).catch(() => []),
 };
 
-// ──────────────────────────────────────────────────────────
-// PINS
-// ──────────────────────────────────────────────────────────
-
 import type { PinnedMessage } from "../types/pin";
 
 export const pins = {
@@ -229,20 +192,12 @@ export const pins = {
         request<void>(`/channels/${channelId}/pins/${messageId}`, { method: "DELETE" }),
 };
 
-// ──────────────────────────────────────────────────────────
-// REACTIONS
-// ──────────────────────────────────────────────────────────
-
 export const reactions = {
     add: (messageId: string, emoji: string) =>
         request<void>(`/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`, { method: "PUT" }),
     remove: (messageId: string, emoji: string) =>
         request<void>(`/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`, { method: "DELETE" }),
 };
-
-// ──────────────────────────────────────────────────────────
-// READ STATE
-// ──────────────────────────────────────────────────────────
 
 export const readState = {
     markAsRead: (channelId: string, messageId: string) =>
@@ -251,10 +206,6 @@ export const readState = {
         request<Record<string, number>>("/channels/unread", { method: "POST", ...json({ channelIds }) })
             .catch(() => ({} as Record<string, number>)),
 };
-
-// ──────────────────────────────────────────────────────────
-// PRESENCE
-// ──────────────────────────────────────────────────────────
 
 export const presence = {
     me: () => requestOptional<{ status: string }>("/presence/me"),
@@ -265,10 +216,6 @@ export const presence = {
             .catch(() => ({} as Record<string, string>)),
 };
 
-// ──────────────────────────────────────────────────────────
-// USER PROFILE
-// ──────────────────────────────────────────────────────────
-
 export const userProfile = {
     updateDisplayName: (displayName: string) =>
         request<void>("/users/display-name", { method: "POST", ...json({ displayName }) }),
@@ -278,10 +225,6 @@ export const userProfile = {
         return request<{ avatarUrl: string }>("/users/avatar", { method: "POST", body: form });
     },
 };
-
-// ──────────────────────────────────────────────────────────
-// SEARCH
-// ──────────────────────────────────────────────────────────
 
 export const search = {
     messages: (query: string, opts: { channelId?: string; guildId?: string; limit?: number }) => {
@@ -295,10 +238,6 @@ export const search = {
     },
 };
 
-// ──────────────────────────────────────────────────────────
-// BLOCKS
-// ──────────────────────────────────────────────────────────
-
 export const blocks = {
     list: () => request<{ userId: string; username: string; displayName: string; blockedAt: string }[]>("/blocks").catch(() => []),
     block: (userId: string) => request<void>(`/blocks/${userId}`, { method: "PUT" }),
@@ -306,10 +245,6 @@ export const blocks = {
     isBlocked: (userId: string) =>
         request<{ blocked: boolean }>(`/blocks/${userId}`).then(d => d.blocked).catch(() => false),
 };
-
-// ──────────────────────────────────────────────────────────
-// ROLES
-// ──────────────────────────────────────────────────────────
 
 import type { GuildRole } from "../types/guild";
 
@@ -329,10 +264,6 @@ export const roles = {
         request<void>(`/guilds/${guildId}/roles/${roleId}/members/${userId}`, { method: "DELETE" }),
 };
 
-// ──────────────────────────────────────────────────────────
-// INVITES
-// ──────────────────────────────────────────────────────────
-
 import type { GuildInvite } from "../types/guild";
 
 export const invites = {
@@ -343,10 +274,6 @@ export const invites = {
     join: (code: string) => request<{ id: string; name: string; iconUrl: string | null }>(`/invites/${code}/join`, { method: "POST" }),
     revoke: (inviteId: string) => request<void>(`/invites/${inviteId}`, { method: "DELETE" }),
 };
-
-// ──────────────────────────────────────────────────────────
-// GUILD MODERATION
-// ──────────────────────────────────────────────────────────
 
 export interface GuildBanEntry {
     guildId: string;
@@ -367,10 +294,6 @@ export const guildModeration = {
         request<GuildBanEntry[]>(`/guilds/${guildId}/bans`).catch(() => [] as GuildBanEntry[]),
 };
 
-// ──────────────────────────────────────────────────────────
-// CHANNEL PERMISSIONS
-// ──────────────────────────────────────────────────────────
-
 export interface ChannelOverride {
     id: string;
     channelId: string;
@@ -386,10 +309,6 @@ export const channelPermissions = {
     setOverride: (channelId: string, opts: { roleId?: string | null; userId?: string | null; permissionId: string; allow: boolean | null }) =>
         request<void>(`/channels/${channelId}/permissions`, { method: "PUT", ...json(opts) }),
 };
-
-// ──────────────────────────────────────────────────────────
-// THREADS
-// ──────────────────────────────────────────────────────────
 
 import type { Thread, ThreadMessage } from "../types/thread";
 
@@ -407,20 +326,12 @@ export const threads = {
         requestOptional<ThreadMessage>(`/channels/${channelId}/threads/${threadId}/messages`, { method: "POST", ...json({ content }) }),
 };
 
-// ──────────────────────────────────────────────────────────
-// VOICE
-// ──────────────────────────────────────────────────────────
-
 export const voice = {
     participants: (channelId: string) =>
         request<{ userId: string; username: string; displayName: string; avatarUrl: string | null; isMuted: boolean; isDeafened: boolean; isCameraOn: boolean; isScreenSharing: boolean; joinedAt: string }[]>(
             `/voice/channels/${channelId}/participants`
         ).catch(() => []),
 };
-
-// ──────────────────────────────────────────────────────────
-// ATTACHMENT UPLOADS
-// ──────────────────────────────────────────────────────────
 
 export const uploads = {
     guildMessage: (channelId: string, content: string, clientMessageId: string, files: File[], signal?: AbortSignal) => {
@@ -438,10 +349,6 @@ export const uploads = {
         return request<Message>(`/dm-messages/channel/${channelId}/with-attachments`, { method: "POST", body: form, signal });
     },
 };
-
-// ──────────────────────────────────────────────────────────
-// EXPORTED TYPES FOR CONSUMERS
-// ──────────────────────────────────────────────────────────
 
 export type { GuildSummary, Guild, GuildChannel, GuildMember, GuildPermissions, GuildRole, RolePermission, GuildInvite } from "../types/guild";
 export type { DmChannel, DmUser } from "../types/dm";

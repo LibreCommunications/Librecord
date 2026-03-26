@@ -9,7 +9,6 @@ public interface IAuthRepository
     Task<bool> CheckPasswordAsync(User user, string password);
     Task<IdentityResult> CreateUserAsync(User user, string password);
 
-    // Refresh tokens
     Task AddRefreshTokenAsync(RefreshToken token);
     Task<RefreshToken?> GetRefreshTokenAsync(string token);
     Task RevokeRefreshTokenAsync(RefreshToken token);

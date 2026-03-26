@@ -1,4 +1,4 @@
-﻿using Librecord.Domain.Guilds;
+using Librecord.Domain.Guilds;
 using Librecord.Domain.Identity;
 using Librecord.Domain.Messaging;
 using Librecord.Domain.Messaging.Common;
@@ -20,17 +20,11 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration config)
     {
-        // JWT options
         services.AddOptions<JwtOptions>()
             .Bind(config.GetSection("Jwt"))
             .ValidateDataAnnotations();
 
-        // In-memory cache for repository query results (short TTL)
         services.AddMemoryCache();
-
-        //
-        // ─── REPOSITORIES ──────────────────────────────────────────────────────────
-        //
 
         services.AddScoped<IAuthRepository, AuthRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
@@ -56,10 +50,6 @@ public static class DependencyInjection
         services.AddScoped<IAttachmentAccessRepository, AttachmentAccessRepository>();
         services.AddScoped<IThreadRepository, ThreadRepository>();
 
-        //
-        // ─── SERVICES (INFRA) ─────────────────────────────────────────────────────
-        //
-
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddSingleton<IMessageEncryptionService>(
             new AesGcmMessageEncryptionService(
@@ -69,16 +59,11 @@ public static class DependencyInjection
             )
         );
 
-        // LiveKit options
         services.AddOptions<LiveKitOptions>()
             .Bind(config.GetSection("LiveKit"))
             .ValidateDataAnnotations();
 
         services.AddSingleton<ILiveKitTokenService, LiveKitTokenService>();
-
-        //
-        // ─── MINIO STORAGE ────────────────────────────────────────────────────────
-        //
 
         services.Configure<AttachmentStorageOptions>(
             config.GetSection("Minio"));

@@ -5,9 +5,6 @@ import * as livekitClient from "../voice/livekitClient";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-// ---------------------------------------------------------------------------
-// Reactive connection state
-// ---------------------------------------------------------------------------
 export type ConnectionState = "disconnected" | "connecting" | "connected" | "reconnecting";
 
 let _state: ConnectionState = "disconnected";
@@ -25,9 +22,6 @@ export function setConnectionState(s: ConnectionState) {
     _stateListeners.forEach(cb => cb());
 }
 
-// ---------------------------------------------------------------------------
-// SignalR connection
-// ---------------------------------------------------------------------------
 export const appConnection = new signalR.HubConnectionBuilder()
     .withUrl(`${API_URL}/hubs/app`, { withCredentials: true })
     .withAutomaticReconnect([0, 1000, 2000, 5000, 10000, 30000])

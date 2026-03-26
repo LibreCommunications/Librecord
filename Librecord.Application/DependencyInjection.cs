@@ -14,11 +14,9 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
-        // Singletons
         services.AddSingleton<IPermissionRegistry, PermissionRegistry>();
         services.AddSingleton<IConnectionTracker, ConnectionTracker>();
 
-        // Register all application services here
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IPermissionService, PermissionService>();
         services.AddScoped<IUserService, UserService>();

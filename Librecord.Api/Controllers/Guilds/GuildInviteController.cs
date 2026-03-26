@@ -24,9 +24,6 @@ public class GuildInviteController : AuthenticatedController
         _guilds = guilds;
         _permissions = permissions;
     }
-    // ---------------------------------------------------------
-    // CREATE INVITE
-    // ---------------------------------------------------------
     [HttpPost("guilds/{guildId:guid}/invites")]
     public async Task<IActionResult> Create(
         Guid guildId,
@@ -53,9 +50,6 @@ public class GuildInviteController : AuthenticatedController
         }
     }
 
-    // ---------------------------------------------------------
-    // LIST INVITES FOR GUILD
-    // ---------------------------------------------------------
     [HttpGet("guilds/{guildId:guid}/invites")]
     public async Task<IActionResult> List(Guid guildId)
     {
@@ -67,9 +61,6 @@ public class GuildInviteController : AuthenticatedController
         return Ok(invites.Select(MapInvite));
     }
 
-    // ---------------------------------------------------------
-    // JOIN VIA INVITE CODE
-    // ---------------------------------------------------------
     [HttpPost("invites/{code}/join")]
     public async Task<IActionResult> Join(string code)
     {
@@ -90,9 +81,6 @@ public class GuildInviteController : AuthenticatedController
         }
     }
 
-    // ---------------------------------------------------------
-    // GET INVITE INFO (public, for preview)
-    // ---------------------------------------------------------
     [HttpGet("invites/{code}")]
     public async Task<IActionResult> GetByCode(string code)
     {
@@ -115,9 +103,6 @@ public class GuildInviteController : AuthenticatedController
         });
     }
 
-    // ---------------------------------------------------------
-    // REVOKE INVITE
-    // ---------------------------------------------------------
     [HttpDelete("invites/{inviteId:guid}")]
     public async Task<IActionResult> Revoke(Guid inviteId)
     {
@@ -136,9 +121,6 @@ public class GuildInviteController : AuthenticatedController
         }
     }
 
-    // ---------------------------------------------------------
-    // HELPERS
-    // ---------------------------------------------------------
     private static object MapInvite(Domain.Guilds.GuildInvite invite) => new
     {
         id = invite.Id,

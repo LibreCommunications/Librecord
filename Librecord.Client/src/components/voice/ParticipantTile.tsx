@@ -18,10 +18,8 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
 
     const showVideo = participant.isCameraOn;
 
-    // Reactive camera track via LiveKit RoomEvents (no polling/custom events)
     const cameraTrack = useTrackBySource(participant.userId, Track.Source.Camera);
 
-    // Attach/detach following @livekit/components-react pattern
     useEffect(() => {
         const el = videoRef.current;
         if (!el) return;
@@ -41,7 +39,6 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
     const avatarSrc = getAvatarUrl(participant.avatarUrl);
     const avatarSize = compact ? 36 : 72;
 
-    // ── COMPACT MODE (screen-share sidebar) ──────────────────────────
     if (compact) {
         return (
             <div
@@ -114,7 +111,6 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
         );
     }
 
-    // ── FULL MODE (normal grid) ──────────────────────────────────────
     return (
         <div
             className={`
@@ -161,7 +157,6 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
                 </div>
             )}
 
-            {/* Status badges */}
             <div className="absolute bottom-2 left-2 flex items-center gap-1">
                 {showVideo && (
                     <span className="text-xs text-white/90 bg-black/50 rounded px-1.5 py-0.5 backdrop-blur-sm truncate max-w-[120px]">

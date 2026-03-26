@@ -19,7 +19,6 @@ public class UserService : IUserService
 
     public async Task<UserInfoResult> GetUserInfoAsync(Guid userId)
     {
-        // Load user WITH guilds included
         var user = await _users.GetUserWithGuildsAsync(userId);
 
         if (user == null)
@@ -28,9 +27,6 @@ public class UserService : IUserService
         return UserInfoResult.FromUser(user);
     }
 
-    // ----------------------------------
-    // LIGHT LOOKUPS
-    // ----------------------------------
     public Task<User?> GetByIdAsync(Guid userId)
     {
         return _users.GetByIdAsync(userId);
@@ -45,9 +41,6 @@ public class UserService : IUserService
         return await _users.GetByIdsAsync(ids);
     }
 
-    // ----------------------------------
-    // PROFILE MUTATIONS
-    // ----------------------------------
     public async Task<string?> UpdateDisplayNameAsync(Guid userId, string displayName)
     {
         var user = await _users.GetByIdAsync(userId);
@@ -64,7 +57,6 @@ public class UserService : IUserService
         var user = await _users.GetByIdAsync(userId);
         if (user == null) return null;
 
-        // Delete old avatar
         if (!string.IsNullOrEmpty(user.AvatarUrl))
         {
             var oldKey = user.AvatarUrl.Replace("/cdn/", "");

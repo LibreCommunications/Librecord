@@ -23,7 +23,6 @@ public sealed class SignalRDmRealtimeNotifier : IDmRealtimeNotifier
         {
             DmMessageCreated created =>
                 Task.WhenAll(
-                    // Lightweight ping for unread badges + notifications
                     _hub.Clients.Group(group).SendAsync(
                         "dm:message:ping",
                         new
@@ -33,7 +32,6 @@ public sealed class SignalRDmRealtimeNotifier : IDmRealtimeNotifier
                             authorId = created.AuthorId,
                             authorName = created.Author.DisplayName,
                         }),
-                    // Full payload for active channel view
                     _hub.Clients.Group(group).SendAsync(
                         "dm:message:new",
                         new DmRealtimeMessageCreatedTransport

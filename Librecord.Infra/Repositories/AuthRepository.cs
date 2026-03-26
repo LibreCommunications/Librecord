@@ -38,10 +38,6 @@ public class AuthRepository : IAuthRepository
         return await _userManager.CreateAsync(user, password);
     }
 
-    // ---------------------------------------------------------
-    // REFRESH TOKENS
-    // ---------------------------------------------------------
-
     public async Task AddRefreshTokenAsync(RefreshToken token)
     {
         await _db.Set<RefreshToken>().AddAsync(token);

@@ -14,9 +14,6 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApi(this IServiceCollection services, IConfiguration configuration)
     {
-        // ----------------------------
-        // MVC / Controllers
-        // ----------------------------
         services.AddControllers()
             .AddJsonOptions(o =>
             {
@@ -24,28 +21,18 @@ public static class DependencyInjection
                     JsonNamingPolicy.CamelCase;
             });
 
-        // ----------------------------
-        // SignalR
-        // ----------------------------
+        // Keepalive every 10s to prevent Cloudflare from killing idle WebSockets (100s timeout)
         services.AddSignalR(options =>
         {
-            // Send keepalive pings every 10s to prevent Cloudflare
-            // from killing idle WebSocket connections (100s timeout)
             options.KeepAliveInterval = TimeSpan.FromSeconds(10);
             options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
         });
 
-        // ----------------------------
-        // Realtime adapters
-        // ----------------------------
         services.AddScoped<IDmRealtimeNotifier, SignalRDmRealtimeNotifier>();
         services.AddScoped<IGuildRealtimeNotifier, SignalRGuildRealtimeNotifier>();
         services.AddScoped<IVoiceRealtimeNotifier, SignalRVoiceRealtimeNotifier>();
         services.AddScoped<IFriendshipRealtimeNotifier, SignalRFriendshipNotifier>();
 
-        // ----------------------------
-        // CORS (frontend)
-        // ----------------------------
         var corsOrigins = configuration.GetSection("Cors:Origins").Get<string[]>()
                           ?? ["https://localhost:5173"];
 

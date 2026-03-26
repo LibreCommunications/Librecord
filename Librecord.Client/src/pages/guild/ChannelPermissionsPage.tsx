@@ -62,7 +62,6 @@ export default function ChannelPermissionsPage() {
         if (!channelId) return;
         const current = getOverrideState(roleId, permId);
 
-        // Cycle: null (inherit) → true (allow) → false (deny) → null
         const next: TriState = current === null ? true : current === true ? false : null;
 
         await setOverride(channelId, {
@@ -112,7 +111,6 @@ export default function ChannelPermissionsPage() {
                     <div className="text-gray-400">Loading...</div>
                 ) : (
                     <div className="flex gap-6">
-                        {/* Role list */}
                         <div className="w-48 shrink-0 space-y-1">
                             <h3 className="text-xs text-gray-400 uppercase font-bold mb-2">Roles</h3>
                             {roles.map(r => (
@@ -130,7 +128,6 @@ export default function ChannelPermissionsPage() {
                             ))}
                         </div>
 
-                        {/* Permission grid */}
                         {selectedRoleId && (
                             <div className="flex-1">
                                 {roles.find(r => r.id === selectedRoleId)?.name === "Owner" ? (

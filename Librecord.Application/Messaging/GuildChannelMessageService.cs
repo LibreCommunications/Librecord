@@ -17,9 +17,6 @@ public class GuildChannelMessageService : IGuildChannelMessageService
         _realtime = realtime;
     }
 
-    // -------------------------------------------------
-    // READS
-    // -------------------------------------------------
     public Task<Message?> GetMessageAsync(Guid messageId)
     {
         return _guildMessages.GetMessageAsync(messageId);
@@ -36,9 +33,6 @@ public class GuildChannelMessageService : IGuildChannelMessageService
             beforeMessageId);
     }
 
-    // -------------------------------------------------
-    // CREATE
-    // -------------------------------------------------
     public async Task<Message> CreateMessageAsync(
         Guid channelId,
         Guid userId,
@@ -89,9 +83,6 @@ public class GuildChannelMessageService : IGuildChannelMessageService
         return hydrated;
     }
 
-    // -------------------------------------------------
-    // UPDATE
-    // -------------------------------------------------
     public async Task<Message> EditMessageAsync(
         Guid messageId,
         Guid editorUserId,
@@ -138,9 +129,6 @@ public class GuildChannelMessageService : IGuildChannelMessageService
         return message;
     }
 
-    // -------------------------------------------------
-    // DELETE
-    // -------------------------------------------------
     public async Task DeleteMessageAsync(Guid messageId)
     {
         var message = await _guildMessages.GetMessageAsync(messageId)

@@ -9,13 +9,8 @@ import {
 
 let room: Room | null = null;
 
-// ─── CLIENT-SIDE SPEAKING DETECTION ────────────────────────────────────
-// Uses the Web Audio API to analyze received audio levels locally.
-// Zero round-trip to the SFU — the green border appears the instant
-// audio is loud enough, not 1s later when the server tells us.
-
-const SPEAKING_THRESHOLD = 0.015; // RMS threshold (0-1)
-const SPEAKING_OFF_DELAY = 300;   // ms of silence before "not speaking"
+const SPEAKING_THRESHOLD = 0.015;
+const SPEAKING_OFF_DELAY = 300;
 
 const audioCtxRef: { ctx: AudioContext | null } = { ctx: null };
 const analysers = new Map<string, {
@@ -39,7 +34,6 @@ function getAudioCtx(): AudioContext | null {
 }
 
 function startAnalysingTrack(identity: string, track: MediaStreamTrack) {
-    // Don't double-attach
     if (analysers.has(identity)) {
         const existing = analysers.get(identity)!;
         existing.source.disconnect();
@@ -58,7 +52,6 @@ function startAnalysingTrack(identity: string, track: MediaStreamTrack) {
 
     analysers.set(identity, { analyser, source, speaking: false, silentSince: 0 });
 
-    // Start the polling loop if not already running
     if (animFrameId === null) {
         pollSpeaking();
     }
@@ -94,7 +87,6 @@ function pollSpeaking() {
     for (const [identity, entry] of analysers) {
         entry.analyser.getByteTimeDomainData(buf);
 
-        // Compute RMS
         let sum = 0;
         for (let i = 0; i < buf.length; i++) {
             const v = (buf[i] - 128) / 128;
@@ -128,15 +120,13 @@ function pollSpeaking() {
     animFrameId = requestAnimationFrame(pollSpeaking);
 }
 
-// ─── AUDIO PLAYBACK ────────────────────────────────────────────────────
-// Explicitly attach remote audio tracks to <audio> elements.
 // LiveKit's auto-attach relies on room.startAudio() which can fail
-// if called outside a user gesture context. This guarantees playback.
-
+// if called outside a user gesture context. Explicit <audio> elements
+// guarantee playback.
 const audioElements = new Map<string, HTMLAudioElement>();
 
 function attachAudioTrack(identity: string, track: MediaStreamTrack) {
-    detachAudioTrack(identity); // clean up any existing element
+    detachAudioTrack(identity);
 
     const audio = document.createElement("audio");
     audio.srcObject = new MediaStream([track]);
@@ -165,8 +155,6 @@ function detachAllAudio() {
         detachAudioTrack(id);
     }
 }
-
-// ─── ROOM SETUP ────────────────────────────────────────────────────────
 
 function bindRemoteAudioTrack(participant: RemoteParticipant) {
     participant.audioTrackPublications.forEach(pub => {
@@ -229,13 +217,10 @@ export async function connectToVoice(token: string, wsUrl: string) {
     await room.connect(wsUrl, token);
     await room.localParticipant.setMicrophoneEnabled(true);
 
-    // Unlock browser audio playback for remote participants' audio tracks.
     await room.startAudio();
 
-    // Start analysing audio for any participants already in the room
     room.remoteParticipants.forEach(bindRemoteAudioTrack);
 
-    // Analyse own mic
     const localAudioPub = room.localParticipant.audioTrackPublications.values().next().value;
     if (localAudioPub?.track?.mediaStreamTrack) {
         startAnalysingTrack(room.localParticipant.identity, localAudioPub.track.mediaStreamTrack);
@@ -302,7 +287,6 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
     const res = RESOLUTION_MAP[options.resolution];
     const numericFps = options.frameRate === "source" ? undefined : options.frameRate;
 
-    // Build resolution constraint only when we have something to constrain.
     let resolution: { width: number; height: number; frameRate?: number } | undefined;
     if (res) {
         resolution = { ...res, ...(numericFps ? { frameRate: numericFps } : {}) };
@@ -316,7 +300,7 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
     } catch (e) {
         console.warn("[Voice] Screen share failed, retrying without constraints:", e);
         try {
-            // Fallback: no constraints at all — maximum browser compatibility
+            // Fallback: no constraints — maximum browser compatibility
             await room.localParticipant.setScreenShareEnabled(true, {
                 audio: options.audio,
             });
@@ -326,7 +310,7 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
         }
     }
 
-    // Apply content hint after capture (some browsers reject it in constraints)
+    // Some browsers reject contentHint in constraints but accept it post-capture
     try {
         const hint = numericFps === undefined || numericFps >= 30 ? "motion" : "detail";
         room.localParticipant.videoTrackPublications.forEach(pub => {

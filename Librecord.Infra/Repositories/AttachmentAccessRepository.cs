@@ -12,7 +12,6 @@ public class AttachmentAccessRepository : IAttachmentAccessRepository
 
     public async Task<bool> CanUserAccessMessageAsync(Guid messageId, Guid userId)
     {
-        // Check DM channel membership
         var dmAccess = await _db.DmChannelMessages
             .Where(dcm => dcm.MessageId == messageId)
             .Select(dcm => dcm.Channel.Members.Any(m => m.UserId == userId))
@@ -20,7 +19,6 @@ public class AttachmentAccessRepository : IAttachmentAccessRepository
 
         if (dmAccess) return true;
 
-        // Check guild channel membership
         var guildChannelId = await _db.GuildChannelMessages
             .Where(gcm => gcm.MessageId == messageId)
             .Select(gcm => (Guid?)gcm.ChannelId)

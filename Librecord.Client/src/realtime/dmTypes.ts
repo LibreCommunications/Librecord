@@ -4,9 +4,6 @@ import type {
     MessageEdit,
 } from "../types/message";
 
-// -----------------------------
-// AUTHOR
-// -----------------------------
 export interface DmRealtimeAuthor {
     id: string;
     username: string;
@@ -14,9 +11,6 @@ export interface DmRealtimeAuthor {
     avatarUrl: string | null;
 }
 
-// -----------------------------
-// TRANSPORT TYPES (FROM SERVER)
-// -----------------------------
 export interface DmRealtimeMessageTransport {
     channelId: string;
     messageId: string;

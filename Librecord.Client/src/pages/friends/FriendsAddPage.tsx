@@ -13,7 +13,6 @@ export default function FriendsAddPage() {
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    // Derive suggestions — empty when input is blank
     const suggestions = username.trim() ? rawSuggestions : [];
 
     useEffect(() => {

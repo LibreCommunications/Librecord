@@ -1,16 +1,10 @@
 namespace Librecord.Application.Realtime.Social;
 
-// ---------------------------------------------------------
-// BASE EVENT
-// ---------------------------------------------------------
 public abstract class FriendshipEvent
 {
     public Guid UserId { get; init; }
 }
 
-// ---------------------------------------------------------
-// FRIEND REQUEST RECEIVED (sent to the target user)
-// ---------------------------------------------------------
 public sealed class FriendRequestReceived : FriendshipEvent
 {
     public Guid FromUserId { get; init; }
@@ -19,9 +13,6 @@ public sealed class FriendRequestReceived : FriendshipEvent
     public string? FromAvatarUrl { get; init; }
 }
 
-// ---------------------------------------------------------
-// FRIEND REQUEST ACCEPTED (sent to the original requester)
-// ---------------------------------------------------------
 public sealed class FriendRequestAccepted : FriendshipEvent
 {
     public Guid FriendUserId { get; init; }
@@ -30,17 +21,11 @@ public sealed class FriendRequestAccepted : FriendshipEvent
     public string? FriendAvatarUrl { get; init; }
 }
 
-// ---------------------------------------------------------
-// FRIEND REQUEST DECLINED (sent to the original requester)
-// ---------------------------------------------------------
 public sealed class FriendRequestDeclined : FriendshipEvent
 {
     public Guid DeclinedByUserId { get; init; }
 }
 
-// ---------------------------------------------------------
-// FRIEND REMOVED (sent to the removed friend)
-// ---------------------------------------------------------
 public sealed class FriendRemoved : FriendshipEvent
 {
     public Guid RemovedByUserId { get; init; }

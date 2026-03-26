@@ -19,14 +19,12 @@ export function MemberSidebar({ guildId }: Props) {
         getMembers(guildId).then(async (m) => {
             setMembers(m);
 
-            // Fetch bulk presence
             const userIds = m.map(member => member.userId);
             const map = await presence.bulk(userIds);
             setPresenceMap(map);
         });
     }, [guildId, getMembers]);
 
-    // Listen for realtime presence changes
     useEffect(() => {
         const onPresence = (e: CustomEvent<AppEventMap["guild:user:presence"]>) => {
             setPresenceMap(prev => ({
@@ -39,7 +37,6 @@ export function MemberSidebar({ guildId }: Props) {
         return () => window.removeEventListener("guild:user:presence", onPresence as EventListener);
     }, []);
 
-    // Group by highest role
     const grouped = new Map<string, GuildMember[]>();
 
     for (const member of members) {
