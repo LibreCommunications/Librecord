@@ -26,6 +26,7 @@ public class GuildServiceTests
         var guild = await svc.CreateGuildAsync(ownerId, "Test Guild");
 
         Assert.Equal("Test Guild", guild.Name);
+        Assert.Equal(ownerId, guild.OwnerId);
         Assert.Equal(2, guild.Roles.Count);
         Assert.Contains(guild.Roles, r => r.Name == "@everyone");
         Assert.Contains(guild.Roles, r => r.Name == "Owner");

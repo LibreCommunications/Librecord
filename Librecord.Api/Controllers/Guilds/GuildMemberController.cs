@@ -54,8 +54,11 @@ public class GuildMemberController : AuthenticatedController
         var granted = await _permissions.GetGrantedGuildPermissionsAsync(UserId, guildId);
         if (granted == null) return Forbid();
 
+        var guild = await _guilds.GetGuildAsync(guildId);
+
         return Ok(new
         {
+            isOwner = guild?.OwnerId == UserId,
             manageGuild = granted.Contains(GuildPermission.ManageGuild),
             manageChannels = granted.Contains(GuildPermission.ManageChannels),
             manageRoles = granted.Contains(GuildPermission.ManageRoles),

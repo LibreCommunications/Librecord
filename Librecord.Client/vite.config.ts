@@ -18,13 +18,18 @@ function getHttpsConfig() {
   return undefined;
 }
 
-function versionPlugin() {
+function versionPlugin(): import("vite").Plugin {
   const buildId = Date.now().toString(36);
   return {
     name: "version-json",
-    buildStart() {
-      // Expose to client code via import.meta.env
-      process.env.VITE_BUILD_ID = buildId;
+    // `config` runs before env resolution — `define` injects the value
+    // so import.meta.env.VITE_BUILD_ID is available in client code
+    config() {
+      return {
+        define: {
+          "import.meta.env.VITE_BUILD_ID": JSON.stringify(buildId),
+        },
+      };
     },
     generateBundle() {
       this.emitFile({
@@ -33,7 +38,7 @@ function versionPlugin() {
         source: JSON.stringify({ buildId }),
       });
     },
-  } satisfies import("vite").Plugin;
+  };
 }
 
 export default defineConfig({

@@ -16,6 +16,7 @@ public class AppHub : Hub
     private readonly IPresenceService _presence;
     private readonly IVoiceService _voice;
     private readonly IConnectionTracker _connections;
+    private readonly IHostApplicationLifetime _lifetime;
     private readonly ILogger<AppHub> _logger;
 
     public AppHub(
@@ -24,6 +25,7 @@ public class AppHub : Hub
         IPresenceService presence,
         IVoiceService voice,
         IConnectionTracker connections,
+        IHostApplicationLifetime lifetime,
         ILogger<AppHub> logger)
     {
         _channels = channels;
@@ -31,6 +33,7 @@ public class AppHub : Hub
         _presence = presence;
         _voice = voice;
         _connections = connections;
+        _lifetime = lifetime;
         _logger = logger;
     }
 
@@ -311,9 +314,11 @@ public class AppHub : Hub
 
         _connections.Disconnect(UserId);
 
-        // Only leave voice and broadcast offline if user has no remaining
-        // connections (supports multi-tab and SignalR reconnect grace period)
-        if (!_connections.IsOnline(UserId))
+        var isShuttingDown = _lifetime.ApplicationStopping.IsCancellationRequested;
+
+        // During server shutdown, preserve voice states so clients can
+        // rejoin after the restart. Only clean up on genuine user disconnects.
+        if (!_connections.IsOnline(UserId) && !isShuttingDown)
         {
             try
             {

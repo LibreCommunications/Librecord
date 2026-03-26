@@ -5,6 +5,7 @@ import type { GuildPermissions } from "../types/guild";
 export type { GuildPermissions };
 
 const NONE: GuildPermissions = {
+    isOwner: false,
     manageGuild: false,
     manageChannels: false,
     manageRoles: false,

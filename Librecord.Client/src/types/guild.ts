@@ -30,6 +30,7 @@ export interface GuildMember {
 }
 
 export interface GuildPermissions {
+    isOwner: boolean;
     manageGuild: boolean;
     manageChannels: boolean;
     manageRoles: boolean;

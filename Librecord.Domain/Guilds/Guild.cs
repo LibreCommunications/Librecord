@@ -4,6 +4,7 @@ public class Guild
 {
     public Guid Id { get; set; }
     public required string Name { get; set; }
+    public Guid OwnerId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public string? IconUrl { get; set; }

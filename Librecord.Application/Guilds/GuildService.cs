@@ -27,6 +27,7 @@ public class GuildService : IGuildService
         {
             Id = Guid.NewGuid(),
             Name = name.Trim(),
+            OwnerId = ownerId,
             CreatedAt = DateTime.UtcNow
         };
 

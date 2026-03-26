@@ -191,7 +191,7 @@ export default function ChannelSidebar({ guildId }: Props) {
                                 </svg>
                             </button>
                         )}
-                        {(permissions.manageGuild || permissions.manageRoles) && (
+                        {permissions.isOwner && (
                             <Link
                                 to={`/app/guild/${guildId}/settings`}
                                 className="p-1 rounded text-[#949ba4] hover:text-[#dbdee1] hover:bg-[#35373c]"
