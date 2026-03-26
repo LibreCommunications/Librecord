@@ -280,7 +280,7 @@ export function useChatChannel(config: ChatChannelConfig) {
         setMessages(prev => prev.filter(m => m.id !== messageId));
         setMenuOpenId(null);
         setEditingId(null);
-        try { await config.deleteMessage(messageId); } catch { }
+        try { await config.deleteMessage(messageId); } catch { /* best-effort */ }
     };
 
     const handleEdit = async (messageId: string, dto: { content: string }) => {
