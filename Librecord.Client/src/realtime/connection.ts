@@ -22,9 +22,19 @@ export function setConnectionState(s: ConnectionState) {
     _stateListeners.forEach(cb => cb());
 }
 
+// Keep retrying for up to 5 minutes with exponential backoff (capped at 15s).
+// The default fixed array gives up after ~48s which is too short for CI deploys.
+const reconnectPolicy: signalR.IRetryPolicy = {
+    nextRetryDelayInMilliseconds(retryContext) {
+        const elapsed = retryContext.elapsedMilliseconds;
+        if (elapsed > 5 * 60_000) return null; // give up after 5 minutes
+        return Math.min(1000 * Math.pow(1.5, retryContext.previousRetryCount), 15_000);
+    },
+};
+
 export const appConnection = new signalR.HubConnectionBuilder()
     .withUrl(`${API_URL}/hubs/app`, { withCredentials: true })
-    .withAutomaticReconnect([0, 1000, 2000, 5000, 10000, 30000])
+    .withAutomaticReconnect(reconnectPolicy)
     .build();
 
 appConnection.keepAliveIntervalInMilliseconds = 10_000;
@@ -34,8 +44,6 @@ appConnection.onreconnected(async () => {
     registerListeners();
     setConnectionState("connected");
 
-    // If we were in a voice channel, re-register state with the server
-    // so the DB row survives restarts and other users still see us.
     const voice = getVoiceState();
     if (voice.isConnected && voice.channelId) {
         try {
@@ -58,11 +66,38 @@ appConnection.onreconnecting(err => {
     setConnectionState("reconnecting");
 });
 
-// Only nuke voice state when the connection is fully closed (not reconnecting).
-// LiveKit media continues independently — if SignalR reconnects, the voice
-// session resumes via RejoinVoiceChannel above.
-appConnection.onclose(err => {
+// All retry attempts exhausted. If we're in a voice call, try one more
+// fresh connection before nuking state — LiveKit media is still flowing.
+appConnection.onclose(async (err) => {
     console.warn("[Realtime] Connection closed", err?.message);
+
+    const wasInVoice = getVoiceState().isConnected;
+
+    if (wasInVoice) {
+        console.info("[Realtime] Was in voice call — attempting fresh connection...");
+        setConnectionState("reconnecting");
+        try {
+            await appConnection.start();
+            registerListeners();
+            setConnectionState("connected");
+
+            const voice = getVoiceState();
+            if (voice.channelId) {
+                await appConnection.invoke("RejoinVoiceChannel", voice.channelId, {
+                    isMuted: voice.isMuted,
+                    isDeafened: voice.isDeafened,
+                    isCameraOn: voice.isCameraOn,
+                    isScreenSharing: voice.isScreenSharing,
+                });
+            }
+
+            window.dispatchEvent(new Event("realtime:reconnected"));
+            return;
+        } catch (e) {
+            console.warn("[Realtime] Fresh connection failed:", e);
+        }
+    }
+
     setConnectionState("disconnected");
     livekitClient.disconnect().catch(() => {});
     resetVoiceState();

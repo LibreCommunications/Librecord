@@ -85,6 +85,10 @@ export default function GlobalSidebar() {
 
     const isDmPage = !guildId && location.pathname.startsWith("/app/dm");
 
+    if (isDmPage && dmUnread) {
+        setDmUnread(false);
+    }
+
     const loadGuilds = useCallback(() => {
         getGuilds().then(async (list) => {
             setGuilds(list);
