@@ -6,4 +6,5 @@ public interface IVoiceService
     Task LeaveVoiceChannelAsync(Guid userId);
     Task UpdateVoiceStateAsync(Guid userId, VoiceStateUpdateDto update);
     Task<List<VoiceParticipantDto>> GetChannelParticipantsAsync(Guid channelId);
+    Task<Domain.Voice.VoiceState?> GetVoiceStateAsync(Guid userId);
 }

@@ -65,12 +65,17 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 ApplyMigrations(app);
 
-// Clear stale voice states from previous run
+// Voice states persist in PostgreSQL so calls survive restarts.
+// Stale states are cleaned up when users reconnect or via RejoinVoiceChannel.
+
+// Graceful shutdown: give SignalR connections time to close cleanly
+// so OnDisconnectedAsync fires and voice states are properly cleaned up
+// for users who don't reconnect.
+app.Lifetime.ApplicationStopping.Register(() =>
 {
-    using var scope = app.Services.CreateScope();
-    var voiceRepo = scope.ServiceProvider.GetRequiredService<IVoiceStateRepository>();
-    await voiceRepo.RemoveAllAsync();
-}
+    app.Logger.LogInformation("Graceful shutdown: waiting for SignalR connections to drain...");
+    Thread.Sleep(5_000);
+});
 
 if (app.Environment.IsDevelopment())
 {

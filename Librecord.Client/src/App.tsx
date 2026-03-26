@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth";
 import LoadingSpinner from "./components/LoadingSpinner";
+import { UpdateBanner } from "./components/ui/UpdateBanner";
 
 const LoginPage = lazy(() => import("./pages/auth/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/auth/RegisterPage"));
@@ -26,6 +27,7 @@ function ProtectedRoute() {
 export default function App() {
     return (
         <Suspense fallback={<LoadingSpinner />}>
+            <UpdateBanner />
             <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />

@@ -152,6 +152,11 @@ public class VoiceService : IVoiceService
         });
     }
 
+    public Task<VoiceState?> GetVoiceStateAsync(Guid userId)
+    {
+        return _voiceStates.GetByUserIdAsync(userId);
+    }
+
     public async Task<List<VoiceParticipantDto>> GetChannelParticipantsAsync(Guid channelId)
     {
         var states = await _voiceStates.GetByChannelIdAsync(channelId);

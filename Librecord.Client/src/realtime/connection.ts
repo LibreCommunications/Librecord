@@ -1,6 +1,6 @@
 import * as signalR from "@microsoft/signalr";
 import { registerListeners } from "./listeners";
-import { resetVoiceState } from "../voice/voiceStore";
+import { getVoiceState, resetVoiceState } from "../voice/voiceStore";
 import * as livekitClient from "../voice/livekitClient";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -30,9 +30,26 @@ export const appConnection = new signalR.HubConnectionBuilder()
 appConnection.keepAliveIntervalInMilliseconds = 10_000;
 appConnection.serverTimeoutInMilliseconds = 60_000;
 
-appConnection.onreconnected(() => {
+appConnection.onreconnected(async () => {
     registerListeners();
     setConnectionState("connected");
+
+    // If we were in a voice channel, re-register state with the server
+    // so the DB row survives restarts and other users still see us.
+    const voice = getVoiceState();
+    if (voice.isConnected && voice.channelId) {
+        try {
+            await appConnection.invoke("RejoinVoiceChannel", voice.channelId, {
+                isMuted: voice.isMuted,
+                isDeafened: voice.isDeafened,
+                isCameraOn: voice.isCameraOn,
+                isScreenSharing: voice.isScreenSharing,
+            });
+        } catch (e) {
+            console.warn("[Realtime] Failed to rejoin voice channel:", e);
+        }
+    }
+
     window.dispatchEvent(new Event("realtime:reconnected"));
 });
 
@@ -41,6 +58,9 @@ appConnection.onreconnecting(err => {
     setConnectionState("reconnecting");
 });
 
+// Only nuke voice state when the connection is fully closed (not reconnecting).
+// LiveKit media continues independently — if SignalR reconnects, the voice
+// session resumes via RejoinVoiceChannel above.
 appConnection.onclose(err => {
     console.warn("[Realtime] Connection closed", err?.message);
     setConnectionState("disconnected");

@@ -267,6 +267,30 @@ public class AppHub : Hub
         await _voice.UpdateVoiceStateAsync(UserId, update);
     }
 
+    /// Re-registers voice state after a SignalR reconnect. If the user's
+    /// voice state row still exists in the DB (survived the restart), this
+    /// re-broadcasts their presence so other clients see them. If it was
+    /// lost, re-creates it.
+    public async Task<VoiceJoinResult?> RejoinVoiceChannel(Guid channelId, VoiceStateUpdateDto currentState)
+    {
+        _logger.LogInformation(
+            "[APP HUB] RejoinVoiceChannel | UserId={UserId} | ChannelId={ChannelId}",
+            UserId, channelId);
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, GuildGroup(channelId));
+
+        var existing = await _voice.GetVoiceStateAsync(UserId);
+        if (existing is not null && existing.ChannelId == channelId)
+        {
+            // Row survived — just update flags and re-broadcast
+            await _voice.UpdateVoiceStateAsync(UserId, currentState);
+            return null;
+        }
+
+        // Row was lost (e.g. ungraceful crash) — full rejoin
+        return await _voice.JoinVoiceChannelAsync(channelId, UserId);
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         if (exception != null)
@@ -285,20 +309,24 @@ public class AppHub : Hub
                 UserId);
         }
 
-        try
-        {
-            await _voice.LeaveVoiceChannelAsync(UserId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex,
-                "[APP HUB] Failed to leave voice on disconnect | UserId={UserId}",
-                UserId);
-        }
-
         _connections.Disconnect(UserId);
 
-        // Only broadcast offline if user has no remaining connections and isn't invisible
+        // Only leave voice and broadcast offline if user has no remaining
+        // connections (supports multi-tab and SignalR reconnect grace period)
+        if (!_connections.IsOnline(UserId))
+        {
+            try
+            {
+                await _voice.LeaveVoiceChannelAsync(UserId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "[APP HUB] Failed to leave voice on disconnect | UserId={UserId}",
+                    UserId);
+            }
+        }
+
         if (!_connections.IsOnline(UserId))
         {
             var currentPresence = await _presence.GetPresenceAsync(UserId);

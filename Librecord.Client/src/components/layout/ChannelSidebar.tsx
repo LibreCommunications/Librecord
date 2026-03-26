@@ -31,7 +31,7 @@ export default function ChannelSidebar({ guildId }: Props) {
     const loading = loadedGuildId !== guildId;
     const [showCreate, setShowCreate] = useState(false);
     const [canManageChannels, setCanManageChannels] = useState(false);
-    const [channelParticipants, setChannelParticipants] = useState<Record<string, { userId: string; username: string; displayName: string; avatarUrl: string | null; isMuted: boolean; isDeafened: boolean }[]>>({});
+    const [channelParticipants, setChannelParticipants] = useState<Record<string, { userId: string; username: string; displayName: string; avatarUrl: string | null; isMuted: boolean; isDeafened: boolean; isCameraOn: boolean; isScreenSharing: boolean }[]>>({});
 
     const loadChannels = useCallback(async function loadChannels() {
         const list = await getGuildChannels(guildId);
@@ -102,11 +102,22 @@ export default function ChannelSidebar({ guildId }: Props) {
                 [chId]: (prev[chId] ?? []).filter(x => x.userId !== userId),
             }));
         };
+        const onState = (e: CustomEvent<AppEventMap["voice:user:state"]>) => {
+            const { channelId: chId, userId, isMuted, isDeafened, isCameraOn, isScreenSharing } = e.detail;
+            setChannelParticipants(prev => ({
+                ...prev,
+                [chId]: (prev[chId] ?? []).map(x =>
+                    x.userId === userId ? { ...x, isMuted, isDeafened, isCameraOn, isScreenSharing } : x
+                ),
+            }));
+        };
         window.addEventListener("voice:user:joined", onJoin as EventListener);
         window.addEventListener("voice:user:left", onLeave as EventListener);
+        window.addEventListener("voice:user:state", onState as EventListener);
         return () => {
             window.removeEventListener("voice:user:joined", onJoin as EventListener);
             window.removeEventListener("voice:user:left", onLeave as EventListener);
+            window.removeEventListener("voice:user:state", onState as EventListener);
         };
     }, []);
 
@@ -270,13 +281,34 @@ export default function ChannelSidebar({ guildId }: Props) {
                                                                     ${isSpeaking ? "shadow-[0_0_0_2px_#23a55a]" : ""}
                                                                 `}
                                                             />
-                                                            <span className="truncate">{p.displayName}</span>
-                                                            {p.isMuted && (
-                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-400 shrink-0">
-                                                                    <line x1="1" y1="1" x2="23" y2="23" />
-                                                                    <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
-                                                                </svg>
-                                                            )}
+                                                            <span className="truncate flex-1">{p.displayName}</span>
+                                                            <span className="flex items-center gap-0.5 shrink-0">
+                                                                {p.isScreenSharing && (
+                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#5865f2]">
+                                                                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                                                                        <line x1="8" y1="21" x2="16" y2="21" />
+                                                                        <line x1="12" y1="17" x2="12" y2="21" />
+                                                                    </svg>
+                                                                )}
+                                                                {p.isCameraOn && (
+                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#dbdee1]">
+                                                                        <polygon points="23 7 16 12 23 17 23 7" />
+                                                                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                                                                    </svg>
+                                                                )}
+                                                                {p.isDeafened && (
+                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-400">
+                                                                        <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+                                                                        <line x1="1" y1="1" x2="23" y2="23" />
+                                                                    </svg>
+                                                                )}
+                                                                {p.isMuted && !p.isDeafened && (
+                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-400">
+                                                                        <line x1="1" y1="1" x2="23" y2="23" />
+                                                                        <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
+                                                                    </svg>
+                                                                )}
+                                                            </span>
                                                         </div>
                                                     );
                                                 })}
