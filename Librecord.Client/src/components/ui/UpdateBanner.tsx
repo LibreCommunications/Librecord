@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { getVoiceState } from "../../voice/voiceStore";
 
-const BUILD_ID = import.meta.env.VITE_BUILD_ID as string | undefined;
-const POLL_INTERVAL = 60_000;
+declare const __BUILD_ID__: string | undefined;
+
+const BUILD_ID = typeof __BUILD_ID__ !== "undefined" ? __BUILD_ID__ : undefined;
+const POLL_INTERVAL = 30_000;
 
 export function UpdateBanner() {
     const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -22,20 +23,24 @@ export function UpdateBanner() {
             } catch { /* offline or dev server */ }
         }
 
+        check();
         const id = setInterval(check, POLL_INTERVAL);
         return () => clearInterval(id);
     }, []);
 
     if (!updateAvailable || dismissed) return null;
 
-    // Don't show during active voice calls
-    if (getVoiceState().isConnected) return null;
+    function handleRefresh() {
+        // Save current page so it can be restored after reload
+        sessionStorage.setItem("librecord:returnUrl", window.location.pathname);
+        window.location.reload();
+    }
 
     return (
-        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 bg-[#5865F2] text-white text-sm rounded-lg px-4 py-2.5 shadow-lg">
+        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 bg-[#5865F2] text-white text-sm rounded-lg px-4 py-2.5 shadow-lg animate-in fade-in">
             <span>A new version is available.</span>
             <button
-                onClick={() => window.location.reload()}
+                onClick={handleRefresh}
                 className="font-medium underline underline-offset-2 hover:text-white/80"
             >
                 Refresh

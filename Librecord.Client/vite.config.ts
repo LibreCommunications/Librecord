@@ -22,12 +22,10 @@ function versionPlugin(): import("vite").Plugin {
   const buildId = Date.now().toString(36);
   return {
     name: "version-json",
-    // `config` runs before env resolution — `define` injects the value
-    // so import.meta.env.VITE_BUILD_ID is available in client code
     config() {
       return {
         define: {
-          "import.meta.env.VITE_BUILD_ID": JSON.stringify(buildId),
+          __BUILD_ID__: JSON.stringify(buildId),
         },
       };
     },
