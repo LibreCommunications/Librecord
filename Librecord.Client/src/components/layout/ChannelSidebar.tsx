@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useChannels, type GuildChannel } from "../../hooks/useChannels";
 import { useReadState } from "../../hooks/useReadState";
 import { useVoice } from "../../hooks/useVoice";
+import { useGuildPermissions } from "../../hooks/useGuildPermissions";
 import { UnreadBadge } from "../ui/UnreadBadge";
 import CreateChannelModal from "../../pages/guild/CreateChannelModal";
 import type { AppEventMap } from "../../realtime/events";
@@ -24,6 +25,7 @@ export default function ChannelSidebar({ guildId }: Props) {
     const { voiceState, joinVoice } = useVoice();
     const { user } = useAuth();
     const { getAvatarUrl } = useUserProfile();
+    const { permissions } = useGuildPermissions(guildId);
 
     const [channels, setChannels] = useState<GuildChannel[]>([]);
     const [unreads, setUnreads] = useState<Record<string, number>>({});
@@ -174,22 +176,42 @@ export default function ChannelSidebar({ guildId }: Props) {
     return (
         <>
             <aside className="w-60 bg-[#2b2d31] border-r border-black/20 flex-1 flex flex-col">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-black/20 shrink-0">
+                    <span className="text-white font-semibold text-sm truncate">Channels</span>
+                    <div className="flex items-center gap-1">
+                        {canManageChannels && (
+                            <button
+                                onClick={() => setShowCreate(true)}
+                                className="p-1 rounded text-[#949ba4] hover:text-[#dbdee1] hover:bg-[#35373c]"
+                                title="Create channel"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="12" y1="5" x2="12" y2="19" />
+                                    <line x1="5" y1="12" x2="19" y2="12" />
+                                </svg>
+                            </button>
+                        )}
+                        {(permissions.manageGuild || permissions.manageRoles) && (
+                            <Link
+                                to={`/app/guild/${guildId}/settings`}
+                                className="p-1 rounded text-[#949ba4] hover:text-[#dbdee1] hover:bg-[#35373c]"
+                                title="Server Settings"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="12" r="3" />
+                                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                                </svg>
+                            </Link>
+                        )}
+                    </div>
+                </div>
                 <div className="flex-1 overflow-y-auto dark-scrollbar pt-3">
                     {loading && <div className="text-xs text-gray-500 px-4 py-2">Loading channels…</div>}
 
                     {!loading && (
                         <>
-                            <div className="flex items-center justify-between px-3 pb-0.5 pt-4 first:pt-0">
+                            <div className="px-3 pb-0.5">
                                 <h2 className="text-[#949ba4] uppercase text-[11px] font-bold tracking-wide">Text Channels</h2>
-                                {canManageChannels && (
-                                    <button
-                                        onClick={() => setShowCreate(true)}
-                                        className="text-[#949ba4] hover:text-[#dbdee1] text-base leading-none"
-                                        title="Create channel"
-                                    >
-                                        +
-                                    </button>
-                                )}
                             </div>
                             {textChannels.map(ch => {
                                 const unreadCount = unreads[ch.id] ?? 0;
@@ -224,17 +246,8 @@ export default function ChannelSidebar({ guildId }: Props) {
                                 );
                             })}
 
-                            <div className="flex items-center justify-between px-3 pb-0.5 pt-4">
+                            <div className="px-3 pb-0.5 pt-4">
                                 <h2 className="text-[#949ba4] uppercase text-[11px] font-bold tracking-wide">Voice Channels</h2>
-                                {canManageChannels && (
-                                    <button
-                                        onClick={() => setShowCreate(true)}
-                                        className="text-[#949ba4] hover:text-[#dbdee1] text-base leading-none"
-                                        title="Create channel"
-                                    >
-                                        +
-                                    </button>
-                                )}
                             </div>
                             {voiceChannels.map(ch => {
                                 const isInVoiceChannel = voiceState.isConnected && voiceState.channelId === ch.id;
@@ -267,7 +280,7 @@ export default function ChannelSidebar({ guildId }: Props) {
                                             <span className="truncate flex-1 text-[15px] leading-5">{ch.name}</span>
                                         </div>
                                         {voiceParticipants.length > 0 && (
-                                            <div className="ml-[42px] mr-2 mt-0.5 mb-1 space-y-px">
+                                            <div className="ml-7 mr-2 mt-0.5 mb-1 space-y-px">
                                                 {voiceParticipants.map(p => {
                                                     const isSpeaking = speakingMap[p.userId] ?? false;
                                                     return (
@@ -296,16 +309,16 @@ export default function ChannelSidebar({ guildId }: Props) {
                                                                         <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
                                                                     </svg>
                                                                 )}
+                                                                {p.isMuted && (
+                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-400">
+                                                                        <line x1="1" y1="1" x2="23" y2="23" />
+                                                                        <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
+                                                                    </svg>
+                                                                )}
                                                                 {p.isDeafened && (
                                                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-400">
                                                                         <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
                                                                         <line x1="1" y1="1" x2="23" y2="23" />
-                                                                    </svg>
-                                                                )}
-                                                                {p.isMuted && !p.isDeafened && (
-                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-400">
-                                                                        <line x1="1" y1="1" x2="23" y2="23" />
-                                                                        <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
                                                                     </svg>
                                                                 )}
                                                             </span>
