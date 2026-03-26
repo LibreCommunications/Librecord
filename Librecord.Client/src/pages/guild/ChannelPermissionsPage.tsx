@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useChannels } from "../../hooks/useChannels";
 import { useGuildRoles, type GuildRole } from "../../hooks/useGuildRoles";
 import { useChannelPermissions, type ChannelOverride } from "../../hooks/useChannelPermissions";
+import { useGuildPermissions } from "../../hooks/useGuildPermissions";
 
 const CHANNEL_PERMISSIONS = [
     { id: "22222222-2222-2222-2222-222222222201", name: "View Channel" },
@@ -22,6 +23,12 @@ export default function ChannelPermissionsPage() {
     const { getChannel } = useChannels();
     const { getRoles } = useGuildRoles();
     const { getOverrides, setOverride } = useChannelPermissions();
+    const { permissions, loaded: permsLoaded } = useGuildPermissions(guildId);
+
+    if (permsLoaded && !permissions.manageChannels) {
+        navigate(`/app/guild/${guildId}${channelId ? `/${channelId}` : ""}`, { replace: true });
+        return null;
+    }
 
     const [channelName, setChannelName] = useState("");
     const [roles, setRoles] = useState<GuildRole[]>([]);

@@ -7,6 +7,7 @@ import { useGuildChannelMessages } from "../../hooks/useGuildChannelMessages";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { useAttachmentUpload } from "../../hooks/useAttachmentUpload";
 import { useChatChannel, type ChatChannelConfig } from "../../hooks/useChatChannel";
+import { useGuildPermissions } from "../../hooks/useGuildPermissions";
 
 import { MemberSidebar } from "../../components/guild/MemberSidebar";
 import { InviteModal } from "../../components/guild/InviteModal";
@@ -29,6 +30,7 @@ export default function GuildChannelPage() {
         deleteMessage: guildDeleteMessage,
     } = useGuildChannelMessages();
     const { sendGuildMessageWithAttachments } = useAttachmentUpload();
+    const { permissions } = useGuildPermissions(guildId);
     const [channelName, setChannelName] = useState<string | null>(null);
     const [channelTopic, setChannelTopic] = useState<string | null>(null);
     const [channelType, setChannelType] = useState<number>(0);
@@ -152,7 +154,7 @@ export default function GuildChannelPage() {
                             </svg>
                         </button>
 
-                        {guildId && channelId && (
+                        {guildId && channelId && permissions.manageChannels && (
                             <Link
                                 to={`/app/guild/${guildId}/${channelId}/permissions`}
                                 className="icon-btn"
