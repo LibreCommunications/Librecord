@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { getParticipantTracks } from "../../voice/livekitClient";
+import { Track } from "livekit-client";
+import { useTrackBySource } from "../../voice/useTrackBySource";
 import type { VoiceParticipant } from "../../voice/voiceStore";
 import { MicOffIcon, HeadphonesOffIcon, CameraIcon, ScreenShareIcon } from "./VoiceIcons";
 
@@ -14,39 +15,28 @@ interface Props {
 export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact }: Props) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [imgError, setImgError] = useState(false);
-    const attachedTrackRef = useRef<MediaStreamTrack | null>(null);
 
     const showVideo = participant.isCameraOn;
 
+    // Reactive camera track via LiveKit RoomEvents (no polling/custom events)
+    const cameraTrack = useTrackBySource(participant.userId, Track.Source.Camera);
+
+    // Attach/detach following @livekit/components-react pattern
     useEffect(() => {
-        if (!showVideo) {
-            if (videoRef.current) videoRef.current.srcObject = null;
-            attachedTrackRef.current = null;
+        const el = videoRef.current;
+        if (!el) return;
+
+        if (!showVideo || !cameraTrack) {
+            cameraTrack?.detach(el);
             return;
         }
 
-        function tryAttach() {
-            const { camera } = getParticipantTracks(participant.userId);
-            const mediaTrack = camera?.mediaStreamTrack ?? null;
+        cameraTrack.attach(el);
 
-            if (mediaTrack && videoRef.current && attachedTrackRef.current !== mediaTrack) {
-                videoRef.current.srcObject = new MediaStream([mediaTrack]);
-                attachedTrackRef.current = mediaTrack;
-            }
-        }
-
-        tryAttach();
-
-        // Re-attach whenever a track is subscribed/published for this participant
-        const onTrackChanged = (e: Event) => {
-            const detail = (e as CustomEvent<{ identity: string }>).detail;
-            if (detail?.identity === participant.userId) {
-                tryAttach();
-            }
+        return () => {
+            cameraTrack.detach(el);
         };
-        window.addEventListener("voice:track:changed", onTrackChanged);
-        return () => window.removeEventListener("voice:track:changed", onTrackChanged);
-    }, [showVideo, participant.userId]);
+    }, [showVideo, cameraTrack]);
 
     const avatarSrc = getAvatarUrl(participant.avatarUrl);
     const avatarSize = compact ? 36 : 72;

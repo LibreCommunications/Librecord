@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { getParticipantTracks } from "../../voice/livekitClient";
+import { Track } from "livekit-client";
+import { useTrackBySource } from "../../voice/useTrackBySource";
 import type { VoiceParticipant } from "../../voice/voiceStore";
 import { ScreenShareIcon } from "./VoiceIcons";
 
@@ -16,47 +17,34 @@ interface Props {
 export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf }: Props) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const attachedTrackRef = useRef<MediaStreamTrack | null>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
 
+    // ── Reactive track from LiveKit RoomEvents (no polling) ──────
+    const track = useTrackBySource(participant.userId, Track.Source.ScreenShare);
+
+    // ── Attach / detach following @livekit/components-react ──────
+    // Canonical pattern: effect depends on [track, isWatching].
+    // attach() in body, detach() in cleanup.  The SDK handles
+    // MediaStream wrapping, Safari/Firefox quirks, and autoplay.
     useEffect(() => {
-        if (!isWatching) {
-            if (videoRef.current) videoRef.current.srcObject = null;
-            attachedTrackRef.current = null;
+        const el = videoRef.current;
+        if (!el) return;
+
+        if (!isWatching || !track) {
+            track?.detach(el);
             return;
         }
 
-        function tryAttach(): boolean {
-            const { screen } = getParticipantTracks(participant.userId);
-            const mediaTrack = screen?.mediaStreamTrack ?? null;
+        track.attach(el);
 
-            if (mediaTrack && videoRef.current && attachedTrackRef.current !== mediaTrack) {
-                videoRef.current.srcObject = new MediaStream([mediaTrack]);
-                attachedTrackRef.current = mediaTrack;
-                return true;
-            }
-            return !!attachedTrackRef.current;
-        }
-
-        // Try immediately, then poll until track appears
-        tryAttach();
-        let retries = 0;
-        const interval = setInterval(() => {
-            if (tryAttach() || ++retries > 20) clearInterval(interval);
-        }, 500);
-
-        const onTrackChanged = (e: Event) => {
-            const detail = (e as CustomEvent<{ identity: string }>).detail;
-            if (detail?.identity === participant.userId) {
-                if (tryAttach()) clearInterval(interval);
-            }
-        };
-        window.addEventListener("voice:track:changed", onTrackChanged);
         return () => {
-            clearInterval(interval);
-            window.removeEventListener("voice:track:changed", onTrackChanged);
+            track.detach(el);
         };
-    }, [participant.userId, participant.isScreenSharing, isWatching]);
+    }, [track, isWatching]);
+
+    // Derive status from track + isWatching (no separate state)
+    const trackStatus: "loading" | "active" =
+        isWatching && track ? "active" : "loading";
 
     // Track fullscreen state changes (user may exit via Escape)
     useEffect(() => {
@@ -121,6 +109,16 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
                 ${isFullscreen ? "rounded-none" : "aspect-video"}
             `}
         >
+            {/* Loading spinner — waiting for LiveKit track subscription */}
+            {trackStatus === "loading" && (
+                <div className="absolute inset-0 flex items-center justify-center z-10">
+                    <div className="flex flex-col items-center gap-3">
+                        <div className="w-8 h-8 border-2 border-[#5865F2] border-t-transparent rounded-full animate-spin" />
+                        <span className="text-xs text-[#949ba4]">Connecting to stream...</span>
+                    </div>
+                </div>
+            )}
+
             <video
                 ref={videoRef}
                 autoPlay
@@ -129,49 +127,53 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
             />
 
             {/* Bottom-left: sharer name */}
-            <div className="absolute bottom-2 left-2 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm rounded-md px-2 py-1">
-                <span className="text-[#5865f2]"><ScreenShareIcon size={12} /></span>
-                <span className="text-xs text-white/90">{participant.displayName}</span>
-            </div>
+            {trackStatus === "active" && (
+                <div className="absolute bottom-2 left-2 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm rounded-md px-2 py-1">
+                    <span className="text-[#5865f2]"><ScreenShareIcon size={12} /></span>
+                    <span className="text-xs text-white/90">{participant.displayName}</span>
+                </div>
+            )}
 
             {/* Bottom-right: controls (visible on hover) */}
-            <div className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 group-hover/screen:opacity-100 transition-opacity">
-                {/* Stop watching — only for viewers, not the sharer */}
-                {!isSelf && (
+            {trackStatus === "active" && (
+                <div className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 group-hover/screen:opacity-100 transition-opacity">
+                    {/* Stop watching — only for viewers, not the sharer */}
+                    {!isSelf && (
+                        <button
+                            onClick={() => onToggleWatch(false)}
+                            title="Stop watching"
+                            className="p-1.5 rounded-md bg-black/60 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/80"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                        </button>
+                    )}
+                    {/* Fullscreen */}
                     <button
-                        onClick={() => onToggleWatch(false)}
-                        title="Stop watching"
+                        onClick={toggleFullscreen}
+                        title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
                         className="p-1.5 rounded-md bg-black/60 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/80"
                     >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
+                        {isFullscreen ? (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="4 14 10 14 10 20" />
+                                <polyline points="20 10 14 10 14 4" />
+                                <line x1="14" y1="10" x2="21" y2="3" />
+                                <line x1="3" y1="21" x2="10" y2="14" />
+                            </svg>
+                        ) : (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="15 3 21 3 21 9" />
+                                <polyline points="9 21 3 21 3 15" />
+                                <line x1="21" y1="3" x2="14" y2="10" />
+                                <line x1="3" y1="21" x2="10" y2="14" />
+                            </svg>
+                        )}
                     </button>
-                )}
-                {/* Fullscreen */}
-                <button
-                    onClick={toggleFullscreen}
-                    title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-                    className="p-1.5 rounded-md bg-black/60 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/80"
-                >
-                    {isFullscreen ? (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="4 14 10 14 10 20" />
-                            <polyline points="20 10 14 10 14 4" />
-                            <line x1="14" y1="10" x2="21" y2="3" />
-                            <line x1="3" y1="21" x2="10" y2="14" />
-                        </svg>
-                    ) : (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="15 3 21 3 21 9" />
-                            <polyline points="9 21 3 21 3 15" />
-                            <line x1="21" y1="3" x2="14" y2="10" />
-                            <line x1="3" y1="21" x2="10" y2="14" />
-                        </svg>
-                    )}
-                </button>
-            </div>
+                </div>
+            )}
         </div>
     );
 }

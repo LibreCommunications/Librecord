@@ -6,6 +6,7 @@ import {
     expectAudioReceiving,
     expectVideoReceiving,
     expectVideoPlaying,
+    expectContinuousVideoStream,
     countActiveVideos,
     API_URL,
     type TestUser,
@@ -281,7 +282,7 @@ test.describe.serial("Full guild + WebRTC voice flow with media verification", (
 
     // ─── 12. USER A SCREEN SHARES → BOB SEES IT ──────────────────────
 
-    test("User A starts screen share and User B receives it with real frames", async () => {
+    test("User A starts screen share and User B receives continuous stream", async () => {
         await pageA.locator("[title='Share Screen']").click();
         // Screen share modal appears — click "Go Live" with defaults
         await expect(pageA.getByText("Screen Share")).toBeVisible({ timeout: 5_000 });
@@ -300,11 +301,10 @@ test.describe.serial("Full guild + WebRTC voice flow with media verification", (
             "Bob should receive screen share video bytes from Alice",
         );
 
-        // The ScreenShareTile renders a <video> inside a div with specific classes.
-        // Verify that Bob has an active non-hidden video element rendering frames.
-        await expectVideoPlaying(
+        // Verify continuous stream — multiple non-black frame samples over 1.5s
+        await expectContinuousVideoStream(
             pageB,
-            "Bob should see Alice's screen share as non-black frames",
+            "Bob should see Alice's screen share as continuous non-black frames",
         );
 
         // Count active videos on Bob's side — should be exactly 1 (the screen share)
@@ -364,10 +364,10 @@ test.describe.serial("Full guild + WebRTC voice flow with media verification", (
             })
             .toBeGreaterThanOrEqual(2);
 
-        // Verify both are actually rendering non-black content
-        await expectVideoPlaying(
+        // Verify continuous stream from the combined camera+screen share
+        await expectContinuousVideoStream(
             pageB,
-            "Bob should see non-black frames from Alice's camera+screen",
+            "Bob should see continuous non-black frames from Alice's camera+screen",
         );
 
         // Cleanup: disable both
@@ -437,9 +437,10 @@ test.describe.serial("Full guild + WebRTC voice flow with media verification", (
             "Alice should receive screen share video bytes from Bob",
         );
 
-        await expectVideoPlaying(
+        // Verify continuous stream — multiple non-black frame samples over 1.5s
+        await expectContinuousVideoStream(
             pageA,
-            "Alice should see Bob's screen share as non-black frames",
+            "Alice should see Bob's screen share as continuous non-black frames",
         );
 
         // Stop sharing

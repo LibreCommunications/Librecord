@@ -190,34 +190,21 @@ export async function connectToVoice(token: string, wsUrl: string) {
         },
     });
 
-    room.on(RoomEvent.ParticipantConnected, () => {
-    });
-
     room.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
         stopAnalysingTrack(p.identity);
     });
 
-    room.on(RoomEvent.TrackSubscribed, (track, pub: RemoteTrackPublication, p: RemoteParticipant) => {
-        window.dispatchEvent(new CustomEvent("voice:track:changed", {
-            detail: { identity: p.identity, source: pub.source },
-        }));
+    room.on(RoomEvent.TrackSubscribed, (track, _pub: RemoteTrackPublication, p: RemoteParticipant) => {
         if (track.kind === "audio") {
             const msTrack = track.mediaStreamTrack;
             if (msTrack) {
-                // Speaking detection
                 startAnalysingTrack(p.identity, msTrack);
-                // Explicitly attach to an <audio> element for playback.
-                // LiveKit's auto-attach can fail if room.startAudio() is called
-                // outside a user gesture context (deep in an async chain).
                 attachAudioTrack(p.identity, msTrack);
             }
         }
     });
 
     room.on(RoomEvent.TrackUnsubscribed, (_t, pub: RemoteTrackPublication, p: RemoteParticipant) => {
-        window.dispatchEvent(new CustomEvent("voice:track:changed", {
-            detail: { identity: p.identity, source: pub.source },
-        }));
         if (pub.kind === "audio") {
             stopAnalysingTrack(p.identity);
             detachAudioTrack(p.identity);
@@ -225,10 +212,6 @@ export async function connectToVoice(token: string, wsUrl: string) {
     });
 
     room.on(RoomEvent.LocalTrackPublished, (pub) => {
-        window.dispatchEvent(new CustomEvent("voice:track:changed", {
-            detail: { identity: room!.localParticipant.identity, source: pub.source },
-        }));
-        // Analyse own mic for self speaking indicator
         if (pub.kind === "audio") {
             const msTrack = pub.track?.mediaStreamTrack;
             if (msTrack) {
@@ -238,9 +221,6 @@ export async function connectToVoice(token: string, wsUrl: string) {
     });
 
     room.on(RoomEvent.LocalTrackUnpublished, (pub) => {
-        window.dispatchEvent(new CustomEvent("voice:track:changed", {
-            detail: { identity: room!.localParticipant.identity, source: pub.source },
-        }));
         if (pub.kind === "audio") {
             stopAnalysingTrack(room!.localParticipant.identity);
         }

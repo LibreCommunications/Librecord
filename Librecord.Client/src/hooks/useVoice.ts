@@ -87,22 +87,42 @@ export function useVoice() {
     }, []);
 
     const startScreenShare = useCallback(async (options: ScreenShareSettings) => {
-        const isScreenSharing = await livekitClient.startScreenShare(options);
-        if (!isScreenSharing) return; // User cancelled or browser rejected
-        setVoiceState({ isScreenSharing });
+        const started = await livekitClient.startScreenShare(options);
+        if (!started) return; // User cancelled or browser rejected
+
+        setVoiceState({ isScreenSharing: true });
         const uid = getLocalUserId();
-        if (uid) updateParticipantState(uid, { isScreenSharing });
-        await appConnection.invoke("UpdateVoiceState", { isScreenSharing });
+        if (uid) updateParticipantState(uid, { isScreenSharing: true });
         playStreamStartSound();
+
+        // Notify server — if this fails, LiveKit is still sharing so we
+        // keep the local state consistent and log rather than rolling back.
+        try {
+            await appConnection.invoke("UpdateVoiceState", { isScreenSharing: true });
+        } catch (e) {
+            console.warn("[Voice] Failed to notify server of screen share start:", e);
+        }
     }, []);
 
     const stopScreenShare = useCallback(async () => {
-        await livekitClient.stopScreenShare();
+        // Update local state first — even if LiveKit or SignalR fails,
+        // the user sees an immediate response.
         setVoiceState({ isScreenSharing: false });
         const uid = getLocalUserId();
         if (uid) updateParticipantState(uid, { isScreenSharing: false });
-        await appConnection.invoke("UpdateVoiceState", { isScreenSharing: false });
         playStreamStopSound();
+
+        // Best-effort cleanup — errors are logged, not thrown.
+        try {
+            await livekitClient.stopScreenShare();
+        } catch (e) {
+            console.warn("[Voice] Failed to stop LiveKit screen share:", e);
+        }
+        try {
+            await appConnection.invoke("UpdateVoiceState", { isScreenSharing: false });
+        } catch (e) {
+            console.warn("[Voice] Failed to notify server of screen share stop:", e);
+        }
     }, []);
 
     return {
