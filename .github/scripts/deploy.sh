@@ -45,22 +45,35 @@ echo "Active: $ACTIVE -> Deploying: $NEW_SLOT (port $NEW_PORT)"
 # Export for podman-compose
 export BLUE_PORT GREEN_PORT
 
-# Ensure infra services are running (livekit is shared, only start with prod)
-echo "Ensuring infra services are up..."
-if [ "$ENV" = "prod" ]; then
-  podman-compose -p "$PROJECT" -f "$REPO_DIR/podman-compose.yml" --profile livekit up -d postgres minio livekit
-else
-  podman-compose -p "$PROJECT" -f "$REPO_DIR/podman-compose.yml" up -d postgres minio
-fi
-
-# Get the pod network so the backend can reach postgres/minio by service name
-POD_NETWORK="${PROJECT}_default"
-
 # Source .env for backend environment variables
 set -a
 # shellcheck disable=SC1091
 source "$REPO_DIR/.env"
 set +a
+
+# Ensure infra services are running (livekit is shared, only start with prod)
+echo "Ensuring infra services are up..."
+if [ "$ENV" = "prod" ]; then
+  podman-compose -p "$PROJECT" --env-file "$REPO_DIR/.env" -f "$REPO_DIR/podman-compose.yml" --profile livekit up -d postgres minio livekit
+else
+  podman-compose -p "$PROJECT" --env-file "$REPO_DIR/.env" -f "$REPO_DIR/podman-compose.yml" up -d postgres minio
+fi
+
+# Wait for postgres to be ready before starting the backend
+echo "Waiting for PostgreSQL to accept connections..."
+for i in $(seq 1 30); do
+  if podman exec "${PROJECT}_postgres_1" pg_isready -U "${POSTGRES_USER:-$POSTGRES_DB}" > /dev/null 2>&1; then
+    echo "PostgreSQL ready on attempt $i"
+    break
+  fi
+  if [ "$i" -eq 30 ]; then
+    echo "WARNING: PostgreSQL readiness check timed out, proceeding anyway..."
+  fi
+  sleep 1
+done
+
+# Get the pod network so the backend can reach postgres/minio by service name
+POD_NETWORK="${PROJECT}_default"
 
 # Remove old container if it exists
 podman rm -f "$CONTAINER" 2>/dev/null || true

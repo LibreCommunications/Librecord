@@ -56,7 +56,7 @@ services:
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql
+      - postgres_data:/var/lib/postgresql/data
 
   minio:
     image: docker.io/minio/minio:RELEASE.2025-03-12T18-04-18Z

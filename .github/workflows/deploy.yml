@@ -93,20 +93,18 @@ jobs:
           ) &
           PID_DOTNET=$!
 
-          # ── Frontend: install + parallel tsc/vite/lint ─────────────
+          # ── Frontend: install + build + lint ──────────────────────
           (
             cd Librecord.Client
             if [ ! -d node_modules ] || [ package-lock.json -nt node_modules/.package-lock.json ]; then
               npm install --prefer-offline --no-audit --no-fund
             fi
-            npx tsc -b &
-            PID_TSC=$!
+            npx tsc -b || { echo "::error::TypeScript check failed"; exit 1; }
             npx vite build &
             PID_VITE=$!
             npx eslint . &
             PID_LINT=$!
             FAIL=0
-            wait $PID_TSC  || { echo "::error::TypeScript check failed"; FAIL=1; }
             wait $PID_VITE || { echo "::error::Vite build failed"; FAIL=1; }
             wait $PID_LINT || { echo "::error::ESLint failed"; FAIL=1; }
             [ $FAIL -eq 0 ] || exit 1
