@@ -17,6 +17,10 @@ jobs:
 
     env:
       IS_PROD: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/master') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'production') }}
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+      DOTNET_USE_SHARED_COMPILATION: true
 
     environment: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/master') && 'production' || (github.event_name == 'workflow_dispatch' && inputs.environment) || 'test' }}
 
@@ -49,20 +53,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Cache NuGet packages
-        uses: actions/cache@v5
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ hashFiles('**/*.csproj') }}
-          restore-keys: nuget-
-
-      - name: Cache npm
-        uses: actions/cache@v5
-        with:
-          path: Librecord.Client/node_modules
-          key: npm-${{ hashFiles('Librecord.Client/package-lock.json') }}
-          restore-keys: npm-
-
       - name: Write .env
         run: |
           cat > .env <<EOF
@@ -84,29 +74,58 @@ jobs:
           GREEN_PORT=${{ steps.config.outputs.green_port }}
           EOF
           chmod 600 .env
+          echo "VITE_API_URL=https://${{ secrets.DOMAIN }}/api" > Librecord.Client/.env
 
-      - name: Write frontend .env
-        run: echo "VITE_API_URL=https://${{ secrets.DOMAIN }}/api" > Librecord.Client/.env
-
-      # Run backend tests, frontend build+lint, and Docker image build all in parallel
-      - name: Build and test everything in parallel
+      # ── Build everything in parallel, share artifacts ──────────────
+      - name: Build, test, package
         run: |
           set -euo pipefail
 
-          dotnet test Librecord.Tests/Librecord.Tests.csproj --verbosity minimal &
-          PID_TEST=$!
+          # ── .NET: build once, test + publish reuse it ──────────────
+          (
+            dotnet build Librecord.sln -c Release --nologo -v q
+            dotnet test Librecord.Tests/Librecord.Tests.csproj -c Release --no-build --nologo -v q &
+            PID_TEST=$!
+            dotnet publish Librecord.Api/Librecord.Api.csproj -c Release --no-build --nologo -v q -o .publish &
+            PID_PUB=$!
+            wait $PID_TEST || exit 1
+            wait $PID_PUB  || exit 1
+          ) &
+          PID_DOTNET=$!
 
-          (cd Librecord.Client && npm ci --prefer-offline && npm run build && npm run lint) &
-          PID_FRONT=$!
+          # ── Frontend: install + parallel tsc/vite/lint ─────────────
+          (
+            cd Librecord.Client
+            if [ ! -d node_modules ] || [ package-lock.json -nt node_modules/.package-lock.json ]; then
+              npm install --prefer-offline --no-audit --no-fund
+            fi
+            npx tsc -b &
+            PID_TSC=$!
+            npx vite build &
+            PID_VITE=$!
+            npx eslint . &
+            PID_LINT=$!
+            FAIL=0
+            wait $PID_TSC  || { echo "::error::TypeScript check failed"; FAIL=1; }
+            wait $PID_VITE || { echo "::error::Vite build failed"; FAIL=1; }
+            wait $PID_LINT || { echo "::error::ESLint failed"; FAIL=1; }
+            [ $FAIL -eq 0 ] || exit 1
+          ) &
+          PID_FRONTEND=$!
 
-          docker compose -p "${{ steps.config.outputs.site }}" -f docker-compose.yml --profile blue --profile green build &
-          PID_DOCKER=$!
-
+          # ── Wait for both tracks ───────────────────────────────────
           FAIL=0
-          wait $PID_TEST  || { echo "::error::Backend tests failed"; FAIL=1; }
-          wait $PID_FRONT || { echo "::error::Frontend build/lint failed"; FAIL=1; }
-          wait $PID_DOCKER || { echo "::error::Docker build failed"; FAIL=1; }
+          wait $PID_DOTNET   || { echo "::error::Backend build/test failed"; FAIL=1; }
+          wait $PID_FRONTEND || { echo "::error::Frontend failed"; FAIL=1; }
           [ $FAIL -eq 0 ] || exit 1
+
+      # ── Podman: runtime-only image from pre-built output ───────────
+      - name: Build container image
+        run: |
+          podman build \
+            -f Dockerfile.ci \
+            -t ${{ steps.config.outputs.site }}-backend:latest \
+            .
 
       - name: Deploy frontend
         run: |
