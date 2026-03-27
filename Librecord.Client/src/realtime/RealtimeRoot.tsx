@@ -32,16 +32,20 @@ async function tryRestoreVoiceSession() {
             isScreenSharing: false,
         });
 
+        const stateUpdate = {
+            isMuted: session.isMuted,
+            isDeafened: session.isDeafened,
+            isCameraOn: false,
+            isScreenSharing: false,
+        };
+
         if (result) {
             setVoiceState({
                 channelId: session.channelId,
                 guildId: session.guildId,
                 participants: result.participants,
                 isConnected: true,
-                isMuted: session.isMuted,
-                isDeafened: session.isDeafened,
-                isCameraOn: false,
-                isScreenSharing: false,
+                ...stateUpdate,
             });
             await livekitClient.connectToVoice(result.token, result.wsUrl, session.isMuted, session.isDeafened);
         } else {
@@ -56,12 +60,14 @@ async function tryRestoreVoiceSession() {
                 guildId: session.guildId,
                 participants: fullResult.participants,
                 isConnected: true,
-                isMuted: session.isMuted,
-                isDeafened: session.isDeafened,
-                isCameraOn: false,
-                isScreenSharing: false,
+                ...stateUpdate,
             });
             await livekitClient.connectToVoice(fullResult.token, fullResult.wsUrl, session.isMuted, session.isDeafened);
+        }
+
+        // Push persisted mute/deafen to the DB so other users see the correct state
+        if (session.isMuted || session.isDeafened) {
+            await appConnection.invoke("UpdateVoiceState", stateUpdate);
         }
     } catch (e) {
         console.warn("[Realtime] Failed to restore voice session:", e);
