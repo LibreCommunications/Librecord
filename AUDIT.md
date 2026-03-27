@@ -10,7 +10,7 @@
 - **File upload MIME type not validated server-side** — `AttachmentController` and `UserProfileController` trust client-provided `ContentType` header. Validate actual file magic bytes instead.
 - **VoiceController.GetParticipants** doesn't check channel membership — any authenticated user can enumerate voice participants.
 - **ThreadController** returns thread creator info without verifying caller has channel access.
-- **CORS too permissive** — `DependencyInjection.cs` uses `.AllowAnyHeader()` and `.AllowAnyMethod()`. Restrict to specific methods (`GET`, `POST`, `PUT`, `DELETE`) and required headers (`Content-Type`, `Authorization`).
+- ~~CORS too permissive~~ — fixed. Restricted to `GET/POST/PUT/DELETE` and `Content-Type` header only.
 - **`AllowedHosts = "*"`** in `appsettings.json` — vulnerable to Host header injection. Set to actual domain(s).
 - **No rate limiting on sensitive endpoints** — friend requests, search, invite creation, and message sending have no `[EnableRateLimiting]`.
 - **Auth failures not logged** — `OnAuthenticationFailed` in `Program.cs` returns `Task.CompletedTask` silently. Log failed auth attempts.

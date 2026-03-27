@@ -42,8 +42,8 @@ public static class DependencyInjection
             {
                 policy
                     .WithOrigins(corsOrigins)
-                    .AllowAnyHeader()
-                    .AllowAnyMethod()
+                    .WithMethods("GET", "POST", "PUT", "DELETE")
+                    .WithHeaders("Content-Type")
                     .AllowCredentials();
             });
         });
