@@ -2,7 +2,6 @@ x-backend: &backend-base
   build:
     context: .
     dockerfile: ${BACKEND_DOCKERFILE:-Dockerfile}
-  image: ${COMPOSE_PROJECT_NAME:-librecord}-backend:latest
   restart: unless-stopped
   depends_on:
     postgres:
@@ -32,21 +31,18 @@ x-backend: &backend-base
 services:
   backend-blue:
     <<: *backend-base
-    container_name: ${COMPOSE_PROJECT_NAME:-librecord}-backend-blue
     profiles: [blue]
     ports:
       - "127.0.0.1:${BLUE_PORT:-5111}:5111"
 
   backend-green:
     <<: *backend-base
-    container_name: ${COMPOSE_PROJECT_NAME:-librecord}-backend-green
     profiles: [green]
     ports:
       - "127.0.0.1:${GREEN_PORT:-5112}:5111"
 
   postgres:
     image: docker.io/library/postgres:18
-    container_name: ${COMPOSE_PROJECT_NAME:-librecord}-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -64,7 +60,6 @@ services:
 
   minio:
     image: docker.io/minio/minio:RELEASE.2025-03-12T18-04-18Z
-    container_name: ${COMPOSE_PROJECT_NAME:-librecord}-minio
     restart: unless-stopped
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
@@ -78,7 +73,6 @@ services:
 
   livekit:
     image: docker.io/livekit/livekit-server:v1.8.3
-    container_name: ${COMPOSE_PROJECT_NAME:-librecord}-livekit
     restart: unless-stopped
     profiles: [livekit]
     command: --config /etc/livekit.yaml

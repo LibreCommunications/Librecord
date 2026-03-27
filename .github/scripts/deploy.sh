@@ -66,7 +66,7 @@ for i in $(seq 1 $ATTEMPTS); do
   if [ "$i" -eq "$ATTEMPTS" ]; then
     echo "ERROR: Health check failed after $ATTEMPTS attempts"
     echo "=== Container logs (last 50 lines) ==="
-    podman logs "${PROJECT}-backend-${NEW_SLOT}" --tail 50 2>&1 || true
+    podman logs "${PROJECT}_backend-${NEW_SLOT}_1" --tail 50 2>&1 || true
     echo "=== End of logs ==="
     echo "Rolling back: stopping backend-$NEW_SLOT"
     podman-compose -p "$PROJECT" -f "$REPO_DIR/podman-compose.yml" --profile "$NEW_SLOT" stop "backend-$NEW_SLOT"
