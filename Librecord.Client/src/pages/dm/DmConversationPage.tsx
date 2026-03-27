@@ -127,7 +127,10 @@ export default function DmConversationPage() {
                         <DmHeader
                             channelName={channelName}
                             isGroup={channel?.isGroup ?? false}
-                            onAddMember={() => setShowAddModal(true)}
+                            onAddMember={() => {
+                                if (dmId) getDmChannel(dmId).then(ch => { if (ch) setChannel(ch); });
+                                setShowAddModal(true);
+                            }}
                             onLeave={() => setShowLeaveConfirm(true)}
                         />
                     </div>
