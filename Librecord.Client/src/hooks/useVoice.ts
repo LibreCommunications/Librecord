@@ -1,13 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
 import { appConnection } from "../realtime/connection";
 import * as livekitClient from "../voice/livekitClient";
+import type { ScreenShareSettings } from "../voice/livekitClient";
 import {
     getVoiceState,
     setVoiceState,
+    updateParticipantState,
     resetVoiceState,
     type VoiceState,
     type VoiceParticipant,
 } from "../voice/voiceStore";
+import { playJoinSound, playLeaveSound, playStreamStartSound, playStreamStopSound } from "../voice/sounds";
+
+function getLocalUserId(): string | null {
+    const lp = livekitClient.getLocalParticipant();
+    return lp?.identity ?? null;
+}
 
 export function useVoice() {
     const [voiceState, setLocalState] = useState<VoiceState>(getVoiceState());
@@ -39,9 +47,11 @@ export function useVoice() {
         });
 
         await livekitClient.connectToVoice(result.token, result.wsUrl);
+        playJoinSound();
     }, []);
 
     const leaveVoice = useCallback(async () => {
+        playLeaveSound();
         await livekitClient.disconnect();
         try {
             await appConnection.invoke("LeaveVoiceChannel");
@@ -54,25 +64,61 @@ export function useVoice() {
     const toggleMute = useCallback(async () => {
         const isMuted = await livekitClient.toggleMute();
         setVoiceState({ isMuted });
+        const uid = getLocalUserId();
+        if (uid) updateParticipantState(uid, { isMuted });
         await appConnection.invoke("UpdateVoiceState", { isMuted });
     }, []);
 
     const toggleDeafen = useCallback(async () => {
         const isDeafened = await livekitClient.toggleDeafen();
         setVoiceState({ isDeafened });
+        const uid = getLocalUserId();
+        if (uid) updateParticipantState(uid, { isDeafened });
         await appConnection.invoke("UpdateVoiceState", { isDeafened });
     }, []);
 
     const toggleCamera = useCallback(async () => {
         const isCameraOn = await livekitClient.toggleCamera();
         setVoiceState({ isCameraOn });
+        const uid = getLocalUserId();
+        if (uid) updateParticipantState(uid, { isCameraOn });
         await appConnection.invoke("UpdateVoiceState", { isCameraOn });
     }, []);
 
-    const toggleScreenShare = useCallback(async () => {
-        const isScreenSharing = await livekitClient.toggleScreenShare();
-        setVoiceState({ isScreenSharing });
-        await appConnection.invoke("UpdateVoiceState", { isScreenSharing });
+    const startScreenShare = useCallback(async (options: ScreenShareSettings) => {
+        const started = await livekitClient.startScreenShare(options);
+        if (!started) return;
+
+        setVoiceState({ isScreenSharing: true });
+        const uid = getLocalUserId();
+        if (uid) updateParticipantState(uid, { isScreenSharing: true });
+        playStreamStartSound();
+
+        // If this fails, LiveKit is still sharing so we keep local state
+        // consistent and log rather than rolling back.
+        try {
+            await appConnection.invoke("UpdateVoiceState", { isScreenSharing: true });
+        } catch (e) {
+            console.warn("[Voice] Failed to notify server of screen share start:", e);
+        }
+    }, []);
+
+    const stopScreenShare = useCallback(async () => {
+        setVoiceState({ isScreenSharing: false });
+        const uid = getLocalUserId();
+        if (uid) updateParticipantState(uid, { isScreenSharing: false });
+        playStreamStopSound();
+
+        try {
+            await livekitClient.stopScreenShare();
+        } catch (e) {
+            console.warn("[Voice] Failed to stop LiveKit screen share:", e);
+        }
+        try {
+            await appConnection.invoke("UpdateVoiceState", { isScreenSharing: false });
+        } catch (e) {
+            console.warn("[Voice] Failed to notify server of screen share stop:", e);
+        }
     }, []);
 
     return {
@@ -82,6 +128,7 @@ export function useVoice() {
         toggleMute,
         toggleDeafen,
         toggleCamera,
-        toggleScreenShare,
+        startScreenShare,
+        stopScreenShare,
     };
 }

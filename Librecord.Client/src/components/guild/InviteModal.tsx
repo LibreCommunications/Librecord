@@ -13,7 +13,6 @@ export function InviteModal({ guildId, onClose }: Props) {
     const [loading, setLoading] = useState(false);
     const copyTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-    // Clear timeout on unmount
     useEffect(() => {
         return () => { if (copyTimerRef.current) clearTimeout(copyTimerRef.current); };
     }, []);

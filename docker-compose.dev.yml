@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   postgres:
     image: docker.io/library/postgres:18
@@ -45,6 +43,6 @@ volumes:
   minio_dev_data:
 
 
-# Run with '{docker,podman}-compose -f docker-compose.dev.yml up -d'
-# Requires: podman and podman-compose / docker and docker-compose
+# Run with 'podman compose -f docker-compose.dev.yml up -d'
+# Requires: podman and podman-compose
 # Only tested on Arch

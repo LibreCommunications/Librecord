@@ -90,7 +90,6 @@ public class GuildMessageWithAttachmentController : AuthenticatedController
     }
 }
 
-// DM version
 [ApiController]
 [Authorize]
 [Route("dm-messages/channel/{channelId:guid}")]

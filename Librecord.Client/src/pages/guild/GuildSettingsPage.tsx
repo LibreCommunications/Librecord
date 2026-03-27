@@ -38,17 +38,16 @@ export default function GuildSettingsPage() {
 
     if (!guildId) return null;
 
-    const canManageGuild = permissions.manageGuild;
-    const canManageRoles = permissions.manageRoles;
+    const canAccessGeneral = permissions.isOwner || permissions.manageGuild;
+    const canAccessRoles = permissions.isOwner || permissions.manageRoles;
+    const canAccessSettings = canAccessGeneral || canAccessRoles;
 
-    // Auto-select first available tab
     if (permsLoaded && tab === null) {
-        if (canManageGuild) setTab("general");
-        else if (canManageRoles) setTab("roles");
+        if (canAccessGeneral) setTab("general");
+        else if (canAccessRoles) setTab("roles");
     }
 
-    // No permissions at all — redirect back
-    if (permsLoaded && !canManageGuild && !canManageRoles) {
+    if (permsLoaded && !canAccessSettings) {
         navigate(`/app/guild/${guildId}`, { replace: true });
         return null;
     }
@@ -59,7 +58,7 @@ export default function GuildSettingsPage() {
                 <h1 className="text-2xl font-bold text-white mb-6">Server Settings</h1>
 
                 <div className="flex gap-4 mb-6 border-b border-[#3f4147] pb-2">
-                    {canManageGuild && (
+                    {canAccessGeneral && (
                         <button
                             onClick={() => setTab("general")}
                             className={`pb-2 text-sm font-medium ${tab === "general" ? "text-white border-b-2 border-[#5865F2]" : "text-[#949ba4] hover:text-[#dbdee1]"}`}
@@ -67,7 +66,7 @@ export default function GuildSettingsPage() {
                             General
                         </button>
                     )}
-                    {canManageRoles && (
+                    {canAccessRoles && (
                         <button
                             onClick={() => setTab("roles")}
                             className={`pb-2 text-sm font-medium ${tab === "roles" ? "text-white border-b-2 border-[#5865F2]" : "text-[#949ba4] hover:text-[#dbdee1]"}`}
@@ -77,7 +76,7 @@ export default function GuildSettingsPage() {
                     )}
                 </div>
 
-                {tab === "general" && canManageGuild && (
+                {tab === "general" && (
                     <div className="space-y-6">
                         <div>
                             <label className="block section-label mb-2">
@@ -114,7 +113,7 @@ export default function GuildSettingsPage() {
                     </div>
                 )}
 
-                {tab === "roles" && canManageRoles && (
+                {tab === "roles" && (
                     <GuildRoleSettings guildId={guildId} />
                 )}
             </div>

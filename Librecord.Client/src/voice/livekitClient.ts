@@ -9,13 +9,8 @@ import {
 
 let room: Room | null = null;
 
-// ─── CLIENT-SIDE SPEAKING DETECTION ────────────────────────────────────
-// Uses the Web Audio API to analyze received audio levels locally.
-// Zero round-trip to the SFU — the green border appears the instant
-// audio is loud enough, not 1s later when the server tells us.
-
-const SPEAKING_THRESHOLD = 0.015; // RMS threshold (0-1)
-const SPEAKING_OFF_DELAY = 300;   // ms of silence before "not speaking"
+const SPEAKING_THRESHOLD = 0.015;
+const SPEAKING_OFF_DELAY = 300;
 
 const audioCtxRef: { ctx: AudioContext | null } = { ctx: null };
 const analysers = new Map<string, {
@@ -39,7 +34,6 @@ function getAudioCtx(): AudioContext | null {
 }
 
 function startAnalysingTrack(identity: string, track: MediaStreamTrack) {
-    // Don't double-attach
     if (analysers.has(identity)) {
         const existing = analysers.get(identity)!;
         existing.source.disconnect();
@@ -58,7 +52,6 @@ function startAnalysingTrack(identity: string, track: MediaStreamTrack) {
 
     analysers.set(identity, { analyser, source, speaking: false, silentSince: 0 });
 
-    // Start the polling loop if not already running
     if (animFrameId === null) {
         pollSpeaking();
     }
@@ -94,7 +87,6 @@ function pollSpeaking() {
     for (const [identity, entry] of analysers) {
         entry.analyser.getByteTimeDomainData(buf);
 
-        // Compute RMS
         let sum = 0;
         for (let i = 0; i < buf.length; i++) {
             const v = (buf[i] - 128) / 128;
@@ -128,15 +120,13 @@ function pollSpeaking() {
     animFrameId = requestAnimationFrame(pollSpeaking);
 }
 
-// ─── AUDIO PLAYBACK ────────────────────────────────────────────────────
-// Explicitly attach remote audio tracks to <audio> elements.
 // LiveKit's auto-attach relies on room.startAudio() which can fail
-// if called outside a user gesture context. This guarantees playback.
-
+// if called outside a user gesture context. Explicit <audio> elements
+// guarantee playback.
 const audioElements = new Map<string, HTMLAudioElement>();
 
 function attachAudioTrack(identity: string, track: MediaStreamTrack) {
-    detachAudioTrack(identity); // clean up any existing element
+    detachAudioTrack(identity);
 
     const audio = document.createElement("audio");
     audio.srcObject = new MediaStream([track]);
@@ -166,8 +156,6 @@ function detachAllAudio() {
     }
 }
 
-// ─── ROOM SETUP ────────────────────────────────────────────────────────
-
 function bindRemoteAudioTrack(participant: RemoteParticipant) {
     participant.audioTrackPublications.forEach(pub => {
         const msTrack = pub.track?.mediaStreamTrack;
@@ -177,7 +165,7 @@ function bindRemoteAudioTrack(participant: RemoteParticipant) {
     });
 }
 
-export async function connectToVoice(token: string, wsUrl: string) {
+export async function connectToVoice(token: string, wsUrl: string, initialMuted = false, initialDeafened = false) {
     if (room) await disconnect();
 
     room = new Room({
@@ -190,34 +178,21 @@ export async function connectToVoice(token: string, wsUrl: string) {
         },
     });
 
-    room.on(RoomEvent.ParticipantConnected, () => {
-    });
-
     room.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
         stopAnalysingTrack(p.identity);
     });
 
-    room.on(RoomEvent.TrackSubscribed, (track, pub: RemoteTrackPublication, p: RemoteParticipant) => {
-        window.dispatchEvent(new CustomEvent("voice:track:changed", {
-            detail: { identity: p.identity, source: pub.source },
-        }));
+    room.on(RoomEvent.TrackSubscribed, (track, _pub: RemoteTrackPublication, p: RemoteParticipant) => {
         if (track.kind === "audio") {
             const msTrack = track.mediaStreamTrack;
             if (msTrack) {
-                // Speaking detection
                 startAnalysingTrack(p.identity, msTrack);
-                // Explicitly attach to an <audio> element for playback.
-                // LiveKit's auto-attach can fail if room.startAudio() is called
-                // outside a user gesture context (deep in an async chain).
                 attachAudioTrack(p.identity, msTrack);
             }
         }
     });
 
     room.on(RoomEvent.TrackUnsubscribed, (_t, pub: RemoteTrackPublication, p: RemoteParticipant) => {
-        window.dispatchEvent(new CustomEvent("voice:track:changed", {
-            detail: { identity: p.identity, source: pub.source },
-        }));
         if (pub.kind === "audio") {
             stopAnalysingTrack(p.identity);
             detachAudioTrack(p.identity);
@@ -225,10 +200,6 @@ export async function connectToVoice(token: string, wsUrl: string) {
     });
 
     room.on(RoomEvent.LocalTrackPublished, (pub) => {
-        window.dispatchEvent(new CustomEvent("voice:track:changed", {
-            detail: { identity: room!.localParticipant.identity, source: pub.source },
-        }));
-        // Analyse own mic for self speaking indicator
         if (pub.kind === "audio") {
             const msTrack = pub.track?.mediaStreamTrack;
             if (msTrack) {
@@ -238,24 +209,22 @@ export async function connectToVoice(token: string, wsUrl: string) {
     });
 
     room.on(RoomEvent.LocalTrackUnpublished, (pub) => {
-        window.dispatchEvent(new CustomEvent("voice:track:changed", {
-            detail: { identity: room!.localParticipant.identity, source: pub.source },
-        }));
         if (pub.kind === "audio") {
             stopAnalysingTrack(room!.localParticipant.identity);
         }
     });
 
     await room.connect(wsUrl, token);
-    await room.localParticipant.setMicrophoneEnabled(true);
+    await room.localParticipant.setMicrophoneEnabled(!initialMuted);
 
-    // Unlock browser audio playback for remote participants' audio tracks.
+    if (initialDeafened) {
+        isDeafened = true;
+    }
+
     await room.startAudio();
 
-    // Start analysing audio for any participants already in the room
     room.remoteParticipants.forEach(bindRemoteAudioTrack);
 
-    // Analyse own mic
     const localAudioPub = room.localParticipant.audioTrackPublications.values().next().value;
     if (localAudioPub?.track?.mediaStreamTrack) {
         startAnalysingTrack(room.localParticipant.identity, localAudioPub.track.mediaStreamTrack);
@@ -304,11 +273,66 @@ export async function toggleCamera(): Promise<boolean> {
     return enabled;
 }
 
-export async function toggleScreenShare(): Promise<boolean> {
+export interface ScreenShareSettings {
+    resolution: "720p" | "1080p" | "1440p" | "source";
+    frameRate: 15 | 30 | 60 | "source";
+    audio: boolean;
+}
+
+const RESOLUTION_MAP: Record<string, { width: number; height: number } | undefined> = {
+    "720p": { width: 1280, height: 720 },
+    "1080p": { width: 1920, height: 1080 },
+    "1440p": { width: 2560, height: 1440 },
+};
+
+export async function startScreenShare(options: ScreenShareSettings): Promise<boolean> {
     if (!room) return false;
-    const sharing = !room.localParticipant.isScreenShareEnabled;
-    await room.localParticipant.setScreenShareEnabled(sharing, { audio: true });
-    return sharing;
+
+    const res = RESOLUTION_MAP[options.resolution];
+    const numericFps = options.frameRate === "source" ? undefined : options.frameRate;
+
+    let resolution: { width: number; height: number; frameRate?: number } | undefined;
+    if (res) {
+        resolution = { ...res, ...(numericFps ? { frameRate: numericFps } : {}) };
+    }
+
+    try {
+        await room.localParticipant.setScreenShareEnabled(true, {
+            audio: options.audio,
+            ...(resolution ? { resolution } : {}),
+        });
+    } catch (e) {
+        console.warn("[Voice] Screen share failed, retrying without constraints:", e);
+        try {
+            // Fallback: no constraints — maximum browser compatibility
+            await room.localParticipant.setScreenShareEnabled(true, {
+                audio: options.audio,
+            });
+        } catch (e2) {
+            console.warn("[Voice] Screen share failed entirely:", e2);
+            return false;
+        }
+    }
+
+    // Some browsers reject contentHint in constraints but accept it post-capture
+    try {
+        const hint = numericFps === undefined || numericFps >= 30 ? "motion" : "detail";
+        room.localParticipant.videoTrackPublications.forEach(pub => {
+            if (pub.source === Track.Source.ScreenShare && pub.track?.mediaStreamTrack) {
+                pub.track.mediaStreamTrack.contentHint = hint;
+            }
+        });
+    } catch {
+        // contentHint not supported — fine
+    }
+
+    return true;
+}
+
+export async function stopScreenShare(): Promise<boolean> {
+    if (!room) return false;
+    await room.localParticipant.setScreenShareEnabled(false);
+    return false;
 }
 
 export function getRoom(): Room | null {

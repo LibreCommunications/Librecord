@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { MessageMenu } from "./MessageMenu";
 import { ReactionBar } from "../messages/ReactionBar";
 import { ImageLightbox } from "../ui/ImageLightbox";
@@ -46,6 +46,7 @@ export const MessageItem = memo(function MessageItem({
                             }: MessageItemProps) {
     const [editContent, setEditContent] = useState(msg.content);
     const [lightboxSrc, setLightboxSrc] = useState<{ src: string; alt: string } | null>(null);
+    const moreButtonRef = useRef<HTMLButtonElement>(null);
 
     return (
         <div className="flex gap-4 px-4 py-1.5 group relative hover:bg-[#2e3035] transition-colors" data-testid={`message-${msg.id}`}>
@@ -211,6 +212,7 @@ export const MessageItem = memo(function MessageItem({
                             </button>
                         )}
                         <button
+                            ref={moreButtonRef}
                             onClick={onToggleMenu}
                             className={`px-2 py-1 text-[#b5bac1] hover:text-white hover:bg-[#35373c] transition-colors ${isAuthor ? "" : "rounded-l"} rounded-r`}
                             title="More"
@@ -224,6 +226,7 @@ export const MessageItem = memo(function MessageItem({
                     </div>
                     {menuOpen && (
                         <MessageMenu
+                            anchorRef={moreButtonRef}
                             onAddReaction={(emoji) => {
                                 onAddReaction(msg.id, emoji);
                                 onToggleMenu();

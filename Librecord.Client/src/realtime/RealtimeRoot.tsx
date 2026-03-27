@@ -2,9 +2,10 @@ import { useEffect, useRef } from "react";
 import { appConnection, setConnectionState } from "./connection";
 import { registerListeners } from "./listeners";
 import { initNotifications, cleanupNotifications } from "./notifications";
-import { resetVoiceState } from "../voice/voiceStore";
+import { resetVoiceState, getPersistedVoiceSession, clearPersistedVoiceSession, setVoiceState } from "../voice/voiceStore";
 import * as livekitClient from "../voice/livekitClient";
 import { useAuth } from "../hooks/useAuth";
+import type { VoiceParticipant } from "../voice/voiceStore";
 
 declare global {
     interface Window {
@@ -15,11 +16,79 @@ declare global {
 // Module-level flag — survives React StrictMode double-mount
 let started = false;
 
+async function tryRestoreVoiceSession() {
+    const session = getPersistedVoiceSession();
+    if (!session) return;
+
+    try {
+        const result = await appConnection.invoke<{
+            token: string;
+            wsUrl: string;
+            participants: VoiceParticipant[];
+        } | null>("RejoinVoiceChannel", session.channelId, {
+            isMuted: session.isMuted,
+            isDeafened: session.isDeafened,
+            isCameraOn: false,
+            isScreenSharing: false,
+        });
+
+        const stateUpdate = {
+            isMuted: session.isMuted,
+            isDeafened: session.isDeafened,
+            isCameraOn: false,
+            isScreenSharing: false,
+        };
+
+        if (result) {
+            setVoiceState({
+                channelId: session.channelId,
+                guildId: session.guildId,
+                participants: result.participants,
+                isConnected: true,
+                ...stateUpdate,
+            });
+            await livekitClient.connectToVoice(result.token, result.wsUrl, session.isMuted, session.isDeafened);
+        } else {
+            const fullResult = await appConnection.invoke<{
+                token: string;
+                wsUrl: string;
+                participants: VoiceParticipant[];
+            }>("JoinVoiceChannel", session.channelId);
+
+            setVoiceState({
+                channelId: session.channelId,
+                guildId: session.guildId,
+                participants: fullResult.participants,
+                isConnected: true,
+                ...stateUpdate,
+            });
+            await livekitClient.connectToVoice(fullResult.token, fullResult.wsUrl, session.isMuted, session.isDeafened);
+        }
+
+        // Push persisted mute/deafen to the DB so other users see the correct state
+        if (session.isMuted || session.isDeafened) {
+            await appConnection.invoke("UpdateVoiceState", stateUpdate);
+        }
+    } catch (e) {
+        console.warn("[Realtime] Failed to restore voice session:", e);
+        clearPersistedVoiceSession();
+    }
+}
+
+function restoreReturnUrl() {
+    const returnUrl = sessionStorage.getItem("librecord:returnUrl");
+    if (returnUrl) {
+        sessionStorage.removeItem("librecord:returnUrl");
+        if (returnUrl !== window.location.pathname) {
+            window.history.replaceState(null, "", returnUrl);
+        }
+    }
+}
+
 export function RealtimeRoot() {
     const { user } = useAuth();
     const userIdRef = useRef<string | null>(null);
 
-    // Start connection once when user is available
     useEffect(() => {
         if (!user?.userId || started) return;
         started = true;
@@ -28,25 +97,30 @@ export function RealtimeRoot() {
         initNotifications(user.userId);
 
         setConnectionState("connecting");
-        appConnection.start().then(() => {
+        appConnection.start().then(async () => {
             registerListeners();
             setConnectionState("connected");
             window.__realtimeReady = true;
             window.dispatchEvent(new Event("realtime:ready"));
+
+            restoreReturnUrl();
+            await tryRestoreVoiceSession();
+
+            // Trigger re-fetch of voice participants and presence now that
+            // the connection is established and voice session is restored.
+            window.dispatchEvent(new Event("realtime:reconnected"));
         }).catch(err => {
             console.error("[Realtime] Connection failed", err);
             setConnectionState("disconnected");
         });
     });
 
-    // Detect logout — user was set, now null
     useEffect(() => {
         if (user?.userId) {
             userIdRef.current = user.userId;
             return;
         }
         if (!user && userIdRef.current) {
-            // User logged out
             userIdRef.current = null;
             started = false;
             window.__realtimeReady = false;

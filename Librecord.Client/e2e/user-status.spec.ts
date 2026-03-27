@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { makeUser, registerUser, loginUser, BASE, API_URL, type TestUser } from "./helpers";
+import { makeUser, registerUser, loginUser, waitForRealtime, BASE, API_URL, type TestUser } from "./helpers";
 import type { BrowserContext, Page } from "@playwright/test";
 
 /**
@@ -188,6 +188,7 @@ test.describe.serial("User status — set, persist, broadcast, invisible", () =>
     test("Online persists after page refresh", async () => {
         await pageA.reload();
         await pageA.waitForURL(/\/app/, { timeout: 10_000 });
+        await waitForRealtime(pageA);
 
         const status = await getMyStatus(pageA);
         expect(status).toBe("online");

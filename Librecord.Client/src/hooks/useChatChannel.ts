@@ -8,31 +8,16 @@ import { useToast } from "./useToast";
 import type { Message } from "../types/message";
 import type { UploadResult } from "./useAttachmentUpload";
 
-// ──────────────────────────────────────────────────────────
-// TYPES
-// ──────────────────────────────────────────────────────────
-
 type OptimisticMessage = Message & { clientMessageId?: string };
 
 export interface ChatChannelConfig {
     channelId: string | undefined;
 
-    /** Fetch paginated messages for the channel. */
     getMessages: (channelId: string, limit?: number, before?: string) => Promise<Message[]>;
-
-    /** Send a text-only message. */
     sendTextMessage: (channelId: string, content: string, clientMessageId: string) => Promise<void>;
-
-    /** Send a message with file attachments. */
     sendWithAttachments: (channelId: string, content: string, clientMessageId: string, files: File[]) => Promise<UploadResult>;
-
-    /** Edit a message (adapter: close over channelId if the API needs it). */
     editMessage: (messageId: string, dto: { content: string }) => Promise<{ content: string; editedAt?: string | null }>;
-
-    /** Delete a message (adapter: close over channelId if the API needs it). */
     deleteMessage: (messageId: string) => Promise<void>;
-
-    /** SignalR custom-event names (differ between DM and guild). */
     events: {
         messageNew: string;
         messageEdited: string;
@@ -44,10 +29,6 @@ export interface ChatChannelConfig {
 
 const createClientMessageId = () => crypto.randomUUID();
 
-// ──────────────────────────────────────────────────────────
-// HOOK
-// ──────────────────────────────────────────────────────────
-
 export function useChatChannel(config: ChatChannelConfig) {
     const { channelId, events } = config;
 
@@ -57,7 +38,6 @@ export function useChatChannel(config: ChatChannelConfig) {
     const { pinMessage, unpinMessage, getPins } = usePins();
     const { toast } = useToast();
 
-    // ── State ────────────────────────────────────────────
     const [messages, setMessages] = useState<OptimisticMessage[]>([]);
     const [content, setContent] = useState("");
     const [loading, setLoading] = useState(false);
@@ -71,7 +51,6 @@ export function useChatChannel(config: ChatChannelConfig) {
     const [loadingMore, setLoadingMore] = useState(false);
     const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
-    // ── Refs ─────────────────────────────────────────────
     const shouldAutoScrollRef = useRef(false);
     const attachTriggerRef = useRef<{ open: () => void }>(null);
     const channelIdRef = useRef(channelId);
@@ -80,7 +59,6 @@ export function useChatChannel(config: ChatChannelConfig) {
 
     const { typingNames, sendTyping, stopTyping } = useTypingIndicator(channelId, config.typingScope, user?.userId);
 
-    // ── Channel change reset (render-phase) ─────────────
     const [prevChannelId, setPrevChannelId] = useState(channelId);
     if (channelId !== prevChannelId) {
         setPrevChannelId(channelId);
@@ -89,7 +67,6 @@ export function useChatChannel(config: ChatChannelConfig) {
         setMessages([]);
     }
 
-    // ── Warn before leaving while uploading ──────────────
     useEffect(() => {
         if (!sending) return;
         const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
@@ -97,7 +74,6 @@ export function useChatChannel(config: ChatChannelConfig) {
         return () => window.removeEventListener("beforeunload", handler);
     }, [sending]);
 
-    // ── Realtime helper ──────────────────────────────────
     const applyNewMessage = useCallback((
         prev: OptimisticMessage[],
         message: Message,
@@ -117,7 +93,6 @@ export function useChatChannel(config: ChatChannelConfig) {
         return [...prev, message];
     }, []);
 
-    // ── REALTIME: MESSAGE CREATED ────────────────────────
     useEffect(() => {
         if (!channelId) return;
         const handler = (event: CustomEvent<{ message: Message; clientMessageId?: string }>) => {
@@ -130,7 +105,6 @@ export function useChatChannel(config: ChatChannelConfig) {
         return () => window.removeEventListener(events.messageNew, handler as EventListener);
     }, [channelId, events.messageNew, markAsRead, applyNewMessage]);
 
-    // ── MARK AS READ ON FOCUS ────────────────────────────
     useEffect(() => {
         if (!channelId) return;
         const onFocus = () => {
@@ -143,7 +117,6 @@ export function useChatChannel(config: ChatChannelConfig) {
         return () => window.removeEventListener("focus", onFocus);
     }, [channelId, markAsRead]);
 
-    // ── REALTIME: MESSAGE EDITED ─────────────────────────
     useEffect(() => {
         if (!channelId) return;
         const handler = (event: CustomEvent<{ channelId: string; messageId: string; content: string; editedAt?: string }>) => {
@@ -155,7 +128,6 @@ export function useChatChannel(config: ChatChannelConfig) {
         return () => window.removeEventListener(events.messageEdited, handler as EventListener);
     }, [channelId, events.messageEdited]);
 
-    // ── REALTIME: MESSAGE DELETED ────────────────────────
     useEffect(() => {
         if (!channelId) return;
         const handler = (event: CustomEvent<{ channelId: string; messageId: string }>) => {
@@ -166,7 +138,6 @@ export function useChatChannel(config: ChatChannelConfig) {
         return () => window.removeEventListener(events.messageDeleted, handler as EventListener);
     }, [channelId, events.messageDeleted]);
 
-    // ── REALTIME: PIN / UNPIN ────────────────────────────
     useEffect(() => {
         if (!channelId) return;
         const onPinned = (event: CustomEvent<{ channelId: string; messageId: string }>) => {
@@ -185,7 +156,6 @@ export function useChatChannel(config: ChatChannelConfig) {
         };
     }, [channelId]);
 
-    // ── REALTIME: REACTIONS ──────────────────────────────
     useEffect(() => {
         if (!channelId) return;
         const onAdded = (event: CustomEvent<{ channelId: string; messageId: string; userId: string; emoji: string }>) => {
@@ -214,11 +184,9 @@ export function useChatChannel(config: ChatChannelConfig) {
         };
     }, [channelId, user?.userId]);
 
-    // ── LOAD INITIAL MESSAGES + PINS ─────────────────────
     useEffect(() => {
         if (!channelId) return;
 
-        // Abort any in-flight requests from the previous channel
         abortRef.current?.abort();
         const ac = new AbortController();
         abortRef.current = ac;
@@ -246,8 +214,6 @@ export function useChatChannel(config: ChatChannelConfig) {
         return () => { ac.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [channelId]);
-
-    // ── HANDLERS ─────────────────────────────────────────
 
     const handleSend = async () => {
         if (!channelId || (!content.trim() && pendingFiles.length === 0) || !user) return;
@@ -314,7 +280,7 @@ export function useChatChannel(config: ChatChannelConfig) {
         setMessages(prev => prev.filter(m => m.id !== messageId));
         setMenuOpenId(null);
         setEditingId(null);
-        try { await config.deleteMessage(messageId); } catch { /* optimistic */ }
+        try { await config.deleteMessage(messageId); } catch { /* best-effort */ }
     };
 
     const handleEdit = async (messageId: string, dto: { content: string }) => {
@@ -373,7 +339,6 @@ export function useChatChannel(config: ChatChannelConfig) {
         try {
             await removeReaction(messageId, emoji);
         } catch {
-            // Rollback
             setMessages(prev => prev.map(m => {
                 if (m.id !== messageId) return m;
                 return { ...m, reactions: [...m.reactions, { userId: user.userId, emoji, createdAt: new Date().toISOString() }] };
@@ -384,7 +349,6 @@ export function useChatChannel(config: ChatChannelConfig) {
     const handlePin = async (messageId: string) => {
         if (!channelId) return;
         const isPinned = pinnedIds.has(messageId);
-        // Optimistic update
         if (isPinned) {
             setPinnedIds(prev => { const next = new Set(prev); next.delete(messageId); return next; });
         } else {
@@ -397,7 +361,6 @@ export function useChatChannel(config: ChatChannelConfig) {
                 await pinMessage(channelId, messageId);
             }
         } catch {
-            // Rollback
             if (isPinned) {
                 setPinnedIds(prev => new Set(prev).add(messageId));
             } else {

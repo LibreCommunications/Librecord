@@ -6,10 +6,6 @@ interface Props {
     triggerRef?: React.Ref<{ open: () => void }>;
 }
 
-/**
- * Build a Map<File, objectURL> reusing existing URLs where possible.
- * Revokes URLs for files no longer present.
- */
 function reconcileUrls(
     prev: Map<File, string>,
     files: File[],
@@ -27,26 +23,20 @@ function reconcileUrls(
 export function AttachmentUpload({ files, onFilesChange, triggerRef }: Props) {
     const inputRef = useRef<HTMLInputElement>(null);
 
-    // Track which files array we last computed URLs for
     const [urlState, setUrlState] = useState<{ files: File[]; urls: Map<File, string> }>({
         files: [],
         urls: new Map(),
     });
 
-    // Synchronize preview URLs when files change (runs during render, no effect needed)
     let previewUrls = urlState.urls;
     if (files !== urlState.files) {
         const next = reconcileUrls(urlState.urls, files);
         previewUrls = next;
-        // Schedule state update — this is fine because we're computing derived state
-        // from changed props (the "if changed" pattern recommended by React docs)
         setUrlState({ files, urls: next });
     }
 
-    // Revoke all on unmount
     useEffect(() => {
         return () => {
-            // Read the latest state at unmount time via the setter
             setUrlState(prev => {
                 for (const url of prev.urls.values()) URL.revokeObjectURL(url);
                 return prev;
@@ -72,7 +62,6 @@ export function AttachmentUpload({ files, onFilesChange, triggerRef }: Props) {
         inputRef.current?.click();
     }
 
-    // Expose open() to parent via ref
     useImperativeHandle(triggerRef, () => ({ open }));
 
     return (
@@ -80,7 +69,6 @@ export function AttachmentUpload({ files, onFilesChange, triggerRef }: Props) {
             onDrop={handleDrop}
             onDragOver={e => e.preventDefault()}
         >
-            {/* File previews */}
             {files.length > 0 && (
                 <div className="flex gap-2 mb-2 flex-wrap px-4">
                     {files.map((file, i) => (
@@ -111,7 +99,6 @@ export function AttachmentUpload({ files, onFilesChange, triggerRef }: Props) {
                 </div>
             )}
 
-            {/* Hidden file input */}
             <input
                 ref={inputRef}
                 type="file"

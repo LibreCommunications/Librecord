@@ -18,10 +18,6 @@ public sealed class GuildChannelMessagesController(
     IPermissionService permissions)
     : AuthenticatedController
 {
-
-    // ---------------------------------------------------------
-    // GET SINGLE MESSAGE
-    // ---------------------------------------------------------
     [HttpGet("{messageId:guid}")]
     public async Task<IActionResult> Get(
         Guid channelId,
@@ -43,9 +39,6 @@ public sealed class GuildChannelMessagesController(
         return Ok(MessageDto.From(message));
     }
 
-    // ---------------------------------------------------------
-    // GET CHANNEL MESSAGES
-    // ---------------------------------------------------------
     [HttpGet]
     public async Task<IActionResult> GetChannelMessages(
         Guid channelId,
@@ -68,9 +61,6 @@ public sealed class GuildChannelMessagesController(
         return Ok(result.Select(m => MessageDto.From(m)));
     }
 
-    // ---------------------------------------------------------
-    // CREATE MESSAGE
-    // ---------------------------------------------------------
     [HttpPost]
     public async Task<IActionResult> Create(
         Guid channelId,
@@ -96,9 +86,6 @@ public sealed class GuildChannelMessagesController(
         return Ok(MessageDto.From(message));
     }
 
-    // ---------------------------------------------------------
-    // UPDATE MESSAGE
-    // ---------------------------------------------------------
     [HttpPut("{messageId:guid}")]
     public async Task<IActionResult> Update(
         Guid channelId,
@@ -130,9 +117,6 @@ public sealed class GuildChannelMessagesController(
         }
     }
 
-    // ---------------------------------------------------------
-    // DELETE MESSAGE
-    // ---------------------------------------------------------
     [HttpDelete("{messageId:guid}")]
     public async Task<IActionResult> Delete(
         Guid channelId,

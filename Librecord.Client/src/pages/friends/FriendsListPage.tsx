@@ -54,7 +54,6 @@ export default function FriendsListPage() {
         Promise.resolve().then(loadData);
     }, [loadData]);
 
-    // Refresh friend list on realtime friendship events
     useEffect(() => {
         const refresh = () => { loadData(); };
 
@@ -87,7 +86,6 @@ export default function FriendsListPage() {
         <div className="text-gray-200 space-y-8 pb-10">
             <h1 className="text-2xl font-bold text-white">Friends</h1>
 
-            {/* ================= INCOMING ================= */}
             {incoming.length > 0 && (
                 <section>
                     <h2 className="text-xs font-bold uppercase text-[#949ba4] tracking-wide mb-3">
@@ -152,7 +150,6 @@ export default function FriendsListPage() {
                 </section>
             )}
 
-            {/* ================= FRIEND LIST ================= */}
             <section>
                 <h2 className="text-xs font-bold uppercase text-[#949ba4] tracking-wide mb-3">
                     All Friends — {friends.length}
@@ -220,7 +217,6 @@ export default function FriendsListPage() {
                 </div>
             </section>
 
-            {/* ================= OUTGOING ================= */}
             {outgoing.length > 0 && (
                 <section>
                     <h2 className="text-xs font-bold uppercase text-[#949ba4] tracking-wide mb-3">

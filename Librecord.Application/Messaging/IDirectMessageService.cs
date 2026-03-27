@@ -4,9 +4,6 @@ namespace Librecord.Application.Messaging;
 
 public interface IDirectMessageService
 {
-    // ---------------------------------------------------------
-    // Reads
-    // ---------------------------------------------------------
     Task<Message?> GetMessageAsync(Guid messageId);
 
     Task<IReadOnlyList<Message>> GetMessagesAsync(
@@ -15,9 +12,6 @@ public interface IDirectMessageService
         int limit = 50,
         Guid? beforeMessageId = null);
 
-    // ---------------------------------------------------------
-    // Writes
-    // ---------------------------------------------------------
     Task<Message> SendMessageAsync(
         Guid channelId,
         Guid userId,

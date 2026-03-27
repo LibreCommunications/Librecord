@@ -27,14 +27,13 @@ export function MessageList({
                             }: MessageListProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const isAtBottomRef = useRef(true);
-    const stickyBottomUntilRef = useRef(0); // timestamp: force isAtBottom=true until this time
+    const stickyBottomUntilRef = useRef(0);
     const sentinelRef = useRef<HTMLDivElement | null>(null);
     const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
     const [newMsgCount, setNewMsgCount] = useState(0);
     const prevMsgCountRef = useRef(messages.length);
     const [prevMsgLen, setPrevMsgLen] = useState(messages.length);
 
-    // Clear "new messages" badge when messages are reset (channel switch)
     if (messages.length === 0 && prevMsgLen > 0) {
         setPrevMsgLen(0);
         setNewMsgCount(0);
@@ -42,9 +41,6 @@ export function MessageList({
         setPrevMsgLen(messages.length);
     }
 
-    // ----------------------------------
-    // TRACK SCROLL POSITION
-    // ----------------------------------
     useEffect(() => {
         const el = containerRef.current;
         if (!el) return;
@@ -71,13 +67,8 @@ export function MessageList({
         return () => el.removeEventListener("scroll", onScroll);
     }, []);
 
-    // ----------------------------------
-    // RE-SCROLL WHEN MEDIA LOADS
-    // ----------------------------------
-    // Images/videos load asynchronously after the DOM is updated.
-    // If we were at the bottom, re-scroll so loaded media doesn't
-    // push the viewport up. The load event doesn't bubble, so we
-    // use capture to intercept it on descendant <img>/<video> elements.
+    // The load event doesn't bubble, so we use capture to intercept
+    // it on descendant <img>/<video> elements for re-scrolling.
     useEffect(() => {
         const el = containerRef.current;
         if (!el) return;
@@ -94,15 +85,11 @@ export function MessageList({
         return () => el.removeEventListener("load", onMediaLoad, true);
     }, []);
 
-    // ----------------------------------
-    // AUTO-SCROLL LOGIC
-    // ----------------------------------
     useEffect(() => {
         const el = containerRef.current;
         if (!el) return;
 
         if (forceScrollOnNextUpdateRef?.current) {
-            // Keep isAtBottom=true for 3s so lazy-loaded media triggers re-scroll
             isAtBottomRef.current = true;
             stickyBottomUntilRef.current = Date.now() + 3000;
             requestAnimationFrame(() => {
@@ -113,32 +100,24 @@ export function MessageList({
             return;
         }
 
-        // Reset scroll tracking when messages are cleared (channel switch)
         if (messages.length === 0) {
             isAtBottomRef.current = true;
             prevMsgCountRef.current = 0;
             return;
         }
 
-        // Skip when older messages are being prepended (infinite scroll)
         if (loadingMore) {
             prevMsgCountRef.current = messages.length;
             return;
         }
 
-        // Only auto-scroll when new messages arrive (count increased),
-        // not when existing messages are mutated (reactions, edits)
         if (messages.length > prevMsgCountRef.current) {
-            // Initial load (from empty) — always scroll to bottom
             if (prevMsgCountRef.current === 0 || isAtBottomRef.current) {
                 // Use instant scroll for initial load to avoid race with incoming
                 // realtime messages arriving before smooth animation completes
                 const isInitial = prevMsgCountRef.current === 0;
                 if (isInitial) {
-                    // Keep isAtBottom=true for 3s so lazy-loaded images
-                    // trigger re-scroll as they load
                     stickyBottomUntilRef.current = Date.now() + 3000;
-                    // Wait for DOM layout to complete before scrolling
                     requestAnimationFrame(() => {
                         el.scrollTo({ top: el.scrollHeight, behavior: "instant" });
                     });
@@ -154,9 +133,6 @@ export function MessageList({
         prevMsgCountRef.current = messages.length;
     }, [messages, forceScrollOnNextUpdateRef, loadingMore]);
 
-    // ----------------------------------
-    // INFINITE SCROLL (older messages)
-    // ----------------------------------
     const handleIntersect = useCallback(
         (entries: IntersectionObserverEntry[]) => {
             if (entries[0]?.isIntersecting && hasMore && !loadingMore && !loading && onLoadMore) {
@@ -184,7 +160,6 @@ export function MessageList({
             ref={containerRef}
             className="flex-1 overflow-y-auto dark-scrollbar"
         >
-            {/* Sentinel for infinite scroll */}
             {onLoadMore && hasMore && (
                 <div ref={sentinelRef} className="flex justify-center py-3">
                     {loadingMore && <Spinner size="sm" className="text-[#949ba4]" />}
@@ -254,7 +229,6 @@ export function MessageList({
                 );
             })}
 
-            {/* New messages button */}
             {newMsgCount > 0 && (
                 <button
                     onClick={() => {

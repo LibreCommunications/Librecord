@@ -18,9 +18,7 @@ public class GuildController : AuthenticatedController
     {
         _guilds = guilds;
     }
-    // ---------------------------------------------------------
-    // CREATE GUILD
-    // ---------------------------------------------------------
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateGuildDto dto)
     {
@@ -37,9 +35,7 @@ public class GuildController : AuthenticatedController
         });
     }
 
-    // ---------------------------------------------------------
-    // LIST GUILDS FOR CURRENT USER
-    // ---------------------------------------------------------
+
     [HttpGet]
     public async Task<IActionResult> List()
     {
@@ -53,9 +49,7 @@ public class GuildController : AuthenticatedController
         }));
     }
 
-    // ---------------------------------------------------------
-    // GET GUILD DETAILS
-    // ---------------------------------------------------------
+
     [HttpGet("{guildId:guid}")]
     public async Task<IActionResult> Get(Guid guildId)
     {
@@ -75,9 +69,7 @@ public class GuildController : AuthenticatedController
         });
     }
 
-    // ---------------------------------------------------------
-    // GET CHANNELS FOR GUILD
-    // ---------------------------------------------------------
+
     [HttpGet("{guildId:guid}/channels")]
     public async Task<IActionResult> GetChannels(Guid guildId)
     {

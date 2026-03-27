@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useChannels } from "../../hooks/useChannels";
 import { useGuildRoles, type GuildRole } from "../../hooks/useGuildRoles";
 import { useChannelPermissions, type ChannelOverride } from "../../hooks/useChannelPermissions";
+import { useGuildPermissions } from "../../hooks/useGuildPermissions";
 
 const CHANNEL_PERMISSIONS = [
     { id: "22222222-2222-2222-2222-222222222201", name: "View Channel" },
@@ -22,6 +23,7 @@ export default function ChannelPermissionsPage() {
     const { getChannel } = useChannels();
     const { getRoles } = useGuildRoles();
     const { getOverrides, setOverride } = useChannelPermissions();
+    const { permissions, loaded: permsLoaded } = useGuildPermissions(guildId);
 
     const [channelName, setChannelName] = useState("");
     const [roles, setRoles] = useState<GuildRole[]>([]);
@@ -62,7 +64,6 @@ export default function ChannelPermissionsPage() {
         if (!channelId) return;
         const current = getOverrideState(roleId, permId);
 
-        // Cycle: null (inherit) → true (allow) → false (deny) → null
         const next: TriState = current === null ? true : current === true ? false : null;
 
         await setOverride(channelId, {
@@ -91,6 +92,11 @@ export default function ChannelPermissionsPage() {
 
     if (!channelId || !guildId) return null;
 
+    if (permsLoaded && !permissions.manageChannels) {
+        navigate(`/app/guild/${guildId}/${channelId}`, { replace: true });
+        return null;
+    }
+
     return (
         <div className="flex-1 flex flex-col bg-[#313338] overflow-y-auto">
             <div className="max-w-3xl mx-auto w-full p-8">
@@ -112,7 +118,6 @@ export default function ChannelPermissionsPage() {
                     <div className="text-gray-400">Loading...</div>
                 ) : (
                     <div className="flex gap-6">
-                        {/* Role list */}
                         <div className="w-48 shrink-0 space-y-1">
                             <h3 className="text-xs text-gray-400 uppercase font-bold mb-2">Roles</h3>
                             {roles.map(r => (
@@ -130,7 +135,6 @@ export default function ChannelPermissionsPage() {
                             ))}
                         </div>
 
-                        {/* Permission grid */}
                         {selectedRoleId && (
                             <div className="flex-1">
                                 {roles.find(r => r.id === selectedRoleId)?.name === "Owner" ? (

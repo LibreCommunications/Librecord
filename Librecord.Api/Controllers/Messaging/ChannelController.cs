@@ -34,9 +34,6 @@ public class ChannelController : AuthenticatedController
         _hub = hub;
         _guilds = guilds;
     }
-    // ---------------------------------------------------------
-    // GET CHANNEL
-    // ---------------------------------------------------------
     [HttpGet("{channelId:guid}")]
     public async Task<IActionResult> Get(Guid channelId)
     {
@@ -67,9 +64,6 @@ public class ChannelController : AuthenticatedController
         });
     }
 
-    // ---------------------------------------------------------
-    // LIST CHANNELS IN GUILD
-    // ---------------------------------------------------------
     [HttpGet("guild/{guildId:guid}")]
     public async Task<IActionResult> ListForGuild(Guid guildId)
     {
@@ -96,9 +90,6 @@ public class ChannelController : AuthenticatedController
         }));
     }
 
-    // ---------------------------------------------------------
-    // CREATE CHANNEL
-    // ---------------------------------------------------------
     [HttpPost("guild/{guildId:guid}")]
     public async Task<IActionResult> Create(
         Guid guildId,
@@ -134,9 +125,7 @@ public class ChannelController : AuthenticatedController
 
         await _channels.CreateChannelAsync(channel);
 
-        // Broadcast channel creation to all existing guild channel groups so
-        // connected clients can call JoinChannel for the new channel.
-        // We broadcast to every existing channel group because all guild
+        // Broadcast to every existing channel group because all guild
         // members are already in those groups from OnConnectedAsync.
         var existingChannels = await _channels.GetGuildChannelsAsync(guildId);
         foreach (var ch in existingChannels)
@@ -157,9 +146,6 @@ public class ChannelController : AuthenticatedController
         return Ok(channel);
     }
 
-    // ---------------------------------------------------------
-    // UPDATE CHANNEL
-    // ---------------------------------------------------------
     [HttpPut("{channelId:guid}")]
     public async Task<IActionResult> Update(
         Guid channelId,
@@ -189,9 +175,6 @@ public class ChannelController : AuthenticatedController
         return Ok(channel);
     }
 
-    // ---------------------------------------------------------
-    // DELETE CHANNEL
-    // ---------------------------------------------------------
     [HttpDelete("{channelId:guid}")]
     public async Task<IActionResult> Delete(Guid channelId)
     {

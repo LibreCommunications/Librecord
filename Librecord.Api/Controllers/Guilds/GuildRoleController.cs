@@ -25,9 +25,6 @@ public class GuildRoleController : AuthenticatedController
         _guilds = guilds;
         _permissions = permissions;
     }
-    // ---------------------------------------------------------
-    // LIST ROLES
-    // ---------------------------------------------------------
     [HttpGet]
     public async Task<IActionResult> List(Guid guildId)
     {
@@ -54,9 +51,6 @@ public class GuildRoleController : AuthenticatedController
         return Ok(roles);
     }
 
-    // ---------------------------------------------------------
-    // CREATE ROLE
-    // ---------------------------------------------------------
     [HttpPost]
     public async Task<IActionResult> Create(Guid guildId, [FromBody] CreateRoleRequest req)
     {
@@ -87,9 +81,6 @@ public class GuildRoleController : AuthenticatedController
         });
     }
 
-    // ---------------------------------------------------------
-    // UPDATE ROLE
-    // ---------------------------------------------------------
     [HttpPut("{roleId:guid}")]
     public async Task<IActionResult> Update(Guid guildId, Guid roleId, [FromBody] UpdateRoleRequest req)
     {
@@ -116,9 +107,6 @@ public class GuildRoleController : AuthenticatedController
         });
     }
 
-    // ---------------------------------------------------------
-    // DELETE ROLE
-    // ---------------------------------------------------------
     [HttpDelete("{roleId:guid}")]
     public async Task<IActionResult> Delete(Guid guildId, Guid roleId)
     {
@@ -137,9 +125,6 @@ public class GuildRoleController : AuthenticatedController
         return Ok();
     }
 
-    // ---------------------------------------------------------
-    // SET ROLE PERMISSION
-    // ---------------------------------------------------------
     [HttpPut("{roleId:guid}/permissions/{permissionId:guid}")]
     public async Task<IActionResult> SetPermission(
         Guid guildId, Guid roleId, Guid permissionId, [FromBody] SetPermissionRequest req)
@@ -159,9 +144,6 @@ public class GuildRoleController : AuthenticatedController
         return Ok();
     }
 
-    // ---------------------------------------------------------
-    // ASSIGN ROLE TO MEMBER
-    // ---------------------------------------------------------
     [HttpPost("{roleId:guid}/members/{userId:guid}")]
     public async Task<IActionResult> AssignToMember(Guid guildId, Guid roleId, Guid userId)
     {
@@ -188,9 +170,6 @@ public class GuildRoleController : AuthenticatedController
         return Ok();
     }
 
-    // ---------------------------------------------------------
-    // REMOVE ROLE FROM MEMBER
-    // ---------------------------------------------------------
     [HttpDelete("{roleId:guid}/members/{userId:guid}")]
     public async Task<IActionResult> RemoveFromMember(Guid guildId, Guid roleId, Guid userId)
     {

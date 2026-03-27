@@ -2,8 +2,8 @@ import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "./hooks/useAuth";
 import LoadingSpinner from "./components/LoadingSpinner";
+import { UpdateBanner } from "./components/ui/UpdateBanner";
 
-// Lazy-loaded pages — each becomes a separate chunk
 const LoginPage = lazy(() => import("./pages/auth/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/auth/RegisterPage"));
 const MainPage = lazy(() => import("./pages/MainPage"));
@@ -27,27 +27,23 @@ function ProtectedRoute() {
 export default function App() {
     return (
         <Suspense fallback={<LoadingSpinner />}>
+            <UpdateBanner />
             <Routes>
-                {/* PUBLIC */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
 
                 <Route element={<ProtectedRoute />}>
                     <Route path="/app" element={<MainPage />}>
-                        {/* DM */}
                         <Route path="dm" element={<DmConversationPage />} />
                         <Route path="dm/:dmId" element={<DmConversationPage />} />
                         <Route path="dm/friends/*" element={<FriendsPage />} />
 
-                        {/* GUILD */}
                         <Route path="guild/:guildId" element={<GuildPage />} />
                         <Route path="guild/:guildId/:channelId" element={<GuildPage />} />
 
-                        {/* GUILD SETTINGS */}
                         <Route path="guild/:guildId/settings" element={<GuildSettingsPage />} />
                         <Route path="guild/:guildId/:channelId/permissions" element={<ChannelPermissionsPage />} />
 
-                        {/* SETTINGS */}
                         <Route path="settings">
                             <Route path="user" element={<UserSettingsPage />}>
                                 <Route index element={<Navigate to="profile" replace />} />
@@ -58,7 +54,6 @@ export default function App() {
                     </Route>
                 </Route>
 
-                {/* FALLBACK */}
                 <Route path="*" element={<Navigate to="/app/dm" replace />} />
             </Routes>
         </Suspense>

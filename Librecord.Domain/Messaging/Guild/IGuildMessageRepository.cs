@@ -4,7 +4,6 @@ namespace Librecord.Domain.Messaging.Guild;
 
 public interface IGuildMessageRepository
 {
-    // Reads
     Task<Message?> GetMessageAsync(Guid messageId);
 
     Task<List<Message>> GetChannelMessagesAsync(
@@ -12,7 +11,6 @@ public interface IGuildMessageRepository
         int limit = 50,
         Guid? beforeMessageId = null);
 
-    // Writes
     Task AddMessageAsync(Message message, Guid channelId);
 
     Task AddMessageEditAsync(MessageEdit edit);

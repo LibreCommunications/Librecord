@@ -22,9 +22,6 @@ public class ReactionController : AuthenticatedController
         _hub = hub;
     }
 
-    // ---------------------------------------------------------
-    // ADD REACTION
-    // ---------------------------------------------------------
     [HttpPut("{emoji}")]
     public async Task<IActionResult> Add(Guid messageId, string emoji)
     {
@@ -54,9 +51,6 @@ public class ReactionController : AuthenticatedController
         }
     }
 
-    // ---------------------------------------------------------
-    // REMOVE REACTION
-    // ---------------------------------------------------------
     [HttpDelete("{emoji}")]
     public async Task<IActionResult> Remove(Guid messageId, string emoji)
     {

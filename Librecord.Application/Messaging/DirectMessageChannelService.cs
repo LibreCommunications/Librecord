@@ -31,9 +31,6 @@ public class DirectMessageChannelService : IDirectMessageChannelService
         _logger = logger;
     }
 
-    // ---------------------------------------------------------
-    // GETTERS
-    // ---------------------------------------------------------
     public Task<DmChannel?> GetChannelAsync(Guid channelId)
     {
         return _dms.GetChannelAsync(channelId);
@@ -53,9 +50,6 @@ public class DirectMessageChannelService : IDirectMessageChannelService
         return channel.Members.Any(m => m.UserId == userId);
     }
 
-    // ---------------------------------------------------------
-    // START OR REUSE 1–1 DM
-    // ---------------------------------------------------------
     public async Task<DmChannel> StartDmAsync(Guid requesterId, Guid targetUserId)
     {
         if (requesterId == targetUserId)
@@ -66,7 +60,6 @@ public class DirectMessageChannelService : IDirectMessageChannelService
 
         var channels = await _dms.GetUserDmChannelsAsync(requesterId);
 
-        // Find existing 1-on-1 (not group) with the target
         var existing = channels.FirstOrDefault(c =>
             !c.IsGroup &&
             c.Members.Any(m => m.UserId == targetUserId));
@@ -115,9 +108,6 @@ public class DirectMessageChannelService : IDirectMessageChannelService
         return channel;
     }
 
-    // ---------------------------------------------------------
-    // CREATE GROUP DM
-    // ---------------------------------------------------------
     public async Task<DmChannel> CreateGroupAsync(Guid creatorId, List<Guid> memberIds, string name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -162,9 +152,6 @@ public class DirectMessageChannelService : IDirectMessageChannelService
         return channel;
     }
 
-    // ---------------------------------------------------------
-    // ADD PARTICIPANT (GROUP ONLY)
-    // ---------------------------------------------------------
     public async Task AddParticipantAsync(
         Guid channelId,
         Guid requesterId,
@@ -199,9 +186,6 @@ public class DirectMessageChannelService : IDirectMessageChannelService
         await _dms.SaveChangesAsync();
     }
 
-    // ---------------------------------------------------------
-    // LEAVE GROUP DM
-    // ---------------------------------------------------------
     public async Task LeaveChannelAsync(Guid channelId, Guid userId)
     {
         var channel = await _dms.GetChannelAsync(channelId)
@@ -216,10 +200,8 @@ public class DirectMessageChannelService : IDirectMessageChannelService
 
         channel.Members.Remove(member);
 
-        // Delete channel, messages, and stored files when last member leaves
         if (channel.Members.Count == 0)
         {
-            // Re-fetch with messages for attachment cleanup
             var fullChannel = await _dms.GetChannelWithMessagesAsync(channelId);
             if (fullChannel != null)
             {
@@ -245,9 +227,6 @@ public class DirectMessageChannelService : IDirectMessageChannelService
         await _dms.SaveChangesAsync();
     }
 
-    // ---------------------------------------------------------
-    // DELETE 1-ON-1 DM (only when users are NOT friends)
-    // ---------------------------------------------------------
     public async Task DeleteDmAsync(Guid channelId, Guid userId)
     {
         var channel = await _dms.GetChannelAsync(channelId)
@@ -263,7 +242,6 @@ public class DirectMessageChannelService : IDirectMessageChannelService
         if (otherUser != null && await _friendships.UsersAreConfirmedFriendsAsync(userId, otherUser.UserId))
             throw new InvalidOperationException("Cannot delete a DM with a current friend. Remove them as a friend first.");
 
-        // Re-fetch with messages for attachment cleanup
         var fullChannel = await _dms.GetChannelWithMessagesAsync(channelId);
         if (fullChannel != null)
         {
@@ -287,9 +265,6 @@ public class DirectMessageChannelService : IDirectMessageChannelService
         await _dms.SaveChangesAsync();
     }
 
-    // ---------------------------------------------------------
-    // CHECK IF 1-ON-1 DM MEMBERS ARE FRIENDS
-    // ---------------------------------------------------------
     public async Task<bool> AreMembersFriendsAsync(Guid channelId, Guid userId)
     {
         var channel = await _dms.GetChannelAsync(channelId);
@@ -301,9 +276,6 @@ public class DirectMessageChannelService : IDirectMessageChannelService
         return await _friendships.UsersAreConfirmedFriendsAsync(userId, otherUser.UserId);
     }
 
-    // ---------------------------------------------------------
-    // GET REMAINING MEMBER COUNT (for leave confirmation UI)
-    // ---------------------------------------------------------
     public async Task<int> GetMemberCountAsync(Guid channelId)
     {
         var channel = await _dms.GetChannelAsync(channelId);

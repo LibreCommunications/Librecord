@@ -1,16 +1,6 @@
-/**
- * Browser notification + sound system.
- *
- * Listens for dm:message:new and guild:message:new events
- * and shows desktop notifications + plays a sound when the
- * tab is not focused.
- */
-
 let permissionGranted = false;
 let currentUserId: string | null = null;
 
-// ─── AUDIO ──────────────────────────────────────────────────────────
-// Single shared AudioContext, resumed on first user interaction.
 let audioCtx: AudioContext | null = null;
 
 function getAudioContext(): AudioContext {
@@ -28,7 +18,6 @@ function unlockAudio() {
     if (ctx.state === "suspended") {
         ctx.resume();
     }
-    // Remove listeners once unlocked
     if (ctx.state === "running") {
         for (const evt of unlockEvents) {
             document.removeEventListener(evt, unlockAudio);
@@ -43,7 +32,7 @@ for (const evt of unlockEvents) {
 function playNotificationSound() {
     try {
         const ctx = getAudioContext();
-        if (ctx.state === "suspended") return; // Not yet unlocked
+        if (ctx.state === "suspended") return;
 
         const now = ctx.currentTime;
         const osc = ctx.createOscillator();
@@ -60,8 +49,6 @@ function playNotificationSound() {
         // AudioContext not available
     }
 }
-
-// ─── LISTENERS ──────────────────────────────────────────────────────
 
 let dmListener: EventListener | null = null;
 let guildListener: EventListener | null = null;
@@ -82,7 +69,6 @@ export function initNotifications(userId: string) {
     dmListener = ((e: CustomEvent) => {
         const { channelId, authorId, authorName } = e.detail;
         if (authorId === currentUserId) return;
-        // Skip if we're focused on this exact channel
         if (document.hasFocus() && isViewingChannel(channelId)) return;
         playNotificationSound();
         if (!document.hasFocus()) {
@@ -94,7 +80,6 @@ export function initNotifications(userId: string) {
     guildListener = ((e: CustomEvent) => {
         const { channelId, authorId, authorName } = e.detail;
         if (authorId === currentUserId) return;
-        // Skip if we're focused on this exact channel
         if (document.hasFocus() && isViewingChannel(channelId)) return;
         playNotificationSound();
         if (!document.hasFocus()) {
@@ -116,7 +101,6 @@ export function cleanupNotifications() {
     currentUserId = null;
 }
 
-/** Check if the user is currently viewing a specific channel. */
 function isViewingChannel(channelId: string): boolean {
     const path = window.location.pathname;
     return path.includes(channelId);

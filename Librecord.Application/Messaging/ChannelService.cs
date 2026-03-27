@@ -12,9 +12,6 @@ public class ChannelService : IChannelService
         _channels = channels;
     }
 
-    // ---------------------------------------------------------
-    // CHANNEL
-    // ---------------------------------------------------------
     public Task<GuildChannel?> GetChannelAsync(Guid channelId)
     {
         return _channels.GetChannelAsync(channelId);

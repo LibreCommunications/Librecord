@@ -6,15 +6,9 @@ public class MessageThread
 {
     public Guid Id { get; set; }
 
-    /// <summary>
-    /// The message that started this thread.
-    /// </summary>
     public Guid ParentMessageId { get; set; }
     public Message ParentMessage { get; set; } = null!;
 
-    /// <summary>
-    /// Channel where the parent message lives.
-    /// </summary>
     public Guid ChannelId { get; set; }
 
     public string Name { get; set; } = null!;

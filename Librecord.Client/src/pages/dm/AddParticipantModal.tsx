@@ -25,7 +25,6 @@ export function AddParticipantModal({
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(false);
 
-    // ---------------- LOAD FRIENDS ----------------
     const loadFriends = useCallback(() => {
         getFriends().then(setFriends);
     }, [getFriends]);
@@ -34,13 +33,11 @@ export function AddParticipantModal({
         loadFriends();
     }, [loadFriends]);
 
-    // Existing member IDs
     const memberIds = useMemo(
         () => new Set(members.map(m => m.id)),
         [members]
     );
 
-    // ---------------- FILTER FRIENDS ----------------
     const filtered = friends.filter(f =>
         !memberIds.has(f.otherUserId) &&
         (
@@ -49,7 +46,6 @@ export function AddParticipantModal({
         )
     );
 
-    // ---------------- ADD FRIEND ----------------
     async function handleAdd(userId: string) {
         if (loading) return;
 
@@ -64,7 +60,6 @@ export function AddParticipantModal({
         <div className="modal-overlay-animated">
             <div className="w-full max-w-md rounded-lg bg-[#313338] p-5 shadow-xl animate-[scaleIn_0.15s_ease-out]">
 
-                {/* HEADER */}
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-white">
                         Add friend to group
@@ -77,7 +72,6 @@ export function AddParticipantModal({
                     </button>
                 </div>
 
-                {/* SEARCH */}
                 <input
                     value={query}
                     onChange={e => setQuery(e.target.value)}
@@ -90,7 +84,6 @@ export function AddParticipantModal({
                     "
                 />
 
-                {/* FRIEND LIST */}
                 <div className="max-h-64 overflow-y-auto space-y-1">
                     {filtered.length === 0 && (
                         <div className="text-sm text-gray-400">

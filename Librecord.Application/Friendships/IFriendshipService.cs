@@ -6,19 +6,11 @@ namespace Librecord.Application.Interfaces;
 
 public interface IFriendshipService
 {
-    // -----------------------------
-    // COMMANDS
-    // -----------------------------
-
     Task<FriendResult> SendRequestAsync(Guid requesterId, string username);
     Task<FriendResult> AcceptRequestAsync(Guid userId, Guid requesterId);
     Task<FriendResult> DeclineRequestAsync(Guid userId, Guid requesterId);
     Task<FriendResult> RemoveFriendAsync(Guid userId, Guid friendId);
 
-
-    // -----------------------------
-    // QUERIES (APPLICATION MODELS)
-    // -----------------------------
 
     Task<IReadOnlyList<FriendshipSummaryResult>>
         GetFriendsAsync(Guid userId);

@@ -11,12 +11,9 @@ public class GuildRole
 
     public required string Name { get; set; }
 
-    // Higher number = higher role
     public int Position { get; set; }
 
-    // Permissions assigned to this role
     public List<RolePermission> Permissions { get; set; } = [];
 
-    // Users that have this role
     public List<GuildMemberRole> Members { get; set; } = [];
 }

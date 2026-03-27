@@ -18,9 +18,6 @@ public sealed class DirectMessageController : AuthenticatedController
     {
         _dms = dms;
     }
-    // ---------------------------------------------------------
-    // GET CHANNEL MESSAGES
-    // ---------------------------------------------------------
     [HttpGet("channel/{channelId:guid}")]
     public async Task<IActionResult> GetChannelMessages(
         Guid channelId,
@@ -36,9 +33,6 @@ public sealed class DirectMessageController : AuthenticatedController
         return Ok(messages.Select(x=> MessageDto.From(x)));
     }
 
-    // ---------------------------------------------------------
-    // SEND MESSAGE
-    // ---------------------------------------------------------
     [HttpPost("channel/{channelId:guid}")]
     public async Task<IActionResult> SendMessage(
         Guid channelId,
@@ -60,9 +54,6 @@ public sealed class DirectMessageController : AuthenticatedController
         return Ok(MessageDto.From(message, dto.ClientMessageId));
     }
 
-    // ---------------------------------------------------------
-    // EDIT MESSAGE
-    // ---------------------------------------------------------
     [HttpPut("{messageId:guid}")]
     public async Task<IActionResult> EditMessage(
         Guid messageId,
@@ -82,9 +73,6 @@ public sealed class DirectMessageController : AuthenticatedController
         return Ok(MessageDto.From(message));
     }
 
-    // ---------------------------------------------------------
-    // DELETE MESSAGE
-    // ---------------------------------------------------------
     [HttpDelete("{messageId:guid}")]
     public async Task<IActionResult> DeleteMessage(Guid messageId)
     {

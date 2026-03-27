@@ -39,7 +39,6 @@ export default function DmSidebar() {
             const counts = await getUnreadCounts(list.map(d => d.id));
             setUnreads(counts);
 
-            // Fetch presence for all DM contacts
             const otherUserIds = list.flatMap(dm =>
                 dm.members.filter(m => m.id !== user?.userId).map(m => m.id)
             );
@@ -57,7 +56,6 @@ export default function DmSidebar() {
         Promise.resolve().then(loadDms);
     }, [loadDms]);
 
-    // Refresh DM list when a friend is removed or a new DM channel is created
     useEffect(() => {
         const refresh = () => { loadDms(); };
         window.addEventListener("friend:removed", refresh as EventListener);
@@ -72,16 +70,13 @@ export default function DmSidebar() {
         };
     }, [loadDms]);
 
-    // Update DM list when a member leaves a group DM
     useEffect(() => {
         const onMemberLeft = (e: CustomEvent<AppEventMap["dm:member:left"]>) => {
             const { channelId, userId } = e.detail;
             if (userId === user?.userId) {
-                // Current user left — remove the DM from sidebar
                 setDms(prev => prev.filter(d => d.id !== channelId));
                 if (dmId === channelId) navigate("/app/dm");
             } else {
-                // Another member left — update the member list
                 setDms(prev => prev.map(d =>
                     d.id === channelId
                         ? { ...d, members: d.members.filter(m => m.id !== userId) }
@@ -93,7 +88,6 @@ export default function DmSidebar() {
         return () => window.removeEventListener("dm:member:left", onMemberLeft as EventListener);
     }, [dmId, user?.userId, navigate]);
 
-    // Handle DM channel deletion (1-on-1 DM deleted by either member)
     useEffect(() => {
         const onDeleted = (e: CustomEvent<AppEventMap["dm:channel:deleted"]>) => {
             const { channelId } = e.detail;
@@ -104,7 +98,6 @@ export default function DmSidebar() {
         return () => window.removeEventListener("dm:channel:deleted", onDeleted as EventListener);
     }, [dmId, navigate]);
 
-    // Update presence from real-time events
     useEffect(() => {
         const onPresence = (e: CustomEvent<AppEventMap["dm:user:presence"]>) => {
             setPresenceMap(prev => ({
@@ -117,8 +110,6 @@ export default function DmSidebar() {
         return () => window.removeEventListener("dm:user:presence", onPresence as EventListener);
     }, []);
 
-    // Increment unread when a message ping arrives for a non-active channel.
-    // If the channel was closed (not in dms list), re-fetch to restore it.
     useEffect(() => {
         const onPing = (e: CustomEvent<AppEventMap["dm:message:ping"]>) => {
             const { channelId: pingChannel, authorId } = e.detail;
@@ -128,7 +119,6 @@ export default function DmSidebar() {
             setDms(prev => {
                 const exists = prev.some(d => d.id === pingChannel);
                 if (!exists) {
-                    // Channel was closed/hidden — reload DM list to restore it
                     loadDms();
                 }
                 return prev;
@@ -144,7 +134,6 @@ export default function DmSidebar() {
         return () => window.removeEventListener("dm:message:ping", onPing as EventListener);
     }, [dmId, user?.userId, loadDms]);
 
-    // Clear unread count when navigating into a DM (render-phase)
     const [prevActiveDmId, setPrevActiveDmId] = useState(dmId);
     if (dmId && dmId !== prevActiveDmId) {
         setPrevActiveDmId(dmId);
@@ -335,7 +324,6 @@ export default function DmSidebar() {
                 onCreated={(channelId) => {
                     setShowCreateGroup(false);
                     navigate(`/app/dm/${channelId}`);
-                    // Refresh DM list
                     getMyDms().then(setDms);
                 }}
             />

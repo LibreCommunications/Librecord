@@ -50,7 +50,6 @@ public class ReactionRepository : IReactionRepository
 
     public async Task<Guid?> GetMessageChannelIdAsync(Guid messageId)
     {
-        // Check guild context first, then DM context
         var guildCtx = await _db.GuildChannelMessages
             .Where(g => g.MessageId == messageId)
             .Select(g => (Guid?)g.ChannelId)

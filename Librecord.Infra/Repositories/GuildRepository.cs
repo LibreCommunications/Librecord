@@ -27,12 +27,9 @@ public class GuildRepository : IGuildRepository
 
     public async Task SaveChangesAsync()
     {
-        // Detect modified entities and invalidate relevant caches
         InvalidateCachesFromChangeTracker();
         await _db.SaveChangesAsync();
     }
-
-    // ─── CACHED READS ────────────────────────────────────
 
     public async Task<List<Guild>> GetGuildsForUserAsync(Guid userId)
     {
@@ -133,8 +130,6 @@ public class GuildRepository : IGuildRepository
         return result;
     }
 
-    // ─── NON-CACHED READS ────────────────────────────────
-
     public Task<Guild?> GetGuildAsync(Guid id)
     {
         return _db.Guilds
@@ -185,8 +180,6 @@ public class GuildRepository : IGuildRepository
                 o.RoleId == roleId &&
                 o.UserId == userId);
 
-    // ─── MUTATIONS (with cache invalidation) ─────────────
-
     public Task RemoveMemberAsync(GuildMember member)
     {
         _db.GuildMembers.Remove(member);
@@ -227,13 +220,6 @@ public class GuildRepository : IGuildRepository
         return Task.CompletedTask;
     }
 
-    // ─── CHANGE TRACKER CACHE INVALIDATION ───────────────
-
-    /// <summary>
-    /// Scans the EF change tracker for modified/added/deleted entities
-    /// that affect cached data and evicts the relevant cache keys.
-    /// Called automatically before SaveChangesAsync.
-    /// </summary>
     private void InvalidateCachesFromChangeTracker()
     {
         foreach (var entry in _db.ChangeTracker.Entries())
@@ -244,7 +230,6 @@ public class GuildRepository : IGuildRepository
             switch (entry.Entity)
             {
                 case GuildMemberRole mr:
-                    // Role assigned/removed from member — invalidate member + role perms
                     _cache.Remove($"repo:member:{mr.GuildId}:{mr.UserId}");
                     break;
 
@@ -254,11 +239,9 @@ public class GuildRepository : IGuildRepository
                     break;
 
                 case RolePermission rp:
-                    // Role permission changed — invalidate single + batch caches
                     _cache.Remove($"repo:role-perms-single:{rp.RoleId}");
-                    // Can't target batch keys precisely, so evict all batch keys
-                    // by using a prefix pattern. IMemoryCache doesn't support this,
-                    // so we invalidate via a generation counter instead.
+                    // IMemoryCache doesn't support prefix eviction, so we use a
+                    // generation counter to invalidate all batch role-perm keys.
                     InvalidateAllRolePermsBatch();
                     break;
 
@@ -268,18 +251,12 @@ public class GuildRepository : IGuildRepository
 
                 case GuildChannel ch:
                     _cache.Remove($"repo:channel:{ch.Id}");
-                    // Channel added/removed changes the guilds-for-user result
                     InvalidateGuildsForUserGen();
                     break;
             }
         }
     }
 
-    /// <summary>
-    /// Increments a generation counter that makes all batch role-permission
-    /// cache keys stale. We prefix batch keys with the generation number
-    /// so changing it effectively invalidates all of them.
-    /// </summary>
     private void InvalidateAllRolePermsBatch()
     {
         var gen = _cache.Get<long>("repo:role-perms-gen");

@@ -18,6 +18,27 @@ function getHttpsConfig() {
   return undefined;
 }
 
+function versionPlugin(): import("vite").Plugin {
+  const buildId = Date.now().toString(36);
+  return {
+    name: "version-json",
+    config() {
+      return {
+        define: {
+          __BUILD_ID__: JSON.stringify(buildId),
+        },
+      };
+    },
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "version.json",
+        source: JSON.stringify({ buildId }),
+      });
+    },
+  };
+}
+
 export default defineConfig({
   server: {
     https: getHttpsConfig(),
@@ -28,5 +49,6 @@ export default defineConfig({
     react(),
     babel({ presets: [reactCompilerPreset()] }),
     tailwindcss(),
+    versionPlugin(),
   ],
 });

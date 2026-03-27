@@ -59,7 +59,6 @@ public class ReadStateRepository : IReadStateRepository
             state.LastReadAt = DateTime.UtcNow;
         }
 
-        // Invalidate cache after upsert
         _cache.Remove($"repo:readstate:{userId}:{channelId}");
     }
 
@@ -80,7 +79,6 @@ public class ReadStateRepository : IReadStateRepository
             int count;
             if (lastRead == null)
             {
-                // Count all messages in both DM and guild channels
                 var dmCount = await _db.DmChannelMessages
                     .Where(m => m.ChannelId == channelId)
                     .Join(_db.Messages, dm => dm.MessageId, msg => msg.Id, (dm, msg) => msg)
@@ -97,7 +95,6 @@ public class ReadStateRepository : IReadStateRepository
             }
             else
             {
-                // Get the creation time of the last read message
                 var lastReadMsg = await _db.Messages.FindAsync(lastRead);
                 if (lastReadMsg == null) { result[channelId] = 0; continue; }
 

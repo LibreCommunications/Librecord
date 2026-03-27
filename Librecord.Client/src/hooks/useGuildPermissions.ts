@@ -5,6 +5,7 @@ import type { GuildPermissions } from "../types/guild";
 export type { GuildPermissions };
 
 const NONE: GuildPermissions = {
+    isOwner: false,
     manageGuild: false,
     manageChannels: false,
     manageRoles: false,
@@ -18,7 +19,6 @@ export function useGuildPermissions(guildId: string | undefined) {
     const [loaded, setLoaded] = useState(false);
     const [prevGuildId, setPrevGuildId] = useState(guildId);
 
-    // Reset synchronously during render when guild changes
     if (guildId !== prevGuildId) {
         setPrevGuildId(guildId);
         setPermissions(NONE);

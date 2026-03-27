@@ -28,7 +28,6 @@ public class BlockService : IBlockService
             CreatedAt = DateTime.UtcNow
         });
 
-        // Remove any friendships between the two users
         var friendships = await _friendships.GetFriendshipsForUserAsync(blockerId);
         foreach (var fs in friendships.Where(f => f.RequesterId == blockedId || f.TargetId == blockedId))
         {

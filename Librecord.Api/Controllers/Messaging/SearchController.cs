@@ -36,7 +36,6 @@ public class SearchController : AuthenticatedController
         if (string.IsNullOrWhiteSpace(q))
             return BadRequest("Search query is required.");
 
-        // Verify the user has access to the channel/guild being searched
         if (channelId.HasValue)
         {
             var perm = await _permissions.HasChannelPermissionAsync(UserId, channelId.Value, ChannelPermission.ReadMessages);

@@ -22,7 +22,6 @@ public sealed class SignalRGuildRealtimeNotifier : IGuildRealtimeNotifier
         {
             GuildMessageCreated created =>
                 Task.WhenAll(
-                    // Lightweight ping for unread badges + notifications
                     _hub.Clients.Group(group).SendAsync(
                         "guild:message:ping",
                         new
@@ -32,7 +31,6 @@ public sealed class SignalRGuildRealtimeNotifier : IGuildRealtimeNotifier
                             authorId = created.AuthorId,
                             authorName = created.Author.DisplayName,
                         }),
-                    // Full payload for active channel view
                     _hub.Clients.Group(group).SendAsync(
                         "guild:message:new",
                         new GuildRealtimeMessageCreatedTransport

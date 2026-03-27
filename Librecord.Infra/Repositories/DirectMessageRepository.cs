@@ -19,9 +19,6 @@ public sealed class DirectMessageRepository : IDirectMessageRepository
         _encryption = encryption;
     }
 
-    // ---------------------------------------------------------
-    // READS
-    // ---------------------------------------------------------
 
     public async Task<Message?> GetMessageAsync(Guid messageId)
     {
@@ -66,9 +63,6 @@ public sealed class DirectMessageRepository : IDirectMessageRepository
             .ToList();
     }
 
-    // ---------------------------------------------------------
-    // WRITES
-    // ---------------------------------------------------------
 
     public async Task AddMessageAsync(Message message, Guid channelId)
     {
@@ -121,9 +115,6 @@ public sealed class DirectMessageRepository : IDirectMessageRepository
     public Task SaveChangesAsync()
         => _db.SaveChangesAsync();
 
-    // ---------------------------------------------------------
-    // HELPERS
-    // ---------------------------------------------------------
 
     private async Task<Message?> LoadMessage(Guid id)
         => await _db.Messages

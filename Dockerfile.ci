@@ -1,0 +1,6 @@
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-azurelinux3.0
+WORKDIR /app
+RUN tdnf install -y krb5-libs && tdnf clean all
+COPY .publish/ .
+EXPOSE 5111
+ENTRYPOINT ["dotnet", "Librecord.Api.dll"]

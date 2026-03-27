@@ -35,7 +35,6 @@ public class UserRepository : IUserRepository
     }
 
 
-    // Fetch user with ONLY guilds they belong to
     public async Task<User?> GetUserWithGuildsAsync(Guid id)
     {
         return await _db.Users

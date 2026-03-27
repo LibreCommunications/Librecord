@@ -30,13 +30,9 @@ public class PresenceController : AuthenticatedController
         _dmChannels = dmChannels;
         _hub = hub;
     }
-    // ---------------------------------------------------------
-    // SET STATUS
-    // ---------------------------------------------------------
     [HttpPut]
     public async Task<IActionResult> SetStatus([FromBody] SetStatusRequest request)
     {
-        // Map frontend names to enum values
         var status = request.Status.ToLowerInvariant() switch
         {
             "online" => UserStatus.Default,
@@ -65,9 +61,6 @@ public class PresenceController : AuthenticatedController
         return Ok(new { status = StatusToSelf(status.Value) });
     }
 
-    // ---------------------------------------------------------
-    // GET MY STATUS
-    // ---------------------------------------------------------
     [HttpGet("me")]
     public async Task<IActionResult> GetMyPresence()
     {
@@ -76,9 +69,6 @@ public class PresenceController : AuthenticatedController
         return Ok(new { status });
     }
 
-    // ---------------------------------------------------------
-    // GET BULK PRESENCE
-    // ---------------------------------------------------------
     [HttpPost("bulk")]
     public async Task<IActionResult> GetBulk([FromBody] BulkPresenceRequest request)
     {
@@ -99,9 +89,6 @@ public class PresenceController : AuthenticatedController
         return Ok(result);
     }
 
-    /// <summary>
-    /// Resolves what status to show to other users based on stored preference and connection state.
-    /// </summary>
     private static string ResolveAppearance(UserStatus storedStatus, bool isConnected) => storedStatus switch
     {
         UserStatus.Invisible => "offline",
@@ -111,9 +98,6 @@ public class PresenceController : AuthenticatedController
         _ => "offline"
     };
 
-    /// <summary>
-    /// Maps stored status to what the user sees as their own chosen status.
-    /// </summary>
     private static string StatusToSelf(UserStatus status) => status switch
     {
         UserStatus.Default => "online",

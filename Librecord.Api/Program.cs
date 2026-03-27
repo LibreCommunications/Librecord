@@ -19,9 +19,6 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --------------------------------------------------
-// CONFIG
-// --------------------------------------------------
 var jwtOpts = builder.Configuration
     .GetSection("Jwt")
     .Get<JwtOptions>()
@@ -36,9 +33,6 @@ if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("Default
 if (string.IsNullOrWhiteSpace(builder.Configuration["Security:MessageEncryptionKey"]))
     throw new InvalidOperationException("Security:MessageEncryptionKey is missing.");
 
-// --------------------------------------------------
-// SERVICE REGISTRATION
-// --------------------------------------------------
 ConfigureIdentity(builder.Services);
 ConfigureAuthentication(builder.Services, jwtOpts);
 
@@ -50,14 +44,8 @@ ConfigureDatabase(builder.Services, builder.Configuration);
 ConfigureSwagger(builder.Services);
 ConfigureRateLimiting(builder.Services);
 
-// --------------------------------------------------
-// BUILD APP
-// --------------------------------------------------
 var app = builder.Build();
 
-// --------------------------------------------------
-// MIDDLEWARE PIPELINE
-// --------------------------------------------------
 if (app.Environment.IsDevelopment())
 {
     ConfigureDevelopment(app);
@@ -75,17 +63,19 @@ app.MapControllers();
 app.MapHub<AppHub>("/hubs/app");
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
-// --------------------------------------------------
-// DATABASE MIGRATIONS & SEEDING
-// --------------------------------------------------
 ApplyMigrations(app);
 
-// Clear stale voice states from previous run
+// Voice states persist in PostgreSQL so calls survive restarts.
+// Stale states are cleaned up when users reconnect or via RejoinVoiceChannel.
+
+// Graceful shutdown: give SignalR connections time to close cleanly
+// so OnDisconnectedAsync fires and voice states are properly cleaned up
+// for users who don't reconnect.
+app.Lifetime.ApplicationStopping.Register(() =>
 {
-    using var scope = app.Services.CreateScope();
-    var voiceRepo = scope.ServiceProvider.GetRequiredService<IVoiceStateRepository>();
-    await voiceRepo.RemoveAllAsync();
-}
+    app.Logger.LogInformation("Graceful shutdown: waiting for SignalR connections to drain...");
+    Thread.Sleep(5_000);
+});
 
 if (app.Environment.IsDevelopment())
 {
@@ -93,13 +83,8 @@ if (app.Environment.IsDevelopment())
     await UserSeeder.SeedAsync(scope.ServiceProvider);
 }
 
-// --------------------------------------------------
 await app.RunAsync();
 
-
-// ==================================================
-// CONFIG HELPERS
-// ==================================================
 
 static void ConfigureIdentity(IServiceCollection services)
 {
@@ -140,7 +125,6 @@ static void ConfigureAuthentication(
                 ClockSkew = TimeSpan.FromSeconds(30)
             };
 
-            // Read JWT from HttpOnly cookie
             options.Events = new JwtBearerEvents
             {
                 OnMessageReceived = ctx =>
@@ -221,7 +205,6 @@ static void ConfigureRateLimiting(IServiceCollection services)
             return ip?.ToString() ?? "unknown";
         }
 
-        // Global default: 3000 requests per minute per client IP
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
         {
             var clientIp = GetClientIp(ctx);
@@ -238,7 +221,6 @@ static void ConfigureRateLimiting(IServiceCollection services)
                 });
         });
 
-        // Auth endpoints: 60 per minute (brute force protection)
         options.AddPolicy("auth", ctx =>
         {
             var clientIp = GetClientIp(ctx);
@@ -254,7 +236,6 @@ static void ConfigureRateLimiting(IServiceCollection services)
                 });
         });
 
-        // File uploads: 120 per minute
         options.AddPolicy("upload", ctx =>
         {
             var clientIp = GetClientIp(ctx);

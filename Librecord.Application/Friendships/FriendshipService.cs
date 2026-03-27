@@ -27,9 +27,6 @@ public class FriendshipService : IFriendshipService
         _notifier = notifier;
     }
 
-    // ---------------------------------------------------------
-    // SEND REQUEST
-    // ---------------------------------------------------------
     public async Task<FriendResult> SendRequestAsync(Guid requesterId, string username)
     {
         var targetUser = await _users.GetByUsernameAsync(username);
@@ -81,9 +78,6 @@ public class FriendshipService : IFriendshipService
         return FriendResult.FromFriendship(fs);
     }
 
-    // ---------------------------------------------------------
-    // ACCEPT
-    // ---------------------------------------------------------
     public async Task<FriendResult> AcceptRequestAsync(Guid userId, Guid requesterId)
     {
         var fs = await _repo.GetFriendshipAsync(requesterId, userId);
@@ -112,9 +106,6 @@ public class FriendshipService : IFriendshipService
         return FriendResult.FromFriendship(fs);
     }
 
-    // ---------------------------------------------------------
-    // DECLINE
-    // ---------------------------------------------------------
     public async Task<FriendResult> DeclineRequestAsync(Guid userId, Guid requesterId)
     {
         var fs = await _repo.GetFriendshipAsync(requesterId, userId);
@@ -128,14 +119,12 @@ public class FriendshipService : IFriendshipService
         await _repo.DeleteAsync(fs);
         await _repo.SaveChangesAsync();
 
-        // Notify the original requester that their request was declined/cancelled
         await _notifier.NotifyAsync(new FriendRequestDeclined
         {
             UserId = fs.RequesterId,
             DeclinedByUserId = userId
         });
 
-        // Also notify the target so their incoming requests list updates
         await _notifier.NotifyAsync(new FriendRequestDeclined
         {
             UserId = fs.TargetId,
@@ -145,9 +134,6 @@ public class FriendshipService : IFriendshipService
         return FriendResult.SuccessOnly();
     }
 
-    // ---------------------------------------------------------
-    // REMOVE
-    // ---------------------------------------------------------
     public async Task<FriendResult> RemoveFriendAsync(Guid userId, Guid friendId)
     {
         var fs = await _repo.GetFriendshipAsync(userId, friendId);
@@ -158,7 +144,6 @@ public class FriendshipService : IFriendshipService
         await _repo.DeleteAsync(fs);
         await _repo.SaveChangesAsync();
 
-        // Notify both users so DM sidebars refresh isFriend status
         await _notifier.NotifyAsync(new FriendRemoved
         {
             UserId = friendId,
@@ -173,9 +158,6 @@ public class FriendshipService : IFriendshipService
         return FriendResult.SuccessOnly();
     }
 
-    // ---------------------------------------------------------
-    // FRIEND LIST (APPLICATION MODEL)
-    // ---------------------------------------------------------
     public async Task<IReadOnlyList<FriendshipSummaryResult>> GetFriendsAsync(Guid userId)
     {
         var entries = await _repo.GetFriendshipsForUserAsync(userId);
@@ -202,9 +184,6 @@ public class FriendshipService : IFriendshipService
         return results;
     }
 
-    // ---------------------------------------------------------
-    // REQUESTS (APPLICATION MODEL)
-    // ---------------------------------------------------------
     public async Task<(IReadOnlyList<FriendRequestSummaryResult> Incoming,
             IReadOnlyList<FriendRequestSummaryResult> Outgoing)>
         GetRequestsAsync(Guid userId)
@@ -247,9 +226,6 @@ public class FriendshipService : IFriendshipService
         return (incoming, outgoing);
     }
 
-    // ---------------------------------------------------------
-    // USER SUGGESTIONS (APPLICATION MODEL)
-    // ---------------------------------------------------------
     public async Task<IReadOnlyList<UserSuggestionResult>> SuggestUsernamesAsync(
         string input,
         Guid userId)

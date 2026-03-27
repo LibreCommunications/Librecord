@@ -16,17 +16,20 @@ export function MemberSidebar({ guildId }: Props) {
     const [presenceMap, setPresenceMap] = useState<Record<string, string>>({});
 
     useEffect(() => {
-        getMembers(guildId).then(async (m) => {
-            setMembers(m);
+        function load() {
+            getMembers(guildId).then(async (m) => {
+                setMembers(m);
+                const userIds = m.map(member => member.userId);
+                const map = await presence.bulk(userIds);
+                setPresenceMap(map);
+            });
+        }
+        load();
 
-            // Fetch bulk presence
-            const userIds = m.map(member => member.userId);
-            const map = await presence.bulk(userIds);
-            setPresenceMap(map);
-        });
+        window.addEventListener("realtime:reconnected", load);
+        return () => window.removeEventListener("realtime:reconnected", load);
     }, [guildId, getMembers]);
 
-    // Listen for realtime presence changes
     useEffect(() => {
         const onPresence = (e: CustomEvent<AppEventMap["guild:user:presence"]>) => {
             setPresenceMap(prev => ({
@@ -39,7 +42,6 @@ export function MemberSidebar({ guildId }: Props) {
         return () => window.removeEventListener("guild:user:presence", onPresence as EventListener);
     }, []);
 
-    // Group by highest role
     const grouped = new Map<string, GuildMember[]>();
 
     for (const member of members) {

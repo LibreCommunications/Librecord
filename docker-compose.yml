@@ -1,5 +1,8 @@
 x-backend: &backend-base
-  build: .
+  build:
+    context: .
+    dockerfile: ${BACKEND_DOCKERFILE:-Dockerfile}
+  image: ${COMPOSE_PROJECT_NAME:-librecord}-backend:latest
   restart: unless-stopped
   depends_on:
     postgres:

@@ -23,7 +23,7 @@ export function SearchBar({ channelId, guildId }: Props) {
     }
 
     return (
-        <div className="relative">
+        <div className="relative hidden lg:block">
             <input
                 value={query}
                 onChange={e => setQuery(e.target.value)}

@@ -26,7 +26,6 @@ public class GuildMemberService : IGuildMemberService
         var existingBan = await _guilds.GetBanAsync(guildId, userId);
         if (existingBan != null) return;
 
-        // Remove from guild if member
         var member = await _guilds.GetGuildMemberAsync(guildId, userId);
         if (member != null)
             await _guilds.RemoveMemberAsync(member);

@@ -19,8 +19,6 @@ public class GuildChannelPermissionOverride
     public Guid PermissionId { get; set; }
     public Permission Permission { get; set; } = null!;
 
+    // true = allow, false = deny, null = inherit
     public bool? Allow { get; set; }
-    // true = allow
-    // false = deny
-    // null = inherit
 }

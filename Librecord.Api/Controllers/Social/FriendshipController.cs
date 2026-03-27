@@ -19,9 +19,6 @@ public class FriendshipController : AuthenticatedController
     {
         _friends = friends;
     }
-    // -------------------------------
-    // SEND REQUEST
-    // -------------------------------
     [HttpPost("request")]
     public async Task<ActionResult<FriendshipActionDto>> SendRequest(
         [FromBody] SendFriendRequestRequest request)
@@ -44,9 +41,6 @@ public class FriendshipController : AuthenticatedController
 
         return Ok(new FriendshipActionDto { Success = true });
     }
-    // -------------------------------
-    // LIST FRIENDS
-    // -------------------------------
     [HttpGet("list")]
     public async Task<ActionResult<IReadOnlyList<FriendshipListDto>>> List()
     {
@@ -54,9 +48,6 @@ public class FriendshipController : AuthenticatedController
 
         return Ok(friends.Select(FriendshipListDto.From));
     }
-    // -------------------------------
-    // INCOMING + OUTGOING REQUESTS
-    // -------------------------------
     [HttpGet("requests")]
     public async Task<IActionResult> Requests()
     {
@@ -69,9 +60,6 @@ public class FriendshipController : AuthenticatedController
         });
     }
 
-    // -------------------------------
-    // ACCEPT
-    // -------------------------------
     [HttpPost("accept/{requesterId:guid}")]
     public async Task<ActionResult<FriendshipActionDto>> Accept(Guid requesterId)
     {
@@ -86,9 +74,6 @@ public class FriendshipController : AuthenticatedController
             });
     }
 
-    // -------------------------------
-    // DECLINE
-    // -------------------------------
     [HttpPost("decline/{requesterId:guid}")]
     public async Task<ActionResult<FriendshipActionDto>> Decline(Guid requesterId)
     {
@@ -103,9 +88,6 @@ public class FriendshipController : AuthenticatedController
             });
     }
 
-    // -------------------------------
-    // CANCEL OUTGOING REQUEST
-    // -------------------------------
     [HttpPost("cancel/{targetId:guid}")]
     public async Task<ActionResult<FriendshipActionDto>> Cancel(Guid targetId)
     {
@@ -121,9 +103,6 @@ public class FriendshipController : AuthenticatedController
             });
     }
 
-    // -------------------------------
-    // REMOVE
-    // -------------------------------
     [HttpDelete("remove/{friendId:guid}")]
     public async Task<ActionResult<FriendshipActionDto>> Remove(Guid friendId)
     {
@@ -138,9 +117,6 @@ public class FriendshipController : AuthenticatedController
             });
     }
 
-    // -------------------------------
-    // USERNAME SUGGESTIONS
-    // -------------------------------
     [HttpGet("suggest")]
     public async Task<ActionResult<IReadOnlyList<UserSuggestionDto>>> Suggest(
         [FromQuery] string query)

@@ -21,6 +21,15 @@ export interface VoiceState {
     isConnected: boolean;
 }
 
+const STORAGE_KEY = "librecord:voiceSession";
+
+interface PersistedVoiceSession {
+    channelId: string;
+    guildId: string;
+    isMuted: boolean;
+    isDeafened: boolean;
+}
+
 const INITIAL_STATE: VoiceState = {
     channelId: null,
     guildId: null,
@@ -38,13 +47,42 @@ function emit() {
     window.dispatchEvent(new CustomEvent("voice:state:changed", { detail: state }));
 }
 
+function persist() {
+    if (state.isConnected && state.channelId && state.guildId) {
+        const session: PersistedVoiceSession = {
+            channelId: state.channelId,
+            guildId: state.guildId,
+            isMuted: state.isMuted,
+            isDeafened: state.isDeafened,
+        };
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    } else {
+        sessionStorage.removeItem(STORAGE_KEY);
+    }
+}
+
 function update(patch: Partial<VoiceState>) {
     state = { ...state, ...patch };
+    persist();
     emit();
 }
 
 export function getVoiceState(): VoiceState {
     return state;
+}
+
+export function getPersistedVoiceSession(): PersistedVoiceSession | null {
+    try {
+        const raw = sessionStorage.getItem(STORAGE_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
+}
+
+export function clearPersistedVoiceSession() {
+    sessionStorage.removeItem(STORAGE_KEY);
 }
 
 export function setVoiceState(patch: Partial<VoiceState>) {
@@ -79,5 +117,6 @@ export function updateParticipantState(
 
 export function resetVoiceState() {
     state = { ...INITIAL_STATE };
+    persist();
     emit();
 }

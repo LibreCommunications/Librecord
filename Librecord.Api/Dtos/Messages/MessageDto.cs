@@ -27,9 +27,6 @@ public sealed class MessageDto
     public IReadOnlyList<MessageReactionDto> Reactions { get; init; } = [];
     public IReadOnlyList<MessageEditDto> Edits { get; init; } = [];
 
-    // -------------------------------------------------
-    // MAPPER (GUILD & DM)
-    // -------------------------------------------------
     public static MessageDto From(Message message, string? clientMessageId = null)
     {
         return new MessageDto

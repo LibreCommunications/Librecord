@@ -335,6 +335,111 @@ export async function countActiveVideos(page: Page): Promise<number> {
     });
 }
 
+/**
+ * Verifies that a video stream is continuously producing non-black frames
+ * over a duration. Takes multiple samples and asserts all are non-black.
+ * Also verifies WebRTC video bytes keep increasing (stream is live, not frozen).
+ *
+ * @param page          The page of the user who should be receiving video.
+ * @param description   Human-readable label for error messages.
+ * @param durationMs    How long to sample over (default 1500ms).
+ * @param samples       Number of frame samples to take (default 3).
+ * @param timeout       How long to wait for initial video before sampling.
+ */
+export async function expectContinuousVideoStream(
+    page: Page,
+    description: string,
+    {
+        durationMs = 1500,
+        samples = 3,
+        timeout = 20_000,
+    } = {},
+): Promise<void> {
+    // Phase 1: Wait for video to start rendering non-black frames
+    await expectVideoPlaying(page, `${description} — initial frame`, timeout);
+
+    // Phase 2: Take multiple frame samples, all must be non-black
+    const sampleInterval = Math.floor(durationMs / Math.max(samples - 1, 1));
+    let nonBlackCount = 0;
+
+    for (let i = 0; i < samples; i++) {
+        if (i > 0) await page.waitForTimeout(sampleInterval);
+
+        const isNonBlack = await page.evaluate(() => {
+            const videos = Array.from(document.querySelectorAll("video"));
+            for (const video of videos) {
+                if (video.classList.contains("hidden")) continue;
+                if (!video.srcObject) continue;
+                if (video.videoWidth === 0 || video.videoHeight === 0) continue;
+                if (video.readyState < 2) continue;
+
+                const canvas = document.createElement("canvas");
+                canvas.width = Math.min(video.videoWidth, 64);
+                canvas.height = Math.min(video.videoHeight, 64);
+                const ctx = canvas.getContext("2d")!;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+                let nonBlackPixels = 0;
+                for (let i = 0; i < data.length; i += 4) {
+                    if (data[i] + data[i + 1] + data[i + 2] > 30) nonBlackPixels++;
+                }
+                if (nonBlackPixels / (canvas.width * canvas.height) > 0.05) return true;
+            }
+            return false;
+        });
+
+        if (isNonBlack) nonBlackCount++;
+    }
+
+    expect(
+        nonBlackCount,
+        `Expected continuous non-black video for ${durationMs}ms (${description}), only ${nonBlackCount}/${samples} samples were non-black`,
+    ).toBe(samples);
+
+    // Phase 3: Verify WebRTC video bytes are still increasing (stream is live)
+    const bytesBefore = await page.evaluate(async () => {
+        const pcs: RTCPeerConnection[] = (window as any).__rtcPeerConnections ?? [];
+        let total = 0;
+        for (const pc of pcs) {
+            if (pc.connectionState === "closed") continue;
+            try {
+                const stats = await pc.getStats();
+                for (const [, report] of stats) {
+                    if (report.type === "inbound-rtp" && report.kind === "video") {
+                        total += report.bytesReceived ?? 0;
+                    }
+                }
+            } catch { /* closed */ }
+        }
+        return total;
+    });
+
+    await page.waitForTimeout(500);
+
+    const bytesAfter = await page.evaluate(async () => {
+        const pcs: RTCPeerConnection[] = (window as any).__rtcPeerConnections ?? [];
+        let total = 0;
+        for (const pc of pcs) {
+            if (pc.connectionState === "closed") continue;
+            try {
+                const stats = await pc.getStats();
+                for (const [, report] of stats) {
+                    if (report.type === "inbound-rtp" && report.kind === "video") {
+                        total += report.bytesReceived ?? 0;
+                    }
+                }
+            } catch { /* closed */ }
+        }
+        return total;
+    });
+
+    expect(
+        bytesAfter - bytesBefore,
+        `Expected video bytes to increase over 500ms (${description}), but delta was ${bytesAfter - bytesBefore}`,
+    ).toBeGreaterThan(0);
+}
+
 // ─── DEEP WEBRTC STATS HELPERS ─────────────────────────────────────────
 
 export interface RtpStreamStats {

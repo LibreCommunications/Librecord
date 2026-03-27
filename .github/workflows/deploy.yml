@@ -12,11 +12,15 @@ on:
         options: [production, test]
 
 jobs:
-  deploy:
+  build:
     runs-on: self-hosted
 
     env:
       IS_PROD: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/master') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'production') }}
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+      DOTNET_USE_SHARED_COMPILATION: true
 
     environment: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/master') && 'production' || (github.event_name == 'workflow_dispatch' && inputs.environment) || 'test' }}
 
@@ -47,21 +51,7 @@ jobs:
           fi
 
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ hashFiles('**/*.csproj') }}
-          restore-keys: nuget-
-
-      - name: Cache npm
-        uses: actions/cache@v4
-        with:
-          path: Librecord.Client/node_modules
-          key: npm-${{ hashFiles('Librecord.Client/package-lock.json') }}
-          restore-keys: npm-
+        uses: actions/checkout@v6
 
       - name: Write .env
         run: |
@@ -84,23 +74,58 @@ jobs:
           GREEN_PORT=${{ steps.config.outputs.green_port }}
           EOF
           chmod 600 .env
+          echo "VITE_API_URL=https://${{ secrets.DOMAIN }}/api" > Librecord.Client/.env
 
-      - name: Write frontend .env
-        run: echo "VITE_API_URL=https://${{ secrets.DOMAIN }}/api" > Librecord.Client/.env
-
-      - name: Run backend tests
-        run: dotnet test Librecord.Tests/Librecord.Tests.csproj --verbosity minimal
-
-      - name: Install and build frontend
+      # ── Build everything in parallel, share artifacts ──────────────
+      - name: Build, test, package
         run: |
-          cd Librecord.Client
-          npm ci
-          npm run build
+          set -euo pipefail
 
-      - name: Lint frontend
+          # ── .NET: build once, test + publish reuse it ──────────────
+          (
+            dotnet build Librecord.sln -c Release --nologo -v q
+            dotnet test Librecord.Tests/Librecord.Tests.csproj -c Release --no-build --nologo -v q &
+            PID_TEST=$!
+            dotnet publish Librecord.Api/Librecord.Api.csproj -c Release --no-build --nologo -v q -o .publish &
+            PID_PUB=$!
+            wait $PID_TEST || exit 1
+            wait $PID_PUB  || exit 1
+          ) &
+          PID_DOTNET=$!
+
+          # ── Frontend: install + parallel tsc/vite/lint ─────────────
+          (
+            cd Librecord.Client
+            if [ ! -d node_modules ] || [ package-lock.json -nt node_modules/.package-lock.json ]; then
+              npm install --prefer-offline --no-audit --no-fund
+            fi
+            npx tsc -b &
+            PID_TSC=$!
+            npx vite build &
+            PID_VITE=$!
+            npx eslint . &
+            PID_LINT=$!
+            FAIL=0
+            wait $PID_TSC  || { echo "::error::TypeScript check failed"; FAIL=1; }
+            wait $PID_VITE || { echo "::error::Vite build failed"; FAIL=1; }
+            wait $PID_LINT || { echo "::error::ESLint failed"; FAIL=1; }
+            [ $FAIL -eq 0 ] || exit 1
+          ) &
+          PID_FRONTEND=$!
+
+          # ── Wait for both tracks ───────────────────────────────────
+          FAIL=0
+          wait $PID_DOTNET   || { echo "::error::Backend build/test failed"; FAIL=1; }
+          wait $PID_FRONTEND || { echo "::error::Frontend failed"; FAIL=1; }
+          [ $FAIL -eq 0 ] || exit 1
+
+      # ── Podman: runtime-only image from pre-built output ───────────
+      - name: Build container image
         run: |
-          cd Librecord.Client
-          npm run lint
+          podman build \
+            -f Dockerfile.ci \
+            -t ${{ steps.config.outputs.site }}-backend:latest \
+            .
 
       - name: Deploy frontend
         run: |

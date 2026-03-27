@@ -16,6 +16,7 @@ public class AppHub : Hub
     private readonly IPresenceService _presence;
     private readonly IVoiceService _voice;
     private readonly IConnectionTracker _connections;
+    private readonly IHostApplicationLifetime _lifetime;
     private readonly ILogger<AppHub> _logger;
 
     public AppHub(
@@ -24,6 +25,7 @@ public class AppHub : Hub
         IPresenceService presence,
         IVoiceService voice,
         IConnectionTracker connections,
+        IHostApplicationLifetime lifetime,
         ILogger<AppHub> logger)
     {
         _channels = channels;
@@ -31,6 +33,7 @@ public class AppHub : Hub
         _presence = presence;
         _voice = voice;
         _connections = connections;
+        _lifetime = lifetime;
         _logger = logger;
     }
 
@@ -39,9 +42,6 @@ public class AppHub : Hub
             Context.User!
                 .FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-    // -----------------------------------------
-    // CONNECT
-    // -----------------------------------------
     public override async Task OnConnectedAsync()
     {
         _logger.LogInformation(
@@ -49,7 +49,6 @@ public class AppHub : Hub
             Context.ConnectionId,
             UserId);
 
-        // Join all DM channel groups
         var dmChannels = await _channels.GetUserChannelsAsync(UserId);
 
         _logger.LogInformation(
@@ -60,7 +59,6 @@ public class AppHub : Hub
         await Task.WhenAll(dmChannels.Select(channel =>
             Groups.AddToGroupAsync(Context.ConnectionId, DmGroup(channel.Id))));
 
-        // Join all guild channel groups
         var guilds = await _guilds.GetGuildsForUserAsync(UserId);
         var allGuildChannelIds = guilds.SelectMany(g => (g.Channels ?? []).Select(c => c.Id)).ToList();
 
@@ -73,7 +71,6 @@ public class AppHub : Hub
 
         _connections.Connect(UserId);
 
-        // Broadcast online presence (unless invisible)
         var currentPresence = await _presence.GetPresenceAsync(UserId);
         var isInvisible = currentPresence?.Status == Domain.Identity.UserStatus.Invisible;
 
@@ -88,11 +85,9 @@ public class AppHub : Hub
 
             var presencePayload = new { userId = UserId, status = broadcastStatus };
 
-            // Broadcast to DM groups
             await Task.WhenAll(dmChannels.Select(channel =>
                 Clients.OthersInGroup(DmGroup(channel.Id)).SendAsync("dm:user:presence", presencePayload)));
 
-            // Broadcast to guild groups
             await Task.WhenAll(allGuildChannelIds.Select(channelId =>
                 Clients.OthersInGroup(GuildGroup(channelId)).SendAsync("guild:user:presence", presencePayload)));
         }
@@ -100,9 +95,6 @@ public class AppHub : Hub
         await base.OnConnectedAsync();
     }
 
-    // -----------------------------------------
-    // DM: JOIN CHANNEL
-    // -----------------------------------------
     public async Task JoinDmChannel(Guid channelId)
     {
         _logger.LogInformation(
@@ -137,9 +129,6 @@ public class AppHub : Hub
             group);
     }
 
-    // -----------------------------------------
-    // DM: LEAVE CHANNEL
-    // -----------------------------------------
     public async Task LeaveDmChannel(Guid channelId)
     {
         var group = DmGroup(channelId);
@@ -154,9 +143,6 @@ public class AppHub : Hub
             group);
     }
 
-    // -----------------------------------------
-    // GUILD: JOIN CHANNEL
-    // -----------------------------------------
     public async Task JoinGuildChannel(Guid channelId)
     {
         _logger.LogInformation(
@@ -182,9 +168,6 @@ public class AppHub : Hub
             GuildGroup(channelId));
     }
 
-    // -----------------------------------------
-    // GUILD: LEAVE CHANNEL
-    // -----------------------------------------
     public async Task LeaveGuildChannel(Guid channelId)
     {
         _logger.LogInformation(
@@ -197,9 +180,6 @@ public class AppHub : Hub
             GuildGroup(channelId));
     }
 
-    // -----------------------------------------
-    // DM: TYPING
-    // -----------------------------------------
     public async Task DmStartTyping(Guid channelId)
     {
         var isMember = await _channels.IsMemberAsync(channelId, UserId);
@@ -232,9 +212,6 @@ public class AppHub : Hub
             new { channelId, userId = UserId });
     }
 
-    // -----------------------------------------
-    // GUILD: TYPING
-    // -----------------------------------------
     public async Task GuildStartTyping(Guid channelId)
     {
         var canAccess = await _guilds.CanAccessChannelAsync(channelId, UserId);
@@ -266,9 +243,6 @@ public class AppHub : Hub
             new { channelId, userId = UserId });
     }
 
-    // -----------------------------------------
-    // VOICE: JOIN
-    // -----------------------------------------
     public async Task<VoiceJoinResult> JoinVoiceChannel(Guid channelId)
     {
         _logger.LogInformation(
@@ -282,9 +256,6 @@ public class AppHub : Hub
         return await _voice.JoinVoiceChannelAsync(channelId, UserId);
     }
 
-    // -----------------------------------------
-    // VOICE: LEAVE
-    // -----------------------------------------
     public async Task LeaveVoiceChannel()
     {
         _logger.LogInformation(
@@ -294,17 +265,35 @@ public class AppHub : Hub
         await _voice.LeaveVoiceChannelAsync(UserId);
     }
 
-    // -----------------------------------------
-    // VOICE: UPDATE STATE
-    // -----------------------------------------
     public async Task UpdateVoiceState(VoiceStateUpdateDto update)
     {
         await _voice.UpdateVoiceStateAsync(UserId, update);
     }
 
-    // -----------------------------------------
-    // DISCONNECT
-    // -----------------------------------------
+    /// Re-registers voice state after a SignalR reconnect. If the user's
+    /// voice state row still exists in the DB (survived the restart), this
+    /// re-broadcasts their presence so other clients see them. If it was
+    /// lost, re-creates it.
+    public async Task<VoiceJoinResult?> RejoinVoiceChannel(Guid channelId, VoiceStateUpdateDto currentState)
+    {
+        _logger.LogInformation(
+            "[APP HUB] RejoinVoiceChannel | UserId={UserId} | ChannelId={ChannelId}",
+            UserId, channelId);
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, GuildGroup(channelId));
+
+        var existing = await _voice.GetVoiceStateAsync(UserId);
+        if (existing is not null && existing.ChannelId == channelId)
+        {
+            // Row survived — just update flags and re-broadcast
+            await _voice.UpdateVoiceStateAsync(UserId, currentState);
+            return null;
+        }
+
+        // Row was lost (e.g. ungraceful crash) — full rejoin
+        return await _voice.JoinVoiceChannelAsync(channelId, UserId);
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         if (exception != null)
@@ -323,21 +312,26 @@ public class AppHub : Hub
                 UserId);
         }
 
-        // Leave voice channel on disconnect
-        try
-        {
-            await _voice.LeaveVoiceChannelAsync(UserId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex,
-                "[APP HUB] Failed to leave voice on disconnect | UserId={UserId}",
-                UserId);
-        }
-
         _connections.Disconnect(UserId);
 
-        // Only broadcast offline if user has no remaining connections and isn't invisible
+        var isShuttingDown = _lifetime.ApplicationStopping.IsCancellationRequested;
+
+        // During server shutdown, preserve voice states so clients can
+        // rejoin after the restart. Only clean up on genuine user disconnects.
+        if (!_connections.IsOnline(UserId) && !isShuttingDown)
+        {
+            try
+            {
+                await _voice.LeaveVoiceChannelAsync(UserId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "[APP HUB] Failed to leave voice on disconnect | UserId={UserId}",
+                    UserId);
+            }
+        }
+
         if (!_connections.IsOnline(UserId))
         {
             var currentPresence = await _presence.GetPresenceAsync(UserId);
@@ -347,12 +341,10 @@ public class AppHub : Hub
             {
                 var offlinePayload = new { userId = UserId, status = "offline" };
 
-                // Broadcast to DM groups
                 var dmChannels = await _channels.GetUserChannelsAsync(UserId);
                 await Task.WhenAll(dmChannels.Select(channel =>
                     Clients.OthersInGroup(DmGroup(channel.Id)).SendAsync("dm:user:presence", offlinePayload)));
 
-                // Broadcast to guild groups
                 var guilds = await _guilds.GetGuildsForUserAsync(UserId);
                 var offlineChannelIds = guilds.SelectMany(g => (g.Channels ?? []).Select(c => c.Id)).ToList();
                 await Task.WhenAll(offlineChannelIds.Select(chId =>
@@ -363,9 +355,6 @@ public class AppHub : Hub
         await base.OnDisconnectedAsync(exception);
     }
 
-    // -----------------------------------------
-    // GROUP NAMES
-    // -----------------------------------------
     internal static string DmGroup(Guid channelId)
         => $"dm:{channelId}";
 

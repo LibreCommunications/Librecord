@@ -1,8 +1,5 @@
 namespace Librecord.Application.Realtime.Voice;
 
-// ---------------------------------------------------------
-// BASE EVENT
-// ---------------------------------------------------------
 public abstract class VoiceEvent
 {
     public Guid ChannelId { get; init; }
@@ -10,9 +7,6 @@ public abstract class VoiceEvent
     public Guid UserId { get; init; }
 }
 
-// ---------------------------------------------------------
-// USER JOINED
-// ---------------------------------------------------------
 public sealed class VoiceUserJoined : VoiceEvent
 {
     public string Username { get; init; } = null!;
@@ -24,16 +18,10 @@ public sealed class VoiceUserJoined : VoiceEvent
     public bool IsScreenSharing { get; init; }
 }
 
-// ---------------------------------------------------------
-// USER LEFT
-// ---------------------------------------------------------
 public sealed class VoiceUserLeft : VoiceEvent
 {
 }
 
-// ---------------------------------------------------------
-// USER STATE CHANGED
-// ---------------------------------------------------------
 public sealed class VoiceUserStateChanged : VoiceEvent
 {
     public bool IsMuted { get; init; }
