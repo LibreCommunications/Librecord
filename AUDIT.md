@@ -11,7 +11,7 @@
 - **VoiceController.GetParticipants** doesn't check channel membership — any authenticated user can enumerate voice participants.
 - **ThreadController** returns thread creator info without verifying caller has channel access.
 - ~~CORS too permissive~~ — fixed. Restricted to `GET/POST/PUT/DELETE` and `Content-Type` header only.
-- **`AllowedHosts = "*"`** in `appsettings.json` — vulnerable to Host header injection. Set to actual domain(s).
+- ~~`AllowedHosts = "*"`~~ — fixed. Production deploy now sets `AllowedHosts` to the actual domain via env var. Dev keeps `*` for localhost.
 - **No rate limiting on sensitive endpoints** — friend requests, search, invite creation, and message sending have no `[EnableRateLimiting]`.
 - **Auth failures not logged** — `OnAuthenticationFailed` in `Program.cs` returns `Task.CompletedTask` silently. Log failed auth attempts.
 
