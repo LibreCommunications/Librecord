@@ -56,7 +56,12 @@ public class GuildMessageWithAttachmentController : AuthenticatedController
         {
             var uploads = files
                 .Where(f => f.Length > 0)
-                .Select(f => new AttachmentUpload(f.OpenReadStream(), f.FileName, f.ContentType, f.Length))
+                .Select(f =>
+                {
+                    var stream = f.OpenReadStream();
+                    var contentType = FileSignature.Detect(stream, f.ContentType);
+                    return new AttachmentUpload(stream, f.FileName, contentType, f.Length);
+                })
                 .ToList();
 
             await _attachments.SaveAttachmentsAsync(message.Id, uploads);
@@ -129,7 +134,12 @@ public class DmMessageWithAttachmentController : AuthenticatedController
         {
             var uploads = files
                 .Where(f => f.Length > 0)
-                .Select(f => new AttachmentUpload(f.OpenReadStream(), f.FileName, f.ContentType, f.Length))
+                .Select(f =>
+                {
+                    var stream = f.OpenReadStream();
+                    var contentType = FileSignature.Detect(stream, f.ContentType);
+                    return new AttachmentUpload(stream, f.FileName, contentType, f.Length);
+                })
                 .ToList();
 
             await _attachments.SaveAttachmentsAsync(message.Id, uploads);

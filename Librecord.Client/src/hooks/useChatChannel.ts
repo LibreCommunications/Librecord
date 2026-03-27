@@ -277,10 +277,16 @@ export function useChatChannel(config: ChatChannelConfig) {
     };
 
     const handleDelete = async (messageId: string) => {
+        const snapshot = messages.find(m => m.id === messageId);
         setMessages(prev => prev.filter(m => m.id !== messageId));
         setMenuOpenId(null);
         setEditingId(null);
-        try { await config.deleteMessage(messageId); } catch { /* best-effort */ }
+        try {
+            await config.deleteMessage(messageId);
+        } catch {
+            if (snapshot) setMessages(prev => [...prev, snapshot].sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+            toast("Failed to delete message.", "error");
+        }
     };
 
     const handleEdit = async (messageId: string, dto: { content: string }) => {

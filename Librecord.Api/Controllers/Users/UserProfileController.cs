@@ -61,7 +61,8 @@ public class UserProfileController : AuthenticatedController
             return BadRequest("File too large.");
 
         await using var stream = file.OpenReadStream();
-        var avatarUrl = await _users.UpdateAvatarAsync(UserId, stream, file.FileName, file.ContentType);
+        var contentType = FileSignature.Detect(stream, file.ContentType);
+        var avatarUrl = await _users.UpdateAvatarAsync(UserId, stream, file.FileName, contentType);
         if (avatarUrl == null) return Unauthorized();
 
         return Ok(new { avatarUrl });

@@ -4,6 +4,7 @@ import ChannelSidebar from "../components/layout/ChannelSidebar";
 import DmSidebar from "../components/layout/DmSidebar";
 import { VoiceControls } from "../components/voice/VoiceControls";
 import { ConnectionBanner } from "../components/ui/ConnectionBanner";
+import { ErrorBoundary } from "../components/ui/ErrorBoundary";
 
 import { RealtimeRoot } from "../realtime/RealtimeRoot";
 
@@ -41,7 +42,9 @@ export default function MainPage() {
             )}
 
             <div className="flex flex-1 min-w-0 min-h-0 overflow-hidden">
-                <Outlet />
+                <ErrorBoundary key={location.pathname}>
+                    <Outlet />
+                </ErrorBoundary>
             </div>
         </div>
     );
