@@ -1,4 +1,5 @@
 using Librecord.Application.Messaging;
+using Librecord.Domain;
 using Librecord.Domain.Messaging.Common;
 using Librecord.Domain.Messaging.Direct;
 using Librecord.Domain.Social;
@@ -16,9 +17,18 @@ public class DirectMessageChannelServiceTests
     private readonly Mock<IAttachmentStorageService> _storage = new();
     private readonly Mock<IReadStateRepository> _readStates = new();
 
+    private static Mock<IUnitOfWork> MockUow()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        uow.Setup(u => u.BeginTransactionAsync()).ReturnsAsync(Mock.Of<IAsyncDisposable>());
+        uow.Setup(u => u.CommitAsync()).Returns(Task.CompletedTask);
+        uow.Setup(u => u.SaveChangesAsync()).Returns(Task.CompletedTask);
+        return uow;
+    }
+
     private DirectMessageChannelService CreateService() =>
         new(_dms.Object, _friendships.Object, _blocks.Object, _storage.Object, _readStates.Object,
-            Mock.Of<ILogger<DirectMessageChannelService>>());
+            MockUow().Object, Mock.Of<ILogger<DirectMessageChannelService>>());
 
     private static DmChannel MakeChannel(Guid channelId, params Guid[] memberIds)
     {

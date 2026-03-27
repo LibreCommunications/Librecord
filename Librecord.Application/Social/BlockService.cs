@@ -1,3 +1,4 @@
+using Librecord.Domain;
 using Librecord.Domain.Social;
 
 namespace Librecord.Application.Social;
@@ -6,11 +7,13 @@ public class BlockService : IBlockService
 {
     private readonly IBlockRepository _blocks;
     private readonly IFriendshipRepository _friendships;
+    private readonly IUnitOfWork _uow;
 
-    public BlockService(IBlockRepository blocks, IFriendshipRepository friendships)
+    public BlockService(IBlockRepository blocks, IFriendshipRepository friendships, IUnitOfWork uow)
     {
         _blocks = blocks;
         _friendships = friendships;
+        _uow = uow;
     }
 
     public async Task BlockUserAsync(Guid blockerId, Guid blockedId)
@@ -20,6 +23,8 @@ public class BlockService : IBlockService
 
         var existing = await _blocks.GetBlockAsync(blockerId, blockedId);
         if (existing != null) return;
+
+        await using var _ = await _uow.BeginTransactionAsync();
 
         await _blocks.AddBlockAsync(new UserBlock
         {
@@ -34,7 +39,7 @@ public class BlockService : IBlockService
             await _friendships.DeleteAsync(fs);
         }
 
-        await _blocks.SaveChangesAsync();
+        await _uow.CommitAsync();
     }
 
     public async Task<bool> UnblockUserAsync(Guid blockerId, Guid blockedId)

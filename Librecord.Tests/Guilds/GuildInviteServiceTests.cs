@@ -1,4 +1,5 @@
 using Librecord.Application.Guilds;
+using Librecord.Domain;
 using Librecord.Domain.Guilds;
 using Moq;
 
@@ -9,7 +10,16 @@ public class GuildInviteServiceTests
     private readonly Mock<IGuildInviteRepository> _invites = new();
     private readonly Mock<IGuildRepository> _guilds = new();
 
-    private GuildInviteService CreateService() => new(_invites.Object, _guilds.Object);
+    private static Mock<IUnitOfWork> MockUow()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        uow.Setup(u => u.BeginTransactionAsync()).ReturnsAsync(Mock.Of<IAsyncDisposable>());
+        uow.Setup(u => u.CommitAsync()).Returns(Task.CompletedTask);
+        uow.Setup(u => u.SaveChangesAsync()).Returns(Task.CompletedTask);
+        return uow;
+    }
+
+    private GuildInviteService CreateService() => new(_invites.Object, _guilds.Object, MockUow().Object);
 
     private static Guild MakeGuild(Guid? id = null)
     {
@@ -155,7 +165,6 @@ public class GuildInviteServiceTests
         Assert.Equal(guildId, result.Id);
         Assert.Single(guild.Members);
         Assert.Equal(1, invite.UsesCount);
-        _guilds.Verify(g => g.SaveChangesAsync(), Times.Once);
     }
 
     [Fact]

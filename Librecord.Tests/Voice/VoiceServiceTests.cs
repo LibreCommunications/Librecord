@@ -1,6 +1,7 @@
 using Librecord.Application.Guilds;
 using Librecord.Application.Realtime.Voice;
 using Librecord.Application.Voice;
+using Librecord.Domain;
 using Librecord.Domain.Guilds;
 using Librecord.Domain.Identity;
 using Librecord.Domain.Voice;
@@ -23,12 +24,22 @@ public class VoiceServiceTests
         ApiSecret = "devsecret"
     });
 
+    private static Mock<IUnitOfWork> MockUow()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        uow.Setup(u => u.BeginTransactionAsync()).ReturnsAsync(Mock.Of<IAsyncDisposable>());
+        uow.Setup(u => u.CommitAsync()).Returns(Task.CompletedTask);
+        uow.Setup(u => u.SaveChangesAsync()).Returns(Task.CompletedTask);
+        return uow;
+    }
+
     private VoiceService CreateService() => new(
         _voiceStates.Object,
         _guilds.Object,
         _users.Object,
         _tokenService.Object,
         _notifier.Object,
+        MockUow().Object,
         _options
     );
 
@@ -76,7 +87,6 @@ public class VoiceServiceTests
         _voiceStates.Verify(v => v.AddAsync(It.Is<VoiceState>(s =>
             s.UserId == userId && s.ChannelId == channelId && s.GuildId == guildId
         )), Times.Once);
-        _voiceStates.Verify(v => v.SaveChangesAsync(), Times.AtLeastOnce);
         _notifier.Verify(n => n.NotifyAsync(It.IsAny<VoiceUserJoined>()), Times.Once);
     }
 

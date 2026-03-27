@@ -1,5 +1,6 @@
 using Librecord.Application.Guilds;
 using Librecord.Application.Realtime.Voice;
+using Librecord.Domain;
 using Librecord.Domain.Guilds;
 using Librecord.Domain.Identity;
 using Librecord.Domain.Voice;
@@ -15,6 +16,7 @@ public class VoiceService : IVoiceService
     private readonly IUserRepository _users;
     private readonly ILiveKitTokenService _tokenService;
     private readonly IVoiceRealtimeNotifier _notifier;
+    private readonly IUnitOfWork _uow;
     private readonly LiveKitOptions _liveKitOptions;
 
     public VoiceService(
@@ -23,6 +25,7 @@ public class VoiceService : IVoiceService
         IUserRepository users,
         ILiveKitTokenService tokenService,
         IVoiceRealtimeNotifier notifier,
+        IUnitOfWork uow,
         IOptions<LiveKitOptions> liveKitOptions)
     {
         _voiceStates = voiceStates;
@@ -30,6 +33,7 @@ public class VoiceService : IVoiceService
         _users = users;
         _tokenService = tokenService;
         _notifier = notifier;
+        _uow = uow;
         _liveKitOptions = liveKitOptions.Value;
     }
 
@@ -51,17 +55,17 @@ public class VoiceService : IVoiceService
             throw new InvalidOperationException("User not found.");
 
         var existing = await _voiceStates.GetByUserIdAsync(userId);
+        Guid? previousChannelId = null;
+        Guid? previousGuildId = null;
+
+        // Remove old state + add new state in one transaction
+        await using var _ = await _uow.BeginTransactionAsync();
+
         if (existing is not null)
         {
+            previousChannelId = existing.ChannelId;
+            previousGuildId = existing.GuildId;
             await _voiceStates.RemoveAsync(userId);
-            await _voiceStates.SaveChangesAsync();
-
-            await _notifier.NotifyAsync(new VoiceUserLeft
-            {
-                ChannelId = existing.ChannelId,
-                GuildId = existing.GuildId,
-                UserId = userId
-            });
         }
 
         var voiceState = new VoiceState
@@ -72,7 +76,18 @@ public class VoiceService : IVoiceService
         };
 
         await _voiceStates.AddAsync(voiceState);
-        await _voiceStates.SaveChangesAsync();
+        await _uow.CommitAsync();
+
+        // Notify AFTER commit
+        if (previousChannelId.HasValue)
+        {
+            await _notifier.NotifyAsync(new VoiceUserLeft
+            {
+                ChannelId = previousChannelId.Value,
+                GuildId = previousGuildId!.Value,
+                UserId = userId
+            });
+        }
 
         var displayName = user.DisplayName ?? user.UserName!;
         var token = _tokenService.GenerateToken(userId, displayName, channelId);

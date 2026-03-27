@@ -1,3 +1,4 @@
+using Librecord.Domain;
 using Librecord.Domain.Messaging.Common;
 using Librecord.Domain.Messaging.Direct;
 using Librecord.Domain.Social;
@@ -13,6 +14,7 @@ public class DirectMessageChannelService : IDirectMessageChannelService
     private readonly IBlockRepository _blocks;
     private readonly IAttachmentStorageService _storage;
     private readonly IReadStateRepository _readStates;
+    private readonly IUnitOfWork _uow;
     private readonly ILogger<DirectMessageChannelService> _logger;
 
     public DirectMessageChannelService(
@@ -21,6 +23,7 @@ public class DirectMessageChannelService : IDirectMessageChannelService
         IBlockRepository blocks,
         IAttachmentStorageService storage,
         IReadStateRepository readStates,
+        IUnitOfWork uow,
         ILogger<DirectMessageChannelService> logger)
     {
         _dms = dms;
@@ -28,6 +31,7 @@ public class DirectMessageChannelService : IDirectMessageChannelService
         _blocks = blocks;
         _storage = storage;
         _readStates = readStates;
+        _uow = uow;
         _logger = logger;
     }
 
@@ -200,31 +204,38 @@ public class DirectMessageChannelService : IDirectMessageChannelService
 
         channel.Members.Remove(member);
 
+        // Collect attachment URLs before deleting from DB
+        List<string> attachmentUrls = [];
+
         if (channel.Members.Count == 0)
         {
             var fullChannel = await _dms.GetChannelWithMessagesAsync(channelId);
             if (fullChannel != null)
             {
-                foreach (var dm in fullChannel.Messages)
-                {
-                    foreach (var att in dm.Message.Attachments)
-                    {
-                        try { await _storage.DeleteAsync(att.Url); }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Failed to delete attachment {Url} during channel cleanup", att.Url);
-                        }
-                    }
-                }
+                attachmentUrls = fullChannel.Messages
+                    .SelectMany(dm => dm.Message.Attachments.Select(a => a.Url))
+                    .ToList();
             }
 
-            // Clean up read state records (no FK cascade for generic ChannelId)
+            await using var _ = await _uow.BeginTransactionAsync();
             await _readStates.DeleteByChannelIdAsync(channelId);
-
             await _dms.DeleteChannelAsync(channel);
+            await _uow.CommitAsync();
+        }
+        else
+        {
+            await _dms.SaveChangesAsync();
         }
 
-        await _dms.SaveChangesAsync();
+        // Clean up storage AFTER DB commit (best-effort)
+        foreach (var url in attachmentUrls)
+        {
+            try { await _storage.DeleteAsync(url); }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete attachment {Url} during channel cleanup", url);
+            }
+        }
     }
 
     public async Task DeleteDmAsync(Guid channelId, Guid userId)
@@ -242,27 +253,31 @@ public class DirectMessageChannelService : IDirectMessageChannelService
         if (otherUser != null && await _friendships.UsersAreConfirmedFriendsAsync(userId, otherUser.UserId))
             throw new InvalidOperationException("Cannot delete a DM with a current friend. Remove them as a friend first.");
 
+        // Collect attachment URLs before deleting from DB
+        List<string> attachmentUrls = [];
         var fullChannel = await _dms.GetChannelWithMessagesAsync(channelId);
         if (fullChannel != null)
         {
-            foreach (var dm in fullChannel.Messages)
-            {
-                foreach (var att in dm.Message.Attachments)
-                {
-                    try { await _storage.DeleteAsync(att.Url); }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to delete attachment {Url} during DM cleanup", att.Url);
-                    }
-                }
-            }
+            attachmentUrls = fullChannel.Messages
+                .SelectMany(dm => dm.Message.Attachments.Select(a => a.Url))
+                .ToList();
         }
 
-        // Clean up read state records (no FK cascade for generic ChannelId)
+        // Delete DB records atomically
+        await using var _ = await _uow.BeginTransactionAsync();
         await _readStates.DeleteByChannelIdAsync(channelId);
-
         await _dms.DeleteChannelAsync(channel);
-        await _dms.SaveChangesAsync();
+        await _uow.CommitAsync();
+
+        // Clean up storage AFTER DB commit (best-effort)
+        foreach (var url in attachmentUrls)
+        {
+            try { await _storage.DeleteAsync(url); }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete attachment {Url} during DM cleanup", url);
+            }
+        }
     }
 
     public async Task<bool> AreMembersFriendsAsync(Guid channelId, Guid userId)

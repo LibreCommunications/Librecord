@@ -1,5 +1,6 @@
 using Librecord.Application.Messaging;
 using Librecord.Application.Realtime.DMs;
+using Librecord.Domain;
 using Librecord.Domain.Identity;
 using Librecord.Domain.Messaging.Common;
 using Librecord.Domain.Messaging.Direct;
@@ -25,12 +26,21 @@ public class DmDualUserScenarioTests
     private readonly Mock<IAttachmentStorageService> _storage = new();
     private readonly Mock<IReadStateRepository> _readStates = new();
 
+    private static Mock<IUnitOfWork> MockUow()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        uow.Setup(u => u.BeginTransactionAsync()).ReturnsAsync(Mock.Of<IAsyncDisposable>());
+        uow.Setup(u => u.CommitAsync()).Returns(Task.CompletedTask);
+        uow.Setup(u => u.SaveChangesAsync()).Returns(Task.CompletedTask);
+        return uow;
+    }
+
     private DirectMessageService CreateMessageService() =>
         new(_messages.Object, _channels.Object, _realtime.Object, _blocks.Object);
 
     private DirectMessageChannelService CreateChannelService() =>
         new(_channels.Object, _friendships.Object, _blocks.Object, _storage.Object, _readStates.Object,
-            Mock.Of<ILogger<DirectMessageChannelService>>());
+            MockUow().Object, Mock.Of<ILogger<DirectMessageChannelService>>());
 
     private static User MakeUser(Guid id, string name) => new()
     {

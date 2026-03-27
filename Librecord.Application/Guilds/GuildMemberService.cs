@@ -1,3 +1,4 @@
+using Librecord.Domain;
 using Librecord.Domain.Guilds;
 
 namespace Librecord.Application.Guilds;
@@ -5,10 +6,12 @@ namespace Librecord.Application.Guilds;
 public class GuildMemberService : IGuildMemberService
 {
     private readonly IGuildRepository _guilds;
+    private readonly IUnitOfWork _uow;
 
-    public GuildMemberService(IGuildRepository guilds)
+    public GuildMemberService(IGuildRepository guilds, IUnitOfWork uow)
     {
         _guilds = guilds;
+        _uow = uow;
     }
 
     public async Task<bool> KickMemberAsync(Guid guildId, Guid userId)
@@ -23,6 +26,8 @@ public class GuildMemberService : IGuildMemberService
 
     public async Task BanMemberAsync(Guid guildId, Guid userId, Guid moderatorId, string? reason)
     {
+        await using var _ = await _uow.BeginTransactionAsync();
+
         var existingBan = await _guilds.GetBanAsync(guildId, userId);
         if (existingBan != null) return;
 
@@ -39,7 +44,7 @@ public class GuildMemberService : IGuildMemberService
             CreatedAt = DateTime.UtcNow
         });
 
-        await _guilds.SaveChangesAsync();
+        await _uow.CommitAsync();
     }
 
     public async Task<bool> UnbanMemberAsync(Guid guildId, Guid userId)

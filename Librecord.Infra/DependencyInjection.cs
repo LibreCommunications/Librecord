@@ -1,3 +1,4 @@
+using Librecord.Domain;
 using Librecord.Domain.Guilds;
 using Librecord.Domain.Identity;
 using Librecord.Domain.Messaging;
@@ -8,6 +9,7 @@ using Librecord.Domain.Security;
 using Librecord.Domain.Social;
 using Librecord.Domain.Storage;
 using Librecord.Domain.Voice;
+using Librecord.Infra.Database;
 using Librecord.Infra.Repositories;
 using Librecord.Infra.Security;
 using Librecord.Infra.Services;
@@ -26,6 +28,7 @@ public static class DependencyInjection
 
         services.AddMemoryCache();
 
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IAuthRepository, AuthRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IFriendshipRepository, FriendshipRepository>();

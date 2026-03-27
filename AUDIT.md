@@ -17,7 +17,7 @@
 
 ### Error Handling
 
-- **CDN controllers swallow all exceptions** — `PrivateCdnController` and `PublicCdnController` catch `Exception` and return `NotFound()`, masking storage failures.
+- ~~CDN controllers swallow all exceptions~~ — fixed. CDN controllers now use presigned URL redirects; exception handling simplified.
 - **SignalR hub `OnConnectedAsync` has no try-catch** — DB query failures crash the connection with no useful error.
 - **`GlobalExceptionHandler`** returns generic message without logging stack traces in production.
 
@@ -25,8 +25,8 @@
 
 - ~~Missing indexes~~ — fixed. FK indexes were already auto-created by EF; added `Messages.CreatedAt` index for pagination.
 - **No pagination** on `GetFriendsAsync`, `ListBans`, and search results (search has `limit` but no cursor/offset).
-- **Race condition in `JoinByCodeAsync`** — checks `invite.UsesCount` then increments without a transaction or row lock. Two concurrent joins can exceed `MaxUses`.
-- **Transaction gaps** — `BanMemberAsync` does two saves (remove member + add ban) without a transaction. `LeaveChannelAsync` deletes storage files before the DB delete — if DB fails, files are orphaned.
+- ~~Race condition in `JoinByCodeAsync`~~ — fixed. Wrapped in transaction via `IUnitOfWork`.
+- ~~Transaction gaps~~ — fixed. Added `IUnitOfWork` with transactions to `BanMemberAsync`, `BlockUserAsync`, `LeaveChannelAsync`, `DeleteDmAsync`, `JoinVoiceChannelAsync`. Storage deletes moved to after DB commit.
 - **`StartDmAsync`** doesn't validate both users exist before creating a channel.
 
 ### API Design

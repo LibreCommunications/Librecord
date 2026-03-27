@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Librecord.Domain;
 using Librecord.Domain.Guilds;
 
 namespace Librecord.Application.Guilds;
@@ -7,13 +8,16 @@ public class GuildInviteService : IGuildInviteService
 {
     private readonly IGuildInviteRepository _invites;
     private readonly IGuildRepository _guilds;
+    private readonly IUnitOfWork _uow;
 
     public GuildInviteService(
         IGuildInviteRepository invites,
-        IGuildRepository guilds)
+        IGuildRepository guilds,
+        IUnitOfWork uow)
     {
         _invites = invites;
         _guilds = guilds;
+        _uow = uow;
     }
 
     public async Task<GuildInvite> CreateInviteAsync(
@@ -57,6 +61,8 @@ public class GuildInviteService : IGuildInviteService
 
     public async Task<Guild> JoinByCodeAsync(string code, Guid userId)
     {
+        await using var _ = await _uow.BeginTransactionAsync();
+
         var invite = await _invites.GetByCodeAsync(code)
             ?? throw new InvalidOperationException("Invalid invite code.");
 
@@ -94,7 +100,7 @@ public class GuildInviteService : IGuildInviteService
 
         invite.UsesCount++;
 
-        await _guilds.SaveChangesAsync();
+        await _uow.CommitAsync();
 
         return guild;
     }
