@@ -51,7 +51,7 @@ set -a
 source "$REPO_DIR/.env"
 set +a
 
-# Ensure infra services are running (livekit is shared, only start with prod)
+# Ensure infra services are running (may already be started by CI)
 echo "Ensuring infra services are up..."
 if [ "$ENV" = "prod" ]; then
   docker compose -p "$PROJECT" --env-file "$REPO_DIR/.env" -f "$REPO_DIR/docker-compose.yml" --profile livekit up -d postgres minio livekit
@@ -62,13 +62,13 @@ fi
 # Wait for postgres to be ready before starting the backend
 PG_CONTAINER=$(docker ps --filter "name=${PROJECT}.*postgres" --format '{{.Names}}' | head -1)
 echo "Waiting for PostgreSQL ($PG_CONTAINER) to accept connections..."
-for i in $(seq 1 30); do
+for i in $(seq 1 15); do
   if [ -n "$PG_CONTAINER" ] && docker exec "$PG_CONTAINER" pg_isready -U "${POSTGRES_USER:-$POSTGRES_DB}" > /dev/null 2>&1; then
     echo "PostgreSQL ready on attempt $i"
     break
   fi
-  if [ "$i" -eq 30 ]; then
-    echo "WARNING: PostgreSQL readiness check timed out after 30s"
+  if [ "$i" -eq 15 ]; then
+    echo "WARNING: PostgreSQL readiness check timed out after 15s"
     echo "Postgres container logs:"
     docker logs --tail 20 "$PG_CONTAINER" 2>&1 || true
   fi
@@ -136,7 +136,7 @@ for i in $(seq 1 $ATTEMPTS); do
     docker rm -f "$CONTAINER" 2>/dev/null || true
     exit 1
   fi
-  sleep 2
+  sleep 1
 done
 
 # Switch nginx upstream to new slot

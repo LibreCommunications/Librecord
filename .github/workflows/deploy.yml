@@ -76,10 +76,24 @@ jobs:
           chmod 600 .env
           echo "VITE_API_URL=https://${{ secrets.DOMAIN }}/api" > Librecord.Client/.env
 
-      # ── Build everything in parallel, share artifacts ──────────────
+      # ── Build, test, package + warm up infra in parallel ──────────
       - name: Build, test, package
         run: |
           set -euo pipefail
+
+          # ── Warm up: pull base image + start infra while building ──
+          docker pull mcr.microsoft.com/dotnet/aspnet:10.0 &
+          PID_PULL=$!
+
+          chmod +x .github/scripts/deploy.sh
+          source .env
+          export BLUE_PORT GREEN_PORT
+          if [ "$IS_PROD" = "true" ]; then
+            docker compose -p ${{ steps.config.outputs.site }} --env-file .env -f docker-compose.yml --profile livekit up -d postgres minio livekit &
+          else
+            docker compose -p ${{ steps.config.outputs.site }} --env-file .env -f docker-compose.yml up -d postgres minio &
+          fi
+          PID_INFRA=$!
 
           # ── .NET: build once, test + publish reuse it ──────────────
           (
@@ -97,7 +111,7 @@ jobs:
           (
             cd Librecord.Client
             if [ ! -d node_modules ] || [ package-lock.json -nt node_modules/.package-lock.json ]; then
-              npm install --prefer-offline --no-audit --no-fund
+              npm ci --prefer-offline --no-audit --no-fund
             fi
             npx tsc -b || { echo "::error::TypeScript check failed"; exit 1; }
             npx vite build &
@@ -111,24 +125,28 @@ jobs:
           ) &
           PID_FRONTEND=$!
 
-          # ── Wait for both tracks ───────────────────────────────────
+          # ── Wait for all tracks ──────────────────────────────────
           FAIL=0
           wait $PID_DOTNET   || { echo "::error::Backend build/test failed"; FAIL=1; }
           wait $PID_FRONTEND || { echo "::error::Frontend failed"; FAIL=1; }
+          wait $PID_PULL     || true
+          wait $PID_INFRA    || true
           [ $FAIL -eq 0 ] || exit 1
 
-      # ── Docker: runtime-only image from pre-built output ───────────
-      - name: Build container image
+      # ── Docker image + frontend deploy (parallel) ─────────────────
+      - name: Build image and deploy frontend
         run: |
-          printf 'FROM mcr.microsoft.com/dotnet/aspnet:10.0\nWORKDIR /app\nCOPY .publish/ .\nEXPOSE 5111\nENTRYPOINT ["dotnet", "Librecord.Api.dll"]\n' | \
-          docker build -t ${{ steps.config.outputs.site }}-backend:latest -f - .
+          set -euo pipefail
+          SITE="${{ steps.config.outputs.site }}"
 
-      - name: Deploy frontend
-        run: |
-          rm -rf /var/www/${{ steps.config.outputs.site }}/dist
-          cp -r Librecord.Client/dist /var/www/${{ steps.config.outputs.site }}/dist
+          printf 'FROM mcr.microsoft.com/dotnet/aspnet:10.0\nWORKDIR /app\nCOPY .publish/ .\nEXPOSE 5111\nENTRYPOINT ["dotnet", "Librecord.Api.dll"]\n' | \
+          docker build -t "${SITE}-backend:latest" -f - . &
+          PID_IMG=$!
+
+          rm -rf "/var/www/${SITE}/dist"
+          cp -r Librecord.Client/dist "/var/www/${SITE}/dist"
+
+          wait $PID_IMG || exit 1
 
       - name: Blue-green deploy backend
-        run: |
-          chmod +x .github/scripts/deploy.sh
-          .github/scripts/deploy.sh ${{ steps.config.outputs.slug }}
+        run: .github/scripts/deploy.sh ${{ steps.config.outputs.slug }}
