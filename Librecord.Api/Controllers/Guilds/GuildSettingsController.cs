@@ -1,5 +1,7 @@
 using Librecord.Application.Guilds;
+using Librecord.Application.Permissions;
 using Librecord.Application.Realtime.Guild;
+using Librecord.Domain.Permissions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,21 +14,31 @@ public class GuildSettingsController : AuthenticatedController
     private readonly IGuildSettingsService _settings;
     private readonly IGuildService _guilds;
     private readonly IGuildRealtimeNotifier _guildNotifier;
+    private readonly IPermissionService _permissions;
 
     public GuildSettingsController(
         IGuildSettingsService settings,
         IGuildService guilds,
-        IGuildRealtimeNotifier guildNotifier)
+        IGuildRealtimeNotifier guildNotifier,
+        IPermissionService permissions)
     {
         _settings = settings;
         _guilds = guilds;
         _guildNotifier = guildNotifier;
+        _permissions = permissions;
     }
 
     private async Task<bool> IsOwner(Guid guildId)
     {
         var guild = await _guilds.GetGuildAsync(guildId);
         return guild is not null && guild.OwnerId == UserId;
+    }
+
+    private async Task<bool> CanManageGuild(Guid guildId)
+    {
+        if (await IsOwner(guildId)) return true;
+        var perm = await _permissions.HasGuildPermissionAsync(UserId, guildId, GuildPermission.ManageGuild);
+        return perm.Allowed;
     }
 
     [Authorize]
@@ -36,7 +48,7 @@ public class GuildSettingsController : AuthenticatedController
         if (file == null || file.Length == 0)
             return BadRequest("Invalid file");
 
-        if (!await IsOwner(guildId))
+        if (!await CanManageGuild(guildId))
             return Forbid();
 
         await using var stream = file.OpenReadStream();
@@ -50,7 +62,7 @@ public class GuildSettingsController : AuthenticatedController
     [HttpPut("{guildId:guid}")]
     public async Task<IActionResult> UpdateGuild(Guid guildId, [FromBody] UpdateGuildRequest request)
     {
-        if (!await IsOwner(guildId))
+        if (!await CanManageGuild(guildId))
             return Forbid();
 
         var guild = await _settings.UpdateGuildAsync(guildId, request.Name);

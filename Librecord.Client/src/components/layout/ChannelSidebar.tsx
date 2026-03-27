@@ -9,9 +9,7 @@ import CreateChannelModal from "../../pages/guild/CreateChannelModal";
 import type { AppEventMap } from "../../realtime/events";
 import { useAuth } from "../../hooks/useAuth";
 import { useUserProfile } from "../../hooks/useUserProfile";
-import { guilds as guildsApi, roles as rolesApi, voice } from "../../api/client";
-
-const MANAGE_CHANNELS_PERMISSION_ID = "11111111-1111-1111-1111-111111111104";
+import { voice } from "../../api/client";
 
 interface Props {
     guildId: string;
@@ -32,7 +30,6 @@ export default function ChannelSidebar({ guildId }: Props) {
     const [loadedGuildId, setLoadedGuildId] = useState<string | null>(null);
     const loading = loadedGuildId !== guildId;
     const [showCreate, setShowCreate] = useState(false);
-    const [canManageChannels, setCanManageChannels] = useState(false);
     const [channelParticipants, setChannelParticipants] = useState<Record<string, { userId: string; username: string; displayName: string; avatarUrl: string | null; isMuted: boolean; isDeafened: boolean; isCameraOn: boolean; isScreenSharing: boolean }[]>>({});
 
     const loadChannels = useCallback(async function loadChannels() {
@@ -44,24 +41,7 @@ export default function ChannelSidebar({ guildId }: Props) {
             const counts = await getUnreadCounts(list.map(c => c.id));
             setUnreads(counts);
         }
-
-        try {
-            const [members, guildRoles] = await Promise.all([
-                guildsApi.members(guildId),
-                rolesApi.list(guildId),
-            ]);
-            const me = members.find(m => m.userId === user?.userId);
-            const myRoleIds = new Set((me?.roles ?? []).map(r => r.id));
-            const hasManage = guildRoles
-                .filter(r => myRoleIds.has(r.id))
-                .some(r =>
-                    (r.permissions ?? []).some(p => p.permissionId === MANAGE_CHANNELS_PERMISSION_ID && p.allow)
-                );
-            setCanManageChannels(hasManage);
-        } catch {
-            setCanManageChannels(false);
-        }
-    }, [guildId, getGuildChannels, getUnreadCounts, user?.userId]);
+    }, [guildId, getGuildChannels, getUnreadCounts]);
 
     useEffect(() => {
         if (!guildId) return;
@@ -186,7 +166,7 @@ export default function ChannelSidebar({ guildId }: Props) {
                 <div className="flex items-center justify-between px-3 py-2 border-b border-black/20 shrink-0">
                     <span className="text-white font-semibold text-sm truncate">Channels</span>
                     <div className="flex items-center gap-1">
-                        {canManageChannels && (
+                        {permissions.manageChannels && (
                             <button
                                 onClick={() => setShowCreate(true)}
                                 className="p-1 rounded text-[#949ba4] hover:text-[#dbdee1] hover:bg-[#35373c]"
@@ -198,7 +178,7 @@ export default function ChannelSidebar({ guildId }: Props) {
                                 </svg>
                             </button>
                         )}
-                        {permissions.isOwner && (
+                        {(permissions.isOwner || permissions.manageGuild || permissions.manageRoles) && (
                             <Link
                                 to={`/app/guild/${guildId}/settings`}
                                 className="p-1 rounded text-[#949ba4] hover:text-[#dbdee1] hover:bg-[#35373c]"

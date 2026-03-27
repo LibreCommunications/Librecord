@@ -38,11 +38,16 @@ export default function GuildSettingsPage() {
 
     if (!guildId) return null;
 
+    const canAccessGeneral = permissions.isOwner || permissions.manageGuild;
+    const canAccessRoles = permissions.isOwner || permissions.manageRoles;
+    const canAccessSettings = canAccessGeneral || canAccessRoles;
+
     if (permsLoaded && tab === null) {
-        if (permissions.isOwner) setTab("general");
+        if (canAccessGeneral) setTab("general");
+        else if (canAccessRoles) setTab("roles");
     }
 
-    if (permsLoaded && !permissions.isOwner) {
+    if (permsLoaded && !canAccessSettings) {
         navigate(`/app/guild/${guildId}`, { replace: true });
         return null;
     }
@@ -53,18 +58,22 @@ export default function GuildSettingsPage() {
                 <h1 className="text-2xl font-bold text-white mb-6">Server Settings</h1>
 
                 <div className="flex gap-4 mb-6 border-b border-[#3f4147] pb-2">
-                    <button
-                        onClick={() => setTab("general")}
-                        className={`pb-2 text-sm font-medium ${tab === "general" ? "text-white border-b-2 border-[#5865F2]" : "text-[#949ba4] hover:text-[#dbdee1]"}`}
-                    >
-                        General
-                    </button>
-                    <button
-                        onClick={() => setTab("roles")}
-                        className={`pb-2 text-sm font-medium ${tab === "roles" ? "text-white border-b-2 border-[#5865F2]" : "text-[#949ba4] hover:text-[#dbdee1]"}`}
-                    >
-                        Roles
-                    </button>
+                    {canAccessGeneral && (
+                        <button
+                            onClick={() => setTab("general")}
+                            className={`pb-2 text-sm font-medium ${tab === "general" ? "text-white border-b-2 border-[#5865F2]" : "text-[#949ba4] hover:text-[#dbdee1]"}`}
+                        >
+                            General
+                        </button>
+                    )}
+                    {canAccessRoles && (
+                        <button
+                            onClick={() => setTab("roles")}
+                            className={`pb-2 text-sm font-medium ${tab === "roles" ? "text-white border-b-2 border-[#5865F2]" : "text-[#949ba4] hover:text-[#dbdee1]"}`}
+                        >
+                            Roles
+                        </button>
+                    )}
                 </div>
 
                 {tab === "general" && (
