@@ -1,5 +1,13 @@
 # Production Readiness Audit — Remaining Items
 
+## Frontend / Backend
+
+### Performance
+- **No virtualization on MessageList** — all messages render in the DOM. Severe jank with 100+ messages.
+- **Unbounded message array** — `useChatChannel` messages state grows without limit.
+
+---
+
 ## Infrastructure
 
 ### Observability

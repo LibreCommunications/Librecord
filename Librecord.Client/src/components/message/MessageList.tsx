@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MessageItem } from "./MessageItem";
-import { DateSeparator } from "./DateSeparator";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { EmptyState } from "../ui/EmptyState";
 import { Spinner } from "../ui/Spinner";
-import { useVirtualMessageList } from "../../hooks/useVirtualMessageList";
 import type { MessageListProps } from "./MessageListProps";
 
 export function MessageList({
@@ -36,8 +34,6 @@ export function MessageList({
     const prevMsgCountRef = useRef(messages.length);
     const [prevMsgLen, setPrevMsgLen] = useState(messages.length);
 
-    const { virtualizer, flatItems } = useVirtualMessageList(messages, containerRef);
-
     if (messages.length === 0 && prevMsgLen > 0) {
         setPrevMsgLen(0);
         setNewMsgCount(0);
@@ -45,7 +41,6 @@ export function MessageList({
         setPrevMsgLen(messages.length);
     }
 
-    // Scroll position tracking
     useEffect(() => {
         const el = containerRef.current;
         if (!el) return;
@@ -54,6 +49,8 @@ export function MessageList({
             const el = containerRef.current;
             if (!el) return;
 
+            // During the sticky period after initial load, always consider at bottom
+            // so media load events keep re-scrolling
             if (Date.now() < stickyBottomUntilRef.current) {
                 isAtBottomRef.current = true;
                 return;
@@ -70,7 +67,8 @@ export function MessageList({
         return () => el.removeEventListener("scroll", onScroll);
     }, []);
 
-    // Media load re-scroll (capture phase for non-bubbling load events)
+    // The load event doesn't bubble, so we use capture to intercept
+    // it on descendant <img>/<video> elements for re-scrolling.
     useEffect(() => {
         const el = containerRef.current;
         if (!el) return;
@@ -87,7 +85,6 @@ export function MessageList({
         return () => el.removeEventListener("load", onMediaLoad, true);
     }, []);
 
-    // Auto-scroll on new messages / force scroll on send
     useEffect(() => {
         const el = containerRef.current;
         if (!el) return;
@@ -116,6 +113,8 @@ export function MessageList({
 
         if (messages.length > prevMsgCountRef.current) {
             if (prevMsgCountRef.current === 0 || isAtBottomRef.current) {
+                // Use instant scroll for initial load to avoid race with incoming
+                // realtime messages arriving before smooth animation completes
                 const isInitial = prevMsgCountRef.current === 0;
                 if (isInitial) {
                     stickyBottomUntilRef.current = Date.now() + 3000;
@@ -134,7 +133,6 @@ export function MessageList({
         prevMsgCountRef.current = messages.length;
     }, [messages, forceScrollOnNextUpdateRef, loadingMore]);
 
-    // Infinite scroll sentinel
     const handleIntersect = useCallback(
         (entries: IntersectionObserverEntry[]) => {
             if (entries[0]?.isIntersecting && hasMore && !loadingMore && !loading && onLoadMore) {
@@ -157,7 +155,6 @@ export function MessageList({
         return () => observer.disconnect();
     }, [handleIntersect, onLoadMore]);
 
-    // Stable callbacks for MessageItem
     const handleToggleMenu = useCallback((id: string) => {
         setMenuOpenId(prev => prev === id ? null : id);
     }, [setMenuOpenId]);
@@ -173,8 +170,6 @@ export function MessageList({
     const handleDelete = useCallback((id: string) => {
         setDeleteTargetId(id);
     }, []);
-
-    const virtualItems = virtualizer.getVirtualItems();
 
     return (
         <div
@@ -201,74 +196,50 @@ export function MessageList({
                 />
             )}
 
-            {messages.length > 0 && (
-                <div
-                    style={{
-                        height: virtualizer.getTotalSize(),
-                        width: "100%",
-                        position: "relative",
-                    }}
-                >
-                    {virtualItems.map(virtualRow => {
-                        const item = flatItems[virtualRow.index];
+            {messages.map((msg, idx) => {
+                const isAuthor = msg.author.id === currentUserId;
 
-                        if (item.type === "separator") {
-                            return (
-                                <div
-                                    key={item.key}
-                                    data-index={virtualRow.index}
-                                    ref={virtualizer.measureElement}
-                                    style={{
-                                        position: "absolute",
-                                        top: 0,
-                                        left: 0,
-                                        width: "100%",
-                                        transform: `translateY(${virtualRow.start}px)`,
-                                    }}
-                                >
-                                    <DateSeparator date={item.date} />
-                                </div>
-                            );
-                        }
+                const prevMsg = messages[idx - 1];
+                const msgDate = new Date(msg.createdAt).toDateString();
+                const prevDate = prevMsg ? new Date(prevMsg.createdAt).toDateString() : null;
+                const showDateSep = !prevDate || msgDate !== prevDate;
 
-                        const msg = item.msg;
-                        const isAuthor = msg.author.id === currentUserId;
-
-                        return (
-                            <div
-                                key={item.key}
-                                data-index={virtualRow.index}
-                                ref={virtualizer.measureElement}
-                                style={{
-                                    position: "absolute",
-                                    top: 0,
-                                    left: 0,
-                                    width: "100%",
-                                    transform: `translateY(${virtualRow.start}px)`,
-                                }}
-                            >
-                                <MessageItem
-                                    msg={msg}
-                                    isAuthor={isAuthor}
-                                    isEditing={editingId === msg.id}
-                                    menuOpen={menuOpenId === msg.id}
-                                    currentUserId={currentUserId}
-                                    onToggleMenu={handleToggleMenu}
-                                    onStartEdit={handleStartEdit}
-                                    onCancelEdit={handleCancelEdit}
-                                    onDelete={handleDelete}
-                                    onPin={onPinMessage}
-                                    isPinned={pinnedMessageIds?.has(msg.id)}
-                                    onAddReaction={onAddReaction}
-                                    onRemoveReaction={onRemoveReaction}
-                                    editMessage={editMessage}
-                                    getAvatarUrl={getAvatarUrl}
-                                />
+                return (
+                    <div key={msg.id}>
+                        {showDateSep && (
+                            <div className="flex items-center gap-2 px-4 py-2 mt-2">
+                                <div className="flex-1 h-px bg-[#3f4147]" />
+                                <span className="text-xs font-semibold text-[#949ba4] shrink-0">
+                                    {new Date(msg.createdAt).toLocaleDateString(undefined, {
+                                        weekday: "long",
+                                        year: "numeric",
+                                        month: "long",
+                                        day: "numeric",
+                                    })}
+                                </span>
+                                <div className="flex-1 h-px bg-[#3f4147]" />
                             </div>
-                        );
-                    })}
-                </div>
-            )}
+                        )}
+                        <MessageItem
+                            msg={msg}
+                            isAuthor={isAuthor}
+                            isEditing={editingId === msg.id}
+                            menuOpen={menuOpenId === msg.id}
+                            currentUserId={currentUserId}
+                            onToggleMenu={handleToggleMenu}
+                            onStartEdit={handleStartEdit}
+                            onCancelEdit={handleCancelEdit}
+                            onDelete={handleDelete}
+                            onPin={onPinMessage}
+                            isPinned={pinnedMessageIds?.has(msg.id)}
+                            onAddReaction={onAddReaction}
+                            onRemoveReaction={onRemoveReaction}
+                            editMessage={editMessage}
+                            getAvatarUrl={getAvatarUrl}
+                        />
+                    </div>
+                );
+            })}
 
             {newMsgCount > 0 && (
                 <button

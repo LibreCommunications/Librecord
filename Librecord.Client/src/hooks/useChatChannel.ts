@@ -61,7 +61,6 @@ export function useChatChannel(config: ChatChannelConfig) {
     const pruned = useRef(false);
     useEffect(() => { channelIdRef.current = channelId; }, [channelId]);
 
-    // When messages are pruned, re-enable "load more" since old messages were dropped
     useEffect(() => {
         if (pruned.current) {
             pruned.current = false;
