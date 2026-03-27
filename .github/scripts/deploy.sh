@@ -21,12 +21,8 @@ case "$ENV" in
     ;;
 esac
 
-STATE_DIR="/var/lib/${PROJECT}"
-sudo mkdir -p "$STATE_DIR" && sudo chown "$(id -u):$(id -g)" "$STATE_DIR" 2>/dev/null || {
-    # Fallback to home directory if /var/lib is not writable
-    STATE_DIR="$HOME/.${PROJECT}"
-    mkdir -p "$STATE_DIR"
-}
+STATE_DIR="$HOME/.${PROJECT}"
+mkdir -p "$STATE_DIR"
 STATE_FILE="${STATE_DIR}/active-slot"
 UPSTREAM_FILE="/etc/nginx/conf.d/${PROJECT}-upstream.conf"
 
@@ -43,21 +39,21 @@ fi
 echo "=== Blue-Green Deploy: $ENV ==="
 echo "Active: $ACTIVE -> Deploying: $NEW_SLOT (port $NEW_PORT)"
 
-# Export ports for podman compose
+# Export ports for podman-compose
 export BLUE_PORT GREEN_PORT
 export COMPOSE_PROJECT_NAME="$PROJECT"
 
 # Ensure infra services are running (livekit is shared, only start with prod)
 echo "Ensuring infra services are up..."
 if [ "$ENV" = "prod" ]; then
-  podman compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" --profile livekit up -d postgres minio livekit
+  podman-compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" --profile livekit up -d postgres minio livekit
 else
-  podman compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" up -d postgres minio
+  podman-compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" up -d postgres minio
 fi
 
 # Start new backend slot (image already built in CI, skip rebuild)
 echo "Starting backend-$NEW_SLOT on port $NEW_PORT..."
-podman compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" --profile "$NEW_SLOT" up -d --no-build "backend-$NEW_SLOT"
+podman-compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" --profile "$NEW_SLOT" up -d --no-build "backend-$NEW_SLOT"
 
 # Health check with timeout
 echo "Waiting for health check on port $NEW_PORT..."
@@ -73,7 +69,7 @@ for i in $(seq 1 $ATTEMPTS); do
     podman logs "${PROJECT}-backend-${NEW_SLOT}" --tail 50 2>&1 || true
     echo "=== End of logs ==="
     echo "Rolling back: stopping backend-$NEW_SLOT"
-    podman compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" --profile "$NEW_SLOT" stop "backend-$NEW_SLOT"
+    podman-compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" --profile "$NEW_SLOT" stop "backend-$NEW_SLOT"
     exit 1
   fi
   sleep 1
@@ -87,7 +83,7 @@ sudo /usr/sbin/nginx -t && sudo /usr/sbin/nginx -s reload
 # Stop old slot
 if [ "$ACTIVE" != "none" ]; then
   echo "Stopping old backend-$ACTIVE..."
-  podman compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" --profile "$ACTIVE" stop "backend-$ACTIVE"
+  podman-compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" --profile "$ACTIVE" stop "backend-$ACTIVE"
 fi
 
 # Persist active slot
