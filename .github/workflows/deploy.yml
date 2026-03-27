@@ -12,7 +12,7 @@ on:
         options: [production, test]
 
 jobs:
-  deploy:
+  build:
     runs-on: self-hosted
 
     env:
@@ -88,19 +88,25 @@ jobs:
       - name: Write frontend .env
         run: echo "VITE_API_URL=https://${{ secrets.DOMAIN }}/api" > Librecord.Client/.env
 
-      - name: Run backend tests
-        run: dotnet test Librecord.Tests/Librecord.Tests.csproj --verbosity minimal
-
-      - name: Install and build frontend
+      # Run backend tests, frontend build+lint, and Docker image build all in parallel
+      - name: Build and test everything in parallel
         run: |
-          cd Librecord.Client
-          npm ci
-          npm run build
+          set -euo pipefail
 
-      - name: Lint frontend
-        run: |
-          cd Librecord.Client
-          npm run lint
+          dotnet test Librecord.Tests/Librecord.Tests.csproj --verbosity minimal &
+          PID_TEST=$!
+
+          (cd Librecord.Client && npm ci --prefer-offline && npm run build && npm run lint) &
+          PID_FRONT=$!
+
+          docker compose -p "${{ steps.config.outputs.site }}" -f docker-compose.yml --profile blue --profile green build &
+          PID_DOCKER=$!
+
+          FAIL=0
+          wait $PID_TEST  || { echo "::error::Backend tests failed"; FAIL=1; }
+          wait $PID_FRONT || { echo "::error::Frontend build/lint failed"; FAIL=1; }
+          wait $PID_DOCKER || { echo "::error::Docker build failed"; FAIL=1; }
+          [ $FAIL -eq 0 ] || exit 1
 
       - name: Deploy frontend
         run: |

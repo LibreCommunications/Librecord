@@ -56,8 +56,9 @@ else
 fi
 
 # Build and start new backend slot
+# Image already built in the parallel build step
 echo "Starting backend-$NEW_SLOT on port $NEW_PORT..."
-docker compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" --profile "$NEW_SLOT" up -d --build "backend-$NEW_SLOT"
+docker compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" --profile "$NEW_SLOT" up -d "backend-$NEW_SLOT"
 
 # Health check with timeout
 echo "Waiting for health check on port $NEW_PORT..."
@@ -76,7 +77,7 @@ for i in $(seq 1 $ATTEMPTS); do
     docker compose -p "$PROJECT" -f "$REPO_DIR/docker-compose.yml" --profile "$NEW_SLOT" stop "backend-$NEW_SLOT"
     exit 1
   fi
-  sleep 2
+  sleep 1
 done
 
 # Switch nginx upstream to new slot
