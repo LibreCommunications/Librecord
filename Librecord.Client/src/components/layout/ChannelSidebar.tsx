@@ -288,7 +288,10 @@ export default function ChannelSidebar({ guildId }: Props) {
                                         </div>
                                         {voiceParticipants.length > 0 && (
                                             <div className="ml-7 mr-2 mt-0.5 mb-1 space-y-px">
-                                                {voiceParticipants.map(p => {
+                                                {voiceParticipants.map(raw => {
+                                                    // For the local user, voiceState is the source of truth
+                                                    const isLocal = raw.userId === user?.userId && isInVoiceChannel;
+                                                    const p = isLocal ? { ...raw, isMuted: voiceState.isMuted, isDeafened: voiceState.isDeafened, isCameraOn: voiceState.isCameraOn, isScreenSharing: voiceState.isScreenSharing } : raw;
                                                     const isSpeaking = speakingMap[p.userId] ?? false;
                                                     return (
                                                         <div key={p.userId} className="flex items-center gap-1.5 text-[13px] text-[#949ba4] py-[3px]">
