@@ -99,6 +99,10 @@ export function RealtimeRoot() {
 
             restoreReturnUrl();
             await tryRestoreVoiceSession();
+
+            // Trigger re-fetch of voice participants and presence now that
+            // the connection is established and voice session is restored.
+            window.dispatchEvent(new Event("realtime:reconnected"));
         }).catch(err => {
             console.error("[Realtime] Connection failed", err);
             setConnectionState("disconnected");
