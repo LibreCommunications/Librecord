@@ -4,10 +4,6 @@
 
 ## Backend
 
-### Security
-- **ThreadController** returns thread creator info without verifying caller has channel access.
-- **No rate limiting on sensitive endpoints** — friend requests, search, invite creation, and message sending have no `[EnableRateLimiting]`.
-
 ### Database
 - **No pagination** on `GetFriendsAsync`, `ListBans`, and search results (search has `limit` but no cursor/offset).
 
@@ -19,14 +15,9 @@
 
 ## Frontend
 
-### Security
-- **XSS risk via `dangerouslySetInnerHTML`** — `MessageItem.tsx` renders markdown-processed HTML directly. Sanitize with DOMPurify.
-- **Sensitive data in sessionStorage** — voice session state (channel IDs, guild IDs) stored unencrypted.
-
 ### Performance
 - **No virtualization on MessageList** — all messages render in the DOM. Severe jank with 100+ messages.
 - **Unbounded message array** — `useChatChannel` messages state grows without limit.
-- **No server-side image resizing** — large attachments loaded at full resolution.
 
 ---
 
@@ -38,3 +29,11 @@
 ### Observability
 - **No structured logging** — no JSON formatting, no correlation IDs, no centralized sink.
 - **No metrics** — no Prometheus, OpenTelemetry, or any request/error rate tracking.
+
+---
+
+## Low Priority / Enhancements
+
+- **No server-side image resizing** — large attachments downloaded at full resolution. CSS constrains display size but bandwidth is wasted. Fix requires imgproxy sidecar or upload-time thumbnail generation.
+- **No pagination** on `GetFriendsAsync`, `ListBans` — only matters at scale (1000+ friends/bans per user).
+- **Inconsistent error format** — cosmetic, doesn't affect functionality.
