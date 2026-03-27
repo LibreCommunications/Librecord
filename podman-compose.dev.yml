@@ -27,7 +27,7 @@ services:
       - minio_dev_data:/data
 
   livekit:
-    image: livekit/livekit-server:latest
+    image: docker.io/livekit/livekit-server:latest
     container_name: librecord-livekit-dev
     restart: unless-stopped
     command: --dev --bind 0.0.0.0
@@ -43,6 +43,6 @@ volumes:
   minio_dev_data:
 
 
-# Run with 'podman compose -f docker-compose.dev.yml up -d'
+# Run with 'podman-compose -f podman-compose.dev.yml up -d'
 # Requires: podman and podman-compose
 # Only tested on Arch

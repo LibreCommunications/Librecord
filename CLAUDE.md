@@ -42,7 +42,7 @@ npm run lint         # ESLint
 ### Database
 ```bash
 # Start PostgreSQL + MinIO
-podman compose -f docker-compose.dev.yml up -d
+podman-compose -f podman-compose.dev.yml up -d
 
 # Run migrations (interactive — scaffolds + applies)
 ./ef-migrate.sh
