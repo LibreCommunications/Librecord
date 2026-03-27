@@ -13,13 +13,13 @@
 - ~~CORS too permissive~~ — fixed. Restricted to `GET/POST/PUT/DELETE` and `Content-Type` header only.
 - ~~`AllowedHosts = "*"`~~ — fixed. Production deploy now sets `AllowedHosts` to the actual domain via env var. Dev keeps `*` for localhost.
 - **No rate limiting on sensitive endpoints** — friend requests, search, invite creation, and message sending have no `[EnableRateLimiting]`.
-- **Auth failures not logged** — `OnAuthenticationFailed` in `Program.cs` returns `Task.CompletedTask` silently. Log failed auth attempts.
+- ~~Auth failures not logged~~ — fixed. Now logs path, error message, and client IP on JWT auth failure.
 
 ### Error Handling
 
 - ~~CDN controllers swallow all exceptions~~ — fixed. CDN controllers now use presigned URL redirects; exception handling simplified.
 - ~~SignalR hub `OnConnectedAsync` has no try-catch~~ — fixed. Wrapped in try-catch with structured error logging, re-throws to let SignalR handle the disconnect.
-- **`GlobalExceptionHandler`** returns generic message without logging stack traces in production.
+- ~~`GlobalExceptionHandler`~~ — was already logging 500s with full stack traces. Added warning-level logging for 403 (Forbidden) responses with IP address for security audit trail.
 
 ### Database
 
@@ -75,7 +75,7 @@
 
 - ~~Containers run as root~~ — fixed, `Dockerfile` now uses non-root `appuser`.
 - **No resource limits** — `docker-compose.yml` services have no `mem_limit` or `cpus`. One runaway service can starve the host.
-- **No health checks on MinIO or LiveKit** — only PostgreSQL has a healthcheck. Docker won't restart failed services.
+- ~~No health checks on MinIO or LiveKit~~ — fixed. Added healthchecks for MinIO (`/minio/health/live`) and LiveKit (port 7880).
 - **No volume backup strategy** — `postgres_data` and `minio_data` have no automated backups.
 - **LiveKit uses `network_mode: host`** — bypasses Docker network isolation.
 

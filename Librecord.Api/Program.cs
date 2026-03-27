@@ -165,7 +165,16 @@ static void ConfigureAuthentication(
                     return Task.CompletedTask;
                 },
 
-                OnAuthenticationFailed = _ => Task.CompletedTask
+                OnAuthenticationFailed = ctx =>
+                {
+                    var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                    logger.LogWarning(
+                        "JWT auth failed | Path={Path} | Error={Error} | IP={IP}",
+                        ctx.Request.Path,
+                        ctx.Exception?.Message ?? "unknown",
+                        ctx.HttpContext.Connection.RemoteIpAddress);
+                    return Task.CompletedTask;
+                }
             };
         });
 }

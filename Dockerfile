@@ -17,6 +17,7 @@ RUN dotnet publish Librecord.Api/Librecord.Api.csproj -c Release -o /app --no-re
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends libkrb5-3 && rm -rf /var/lib/apt/lists/*
 RUN useradd --no-create-home --shell /bin/false appuser
 COPY --from=build --chown=appuser /app .
 USER appuser

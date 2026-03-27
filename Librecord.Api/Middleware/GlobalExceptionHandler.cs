@@ -42,6 +42,12 @@ public class GlobalExceptionHandler
             _logger.LogError(exception, "Unhandled exception for {Method} {Path}",
                 context.Request.Method, context.Request.Path);
         }
+        else if (statusCode == HttpStatusCode.Forbidden)
+        {
+            _logger.LogWarning("Access denied for {Method} {Path} | IP={IP} | {Message}",
+                context.Request.Method, context.Request.Path,
+                context.Connection.RemoteIpAddress, exception.Message);
+        }
 
         context.Response.StatusCode = (int)statusCode;
         context.Response.ContentType = "application/json";
