@@ -165,7 +165,7 @@ function bindRemoteAudioTrack(participant: RemoteParticipant) {
     });
 }
 
-export async function connectToVoice(token: string, wsUrl: string) {
+export async function connectToVoice(token: string, wsUrl: string, initialMuted = false, initialDeafened = false) {
     if (room) await disconnect();
 
     room = new Room({
@@ -215,7 +215,11 @@ export async function connectToVoice(token: string, wsUrl: string) {
     });
 
     await room.connect(wsUrl, token);
-    await room.localParticipant.setMicrophoneEnabled(true);
+    await room.localParticipant.setMicrophoneEnabled(!initialMuted);
+
+    if (initialDeafened) {
+        isDeafened = true;
+    }
 
     await room.startAudio();
 

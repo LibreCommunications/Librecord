@@ -43,11 +43,8 @@ async function tryRestoreVoiceSession() {
                 isCameraOn: false,
                 isScreenSharing: false,
             });
-            await livekitClient.connectToVoice(result.token, result.wsUrl);
+            await livekitClient.connectToVoice(result.token, result.wsUrl, session.isMuted, session.isDeafened);
         } else {
-            // Row survived — just restore local state and reconnect LiveKit
-            // RejoinVoiceChannel returned null meaning state was updated,
-            // but we need a token. Do a full join instead.
             const fullResult = await appConnection.invoke<{
                 token: string;
                 wsUrl: string;
@@ -64,7 +61,7 @@ async function tryRestoreVoiceSession() {
                 isCameraOn: false,
                 isScreenSharing: false,
             });
-            await livekitClient.connectToVoice(fullResult.token, fullResult.wsUrl);
+            await livekitClient.connectToVoice(fullResult.token, fullResult.wsUrl, session.isMuted, session.isDeafened);
         }
     } catch (e) {
         console.warn("[Realtime] Failed to restore voice session:", e);
