@@ -14,10 +14,8 @@ COPY Librecord.Domain/ Librecord.Domain/
 COPY Librecord.Infra/ Librecord.Infra/
 RUN dotnet publish Librecord.Api/Librecord.Api.csproj -c Release -o /app --no-restore
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-azurelinux3.0
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
-
-RUN tdnf install -y krb5-libs && tdnf clean all
 
 COPY --from=build /app .
 
