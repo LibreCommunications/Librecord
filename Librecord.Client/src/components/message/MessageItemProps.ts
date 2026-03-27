@@ -8,11 +8,11 @@ export interface MessageItemProps {
     currentUserId?: string;
     isPinned?: boolean;
 
-    onToggleMenu: () => void;
-    onStartEdit: () => void;
+    onToggleMenu: (messageId: string) => void;
+    onStartEdit: (messageId: string) => void;
     onCancelEdit: () => void;
-    onDelete: () => void;
-    onPin?: () => void;
+    onDelete: (messageId: string) => void;
+    onPin?: (messageId: string) => void;
     onAddReaction: (messageId: string, emoji: string) => void;
     onRemoveReaction: (messageId: string, emoji: string) => void;
 

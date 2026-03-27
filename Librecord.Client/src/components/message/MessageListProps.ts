@@ -12,8 +12,8 @@ export interface MessageListProps {
     menuOpenId: string | null;
     editingId: string | null;
 
-    setMenuOpenId: (id: string | null) => void;
-    setEditingId: (id: string | null) => void;
+    setMenuOpenId: React.Dispatch<React.SetStateAction<string | null>>;
+    setEditingId: React.Dispatch<React.SetStateAction<string | null>>;
     
     editMessage: (
         messageId: string,

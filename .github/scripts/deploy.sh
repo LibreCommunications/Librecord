@@ -87,6 +87,8 @@ docker run -d \
   --name "$CONTAINER" \
   --network "$DOCKER_NETWORK" \
   --restart unless-stopped \
+  --memory 512m \
+  --cpus 1.0 \
   -p "127.0.0.1:${NEW_PORT}:5111" \
   -e ASPNETCORE_ENVIRONMENT=Production \
   -e ASPNETCORE_URLS=http://+:5111 \

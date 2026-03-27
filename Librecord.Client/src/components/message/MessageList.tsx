@@ -155,6 +155,22 @@ export function MessageList({
         return () => observer.disconnect();
     }, [handleIntersect, onLoadMore]);
 
+    const handleToggleMenu = useCallback((id: string) => {
+        setMenuOpenId(prev => prev === id ? null : id);
+    }, [setMenuOpenId]);
+
+    const handleStartEdit = useCallback((id: string) => {
+        setEditingId(id);
+    }, [setEditingId]);
+
+    const handleCancelEdit = useCallback(() => {
+        setEditingId(null);
+    }, [setEditingId]);
+
+    const handleDelete = useCallback((id: string) => {
+        setDeleteTargetId(id);
+    }, []);
+
     return (
         <div
             ref={containerRef}
@@ -210,15 +226,11 @@ export function MessageList({
                             isEditing={editingId === msg.id}
                             menuOpen={menuOpenId === msg.id}
                             currentUserId={currentUserId}
-                            onToggleMenu={() =>
-                                setMenuOpenId(
-                                    menuOpenId === msg.id ? null : msg.id
-                                )
-                            }
-                            onStartEdit={() => setEditingId(msg.id)}
-                            onCancelEdit={() => setEditingId(null)}
-                            onDelete={() => setDeleteTargetId(msg.id)}
-                            onPin={onPinMessage ? () => onPinMessage(msg.id) : undefined}
+                            onToggleMenu={handleToggleMenu}
+                            onStartEdit={handleStartEdit}
+                            onCancelEdit={handleCancelEdit}
+                            onDelete={handleDelete}
+                            onPin={onPinMessage}
                             isPinned={pinnedMessageIds?.has(msg.id)}
                             onAddReaction={onAddReaction}
                             onRemoveReaction={onRemoveReaction}

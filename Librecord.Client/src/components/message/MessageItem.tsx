@@ -189,7 +189,7 @@ export const MessageItem = memo(function MessageItem({
                     <div className="flex bg-[#111214] rounded border border-[#2b2d31] shadow-lg">
                         {isAuthor && (
                             <button
-                                onClick={onStartEdit}
+                                onClick={() => onStartEdit(msg.id)}
                                 className="px-2 py-1 text-[#b5bac1] hover:text-white hover:bg-[#35373c] transition-colors rounded-l"
                                 title="Edit"
                             >
@@ -201,7 +201,7 @@ export const MessageItem = memo(function MessageItem({
                         )}
                         {isAuthor && (
                             <button
-                                onClick={onDelete}
+                                onClick={() => onDelete(msg.id)}
                                 className="px-2 py-1 text-[#b5bac1] hover:text-[#f23f43] hover:bg-[#35373c] transition-colors"
                                 title="Delete"
                             >
@@ -213,7 +213,7 @@ export const MessageItem = memo(function MessageItem({
                         )}
                         <button
                             ref={moreButtonRef}
-                            onClick={onToggleMenu}
+                            onClick={() => onToggleMenu(msg.id)}
                             className={`px-2 py-1 text-[#b5bac1] hover:text-white hover:bg-[#35373c] transition-colors ${isAuthor ? "" : "rounded-l"} rounded-r`}
                             title="More"
                         >
@@ -229,10 +229,10 @@ export const MessageItem = memo(function MessageItem({
                             anchorRef={moreButtonRef}
                             onAddReaction={(emoji) => {
                                 onAddReaction(msg.id, emoji);
-                                onToggleMenu();
+                                onToggleMenu(msg.id);
                             }}
-                            onPin={onPin ? () => { onPin(); onToggleMenu(); } : undefined}
-                            onClose={onToggleMenu}
+                            onPin={onPin ? () => { onPin(msg.id); onToggleMenu(msg.id); } : undefined}
+                            onClose={() => onToggleMenu(msg.id)}
                             isPinned={isPinned}
                         />
                     )}
