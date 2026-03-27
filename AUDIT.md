@@ -73,7 +73,7 @@
 
 ### Docker
 
-- **Containers run as root** — `Dockerfile` has no `USER` directive. Add a non-root user.
+- ~~Containers run as root~~ — fixed, `Dockerfile` now uses non-root `appuser`.
 - **No resource limits** — `docker-compose.yml` services have no `mem_limit` or `cpus`. One runaway service can starve the host.
 - **No health checks on MinIO or LiveKit** — only PostgreSQL has a healthcheck. Docker won't restart failed services.
 - **No volume backup strategy** — `postgres_data` and `minio_data` have no automated backups.
@@ -81,12 +81,7 @@
 
 ### Nginx
 
-- **No HSTS header** — missing `Strict-Transport-Security`. Vulnerable to SSL downgrade.
-- **No rate limiting at nginx level** — DDoS requests reach the app before .NET rate limiter kicks in.
-- **No gzip compression** — API JSON responses sent uncompressed (~70% larger).
-- **WebSocket timeout 86400s (24h)** — dead connections waste resources. Reduce to 1800s.
-- **No explicit SSL cipher/protocol config** — relies on nginx defaults. Pin to TLS 1.2+ and modern ciphers.
-- **CSP allows `unsafe-inline` for styles** and uses wildcard `wss://*.gros-sans-dessein.com`.
+All addressed in `nginx.conf` + `nginx-hardening.conf`.
 
 ### CI/CD
 

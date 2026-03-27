@@ -11,6 +11,8 @@ internal class GuildMemberConfiguration : IEntityTypeConfiguration<GuildMember>
         builder.Property(m => m.JoinedAt)
             .IsRequired();
         
+        builder.HasIndex(m => m.UserId);
+
         builder.HasOne(m => m.User)
             .WithMany(u => u.GuildMemberships)
             .HasForeignKey(m => m.UserId)

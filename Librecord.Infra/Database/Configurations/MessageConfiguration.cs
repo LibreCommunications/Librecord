@@ -19,6 +19,9 @@ public class MessageConfiguration : IEntityTypeConfiguration<Message>
         builder.Property(m => m.CreatedAt)
             .IsRequired();
 
+        builder.HasIndex(m => m.UserId);
+        builder.HasIndex(m => m.CreatedAt);
+
         builder.HasOne(m => m.User)
             .WithMany()
             .HasForeignKey(m => m.UserId)

@@ -27,5 +27,7 @@ public class GuildChannelMessageConfiguration
             .WithMany(c => c.Messages)
             .HasForeignKey(m => m.ChannelId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(m => m.ChannelId);
     }
 }
