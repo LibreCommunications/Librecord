@@ -120,10 +120,8 @@ jobs:
       # ── Podman: runtime-only image from pre-built output ───────────
       - name: Build container image
         run: |
-          podman build \
-            -f Dockerfile.ci \
-            -t ${{ steps.config.outputs.site }}-backend:latest \
-            .
+          printf 'FROM mcr.microsoft.com/dotnet/aspnet:10.0\nWORKDIR /app\nCOPY .publish/ .\nEXPOSE 5111\nENTRYPOINT ["dotnet", "Librecord.Api.dll"]\n' | \
+          podman build -t ${{ steps.config.outputs.site }}-backend:latest -f - .
 
       - name: Deploy frontend
         run: |

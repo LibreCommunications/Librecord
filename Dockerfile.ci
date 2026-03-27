@@ -1,5 +1,0 @@
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
-WORKDIR /app
-COPY .publish/ .
-EXPOSE 5111
-ENTRYPOINT ["dotnet", "Librecord.Api.dll"]
