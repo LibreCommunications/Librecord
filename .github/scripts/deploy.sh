@@ -90,7 +90,7 @@ docker run -d \
   -p "127.0.0.1:${NEW_PORT}:5111" \
   -e ASPNETCORE_ENVIRONMENT=Production \
   -e ASPNETCORE_URLS=http://+:5111 \
-  -e "AllowedHosts=${DOMAIN}" \
+  -e "AllowedHosts=${DOMAIN};localhost;127.0.0.1" \
   -e "ConnectionStrings__Default=Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER:-$POSTGRES_DB};Password=${POSTGRES_PASSWORD}" \
   -e Jwt__Issuer=Librecord \
   -e Jwt__Audience=LibrecordClient \
