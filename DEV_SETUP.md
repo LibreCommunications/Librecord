@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- **Docker** (or Podman) + Docker Compose
+- **Podman** + podman-compose
 - **.NET 10.0 SDK**
 - **Node.js 20+** and npm
 - **Git**
@@ -10,7 +10,7 @@
 ## 1. Start Infrastructure
 
 ```bash
-docker-compose -f docker-compose.dev.yml up -d
+podman-compose -f podman-compose.dev.yml up -d
 ```
 
 This starts 3 services:
@@ -23,7 +23,7 @@ This starts 3 services:
 
 Verify they're running:
 ```bash
-docker-compose -f docker-compose.dev.yml ps
+podman ps
 ```
 
 ## 2. Generate HTTPS Certificates
@@ -108,7 +108,7 @@ Your browser will warn about the self-signed cert — accept it for both `localh
 
 ```bash
 # Terminal 1 — Infrastructure
-docker-compose -f docker-compose.dev.yml up -d
+podman-compose -f podman-compose.dev.yml up -d
 
 # Terminal 2 — Backend
 ./ef-migrate.sh --apply-only
@@ -123,7 +123,7 @@ npm run dev
 ## Troubleshooting
 
 **"connection refused" on PostgreSQL**
-- Check Docker is running: `docker-compose -f docker-compose.dev.yml ps`
+- Check containers are running: `podman ps`
 - Make sure port 5432 isn't used by a local PostgreSQL instance
 
 **HTTPS errors in browser**

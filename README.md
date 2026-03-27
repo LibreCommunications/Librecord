@@ -43,7 +43,7 @@ Librecord.Client       — React 19 + TypeScript 5.9 + Vite + Tailwind CSS 4
 ## Quick Start
 
 ```bash
-# One-command setup (requires Docker, .NET 10 SDK, Node.js 20+)
+# One-command setup (requires Podman, .NET 10 SDK, Node.js 20+)
 ./setup-dev.sh
 
 # Start backend

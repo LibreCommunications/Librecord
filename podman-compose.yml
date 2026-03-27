@@ -77,7 +77,7 @@ services:
       - minio_data:/data
 
   livekit:
-    image: livekit/livekit-server:v1.8.3
+    image: docker.io/livekit/livekit-server:v1.8.3
     container_name: ${COMPOSE_PROJECT_NAME:-librecord}-livekit
     restart: unless-stopped
     profiles: [livekit]

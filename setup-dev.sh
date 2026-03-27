@@ -4,7 +4,7 @@
 #
 # Usage:
 #   ./setup-dev.sh            Full setup (infra + certs + backend + frontend)
-#   ./setup-dev.sh --skip-infra   Skip Docker containers (already running)
+#   ./setup-dev.sh --skip-infra   Skip containers (already running)
 #   ./setup-dev.sh --skip-certs   Skip certificate generation (already have them)
 #
 set -euo pipefail
@@ -18,7 +18,7 @@ CERT_KEY="$CERT_DIR/localhost-key.pem"
 CERT_PEM="$CERT_DIR/localhost.pem"
 CLIENT_DIR="$SCRIPT_DIR/Librecord.Client"
 API_PROJECT="$SCRIPT_DIR/Librecord.Api"
-COMPOSE_FILE="$SCRIPT_DIR/docker-compose.dev.yml"
+COMPOSE_FILE="$SCRIPT_DIR/podman-compose.dev.yml"
 APPSETTINGS="$API_PROJECT/appsettings.Development.json"
 
 SKIP_INFRA=false
@@ -67,18 +67,7 @@ step 1 "Checking prerequisites"
 
 MISSING=()
 
-if command -v docker &>/dev/null; then
-    ok "docker $(docker --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1)"
-    COMPOSE_CMD="docker compose"
-    # Fall back to docker-compose if `docker compose` isn't available
-    if ! docker compose version &>/dev/null 2>&1; then
-        if command -v docker-compose &>/dev/null; then
-            COMPOSE_CMD="docker-compose"
-        else
-            MISSING+=("docker-compose")
-        fi
-    fi
-elif command -v podman &>/dev/null; then
+if command -v podman &>/dev/null; then
     ok "podman $(podman --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+' | head -1)"
     if command -v podman-compose &>/dev/null; then
         COMPOSE_CMD="podman-compose"
@@ -86,7 +75,7 @@ elif command -v podman &>/dev/null; then
         MISSING+=("podman-compose")
     fi
 else
-    MISSING+=("docker or podman")
+    MISSING+=("podman")
 fi
 
 if command -v dotnet &>/dev/null; then
@@ -153,8 +142,8 @@ else
     done
 
     # Create the attachment bucket if it doesn't exist
-    docker exec librecord-minio-dev mc alias set local http://localhost:9000 minioadmin minioadmin &>/dev/null
-    docker exec librecord-minio-dev mc mb local/librecord-attachments --ignore-existing &>/dev/null
+    podman exec librecord-minio-dev mc alias set local http://localhost:9000 minioadmin minioadmin &>/dev/null
+    podman exec librecord-minio-dev mc mb local/librecord-attachments --ignore-existing &>/dev/null
     ok "MinIO bucket 'librecord-attachments' ready"
 
     ok "MinIO ready (localhost:9000, console :9001)"
