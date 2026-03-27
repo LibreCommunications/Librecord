@@ -74,13 +74,13 @@ podman run -d \
   -p "127.0.0.1:${NEW_PORT}:5111" \
   -e ASPNETCORE_ENVIRONMENT=Production \
   -e ASPNETCORE_URLS=http://+:5111 \
-  -e "ConnectionStrings__Default=Host=${PROJECT}_postgres_1;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER:-$POSTGRES_DB};Password=${POSTGRES_PASSWORD}" \
+  -e "ConnectionStrings__Default=Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER:-$POSTGRES_DB};Password=${POSTGRES_PASSWORD}" \
   -e Jwt__Issuer=Librecord \
   -e Jwt__Audience=LibrecordClient \
   -e "Jwt__SigningKey=${JWT_SIGNING_KEY}" \
   -e Jwt__AccessTokenMinutes=15 \
   -e Jwt__RefreshTokenDays=14 \
-  -e "Minio__Endpoint=${PROJECT}_minio_1:9000" \
+  -e "Minio__Endpoint=minio:9000" \
   -e "Minio__AccessKey=${MINIO_ACCESS_KEY}" \
   -e "Minio__SecretKey=${MINIO_SECRET_KEY}" \
   -e "Minio__Bucket=${MINIO_BUCKET:-librecord-attachments}" \
