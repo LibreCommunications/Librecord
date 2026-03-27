@@ -10,6 +10,9 @@ import type { UploadResult } from "./useAttachmentUpload";
 
 type OptimisticMessage = Message & { clientMessageId?: string };
 
+const MAX_MESSAGES = 500;
+const PRUNE_TO = 400;
+
 export interface ChatChannelConfig {
     channelId: string | undefined;
 
@@ -55,7 +58,16 @@ export function useChatChannel(config: ChatChannelConfig) {
     const attachTriggerRef = useRef<{ open: () => void }>(null);
     const channelIdRef = useRef(channelId);
     const abortRef = useRef<AbortController | null>(null);
+    const pruned = useRef(false);
     useEffect(() => { channelIdRef.current = channelId; }, [channelId]);
+
+    // When messages are pruned, re-enable "load more" since old messages were dropped
+    useEffect(() => {
+        if (pruned.current) {
+            pruned.current = false;
+            setHasMore(true);
+        }
+    }, [messages]);
 
     const { typingNames, sendTyping, stopTyping } = useTypingIndicator(channelId, config.typingScope, user?.userId);
 
@@ -90,7 +102,12 @@ export function useChatChannel(config: ChatChannelConfig) {
             }
         }
         if (prev.some(m => m.id === message.id)) return prev;
-        return [...prev, message];
+        const next = [...prev, message];
+        if (next.length > MAX_MESSAGES) {
+            pruned.current = true;
+            return next.slice(next.length - PRUNE_TO);
+        }
+        return next;
     }, []);
 
     useEffect(() => {
