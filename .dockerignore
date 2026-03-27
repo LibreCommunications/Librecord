@@ -11,7 +11,7 @@ Librecord.Tests/
 nginx.conf
 livekit.nginx.conf
 livekit.yaml
-podman-compose*.yml
+docker-compose*.yml
 Dockerfile*
 .dockerignore
 ef-migrate.sh

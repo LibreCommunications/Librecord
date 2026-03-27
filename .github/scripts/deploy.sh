@@ -42,7 +42,7 @@ CONTAINER="${PROJECT}-backend-${NEW_SLOT}"
 echo "=== Blue-Green Deploy: $ENV ==="
 echo "Active: $ACTIVE -> Deploying: $NEW_SLOT (port $NEW_PORT)"
 
-# Export for podman-compose
+# Export for docker compose
 export BLUE_PORT GREEN_PORT
 
 # Source .env for backend environment variables
@@ -54,40 +54,38 @@ set +a
 # Ensure infra services are running (livekit is shared, only start with prod)
 echo "Ensuring infra services are up..."
 if [ "$ENV" = "prod" ]; then
-  podman-compose -p "$PROJECT" --env-file "$REPO_DIR/.env" -f "$REPO_DIR/podman-compose.yml" --profile livekit up -d postgres minio livekit
+  docker compose -p "$PROJECT" --env-file "$REPO_DIR/.env" -f "$REPO_DIR/docker-compose.yml" --profile livekit up -d postgres minio livekit
 else
-  podman-compose -p "$PROJECT" --env-file "$REPO_DIR/.env" -f "$REPO_DIR/podman-compose.yml" up -d postgres minio
+  docker compose -p "$PROJECT" --env-file "$REPO_DIR/.env" -f "$REPO_DIR/docker-compose.yml" up -d postgres minio
 fi
 
-# Ensure DNS is working on the container network
-POD_NETWORK="${PROJECT}_default"
-echo "Reloading network to ensure DNS resolution..."
-podman network reload --all 2>/dev/null || true
-
 # Wait for postgres to be ready before starting the backend
-PG_CONTAINER=$(podman ps --filter "name=${PROJECT}.*postgres" --format '{{.Names}}' | head -1)
+PG_CONTAINER=$(docker ps --filter "name=${PROJECT}.*postgres" --format '{{.Names}}' | head -1)
 echo "Waiting for PostgreSQL ($PG_CONTAINER) to accept connections..."
 for i in $(seq 1 30); do
-  if [ -n "$PG_CONTAINER" ] && podman exec "$PG_CONTAINER" pg_isready -U "${POSTGRES_USER:-$POSTGRES_DB}" > /dev/null 2>&1; then
+  if [ -n "$PG_CONTAINER" ] && docker exec "$PG_CONTAINER" pg_isready -U "${POSTGRES_USER:-$POSTGRES_DB}" > /dev/null 2>&1; then
     echo "PostgreSQL ready on attempt $i"
     break
   fi
   if [ "$i" -eq 30 ]; then
     echo "WARNING: PostgreSQL readiness check timed out after 30s"
     echo "Postgres container logs:"
-    podman logs --tail 20 "$PG_CONTAINER" 2>&1 || true
+    docker logs --tail 20 "$PG_CONTAINER" 2>&1 || true
   fi
   sleep 1
 done
 
+# Get the docker network so the backend can reach postgres/minio by service name
+DOCKER_NETWORK="${PROJECT}_default"
+
 # Remove old container if it exists
-podman rm -f "$CONTAINER" 2>/dev/null || true
+docker rm -f "$CONTAINER" 2>/dev/null || true
 
 # Start new backend container directly (no compose build needed)
 echo "Starting $CONTAINER on port $NEW_PORT..."
-podman run -d \
+docker run -d \
   --name "$CONTAINER" \
-  --network "$POD_NETWORK" \
+  --network "$DOCKER_NETWORK" \
   --restart unless-stopped \
   -p "127.0.0.1:${NEW_PORT}:5111" \
   -e ASPNETCORE_ENVIRONMENT=Production \
@@ -115,13 +113,13 @@ echo "Waiting for health check on port $NEW_PORT..."
 ATTEMPTS=30
 for i in $(seq 1 $ATTEMPTS); do
   # Check if container is still running
-  CSTATE=$(podman inspect "$CONTAINER" --format '{{.State.Status}}' 2>/dev/null || echo "gone")
+  CSTATE=$(docker inspect "$CONTAINER" --format '{{.State.Status}}' 2>/dev/null || echo "gone")
   if [ "$CSTATE" != "running" ]; then
     echo "ERROR: Container exited unexpectedly (status: $CSTATE)"
     echo "=== Container logs ==="
-    podman logs --tail 50 "$CONTAINER" 2>&1 || true
+    docker logs --tail 50 "$CONTAINER" 2>&1 || true
     echo "=== End of logs ==="
-    podman rm -f "$CONTAINER" 2>/dev/null || true
+    docker rm -f "$CONTAINER" 2>/dev/null || true
     exit 1
   fi
   if curl -sf "http://127.0.0.1:$NEW_PORT/health" > /dev/null 2>&1; then
@@ -131,11 +129,11 @@ for i in $(seq 1 $ATTEMPTS); do
   if [ "$i" -eq "$ATTEMPTS" ]; then
     echo "ERROR: Health check failed after $ATTEMPTS attempts"
     echo "=== Container logs ==="
-    podman logs --tail 50 "$CONTAINER" 2>&1 || true
+    docker logs --tail 50 "$CONTAINER" 2>&1 || true
     echo "=== End of logs ==="
     echo "Rolling back: stopping $CONTAINER"
-    podman stop "$CONTAINER" 2>/dev/null || true
-    podman rm -f "$CONTAINER" 2>/dev/null || true
+    docker stop "$CONTAINER" 2>/dev/null || true
+    docker rm -f "$CONTAINER" 2>/dev/null || true
     exit 1
   fi
   sleep 2
@@ -150,8 +148,8 @@ sudo /usr/sbin/nginx -t && sudo /usr/sbin/nginx -s reload
 if [ "$ACTIVE" != "none" ]; then
   OLD_CONTAINER="${PROJECT}-backend-${ACTIVE}"
   echo "Stopping old $OLD_CONTAINER..."
-  podman stop "$OLD_CONTAINER" 2>/dev/null || true
-  podman rm -f "$OLD_CONTAINER" 2>/dev/null || true
+  docker stop "$OLD_CONTAINER" 2>/dev/null || true
+  docker rm -f "$OLD_CONTAINER" 2>/dev/null || true
 fi
 
 # Persist active slot

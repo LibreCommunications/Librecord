@@ -21,7 +21,7 @@ Four-layer clean architecture:
 
 - **Backend**: .NET 10.0, EF Core 10 + PostgreSQL, SignalR, ASP.NET Identity, JWT (HttpOnly cookies)
 - **Frontend**: React 19, TypeScript 5.9, Vite (rolldown), Tailwind CSS 4.1, @microsoft/signalr
-- **Infra**: PostgreSQL 18, MinIO (S3-compatible attachment storage), Podman + Compose
+- **Infra**: PostgreSQL 18, MinIO (S3-compatible attachment storage), Docker + Compose
 
 ## Common Commands
 
@@ -42,7 +42,7 @@ npm run lint         # ESLint
 ### Database
 ```bash
 # Start PostgreSQL + MinIO
-podman-compose -f podman-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml up -d
 
 # Run migrations (interactive — scaffolds + applies)
 ./ef-migrate.sh

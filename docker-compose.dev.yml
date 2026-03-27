@@ -43,6 +43,4 @@ volumes:
   minio_dev_data:
 
 
-# Run with 'podman-compose -f podman-compose.dev.yml up -d'
-# Requires: podman and podman-compose
-# Only tested on Arch
+# Run with 'docker compose -f docker-compose.dev.yml up -d'

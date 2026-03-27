@@ -117,11 +117,11 @@ jobs:
           wait $PID_FRONTEND || { echo "::error::Frontend failed"; FAIL=1; }
           [ $FAIL -eq 0 ] || exit 1
 
-      # ── Podman: runtime-only image from pre-built output ───────────
+      # ── Docker: runtime-only image from pre-built output ───────────
       - name: Build container image
         run: |
           printf 'FROM mcr.microsoft.com/dotnet/aspnet:10.0\nWORKDIR /app\nCOPY .publish/ .\nEXPOSE 5111\nENTRYPOINT ["dotnet", "Librecord.Api.dll"]\n' | \
-          podman build -t ${{ steps.config.outputs.site }}-backend:latest -f - .
+          docker build -t ${{ steps.config.outputs.site }}-backend:latest -f - .
 
       - name: Deploy frontend
         run: |
