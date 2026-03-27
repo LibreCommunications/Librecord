@@ -60,14 +60,17 @@ else
 fi
 
 # Wait for postgres to be ready before starting the backend
-echo "Waiting for PostgreSQL to accept connections..."
+PG_CONTAINER=$(podman ps --filter "name=${PROJECT}.*postgres" --format '{{.Names}}' | head -1)
+echo "Waiting for PostgreSQL ($PG_CONTAINER) to accept connections..."
 for i in $(seq 1 30); do
-  if podman exec "${PROJECT}_postgres_1" pg_isready -U "${POSTGRES_USER:-$POSTGRES_DB}" > /dev/null 2>&1; then
+  if [ -n "$PG_CONTAINER" ] && podman exec "$PG_CONTAINER" pg_isready -U "${POSTGRES_USER:-$POSTGRES_DB}" > /dev/null 2>&1; then
     echo "PostgreSQL ready on attempt $i"
     break
   fi
   if [ "$i" -eq 30 ]; then
-    echo "WARNING: PostgreSQL readiness check timed out, proceeding anyway..."
+    echo "WARNING: PostgreSQL readiness check timed out after 30s"
+    echo "Postgres container logs:"
+    podman logs --tail 20 "$PG_CONTAINER" 2>&1 || true
   fi
   sleep 1
 done
@@ -87,13 +90,13 @@ podman run -d \
   -p "127.0.0.1:${NEW_PORT}:5111" \
   -e ASPNETCORE_ENVIRONMENT=Production \
   -e ASPNETCORE_URLS=http://+:5111 \
-  -e "ConnectionStrings__Default=Host=${PROJECT}_postgres_1;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER:-$POSTGRES_DB};Password=${POSTGRES_PASSWORD}" \
+  -e "ConnectionStrings__Default=Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER:-$POSTGRES_DB};Password=${POSTGRES_PASSWORD}" \
   -e Jwt__Issuer=Librecord \
   -e Jwt__Audience=LibrecordClient \
   -e "Jwt__SigningKey=${JWT_SIGNING_KEY}" \
   -e Jwt__AccessTokenMinutes=15 \
   -e Jwt__RefreshTokenDays=14 \
-  -e "Minio__Endpoint=${PROJECT}_minio_1:9000" \
+  -e "Minio__Endpoint=minio:9000" \
   -e "Minio__AccessKey=${MINIO_ACCESS_KEY}" \
   -e "Minio__SecretKey=${MINIO_SECRET_KEY}" \
   -e "Minio__Bucket=${MINIO_BUCKET:-librecord-attachments}" \
@@ -116,7 +119,7 @@ for i in $(seq 1 $ATTEMPTS); do
   if [ "$i" -eq "$ATTEMPTS" ]; then
     echo "ERROR: Health check failed after $ATTEMPTS attempts"
     echo "=== Container logs (last 50 lines) ==="
-    podman logs "$CONTAINER" --tail 50 2>&1 || true
+    podman logs --tail 50 "$CONTAINER" 2>&1 || true
     echo "=== End of logs ==="
     echo "Rolling back: stopping $CONTAINER"
     podman stop "$CONTAINER" 2>/dev/null || true
