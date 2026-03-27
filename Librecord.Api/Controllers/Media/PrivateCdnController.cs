@@ -22,7 +22,7 @@ public class PrivateCdnController : AuthenticatedController
     }
 
     [HttpGet("{**key}")]
-    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [ResponseCache(Duration = 300, Location = ResponseCacheLocation.Client)]
     public async Task<IActionResult> Get(string key)
     {
         if (string.IsNullOrWhiteSpace(key))
@@ -33,11 +33,10 @@ public class PrivateCdnController : AuthenticatedController
 
         try
         {
-            var stream = await _storage.DownloadAsync(key);
-            var contentType = GetContentType(key);
-            return File(stream, contentType);
+            var url = await _storage.GetPresignedUrl(key, 600);
+            return Redirect(url);
         }
-        catch
+        catch (Exception)
         {
             return NotFound();
         }
@@ -54,25 +53,5 @@ public class PrivateCdnController : AuthenticatedController
             return false;
 
         return await _access.CanUserAccessMessageAsync(messageId, UserId);
-    }
-
-    private static string GetContentType(string key)
-    {
-        var ext = Path.GetExtension(key).ToLowerInvariant();
-        return ext switch
-        {
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".png" => "image/png",
-            ".gif" => "image/gif",
-            ".webp" => "image/webp",
-            ".svg" => "image/svg+xml",
-            ".mp4" => "video/mp4",
-            ".webm" => "video/webm",
-            ".mp3" => "audio/mpeg",
-            ".ogg" => "audio/ogg",
-            ".wav" => "audio/wav",
-            ".pdf" => "application/pdf",
-            _ => "application/octet-stream",
-        };
     }
 }

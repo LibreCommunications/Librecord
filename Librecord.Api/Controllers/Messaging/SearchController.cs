@@ -33,8 +33,10 @@ public class SearchController : AuthenticatedController
         [FromQuery] Guid? guildId = null,
         [FromQuery] int limit = 25)
     {
-        if (string.IsNullOrWhiteSpace(q))
-            return BadRequest("Search query is required.");
+        if (string.IsNullOrWhiteSpace(q) || q.Length > 256)
+            return BadRequest("Search query is required and must be under 256 characters.");
+
+        limit = Math.Clamp(limit, 1, 50);
 
         if (channelId.HasValue)
         {

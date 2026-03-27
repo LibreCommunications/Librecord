@@ -139,7 +139,7 @@ jobs:
           set -euo pipefail
           SITE="${{ steps.config.outputs.site }}"
 
-          printf 'FROM mcr.microsoft.com/dotnet/aspnet:10.0\nWORKDIR /app\nRUN adduser --disabled-password --no-create-home appuser\nCOPY --chown=appuser .publish/ .\nUSER appuser\nEXPOSE 5111\nENTRYPOINT ["dotnet", "Librecord.Api.dll"]\n' | \
+          printf 'FROM mcr.microsoft.com/dotnet/aspnet:10.0\nWORKDIR /app\nRUN useradd --no-create-home --shell /bin/false appuser\nCOPY --chown=appuser .publish/ .\nUSER appuser\nEXPOSE 5111\nENTRYPOINT ["dotnet", "Librecord.Api.dll"]\n' | \
           docker build -t "${SITE}-backend:latest" -f - . &
           PID_IMG=$!
 

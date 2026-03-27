@@ -101,6 +101,7 @@ docker run -d \
   -e "Minio__SecretKey=${MINIO_SECRET_KEY}" \
   -e "Minio__Bucket=${MINIO_BUCKET:-librecord-attachments}" \
   -e Minio__UseSSL=false \
+  -e "Minio__PublicEndpoint=https://${DOMAIN}/storage" \
   -e "Security__MessageEncryptionKey=${MESSAGE_ENCRYPTION_KEY}" \
   -e "LiveKit__Host=${LIVEKIT_HOST:-wss://livekit.gros-sans-dessein.com}" \
   -e "LiveKit__ApiKey=${LIVEKIT_API_KEY}" \

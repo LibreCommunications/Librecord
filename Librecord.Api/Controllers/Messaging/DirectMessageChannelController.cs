@@ -196,6 +196,9 @@ public class DirectMessageChannelController : AuthenticatedController
 
 public class CreateGroupRequest
 {
+    [System.ComponentModel.DataAnnotations.MaxLength(64)]
     public string Name { get; set; } = "";
+
+    [System.ComponentModel.DataAnnotations.MaxLength(10)]
     public List<Guid> MemberIds { get; set; } = [];
 }

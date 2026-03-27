@@ -110,10 +110,13 @@ public class PresenceController : AuthenticatedController
 
 public class SetStatusRequest
 {
+    [System.ComponentModel.DataAnnotations.Required]
+    [System.ComponentModel.DataAnnotations.MaxLength(32)]
     public string Status { get; set; } = "";
 }
 
 public class BulkPresenceRequest
 {
+    [System.ComponentModel.DataAnnotations.MaxLength(100)]
     public List<Guid> UserIds { get; set; } = [];
 }

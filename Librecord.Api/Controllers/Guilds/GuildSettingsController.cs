@@ -98,5 +98,6 @@ public class GuildSettingsController : AuthenticatedController
 
 public class UpdateGuildRequest
 {
+    [System.ComponentModel.DataAnnotations.MaxLength(64)]
     public string? Name { get; set; }
 }

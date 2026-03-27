@@ -126,5 +126,6 @@ public class GuildMemberController : AuthenticatedController
 
 public class BanRequest
 {
+    [System.ComponentModel.DataAnnotations.MaxLength(500)]
     public string? Reason { get; set; }
 }

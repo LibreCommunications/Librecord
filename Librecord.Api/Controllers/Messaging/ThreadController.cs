@@ -119,10 +119,15 @@ public class ThreadController : AuthenticatedController
 public class CreateThreadRequest
 {
     public Guid ParentMessageId { get; set; }
+
+    [System.ComponentModel.DataAnnotations.Required]
+    [System.ComponentModel.DataAnnotations.MaxLength(64)]
     public string Name { get; set; } = "";
 }
 
 public class ThreadMessageRequest
 {
+    [System.ComponentModel.DataAnnotations.Required]
+    [System.ComponentModel.DataAnnotations.MaxLength(4000)]
     public string Content { get; set; } = "";
 }

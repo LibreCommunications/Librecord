@@ -190,6 +190,6 @@ public class GuildRoleController : AuthenticatedController
     }
 }
 
-public class CreateRoleRequest { public string? Name { get; set; } }
-public class UpdateRoleRequest { public string? Name { get; set; } public int? Position { get; set; } }
+public class CreateRoleRequest { [System.ComponentModel.DataAnnotations.MaxLength(64)] public string? Name { get; set; } }
+public class UpdateRoleRequest { [System.ComponentModel.DataAnnotations.MaxLength(64)] public string? Name { get; set; } public int? Position { get; set; } }
 public class SetPermissionRequest { public bool Allow { get; set; } }

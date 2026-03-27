@@ -6,7 +6,7 @@
 
 ### Security
 
-- **Missing input validation on request DTOs** — `RegisterRequest`, `BanRequest.Reason`, channel `Name`/`Topic`, group DM name, and search query `q` all lack `[MaxLength]` or `[MinLength]` attributes. Unbounded strings risk DB bloat and DoS.
+- ~~Missing input validation on request DTOs~~ — fixed. Added `[MaxLength]`, `[MinLength]`, `[Required]`, `[EmailAddress]` to all request DTOs and inline request classes. Search query capped at 256 chars.
 - **File upload MIME type not validated server-side** — `AttachmentController` and `UserProfileController` trust client-provided `ContentType` header. Validate actual file magic bytes instead.
 - **VoiceController.GetParticipants** doesn't check channel membership — any authenticated user can enumerate voice participants.
 - **ThreadController** returns thread creator info without verifying caller has channel access.
@@ -23,7 +23,7 @@
 
 ### Database
 
-- **Missing indexes** — No composite index on `GuildMembers(GuildId, UserId)`, no index on `GuildChannelMessages.ChannelId`, `DmChannelMessages.ChannelId`, `GuildBans(GuildId, UserId)`. These are hot query paths.
+- ~~Missing indexes~~ — fixed. FK indexes were already auto-created by EF; added `Messages.CreatedAt` index for pagination.
 - **No pagination** on `GetFriendsAsync`, `ListBans`, and search results (search has `limit` but no cursor/offset).
 - **Race condition in `JoinByCodeAsync`** — checks `invite.UsesCount` then increments without a transaction or row lock. Two concurrent joins can exceed `MaxUses`.
 - **Transaction gaps** — `BanMemberAsync` does two saves (remove member + add ban) without a transaction. `LeaveChannelAsync` deletes storage files before the DB delete — if DB fails, files are orphaned.

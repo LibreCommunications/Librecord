@@ -77,11 +77,19 @@ public class MinioAttachmentStorage : IAttachmentStorageService
             .WithObject(objectName));
     }
 
-    public Task<string> GetPresignedUrl(string objectName, int expirySeconds = 3600)
+    public async Task<string> GetPresignedUrl(string objectName, int expirySeconds = 3600)
     {
-        return _client.PresignedGetObjectAsync(new PresignedGetObjectArgs()
+        var url = await _client.PresignedGetObjectAsync(new PresignedGetObjectArgs()
             .WithBucket(_opts.Bucket)
             .WithObject(objectName)
             .WithExpiry(expirySeconds));
+
+        if (!string.IsNullOrEmpty(_opts.PublicEndpoint))
+        {
+            var uri = new Uri(url);
+            url = $"{_opts.PublicEndpoint.TrimEnd('/')}{uri.PathAndQuery}";
+        }
+
+        return url;
     }
 }

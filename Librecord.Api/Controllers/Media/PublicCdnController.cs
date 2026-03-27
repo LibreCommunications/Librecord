@@ -24,7 +24,7 @@ public class PublicCdnController : ControllerBase
     }
 
     /// <summary>
-    /// Streams public assets directly from MinIO through the backend.
+    /// Returns a presigned URL for public assets stored in MinIO.
     /// </summary>
     [HttpGet("{**key}")]
     [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any)]
@@ -39,29 +39,12 @@ public class PublicCdnController : ControllerBase
 
         try
         {
-            var stream = await _storage.DownloadAsync(key);
-            var contentType = GetContentType(key);
-            return File(stream, contentType);
+            var url = await _storage.GetPresignedUrl(key, 3600);
+            return Redirect(url);
         }
-        catch
+        catch (Exception)
         {
             return NotFound();
         }
-    }
-
-    private static string GetContentType(string key)
-    {
-        var ext = Path.GetExtension(key).ToLowerInvariant();
-        return ext switch
-        {
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".png" => "image/png",
-            ".gif" => "image/gif",
-            ".webp" => "image/webp",
-            ".svg" => "image/svg+xml",
-            ".mp4" => "video/mp4",
-            ".webm" => "video/webm",
-            _ => "application/octet-stream",
-        };
     }
 }
