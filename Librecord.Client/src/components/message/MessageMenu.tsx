@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "🎉", "👀"];
 
@@ -14,11 +14,26 @@ export function MessageMenu({
     isPinned?: boolean;
 }) {
     const [showEmojis, setShowEmojis] = useState(false);
+    const [flipUp, setFlipUp] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useLayoutEffect(() => {
+        const el = menuRef.current;
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const scrollParent = el.closest(".overflow-y-auto");
+        const bottomEdge = scrollParent
+            ? scrollParent.getBoundingClientRect().bottom
+            : window.innerHeight;
+        if (rect.bottom > bottomEdge) {
+            setFlipUp(true);
+        }
+    }, []);
 
     return (
         <>
         <div className="fixed inset-0 z-40" onClick={onClose} />
-        <div className="absolute right-0 top-full mt-1 z-50 bg-[#111214] rounded-lg shadow-xl py-1 min-w-[170px] border border-[#2b2d31]">
+        <div ref={menuRef} className={`absolute right-0 z-50 bg-[#111214] rounded-lg shadow-xl py-1 min-w-[170px] border border-[#2b2d31] ${flipUp ? "bottom-full mb-1" : "top-full mt-1"}`}>
             {onAddReaction && (
                 <div className="relative">
                     <button
