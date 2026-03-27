@@ -90,6 +90,13 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder }
                             if (e.target.value) chat.sendTyping();
                             else chat.stopTyping();
                         }}
+                        onPaste={e => {
+                            const files = e.clipboardData.files;
+                            if (files.length > 0) {
+                                e.preventDefault();
+                                chat.setPendingFiles(prev => [...prev, ...Array.from(files)]);
+                            }
+                        }}
                         onKeyDown={e => {
                             if (e.key === "Enter" && !e.shiftKey) {
                                 e.preventDefault();
