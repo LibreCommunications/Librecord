@@ -59,6 +59,11 @@ else
   podman-compose -p "$PROJECT" --env-file "$REPO_DIR/.env" -f "$REPO_DIR/podman-compose.yml" up -d postgres minio
 fi
 
+# Ensure DNS is working on the container network
+POD_NETWORK="${PROJECT}_default"
+echo "Reloading network to ensure DNS resolution..."
+podman network reload --all 2>/dev/null || true
+
 # Wait for postgres to be ready before starting the backend
 PG_CONTAINER=$(podman ps --filter "name=${PROJECT}.*postgres" --format '{{.Names}}' | head -1)
 echo "Waiting for PostgreSQL ($PG_CONTAINER) to accept connections..."
@@ -74,9 +79,6 @@ for i in $(seq 1 30); do
   fi
   sleep 1
 done
-
-# Get the pod network so the backend can reach postgres/minio by service name
-POD_NETWORK="${PROJECT}_default"
 
 # Remove old container if it exists
 podman rm -f "$CONTAINER" 2>/dev/null || true
@@ -112,13 +114,23 @@ podman run -d \
 echo "Waiting for health check on port $NEW_PORT..."
 ATTEMPTS=30
 for i in $(seq 1 $ATTEMPTS); do
+  # Check if container is still running
+  CSTATE=$(podman inspect "$CONTAINER" --format '{{.State.Status}}' 2>/dev/null || echo "gone")
+  if [ "$CSTATE" != "running" ]; then
+    echo "ERROR: Container exited unexpectedly (status: $CSTATE)"
+    echo "=== Container logs ==="
+    podman logs --tail 50 "$CONTAINER" 2>&1 || true
+    echo "=== End of logs ==="
+    podman rm -f "$CONTAINER" 2>/dev/null || true
+    exit 1
+  fi
   if curl -sf "http://127.0.0.1:$NEW_PORT/health" > /dev/null 2>&1; then
     echo "Health check passed on attempt $i"
     break
   fi
   if [ "$i" -eq "$ATTEMPTS" ]; then
     echo "ERROR: Health check failed after $ATTEMPTS attempts"
-    echo "=== Container logs (last 50 lines) ==="
+    echo "=== Container logs ==="
     podman logs --tail 50 "$CONTAINER" 2>&1 || true
     echo "=== End of logs ==="
     echo "Rolling back: stopping $CONTAINER"
@@ -126,7 +138,7 @@ for i in $(seq 1 $ATTEMPTS); do
     podman rm -f "$CONTAINER" 2>/dev/null || true
     exit 1
   fi
-  sleep 1
+  sleep 2
 done
 
 # Switch nginx upstream to new slot
