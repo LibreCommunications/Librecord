@@ -103,7 +103,6 @@ Librecord.Client/.env.*.local
 Librecord.Api/appsettings.Production.json
 
 # Generated per-domain files
-nginx-*.conf
 setup-nginx.sh
 
 # Editor

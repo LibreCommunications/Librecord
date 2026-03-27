@@ -17,7 +17,9 @@ RUN dotnet publish Librecord.Api/Librecord.Api.csproj -c Release -o /app --no-re
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 
-COPY --from=build /app .
+RUN adduser --disabled-password --no-create-home appuser
+COPY --from=build --chown=appuser /app .
+USER appuser
 
 EXPOSE 5111
 ENTRYPOINT ["dotnet", "Librecord.Api.dll"]
