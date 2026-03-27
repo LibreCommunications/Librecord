@@ -18,7 +18,7 @@
 ### Error Handling
 
 - ~~CDN controllers swallow all exceptions~~ — fixed. CDN controllers now use presigned URL redirects; exception handling simplified.
-- **SignalR hub `OnConnectedAsync` has no try-catch** — DB query failures crash the connection with no useful error.
+- ~~SignalR hub `OnConnectedAsync` has no try-catch~~ — fixed. Wrapped in try-catch with structured error logging, re-throws to let SignalR handle the disconnect.
 - **`GlobalExceptionHandler`** returns generic message without logging stack traces in production.
 
 ### Database
@@ -94,5 +94,5 @@ All addressed in `nginx.conf` + `nginx-hardening.conf`.
 ### Observability
 
 - **No structured logging** — default `ILogger` with no JSON formatting, no correlation IDs, no centralized sink.
-- **Basic `/health` endpoint** — returns `{ status: "healthy" }` without checking DB, MinIO, or LiveKit connectivity.
+- ~~Basic `/health` endpoint~~ — fixed. Now checks DB (`SELECT 1`) and MinIO (`ExistsAsync`) connectivity. Returns 503 if either is unhealthy.
 - **No metrics** — no Prometheus, OpenTelemetry, or any request/error rate tracking.

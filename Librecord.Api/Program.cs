@@ -7,6 +7,7 @@ using Librecord.Application;
 
 using Librecord.Domain.Identity;
 using Librecord.Domain.Security;
+using Librecord.Domain.Storage;
 using Librecord.Domain.Voice;
 using Librecord.Infra;
 using Librecord.Infra.Database;
@@ -61,7 +62,37 @@ app.UseRateLimiter();
 
 app.MapControllers();
 app.MapHub<AppHub>("/hubs/app");
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+app.MapGet("/health", async (IServiceProvider sp) =>
+{
+    var checks = new Dictionary<string, string>();
+
+    try
+    {
+        using var scope = sp.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<LibrecordContext>();
+        await db.Database.ExecuteSqlRawAsync("SELECT 1");
+        checks["database"] = "healthy";
+    }
+    catch
+    {
+        checks["database"] = "unhealthy";
+    }
+
+    try
+    {
+        var storage = sp.GetRequiredService<IAttachmentStorageService>();
+        await storage.ExistsAsync("health-check-probe");
+        checks["storage"] = "healthy";
+    }
+    catch
+    {
+        checks["storage"] = "unhealthy";
+    }
+
+    var allHealthy = checks.Values.All(v => v == "healthy");
+    var statusCode = allHealthy ? 200 : 503;
+    return Results.Json(new { status = allHealthy ? "healthy" : "unhealthy", checks }, statusCode: statusCode);
+});
 
 ApplyMigrations(app);
 

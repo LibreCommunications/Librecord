@@ -44,55 +44,66 @@ public class AppHub : Hub
 
     public override async Task OnConnectedAsync()
     {
-        _logger.LogInformation(
-            "[APP HUB] Connected | ConnectionId={ConnectionId} | UserId={UserId}",
-            Context.ConnectionId,
-            UserId);
-
-        var dmChannels = await _channels.GetUserChannelsAsync(UserId);
-
-        _logger.LogInformation(
-            "[APP HUB] User {UserId} is member of {Count} DM channels",
-            UserId,
-            dmChannels.Count);
-
-        await Task.WhenAll(dmChannels.Select(channel =>
-            Groups.AddToGroupAsync(Context.ConnectionId, DmGroup(channel.Id))));
-
-        var guilds = await _guilds.GetGuildsForUserAsync(UserId);
-        var allGuildChannelIds = guilds.SelectMany(g => (g.Channels ?? []).Select(c => c.Id)).ToList();
-
-        await Task.WhenAll(allGuildChannelIds.Select(channelId =>
-            Groups.AddToGroupAsync(Context.ConnectionId, GuildGroup(channelId))));
-
-        _logger.LogInformation(
-            "[APP HUB] User {UserId} joined {GuildCount} guild(s), {ChannelCount} guild channel(s)",
-            UserId, guilds.Count, allGuildChannelIds.Count);
-
-        _connections.Connect(UserId);
-
-        var currentPresence = await _presence.GetPresenceAsync(UserId);
-        var isInvisible = currentPresence?.Status == Domain.Identity.UserStatus.Invisible;
-
-        if (!isInvisible)
+        try
         {
-            var broadcastStatus = currentPresence?.Status switch
-            {
-                Domain.Identity.UserStatus.Idle => "idle",
-                Domain.Identity.UserStatus.DoNotDisturb => "donotdisturb",
-                _ => "online"
-            };
+            _logger.LogInformation(
+                "[APP HUB] Connected | ConnectionId={ConnectionId} | UserId={UserId}",
+                Context.ConnectionId,
+                UserId);
 
-            var presencePayload = new { userId = UserId, status = broadcastStatus };
+            var dmChannels = await _channels.GetUserChannelsAsync(UserId);
+
+            _logger.LogInformation(
+                "[APP HUB] User {UserId} is member of {Count} DM channels",
+                UserId,
+                dmChannels.Count);
 
             await Task.WhenAll(dmChannels.Select(channel =>
-                Clients.OthersInGroup(DmGroup(channel.Id)).SendAsync("dm:user:presence", presencePayload)));
+                Groups.AddToGroupAsync(Context.ConnectionId, DmGroup(channel.Id))));
+
+            var guilds = await _guilds.GetGuildsForUserAsync(UserId);
+            var allGuildChannelIds = guilds.SelectMany(g => (g.Channels ?? []).Select(c => c.Id)).ToList();
 
             await Task.WhenAll(allGuildChannelIds.Select(channelId =>
-                Clients.OthersInGroup(GuildGroup(channelId)).SendAsync("guild:user:presence", presencePayload)));
-        }
+                Groups.AddToGroupAsync(Context.ConnectionId, GuildGroup(channelId))));
 
-        await base.OnConnectedAsync();
+            _logger.LogInformation(
+                "[APP HUB] User {UserId} joined {GuildCount} guild(s), {ChannelCount} guild channel(s)",
+                UserId, guilds.Count, allGuildChannelIds.Count);
+
+            _connections.Connect(UserId);
+
+            var currentPresence = await _presence.GetPresenceAsync(UserId);
+            var isInvisible = currentPresence?.Status == Domain.Identity.UserStatus.Invisible;
+
+            if (!isInvisible)
+            {
+                var broadcastStatus = currentPresence?.Status switch
+                {
+                    Domain.Identity.UserStatus.Idle => "idle",
+                    Domain.Identity.UserStatus.DoNotDisturb => "donotdisturb",
+                    _ => "online"
+                };
+
+                var presencePayload = new { userId = UserId, status = broadcastStatus };
+
+                await Task.WhenAll(dmChannels.Select(channel =>
+                    Clients.OthersInGroup(DmGroup(channel.Id)).SendAsync("dm:user:presence", presencePayload)));
+
+                await Task.WhenAll(allGuildChannelIds.Select(channelId =>
+                    Clients.OthersInGroup(GuildGroup(channelId)).SendAsync("guild:user:presence", presencePayload)));
+            }
+
+            await base.OnConnectedAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "[APP HUB] OnConnectedAsync failed | ConnectionId={ConnectionId} | UserId={UserId}",
+                Context.ConnectionId,
+                UserId);
+            throw;
+        }
     }
 
     public async Task JoinDmChannel(Guid channelId)
