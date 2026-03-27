@@ -16,13 +16,18 @@ export function MemberSidebar({ guildId }: Props) {
     const [presenceMap, setPresenceMap] = useState<Record<string, string>>({});
 
     useEffect(() => {
-        getMembers(guildId).then(async (m) => {
-            setMembers(m);
+        function load() {
+            getMembers(guildId).then(async (m) => {
+                setMembers(m);
+                const userIds = m.map(member => member.userId);
+                const map = await presence.bulk(userIds);
+                setPresenceMap(map);
+            });
+        }
+        load();
 
-            const userIds = m.map(member => member.userId);
-            const map = await presence.bulk(userIds);
-            setPresenceMap(map);
-        });
+        window.addEventListener("realtime:reconnected", load);
+        return () => window.removeEventListener("realtime:reconnected", load);
     }, [guildId, getMembers]);
 
     useEffect(() => {

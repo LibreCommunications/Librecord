@@ -74,7 +74,7 @@ export default function ChannelSidebar({ guildId }: Props) {
         return () => window.removeEventListener("realtime:reconnected", refresh);
     }, [loadChannels]);
 
-    useEffect(() => {
+    const fetchVoiceParticipants = useCallback(() => {
         const voiceChs = channels.filter(c => c.type === 1);
         if (voiceChs.length === 0) return;
         Promise.all(
@@ -88,6 +88,13 @@ export default function ChannelSidebar({ guildId }: Props) {
             setChannelParticipants(map);
         });
     }, [channels]);
+
+    useEffect(() => {
+        fetchVoiceParticipants();
+
+        window.addEventListener("realtime:reconnected", fetchVoiceParticipants);
+        return () => window.removeEventListener("realtime:reconnected", fetchVoiceParticipants);
+    }, [fetchVoiceParticipants]);
 
     useEffect(() => {
         const onJoin = (e: CustomEvent<AppEventMap["voice:user:joined"]>) => {

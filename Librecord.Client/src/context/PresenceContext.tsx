@@ -21,7 +21,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
         presence.me()
             .then(data => { if (data?.status) setStatus(data.status); })
             .catch(() => {});
-    }, [user?.userId]);
+    }, [user]);
 
     const setMyStatus = useCallback(async (status: string) => {
         await presence.set(status);
