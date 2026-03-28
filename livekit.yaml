@@ -1,6 +1,4 @@
 port: 7880
-log_level: info
-
 rtc:
   port_range_start: 50000
   port_range_end: 60000
@@ -9,10 +7,10 @@ rtc:
   node_ip: 142.169.255.144
 
 turn:
-  enabled: true
-  udp_port: 443
-  relay_range_start: 10000
-  relay_range_end: 30000
+  enabled: false
+  udp_port: 3478
+  relay_range_start: 40000
+  relay_range_end: 40100
 
 keys: {}
 # Keys are injected via LIVEKIT_KEYS env var
