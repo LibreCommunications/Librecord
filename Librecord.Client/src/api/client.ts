@@ -284,6 +284,8 @@ export interface GuildBanEntry {
 }
 
 export const guildModeration = {
+    leave: (guildId: string) =>
+        request<void>(`/guilds/${guildId}/leave`, { method: "POST" }),
     kick: (guildId: string, userId: string) =>
         request<void>(`/guilds/${guildId}/kick/${userId}`, { method: "POST" }),
     ban: (guildId: string, userId: string, reason?: string) =>

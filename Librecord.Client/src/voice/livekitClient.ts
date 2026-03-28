@@ -266,11 +266,21 @@ export async function toggleDeafen(): Promise<boolean> {
     return isDeafened;
 }
 
-export async function toggleCamera(): Promise<boolean> {
+export async function toggleCamera(deviceId?: string): Promise<boolean> {
     if (!room) return false;
     const enabled = !room.localParticipant.isCameraEnabled;
-    await room.localParticipant.setCameraEnabled(enabled);
+    await room.localParticipant.setCameraEnabled(enabled, deviceId ? { deviceId } : undefined);
     return enabled;
+}
+
+export async function switchCamera(deviceId: string): Promise<void> {
+    if (!room) return;
+    await room.localParticipant.setCameraEnabled(true, { deviceId });
+}
+
+export async function listVideoDevices(): Promise<MediaDeviceInfo[]> {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter(d => d.kind === "videoinput");
 }
 
 export interface ScreenShareSettings {

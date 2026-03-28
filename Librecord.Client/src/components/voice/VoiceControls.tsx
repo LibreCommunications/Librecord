@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useVoice } from "../../hooks/useVoice";
 import {
     MicIcon, MicOffIcon,
@@ -6,6 +6,7 @@ import {
     CameraIcon, ScreenShareIcon, PhoneOffIcon,
 } from "./VoiceIcons";
 import { ScreenShareModal, type ScreenShareOptions } from "./ScreenShareModal";
+import * as livekitClient from "../../voice/livekitClient";
 
 export function VoiceControls() {
     const {
@@ -19,6 +20,21 @@ export function VoiceControls() {
     } = useVoice();
 
     const [showScreenShareModal, setShowScreenShareModal] = useState(false);
+    const [showCameraMenu, setShowCameraMenu] = useState(false);
+    const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+    const cameraMenuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!showCameraMenu) return;
+        livekitClient.listVideoDevices().then(setVideoDevices);
+        function onClick(e: MouseEvent) {
+            if (cameraMenuRef.current && !cameraMenuRef.current.contains(e.target as Node)) {
+                setShowCameraMenu(false);
+            }
+        }
+        document.addEventListener("mousedown", onClick);
+        return () => document.removeEventListener("mousedown", onClick);
+    }, [showCameraMenu]);
 
     if (!voiceState.isConnected) return null;
 
@@ -64,15 +80,34 @@ export function VoiceControls() {
                         {voiceState.isDeafened ? <HeadphonesOffIcon /> : <HeadphonesIcon />}
                     </ControlButton>
 
-                    <ControlButton
-                        active={voiceState.isCameraOn}
-                        activeColor="text-white bg-white/10"
-                        inactiveColor="text-gray-400"
-                        onClick={toggleCamera}
-                        title={voiceState.isCameraOn ? "Turn Off Camera" : "Turn On Camera"}
-                    >
-                        <CameraIcon />
-                    </ControlButton>
+                    <div className="relative" ref={cameraMenuRef}>
+                        <ControlButton
+                            active={voiceState.isCameraOn}
+                            activeColor="text-white bg-white/10"
+                            inactiveColor="text-gray-400"
+                            onClick={toggleCamera}
+                            onContextMenu={e => { e.preventDefault(); setShowCameraMenu(!showCameraMenu); }}
+                            title={voiceState.isCameraOn ? "Turn Off Camera" : "Turn On Camera (right-click to select)"}
+                        >
+                            <CameraIcon />
+                        </ControlButton>
+                        {showCameraMenu && videoDevices.length > 0 && (
+                            <div className="absolute bottom-full left-0 mb-2 bg-[#111214] border border-[#2b2d31] rounded-lg shadow-lg py-1 min-w-[200px] z-50">
+                                {videoDevices.map(d => (
+                                    <button
+                                        key={d.deviceId}
+                                        onClick={() => {
+                                            livekitClient.switchCamera(d.deviceId);
+                                            setShowCameraMenu(false);
+                                        }}
+                                        className="w-full text-left px-3 py-1.5 text-sm text-[#dbdee1] hover:bg-white/10 truncate"
+                                    >
+                                        {d.label || `Camera ${d.deviceId.slice(0, 8)}`}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
 
                     <ControlButton
                         active={voiceState.isScreenSharing}
@@ -108,6 +143,7 @@ function ControlButton({
     activeColor,
     inactiveColor,
     onClick,
+    onContextMenu,
     title,
     children,
 }: {
@@ -115,12 +151,14 @@ function ControlButton({
     activeColor: string;
     inactiveColor: string;
     onClick: () => void;
+    onContextMenu?: (e: React.MouseEvent) => void;
     title: string;
     children: React.ReactNode;
 }) {
     return (
         <button
             onClick={onClick}
+            onContextMenu={onContextMenu}
             title={title}
             className={`p-2 rounded hover:bg-white/10 ${active ? activeColor : inactiveColor}`}
         >

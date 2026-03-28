@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MessageList } from "../message/MessageList";
 import { TypingIndicator } from "../messages/TypingIndicator";
 import { AttachmentUpload } from "../messages/AttachmentUpload";
+import { useToast } from "../../hooks/useToast";
 import type { useChatChannel } from "../../hooks/useChatChannel";
 
 type ChatState = ReturnType<typeof useChatChannel>;
@@ -13,8 +14,17 @@ interface ChatViewProps {
     inputPlaceholder: string;
 }
 
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
+
 export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder }: ChatViewProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const { toast } = useToast();
+    const [dragging, setDragging] = useState(false);
+    const dragCounter = useRef(0);
+
+    const handleReject = useCallback((names: string[]) => {
+        toast(`${names.join(", ")} exceeds the 25 MB limit.`, "error");
+    }, [toast]);
 
     // Refocus textarea after sending completes (sending flips false → enabled again)
     const wasSendingRef = useRef(false);
@@ -27,7 +37,33 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder }
     }, [chat.sending]);
 
     return (
-        <>
+        <div
+            className="flex flex-col flex-1 min-h-0 relative"
+            onDragEnter={e => { e.preventDefault(); dragCounter.current++; setDragging(true); }}
+            onDragLeave={e => { e.preventDefault(); dragCounter.current--; if (dragCounter.current <= 0) { dragCounter.current = 0; setDragging(false); } }}
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => {
+                e.preventDefault();
+                dragCounter.current = 0;
+                setDragging(false);
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    const accepted: File[] = [];
+                    const rejected: string[] = [];
+                    for (const f of Array.from(files)) {
+                        if (f.size > MAX_FILE_SIZE) rejected.push(f.name);
+                        else accepted.push(f);
+                    }
+                    if (rejected.length) handleReject(rejected);
+                    if (accepted.length) chat.setPendingFiles(prev => [...prev, ...accepted]);
+                }
+            }}
+        >
+            {dragging && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#5865F2]/20 border-2 border-dashed border-[#5865F2] rounded-lg pointer-events-none">
+                    <span className="text-white text-lg font-medium">Drop files to upload</span>
+                </div>
+            )}
             <MessageList
                 messages={chat.messages}
                 loading={chat.loading}
@@ -58,7 +94,7 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder }
             <TypingIndicator typingNames={chat.typingNames} />
 
             <div className="px-4 py-3 shrink-0">
-                <AttachmentUpload files={chat.pendingFiles} onFilesChange={chat.setPendingFiles} triggerRef={chat.attachTriggerRef} />
+                <AttachmentUpload files={chat.pendingFiles} onFilesChange={chat.setPendingFiles} onReject={handleReject} triggerRef={chat.attachTriggerRef} />
                 {chat.sending && (
                     <div className="flex items-center gap-2 px-4 py-1.5 text-xs text-[#949ba4]">
                         <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -95,7 +131,14 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder }
                             const files = e.clipboardData.files;
                             if (files.length > 0) {
                                 e.preventDefault();
-                                chat.setPendingFiles(prev => [...prev, ...Array.from(files)]);
+                                const accepted: File[] = [];
+                                const rejected: string[] = [];
+                                for (const f of Array.from(files)) {
+                                    if (f.size > MAX_FILE_SIZE) rejected.push(f.name);
+                                    else accepted.push(f);
+                                }
+                                if (rejected.length) handleReject(rejected);
+                                if (accepted.length) chat.setPendingFiles(prev => [...prev, ...accepted]);
                             }
                         }}
                         onKeyDown={e => {
@@ -114,6 +157,6 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder }
                     )}
                 </div>
             </div>
-        </>
+        </div>
     );
 }

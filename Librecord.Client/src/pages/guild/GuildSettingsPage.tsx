@@ -12,7 +12,7 @@ export default function GuildSettingsPage() {
     const { guildId } = useParams<{ guildId: string }>();
     const navigate = useNavigate();
     const { getGuild } = useGuilds();
-    const { updateGuild, deleteGuild } = useGuildSettings();
+    const { updateGuild, deleteGuild, leaveGuild } = useGuildSettings();
     const { permissions, loaded: permsLoaded } = useGuildPermissions(guildId);
     const { toast } = useToast();
 
@@ -20,6 +20,7 @@ export default function GuildSettingsPage() {
     const [saving, setSaving] = useState(false);
     const [tab, setTab] = useState<"general" | "roles" | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
     useEffect(() => {
         if (!guildId) return;
@@ -47,7 +48,7 @@ export default function GuildSettingsPage() {
         else if (canAccessRoles) setTab("roles");
     }
 
-    if (permsLoaded && !canAccessSettings) {
+    if (permsLoaded && !canAccessSettings && permissions.isOwner) {
         navigate(`/app/guild/${guildId}`, { replace: true });
         return null;
     }
@@ -55,7 +56,7 @@ export default function GuildSettingsPage() {
     return (
         <div className="flex-1 flex flex-col bg-[#313338] overflow-y-auto">
             <div className="max-w-2xl mx-auto w-full p-8">
-                <h1 className="text-2xl font-bold text-white mb-6">Server Settings</h1>
+                <h1 className="text-2xl font-bold text-white mb-6">Guild Settings</h1>
 
                 <div className="flex gap-4 mb-6 border-b border-[#3f4147] pb-2">
                     {canAccessGeneral && (
@@ -80,7 +81,7 @@ export default function GuildSettingsPage() {
                     <div className="space-y-6">
                         <div>
                             <label className="block section-label mb-2">
-                                Server Name
+                                Guild Name
                             </label>
                             <input
                                 value={name}
@@ -101,13 +102,13 @@ export default function GuildSettingsPage() {
                         <div className="pt-8 border-t border-[#3f4147]">
                             <h2 className="text-lg font-semibold text-[#f23f43] mb-2">Danger Zone</h2>
                             <p className="text-sm text-[#949ba4] mb-3">
-                                Once you delete a server, there is no going back. All channels, messages, and members will be permanently removed.
+                                Once you delete a guild, there is no going back. All channels, messages, and members will be permanently removed.
                             </p>
                             <button
                                 onClick={() => setShowDeleteConfirm(true)}
                                 className="px-4 py-2 rounded-[4px] bg-[#da373c] text-white font-medium hover:bg-[#a12828] transition-colors"
                             >
-                                Delete Server
+                                Delete Guild
                             </button>
                         </div>
                     </div>
@@ -117,6 +118,38 @@ export default function GuildSettingsPage() {
                     <GuildRoleSettings guildId={guildId} />
                 )}
             </div>
+
+            {!permissions.isOwner && (
+                <div className="max-w-2xl mx-auto w-full px-8 pb-8">
+                    <div className="pt-4 border-t border-[#3f4147]">
+                        <button
+                            onClick={() => setShowLeaveConfirm(true)}
+                            className="px-4 py-2 rounded-[4px] bg-[#da373c] text-white font-medium hover:bg-[#a12828] transition-colors"
+                        >
+                            Leave Guild
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <ConfirmModal
+                open={showLeaveConfirm}
+                title="Leave Guild"
+                description="Are you sure you want to leave this guild? You will need a new invite to rejoin."
+                confirmLabel="Leave"
+                confirmVariant="danger"
+                onConfirm={async () => {
+                    if (await leaveGuild(guildId)) {
+                        window.dispatchEvent(
+                            new CustomEvent("guild:deleted", { detail: { guildId } })
+                        );
+                        toast("Left the guild.", "info");
+                        navigate("/app/dm");
+                    }
+                    setShowLeaveConfirm(false);
+                }}
+                onCancel={() => setShowLeaveConfirm(false)}
+            />
 
             <ConfirmModal
                 open={showDeleteConfirm}

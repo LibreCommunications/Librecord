@@ -3,6 +3,7 @@ import { useEffect, useImperativeHandle, useRef, useState } from "react";
 interface Props {
     files: File[];
     onFilesChange: (files: File[]) => void;
+    onReject?: (fileNames: string[]) => void;
     triggerRef?: React.Ref<{ open: () => void }>;
 }
 
@@ -20,7 +21,7 @@ function reconcileUrls(
     return next;
 }
 
-export function AttachmentUpload({ files, onFilesChange, triggerRef }: Props) {
+export function AttachmentUpload({ files, onFilesChange, onReject, triggerRef }: Props) {
     const inputRef = useRef<HTMLInputElement>(null);
 
     const [urlState, setUrlState] = useState<{ files: File[]; urls: Map<File, string> }>({
@@ -44,9 +45,25 @@ export function AttachmentUpload({ files, onFilesChange, triggerRef }: Props) {
         };
     }, []);
 
+    const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+
     function handleFiles(newFiles: FileList | null) {
         if (!newFiles) return;
-        onFilesChange([...files, ...Array.from(newFiles)]);
+        const accepted: File[] = [];
+        const rejected: string[] = [];
+        for (const file of Array.from(newFiles)) {
+            if (file.size > MAX_FILE_SIZE) {
+                rejected.push(file.name);
+            } else {
+                accepted.push(file);
+            }
+        }
+        if (rejected.length > 0) {
+            onReject?.(rejected);
+        }
+        if (accepted.length > 0) {
+            onFilesChange([...files, ...accepted]);
+        }
     }
 
     function handleRemove(index: number) {

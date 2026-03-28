@@ -68,6 +68,18 @@ public class GuildMemberController : AuthenticatedController
         });
     }
 
+    [HttpPost("leave")]
+    public async Task<IActionResult> Leave(Guid guildId)
+    {
+        var guild = await _guilds.GetGuildAsync(guildId);
+        if (guild == null) return NotFound();
+        if (guild.OwnerId == UserId)
+            return BadRequest("The guild owner cannot leave. Transfer ownership or delete the guild.");
+
+        var left = await _members.KickMemberAsync(guildId, UserId);
+        return left ? Ok() : NotFound("You are not a member of this guild.");
+    }
+
     [HttpPost("kick/{userId:guid}")]
     public async Task<IActionResult> Kick(Guid guildId, Guid userId)
     {
