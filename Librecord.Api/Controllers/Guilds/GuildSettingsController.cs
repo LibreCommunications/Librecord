@@ -55,6 +55,20 @@ public class GuildSettingsController : AuthenticatedController
         var iconUrl = await _settings.UploadGuildIconAsync(guildId, stream, file.FileName, file.ContentType);
         if (iconUrl == null) return NotFound();
 
+        var guild = await _guilds.GetGuildAsync(guildId);
+        if (guild != null)
+        {
+            var channels = (await _guilds.GetGuildAsync(guildId))?.Channels ?? [];
+        var channelIds = channels.Select(c => c.Id).ToList();
+            await _guildNotifier.NotifyGuildUpdatedAsync(new GuildUpdated
+            {
+                GuildId = guildId,
+                Name = guild.Name,
+                IconUrl = iconUrl,
+                ChannelIds = channelIds,
+            });
+        }
+
         return Ok(new { iconUrl });
     }
 
@@ -67,6 +81,16 @@ public class GuildSettingsController : AuthenticatedController
 
         var guild = await _settings.UpdateGuildAsync(guildId, request.Name);
         if (guild == null) return NotFound();
+
+        var channels = (await _guilds.GetGuildAsync(guildId))?.Channels ?? [];
+        var channelIds = channels.Select(c => c.Id).ToList();
+        await _guildNotifier.NotifyGuildUpdatedAsync(new GuildUpdated
+        {
+            GuildId = guildId,
+            Name = guild.Name,
+            IconUrl = guild.IconUrl,
+            ChannelIds = channelIds,
+        });
 
         return Ok(new
         {

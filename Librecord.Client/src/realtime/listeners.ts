@@ -51,6 +51,7 @@ export function registerListeners() {
     appConnection.off("guild:user:stop-typing");
     appConnection.off("guild:user:presence");
     appConnection.off("guild:channel:created");
+    appConnection.off("guild:updated");
     appConnection.off("guild:deleted");
     appConnection.off("voice:user:joined");
     appConnection.off("voice:user:left");
@@ -253,6 +254,13 @@ export function registerListeners() {
                 console.warn("[SignalR] Failed to join new channel group", err);
             });
             dispatchAppEvent("guild:channel:created", payload);
+        }
+    );
+
+    appConnection.on(
+        "guild:updated",
+        (payload: { guildId: string; name?: string; iconUrl?: string | null }) => {
+            dispatchAppEvent("guild:updated", payload);
         }
     );
 

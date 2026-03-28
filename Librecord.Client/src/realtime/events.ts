@@ -136,6 +136,12 @@ export interface AppEventMap {
         position: number;
     };
 
+    "guild:updated": {
+        guildId: string;
+        name?: string;
+        iconUrl?: string | null;
+    };
+
     "guild:deleted": {
         guildId: string;
     };

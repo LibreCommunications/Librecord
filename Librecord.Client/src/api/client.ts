@@ -77,6 +77,11 @@ export const guilds = {
     getChannel: (channelId: string) => requestOptional<GuildChannel & { topic?: string }>(`/channels/${channelId}`),
     members: (guildId: string) => request<GuildMember[]>(`/guilds/${guildId}/members`).catch(() => [] as GuildMember[]),
     myPermissions: (guildId: string) => requestOptional<GuildPermissions>(`/guilds/${guildId}/permissions/me`),
+    uploadIcon: (guildId: string, file: File) => {
+        const form = new FormData();
+        form.append("file", file);
+        return request<{ iconUrl: string }>(`/guilds/${guildId}/icon`, { method: "POST", body: form });
+    },
 };
 
 export const channels = {

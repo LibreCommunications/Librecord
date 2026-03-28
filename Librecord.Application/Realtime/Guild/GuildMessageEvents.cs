@@ -35,6 +35,14 @@ public sealed class GuildMessageDeleted : GuildMessageEvent
 {
 }
 
+public sealed class GuildUpdated
+{
+    public Guid GuildId { get; init; }
+    public string? Name { get; init; }
+    public string? IconUrl { get; init; }
+    public IReadOnlyList<Guid> ChannelIds { get; init; } = [];
+}
+
 // Uses ChannelId to target broadcast groups
 public sealed class GuildDeleted
 {

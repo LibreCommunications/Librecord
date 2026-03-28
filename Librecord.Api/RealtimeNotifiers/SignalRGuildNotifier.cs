@@ -70,6 +70,19 @@ public sealed class SignalRGuildRealtimeNotifier : IGuildRealtimeNotifier
         };
     }
 
+    public Task NotifyGuildUpdatedAsync(GuildUpdated evt)
+    {
+        var tasks = evt.ChannelIds.Select(channelId =>
+            _hub.Clients.Group(AppHub.GuildGroup(channelId))
+                .SendAsync("guild:updated", new
+                {
+                    guildId = evt.GuildId,
+                    name = evt.Name,
+                    iconUrl = evt.IconUrl,
+                }));
+        return Task.WhenAll(tasks);
+    }
+
     public Task NotifyGuildDeletedAsync(GuildDeleted evt)
     {
         // Broadcast to every channel group in the guild so all connected members see it

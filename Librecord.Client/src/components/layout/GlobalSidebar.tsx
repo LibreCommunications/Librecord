@@ -110,6 +110,19 @@ export default function GlobalSidebar() {
     }, [loadGuilds]);
 
     useEffect(() => {
+        const onGuildUpdated = (e: CustomEvent<AppEventMap["guild:updated"]>) => {
+            const { guildId: id, name, iconUrl } = e.detail;
+            setGuilds(prev => prev.map(g =>
+                g.id === id
+                    ? { ...g, ...(name !== undefined && { name }), ...(iconUrl !== undefined && { iconUrl }) }
+                    : g
+            ));
+        };
+        window.addEventListener("guild:updated", onGuildUpdated as EventListener);
+        return () => window.removeEventListener("guild:updated", onGuildUpdated as EventListener);
+    }, []);
+
+    useEffect(() => {
         const onGuildDeleted = (e: CustomEvent<AppEventMap["guild:deleted"]>) => {
             const deletedId = e.detail.guildId;
             setGuilds(prev => prev.filter(g => g.id !== deletedId));

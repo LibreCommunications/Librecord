@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGuilds } from "../../hooks/useGuilds";
 import { useGuildSettings } from "../../hooks/useGuildSettings";
 import { useGuildPermissions } from "../../hooks/useGuildPermissions";
 import { useToast } from "../../hooks/useToast";
+import { guilds as guildsApi, API_URL } from "../../api/client";
 import { GuildRoleSettings } from "./GuildRoleSettings";
 import { ConfirmModal } from "../../components/ui/ConfirmModal";
 import { Spinner } from "../../components/ui/Spinner";
@@ -17,15 +18,18 @@ export default function GuildSettingsPage() {
     const { toast } = useToast();
 
     const [name, setName] = useState("");
+    const [iconUrl, setIconUrl] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+    const [uploadingIcon, setUploadingIcon] = useState(false);
     const [tab, setTab] = useState<"general" | "roles" | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+    const iconInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (!guildId) return;
         getGuild(guildId).then(g => {
-            if (g) setName(g.name);
+            if (g) { setName(g.name); setIconUrl(g.iconUrl ?? null); }
         });
     }, [guildId, getGuild]);
 
@@ -35,6 +39,22 @@ export default function GuildSettingsPage() {
         await updateGuild(guildId, { name: name.trim() });
         setSaving(false);
         toast("Guild settings saved!", "success");
+    }
+
+    async function handleIconUpload(file: File) {
+        if (!guildId) return;
+        if (file.size > 5 * 1024 * 1024) { toast("Image must be under 5 MB.", "error"); return; }
+        if (!/^image\/(png|jpe?g|webp|gif)$/.test(file.type)) { toast("Only PNG, JPEG, WebP, or GIF.", "error"); return; }
+        setUploadingIcon(true);
+        try {
+            const result = await guildsApi.uploadIcon(guildId, file);
+            setIconUrl(result.iconUrl);
+            toast("Guild icon updated!", "success");
+        } catch {
+            toast("Failed to upload icon.", "error");
+        } finally {
+            setUploadingIcon(false);
+        }
     }
 
     if (!guildId) return null;
@@ -79,6 +99,44 @@ export default function GuildSettingsPage() {
 
                 {tab === "general" && (
                     <div className="space-y-6">
+                        <div>
+                            <label className="block section-label mb-2">Guild Icon</label>
+                            <div className="flex items-center gap-4">
+                                <div
+                                    onClick={() => iconInputRef.current?.click()}
+                                    className="w-20 h-20 rounded-2xl bg-[#2b2d31] flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity overflow-hidden border-2 border-dashed border-[#4e5058] hover:border-[#5865F2]"
+                                >
+                                    {iconUrl ? (
+                                        <img src={`${API_URL}${iconUrl}`} className="w-full h-full object-cover" alt="" />
+                                    ) : (
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#949ba4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                            <circle cx="8.5" cy="8.5" r="1.5" />
+                                            <polyline points="21 15 16 10 5 21" />
+                                        </svg>
+                                    )}
+                                </div>
+                                <div className="text-sm text-[#949ba4]">
+                                    {uploadingIcon ? (
+                                        <span className="flex items-center gap-2"><Spinner size="sm" /> Uploading...</span>
+                                    ) : (
+                                        <span>Click to upload. Max 5 MB.<br />PNG, JPEG, WebP, or GIF.</span>
+                                    )}
+                                </div>
+                                <input
+                                    ref={iconInputRef}
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/webp,image/gif"
+                                    className="hidden"
+                                    onChange={e => {
+                                        const f = e.target.files?.[0];
+                                        if (f) handleIconUpload(f);
+                                        e.target.value = "";
+                                    }}
+                                />
+                            </div>
+                        </div>
+
                         <div>
                             <label className="block section-label mb-2">
                                 Guild Name
