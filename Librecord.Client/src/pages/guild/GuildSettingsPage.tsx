@@ -33,7 +33,7 @@ export default function GuildSettingsPage() {
         setSaving(true);
         await updateGuild(guildId, { name: name.trim() });
         setSaving(false);
-        toast("Server settings saved!", "success");
+        toast("Guild settings saved!", "success");
     }
 
     if (!guildId) return null;
@@ -120,9 +120,9 @@ export default function GuildSettingsPage() {
 
             <ConfirmModal
                 open={showDeleteConfirm}
-                title="Delete Server"
-                description={`Are you sure you want to delete this server? This will permanently remove all channels, messages, and members. This action cannot be undone.`}
-                confirmLabel="Delete Server"
+                title="Delete Guild"
+                description={`Are you sure you want to delete this guild? This will permanently remove all channels, messages, and members. This action cannot be undone.`}
+                confirmLabel="Delete Guild"
                 confirmVariant="danger"
                 onConfirm={async () => {
                     if (await deleteGuild(guildId)) {
@@ -131,7 +131,7 @@ export default function GuildSettingsPage() {
                         window.dispatchEvent(
                             new CustomEvent("guild:deleted", { detail: { guildId } })
                         );
-                        toast("Server deleted.", "info");
+                        toast("Guild deleted.", "info");
                         navigate("/app/dm");
                     }
                     setShowDeleteConfirm(false);

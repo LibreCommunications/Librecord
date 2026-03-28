@@ -20,7 +20,8 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder }
     const wasSendingRef = useRef(false);
     useEffect(() => {
         if (wasSendingRef.current && !chat.sending) {
-            textareaRef.current?.focus();
+            // Delay focus until the textarea is re-enabled after the disabled attribute clears
+            requestAnimationFrame(() => textareaRef.current?.focus());
         }
         wasSendingRef.current = chat.sending;
     }, [chat.sending]);

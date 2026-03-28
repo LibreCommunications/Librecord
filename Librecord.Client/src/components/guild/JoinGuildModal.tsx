@@ -76,7 +76,7 @@ export function JoinGuildModal({ onClose, onJoined }: Props) {
                     disabled={loading || !code.trim()}
                     className="w-full py-2 rounded bg-[#5865F2] text-white font-medium hover:bg-[#4752c4] disabled:opacity-50"
                 >
-                    {loading ? "Joining..." : "Join Server"}
+                    {loading ? "Joining..." : "Join Guild"}
                 </button>
 
                 <button

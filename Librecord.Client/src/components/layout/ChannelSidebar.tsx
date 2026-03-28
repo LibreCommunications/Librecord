@@ -182,7 +182,7 @@ export default function ChannelSidebar({ guildId }: Props) {
                             <Link
                                 to={`/app/guild/${guildId}/settings`}
                                 className="p-1 rounded text-[#949ba4] hover:text-[#dbdee1] hover:bg-[#35373c]"
-                                title="Server Settings"
+                                title="Guild Settings"
                             >
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <circle cx="12" cy="12" r="3" />

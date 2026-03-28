@@ -54,7 +54,7 @@ function SidebarIcon({
             </div>
 
             {tooltip && (
-                <div className="absolute left-[60px] px-3 py-1.5 bg-[#111214] text-white text-sm font-medium rounded-md shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                <div className="fixed left-[80px] px-3 py-1.5 bg-[#111214] text-white text-sm font-medium rounded-md shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
                     {tooltip}
                 </div>
             )}
@@ -208,7 +208,7 @@ export default function GlobalSidebar() {
 
                 <SidebarIcon
                     onClick={() => setShowCreate(true)}
-                    tooltip="Create a Server"
+                    tooltip="Create a Guild"
                     testId="create-guild-btn"
                     className="bg-[#313338] hover:bg-[#248046] text-[#248046] hover:text-white"
                 >
@@ -220,7 +220,7 @@ export default function GlobalSidebar() {
 
                 <SidebarIcon
                     onClick={() => setShowJoin(true)}
-                    tooltip="Join a Server"
+                    tooltip="Join a Guild"
                     testId="join-guild-btn"
                     className="bg-[#313338] hover:bg-[#5865F2] text-[#248046] hover:text-white"
                 >

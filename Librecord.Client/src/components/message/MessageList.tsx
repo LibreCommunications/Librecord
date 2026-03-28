@@ -33,6 +33,7 @@ export function MessageList({
     const virtuosoRef = useRef<VirtuosoHandle>(null);
     const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
     const [newMsgCount, setNewMsgCount] = useState(0);
+    const [showScrollBtn, setShowScrollBtn] = useState(false);
     const isAtBottomRef = useRef(true);
 
     const firstItemIndex = useMemo(
@@ -67,6 +68,7 @@ export function MessageList({
     // Track at-bottom state and new message count
     const handleAtBottomStateChange = useCallback((atBottom: boolean) => {
         isAtBottomRef.current = atBottom;
+        setShowScrollBtn(!atBottom);
         if (atBottom) setNewMsgCount(0);
     }, []);
 
@@ -191,7 +193,7 @@ export function MessageList({
                 }}
             />
 
-            {newMsgCount > 0 && (
+            {showScrollBtn && (
                 <button
                     onClick={() => {
                         virtuosoRef.current?.scrollToIndex({
@@ -202,7 +204,10 @@ export function MessageList({
                     }}
                     className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-medium shadow-lg transition-colors z-10"
                 >
-                    {newMsgCount} new message{newMsgCount > 1 ? "s" : ""}
+                    {newMsgCount > 0
+                        ? <>{newMsgCount} new message{newMsgCount > 1 ? "s" : ""}</>
+                        : <>Scroll to bottom</>
+                    }
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="6 9 12 15 18 9" />
                     </svg>
