@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getRoom } from "../../voice/livekitClient";
+import { API_URL } from "../../api/client";
 
 interface TrackStats {
     label: string;
@@ -12,19 +13,27 @@ interface Stats {
     tracks: TrackStats[];
 }
 
+async function measurePing(): Promise<number> {
+    try {
+        const start = performance.now();
+        await fetch(`${API_URL}/health`, { method: "GET", cache: "no-store" });
+        return Math.round(performance.now() - start);
+    } catch {
+        return 0;
+    }
+}
+
 export function DevOverlay() {
     const [stats, setStats] = useState<Stats | null>(null);
 
     useEffect(() => {
-        const interval = setInterval(() => {
+        const interval = setInterval(async () => {
             if (localStorage.getItem("lr:dev-mode") !== "true") { setStats(null); return; }
 
             const room = getRoom();
             if (!room) { setStats(null); return; }
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const eng = room.engine as any;
-            const ping = Math.round(eng?.latency ? eng.latency * 1000 : 0);
+            const ping = await measurePing();
             const tracks: TrackStats[] = [];
 
             // Local tracks
@@ -70,13 +79,13 @@ export function DevOverlay() {
 
     if (!stats) return null;
 
-    const pingColor = stats.ping < 80 ? "text-green-400" : stats.ping < 200 ? "text-yellow-400" : "text-red-400";
+    const pingColor = stats.ping === 0 ? "text-[#949ba4]" : stats.ping < 80 ? "text-green-400" : stats.ping < 200 ? "text-yellow-400" : "text-red-400";
 
     return (
         <div className="fixed bottom-4 right-4 z-[100] bg-black/80 rounded-lg px-3 py-2 text-xs font-mono text-white pointer-events-none select-none space-y-0.5 max-w-[320px]">
             <div className="flex items-center gap-2 border-b border-white/10 pb-1 mb-1">
                 <span className="text-[#949ba4]">PING</span>
-                <span className={`font-bold ${pingColor}`}>{stats.ping}ms</span>
+                <span className={`font-bold ${pingColor}`}>{stats.ping === 0 ? "N/A" : `${stats.ping}ms`}</span>
             </div>
             {stats.tracks.length === 0 && (
                 <div className="text-[#949ba4]">No active tracks</div>

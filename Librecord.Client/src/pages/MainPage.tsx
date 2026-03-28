@@ -4,6 +4,7 @@ import ChannelSidebar from "../components/layout/ChannelSidebar";
 import DmSidebar from "../components/layout/DmSidebar";
 import { VoiceControls } from "../components/voice/VoiceControls";
 import { DevOverlay } from "../components/voice/DevOverlay";
+import { FloatingScreenShare } from "../components/voice/FloatingScreenShare";
 import { ConnectionBanner } from "../components/ui/ConnectionBanner";
 import { ErrorBoundary } from "../components/ui/ErrorBoundary";
 
@@ -22,6 +23,7 @@ export default function MainPage() {
             <RealtimeRoot />
             <ConnectionBanner />
             <DevOverlay />
+            <FloatingScreenShare />
 
             <GlobalSidebar />
 
