@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { MessageItem } from "./MessageItem";
 import { ConfirmModal } from "../ui/ConfirmModal";
@@ -35,6 +35,7 @@ export function MessageList({
     const [newMsgCount, setNewMsgCount] = useState(0);
     const [showScrollBtn, setShowScrollBtn] = useState(false);
     const isAtBottomRef = useRef(true);
+    const hideTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
     const firstItemIndex = useMemo(
         () => Math.max(0, START_INDEX - messages.length),
@@ -66,11 +67,19 @@ export function MessageList({
     }, [forceScrollOnNextUpdateRef]);
 
     // Track at-bottom state and new message count
+    // Debounce hiding the button so image loads don't cause flicker
     const handleAtBottomStateChange = useCallback((atBottom: boolean) => {
         isAtBottomRef.current = atBottom;
-        setShowScrollBtn(!atBottom);
-        if (atBottom) setNewMsgCount(0);
+        clearTimeout(hideTimerRef.current);
+        if (atBottom) {
+            hideTimerRef.current = setTimeout(() => setShowScrollBtn(false), 100);
+            setNewMsgCount(0);
+        } else {
+            setShowScrollBtn(true);
+        }
     }, []);
+
+    useEffect(() => () => clearTimeout(hideTimerRef.current), []);
 
     // When Virtuoso detects the user scrolled to the top
     const handleStartReached = useCallback(() => {
@@ -178,7 +187,7 @@ export function MessageList({
                 itemContent={renderItem}
                 followOutput={followOutput}
                 atBottomStateChange={handleAtBottomStateChange}
-                atBottomThreshold={20}
+                atBottomThreshold={150}
                 startReached={handleStartReached}
                 overscan={600}
                 increaseViewportBy={{ top: 400, bottom: 200 }}

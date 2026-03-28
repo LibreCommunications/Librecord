@@ -74,7 +74,7 @@ export function MemberSidebar({ guildId }: Props) {
                                 <img
                                     src={getAvatarUrl(member.avatarUrl)}
                                     alt={member.displayName}
-                                    className="w-8 h-8 rounded-full bg-gray-600"
+                                    className="w-8 h-8 rounded-full object-cover"
                                 />
                                 <span className="absolute -bottom-0.5 -right-0.5">
                                     <StatusDot

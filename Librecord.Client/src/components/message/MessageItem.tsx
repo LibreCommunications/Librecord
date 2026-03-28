@@ -123,9 +123,8 @@ export const MessageItem = memo(function MessageItem({
                                         key={att.id}
                                         src={src}
                                         alt={att.fileName}
-                                        loading="lazy"
                                         onClick={() => setLightboxSrc({ src, alt: att.fileName })}
-                                        className="max-w-md max-h-80 rounded-lg object-contain cursor-zoom-in hover:brightness-110 transition"
+                                        className="max-w-md max-h-80 min-h-40 rounded-lg object-contain cursor-zoom-in hover:brightness-110 transition"
                                     />
                                 );
                             }
