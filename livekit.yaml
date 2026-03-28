@@ -2,7 +2,7 @@ port: 7880
 rtc:
   port_range_start: 50000
   port_range_end: 60000
-  use_external_ip: true
+  use_external_ip: false
   tcp_port: 7881
   node_ip: 142.169.255.144
 
@@ -11,8 +11,6 @@ turn:
   udp_port: 3478
   relay_range_start: 40000
   relay_range_end: 40100
-  domain: livekit.gros-sans-dessein.com
-  external_tls: true
 
 keys: {}
 # Keys are injected via LIVEKIT_KEYS env var
