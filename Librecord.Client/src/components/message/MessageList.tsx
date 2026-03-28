@@ -82,6 +82,20 @@ export function MessageList({
 
     useEffect(() => () => clearTimeout(hideTimerRef.current), []);
 
+    const scrollToBottom = useCallback(() => {
+        virtuosoRef.current?.scrollTo({ top: Number.MAX_SAFE_INTEGER, behavior: "smooth" });
+        setNewMsgCount(0);
+    }, []);
+
+    // ESC scrolls to bottom
+    useEffect(() => {
+        function onKey(e: KeyboardEvent) {
+            if (e.key === "Escape" && !isAtBottomRef.current) scrollToBottom();
+        }
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [scrollToBottom]);
+
     // When Virtuoso detects the user scrolled to the top
     const handleStartReached = useCallback(() => {
         if (hasMore && !loadingMore && onLoadMore) {
@@ -216,13 +230,7 @@ export function MessageList({
 
             {showScrollBtn && (
                 <button
-                    onClick={() => {
-                        virtuosoRef.current?.scrollToIndex({
-                            index: messages.length - 1,
-                            behavior: "smooth",
-                        });
-                        setNewMsgCount(0);
-                    }}
+                    onClick={scrollToBottom}
                     className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-medium shadow-lg transition-colors z-10"
                 >
                     {newMsgCount > 0
