@@ -56,12 +56,16 @@ public class GuildMemberController : AuthenticatedController
 
         var guild = await _guilds.GetGuildAsync(guildId);
 
+        var isOwner = guild?.OwnerId == UserId;
+        var manageGuild = granted.Contains(GuildPermission.ManageGuild);
+
         return Ok(new
         {
-            isOwner = guild?.OwnerId == UserId,
-            manageGuild = granted.Contains(GuildPermission.ManageGuild),
+            isOwner,
+            manageGuild,
             manageChannels = granted.Contains(GuildPermission.ManageChannels),
             manageRoles = granted.Contains(GuildPermission.ManageRoles),
+            manageMessages = isOwner || manageGuild,
             kickMembers = granted.Contains(GuildPermission.KickMembers),
             banMembers = granted.Contains(GuildPermission.BanMembers),
             inviteMembers = granted.Contains(GuildPermission.InviteMembers),

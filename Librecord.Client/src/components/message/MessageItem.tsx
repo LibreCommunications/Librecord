@@ -34,6 +34,7 @@ export const MessageItem = memo(function MessageItem({
                                 menuOpen,
                                 currentUserId,
                                 isPinned,
+                                canManageMessages,
                                 onToggleMenu,
                                 onStartEdit,
                                 onReply,
@@ -235,7 +236,7 @@ export const MessageItem = memo(function MessageItem({
                                 </svg>
                             </button>
                         )}
-                        {isAuthor && (
+                        {(isAuthor || canManageMessages) && (
                             <button
                                 onClick={() => onDelete(msg.id)}
                                 className="px-2 py-1 text-[#b5bac1] hover:text-[#f23f43] hover:bg-[#35373c] transition-colors"

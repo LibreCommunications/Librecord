@@ -181,6 +181,7 @@ export default function GuildChannelPage() {
                         currentUserId={user?.userId}
                         getAvatarUrl={getAvatarUrl}
                         inputPlaceholder={`Message #${channelName ?? ""}`}
+                        canManageMessages={permissions.isOwner || permissions.manageMessages}
                     />
                 )}
             </div>

@@ -8,6 +8,8 @@ export interface MessageItemProps {
     currentUserId?: string;
     isPinned?: boolean;
 
+    canManageMessages?: boolean;
+
     onToggleMenu: (messageId: string) => void;
     onStartEdit: (messageId: string) => void;
     onReply: (messageId: string) => void;

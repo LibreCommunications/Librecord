@@ -129,6 +129,15 @@ public sealed class GuildChannelMessagesController(
             if (message?.GuildContext?.ChannelId != channelId)
                 return NotFound();
 
+            // Author can always delete their own messages.
+            // Others need ManageMessages permission.
+            if (message.UserId != UserId)
+            {
+                var perm = await permissions.HasChannelPermissionAsync(
+                    UserId, channelId, ChannelPermission.ManageMessages);
+                if (!perm.Allowed) return Forbid();
+            }
+
             await guildChannelMessages.DeleteMessageAsync(messageId);
             return Ok();
         }

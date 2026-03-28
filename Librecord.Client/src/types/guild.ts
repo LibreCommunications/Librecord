@@ -34,6 +34,7 @@ export interface GuildPermissions {
     manageGuild: boolean;
     manageChannels: boolean;
     manageRoles: boolean;
+    manageMessages: boolean;
     kickMembers: boolean;
     banMembers: boolean;
     inviteMembers: boolean;
