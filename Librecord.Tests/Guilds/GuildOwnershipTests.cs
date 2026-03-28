@@ -1,7 +1,9 @@
 using Librecord.Application.Guilds;
 using Librecord.Application.Permissions;
 using Librecord.Domain.Guilds;
+using Librecord.Domain.Messaging.Common;
 using Librecord.Domain.Storage;
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace Librecord.Tests.Guilds;
@@ -11,9 +13,10 @@ public class GuildOwnershipTests
     private readonly Mock<IGuildRepository> _guilds = new();
     private readonly Mock<IPermissionService> _permissions = new();
     private readonly Mock<IAttachmentStorageService> _storage = new();
+    private readonly Mock<IAttachmentRepository> _attachments = new();
 
     private GuildService CreateGuildService() => new(_guilds.Object, _permissions.Object);
-    private GuildSettingsService CreateSettingsService() => new(_guilds.Object, _storage.Object);
+    private GuildSettingsService CreateSettingsService() => new(_guilds.Object, _storage.Object, _attachments.Object, Mock.Of<ILogger<GuildSettingsService>>());
 
     [Fact]
     public async Task CreateGuild_SetsOwnerId()
