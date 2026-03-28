@@ -101,7 +101,6 @@ services:
       LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro
 
 volumes:
   postgres_data:
