@@ -85,7 +85,7 @@ services:
       - minio_data:/data
 
   livekit:
-    image: docker.io/livekit/livekit-server:v1.8.3
+    image: docker.io/livekit/livekit-server:v1.10.0
     restart: unless-stopped
     profiles: [livekit]
     command: --config /etc/livekit.yaml
