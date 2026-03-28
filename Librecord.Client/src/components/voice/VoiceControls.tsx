@@ -98,6 +98,7 @@ export function VoiceControls() {
                                         key={d.deviceId}
                                         onClick={() => {
                                             livekitClient.switchCamera(d.deviceId);
+                                            livekitClient.setDevicePref("videoinput", d.deviceId);
                                             setShowCameraMenu(false);
                                         }}
                                         className="w-full text-left px-3 py-1.5 text-sm text-[#dbdee1] hover:bg-white/10 truncate"

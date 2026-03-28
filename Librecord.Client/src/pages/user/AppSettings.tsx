@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import * as livekitClient from "../../voice/livekitClient";
 
 export default function AppSettings() {
     const [desktopNotifs, setDesktopNotifs] = useState(() => {
@@ -12,15 +13,38 @@ export default function AppSettings() {
         setter(value);
     }
 
+    // ── Device selection ─────────────────────────────────────
+    const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
+    const [audioOutputs, setAudioOutputs] = useState<MediaDeviceInfo[]>([]);
+    const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
+    const [prefs, setPrefs] = useState(livekitClient.getAllDevicePrefs);
+
+    const loadDevices = useCallback(async () => {
+        // Request permission so labels are populated
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+            stream.getTracks().forEach(t => t.stop());
+        } catch { /* user may deny — labels will be empty but IDs still work */ }
+
+        setAudioInputs(await livekitClient.listAudioInputDevices());
+        setAudioOutputs(await livekitClient.listAudioOutputDevices());
+        setVideoInputs(await livekitClient.listVideoDevices());
+    }, []);
+
+    useEffect(() => { loadDevices(); }, [loadDevices]);
+
+    function selectDevice(kind: "audioinput" | "videoinput" | "audiooutput", deviceId: string) {
+        livekitClient.setDevicePref(kind, deviceId);
+        setPrefs(livekitClient.getAllDevicePrefs());
+    }
+
     return (
         <div className="space-y-8">
             <h1 className="text-2xl font-bold text-white">App Settings</h1>
 
             {/* Notifications */}
             <section>
-                <h2 className="section-label mb-4">
-                    Notifications
-                </h2>
+                <h2 className="section-label mb-4">Notifications</h2>
                 <div className="space-y-3">
                     <ToggleRow
                         label="Desktop Notifications"
@@ -37,6 +61,33 @@ export default function AppSettings() {
                 </div>
             </section>
 
+            {/* Voice & Video */}
+            <section>
+                <h2 className="section-label mb-4">Voice & Video</h2>
+                <div className="space-y-3">
+                    <DeviceSelect
+                        label="Microphone"
+                        devices={audioInputs}
+                        selected={prefs.audioinput}
+                        onChange={id => selectDevice("audioinput", id)}
+                    />
+                    <DeviceSelect
+                        label="Speaker / Output"
+                        devices={audioOutputs}
+                        selected={prefs.audiooutput}
+                        onChange={id => selectDevice("audiooutput", id)}
+                    />
+                    <DeviceSelect
+                        label="Camera"
+                        devices={videoInputs}
+                        selected={prefs.videoinput}
+                        onChange={id => selectDevice("videoinput", id)}
+                    />
+                </div>
+                <p className="text-xs text-[#949ba4] mt-3">
+                    Changes apply the next time you join a voice channel.
+                </p>
+            </section>
         </div>
     );
 }
@@ -73,6 +124,36 @@ function ToggleRow({
                     `}
                 />
             </button>
+        </div>
+    );
+}
+
+function DeviceSelect({
+    label,
+    devices,
+    selected,
+    onChange,
+}: {
+    label: string;
+    devices: MediaDeviceInfo[];
+    selected?: string;
+    onChange: (deviceId: string) => void;
+}) {
+    return (
+        <div className="bg-[#2b2d31] rounded-lg px-4 py-3">
+            <label className="text-sm font-medium text-white block mb-2">{label}</label>
+            <select
+                value={selected ?? ""}
+                onChange={e => onChange(e.target.value)}
+                className="w-full bg-[#1e1f22] text-[#dbdee1] text-sm rounded px-3 py-2 outline-none border border-[#3f4147] focus:border-[#5865F2] transition-colors"
+            >
+                <option value="">System Default</option>
+                {devices.map(d => (
+                    <option key={d.deviceId} value={d.deviceId}>
+                        {d.label || `Device ${d.deviceId.slice(0, 8)}`}
+                    </option>
+                ))}
+            </select>
         </div>
     );
 }

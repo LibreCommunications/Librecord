@@ -9,6 +9,32 @@ import {
 
 let room: Room | null = null;
 
+// ── Device preferences (localStorage) ────────────────────────
+const DEVICE_PREFS_KEY = "librecord:devicePrefs";
+type DeviceKind = "audioinput" | "videoinput" | "audiooutput";
+
+export function getDevicePref(kind: DeviceKind): string | undefined {
+    try {
+        const prefs = JSON.parse(localStorage.getItem(DEVICE_PREFS_KEY) ?? "{}");
+        return prefs[kind] || undefined;
+    } catch { return undefined; }
+}
+
+export function setDevicePref(kind: DeviceKind, deviceId: string) {
+    try {
+        const prefs = JSON.parse(localStorage.getItem(DEVICE_PREFS_KEY) ?? "{}");
+        prefs[kind] = deviceId;
+        localStorage.setItem(DEVICE_PREFS_KEY, JSON.stringify(prefs));
+    } catch { /* ignore */ }
+}
+
+export function getAllDevicePrefs(): Record<DeviceKind, string | undefined> {
+    try {
+        const prefs = JSON.parse(localStorage.getItem(DEVICE_PREFS_KEY) ?? "{}");
+        return { audioinput: prefs.audioinput, videoinput: prefs.videoinput, audiooutput: prefs.audiooutput };
+    } catch { return { audioinput: undefined, videoinput: undefined, audiooutput: undefined }; }
+}
+
 const SPEAKING_THRESHOLD = 0.015;
 const SPEAKING_OFF_DELAY = 300;
 
@@ -168,6 +194,9 @@ function bindRemoteAudioTrack(participant: RemoteParticipant) {
 export async function connectToVoice(token: string, wsUrl: string, initialMuted = false, initialDeafened = false) {
     if (room) await disconnect();
 
+    const micId = getDevicePref("audioinput");
+    const camId = getDevicePref("videoinput");
+
     room = new Room({
         dynacast: true,
         adaptiveStream: true,
@@ -175,6 +204,10 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
             autoGainControl: true,
             noiseSuppression: true,
             echoCancellation: true,
+            ...(micId && { deviceId: micId }),
+        },
+        videoCaptureDefaults: {
+            ...(camId && { deviceId: camId }),
         },
     });
 
@@ -281,6 +314,21 @@ export async function switchCamera(deviceId: string): Promise<void> {
 export async function listVideoDevices(): Promise<MediaDeviceInfo[]> {
     const devices = await navigator.mediaDevices.enumerateDevices();
     return devices.filter(d => d.kind === "videoinput");
+}
+
+export async function listAudioInputDevices(): Promise<MediaDeviceInfo[]> {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter(d => d.kind === "audioinput");
+}
+
+export async function listAudioOutputDevices(): Promise<MediaDeviceInfo[]> {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter(d => d.kind === "audiooutput");
+}
+
+export async function switchMicrophone(deviceId: string): Promise<void> {
+    if (!room) return;
+    await room.localParticipant.setMicrophoneEnabled(true, { deviceId });
 }
 
 export interface ScreenShareSettings {
