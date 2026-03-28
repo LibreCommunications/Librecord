@@ -7,7 +7,7 @@ rtc:
   node_ip: 142.169.255.144
 
 turn:
-  enabled: true
+  enabled: false
   udp_port: 3478
   relay_range_start: 40000
   relay_range_end: 40100
