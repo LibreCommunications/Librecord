@@ -47,7 +47,9 @@ public sealed class MessageDto
                 {
                     MessageId = message.ReplyToMessage.Id,
                     Content = message.ReplyToMessage.ContentText ?? "",
-                    Author = UserSummaryDto.From(message.ReplyToMessage.User),
+                    Author = message.ReplyToMessage.User != null
+                        ? UserSummaryDto.From(message.ReplyToMessage.User)
+                        : null,
                 }
                 : message.ReplyToMessageId.HasValue
                     ? new ReplyInfoDto { MessageId = message.ReplyToMessageId.Value, Content = "[deleted]" }

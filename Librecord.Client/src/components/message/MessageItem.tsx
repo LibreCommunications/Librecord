@@ -67,12 +67,10 @@ export const MessageItem = memo(function MessageItem({
                     <span className="font-semibold text-[#c4c9ce]">
                         {msg.replyTo.author?.displayName ?? "Unknown"}
                     </span>
-                    <span className="truncate max-w-[400px]">
-                        {msg.replyTo.content
-                            ? msg.replyTo.content.split("\n")[0]
-                            : <span className="italic">📷 Click to see attachment</span>
-                        }
-                    </span>
+                    {msg.replyTo.content?.trim()
+                        ? <span className="truncate max-w-[400px]">{msg.replyTo.content.split("\n")[0]}</span>
+                        : <span className="italic text-[#949ba4]">📷 Click to see attachment</span>
+                    }
                 </button>
             )}
             <div className="flex gap-4">
