@@ -139,6 +139,8 @@ export interface AppEventMap {
     "guild:member:removed": {
         guildId: string;
         userId: string;
+        action: "kick" | "ban" | "leave";
+        reason?: string | null;
     };
 
     "guild:channel:updated": {

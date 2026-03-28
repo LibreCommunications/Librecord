@@ -39,6 +39,8 @@ public sealed class GuildMemberRemoved
 {
     public Guid GuildId { get; init; }
     public Guid UserId { get; init; }
+    public string Action { get; init; } = "kick"; // "kick", "ban", "leave"
+    public string? Reason { get; init; }
     public IReadOnlyList<Guid> ChannelIds { get; init; } = [];
 }
 

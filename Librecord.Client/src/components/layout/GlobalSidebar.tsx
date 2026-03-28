@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, useRef } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { useGuilds, type GuildSummary } from "../../hooks/useGuilds";
 import { useChannels } from "../../hooks/useChannels";
+import { useVoice } from "../../hooks/useVoice";
 import CreateGuildModal from "../../pages/guild/CreateGuildModal";
 import { JoinGuildModal } from "../../components/guild/JoinGuildModal";
 import { StatusDot } from "../../components/user/StatusDot";
@@ -77,7 +78,9 @@ export default function GlobalSidebar() {
     const [guilds, setGuilds] = useState<GuildSummary[]>([]);
     const [showCreate, setShowCreate] = useState(false);
     const [showJoin, setShowJoin] = useState(false);
+    const [removedNotice, setRemovedNotice] = useState<{ action: "kick" | "ban"; reason?: string | null } | null>(null);
     const { myStatus } = usePresence();
+    const { voiceState, leaveVoice } = useVoice();
 
     const [guildUnreads, setGuildUnreads] = useState<Record<string, number>>({});
     const [dmUnread, setDmUnread] = useState(false);
@@ -139,6 +142,34 @@ export default function GlobalSidebar() {
         window.addEventListener("guild:deleted", onGuildDeleted as EventListener);
         return () => window.removeEventListener("guild:deleted", onGuildDeleted as EventListener);
     }, [guildId, navigate]);
+
+    useEffect(() => {
+        const onMemberRemoved = (e: CustomEvent<AppEventMap["guild:member:removed"]>) => {
+            if (e.detail.userId !== user?.userId) return; // not us
+            const removedGuildId = e.detail.guildId;
+
+            // Remove guild from sidebar
+            setGuilds(prev => prev.filter(g => g.id !== removedGuildId));
+
+            // Disconnect voice if in this guild
+            if (voiceState.isConnected && voiceState.guildId === removedGuildId) {
+                leaveVoice();
+            }
+
+            // Navigate away if viewing this guild
+            if (guildId === removedGuildId) {
+                navigate("/app/dm");
+            }
+
+            // Show notice for kick/ban (not leave — that's voluntary)
+            if (e.detail.action !== "leave") {
+                setRemovedNotice({ action: e.detail.action, reason: e.detail.reason });
+            }
+        };
+
+        window.addEventListener("guild:member:removed", onMemberRemoved as EventListener);
+        return () => window.removeEventListener("guild:member:removed", onMemberRemoved as EventListener);
+    }, [user?.userId, guildId, voiceState.isConnected, voiceState.guildId, leaveVoice, navigate]);
 
     useEffect(() => {
         const onGuildPing = (e: CustomEvent<AppEventMap["guild:message:ping"]>) => {
@@ -277,6 +308,33 @@ export default function GlobalSidebar() {
                         navigate(`/app/guild/${guild.id}`);
                     }}
                 />
+            )}
+
+            {removedNotice && (
+                <div className="fixed inset-0 z-[300] bg-black/60 flex items-center justify-center" onClick={() => setRemovedNotice(null)}>
+                    <div className="bg-[#313338] rounded-lg p-6 w-full max-w-sm shadow-xl text-center" onClick={e => e.stopPropagation()}>
+                        <div className="text-4xl mb-3">{removedNotice.action === "ban" ? "🔨" : "👋"}</div>
+                        <h2 className="text-lg font-bold text-white mb-2">
+                            {removedNotice.action === "ban" ? "You have been banned" : "You have been kicked"}
+                        </h2>
+                        <p className="text-sm text-[#b5bac1] mb-1">
+                            {removedNotice.action === "ban"
+                                ? "You have been banned from this guild and cannot rejoin unless unbanned."
+                                : "You have been kicked from this guild. You can rejoin with a new invite."}
+                        </p>
+                        {removedNotice.action === "ban" && removedNotice.reason && (
+                            <div className="mt-3 bg-[#2b2d31] rounded px-3 py-2 text-sm text-[#dbdee1]">
+                                <span className="text-[#949ba4]">Reason: </span>{removedNotice.reason}
+                            </div>
+                        )}
+                        <button
+                            onClick={() => setRemovedNotice(null)}
+                            className="mt-4 px-6 py-2 rounded bg-[#5865F2] text-white text-sm font-medium hover:bg-[#4752c4]"
+                        >
+                            OK
+                        </button>
+                    </div>
+                </div>
             )}
         </>
     );

@@ -78,6 +78,8 @@ public sealed class SignalRGuildRealtimeNotifier : IGuildRealtimeNotifier
                 {
                     guildId = evt.GuildId,
                     userId = evt.UserId,
+                    action = evt.Action,
+                    reason = evt.Reason,
                 }));
         return Task.WhenAll(tasks);
     }

@@ -262,7 +262,7 @@ export function registerListeners() {
 
     appConnection.on(
         "guild:member:removed",
-        (payload: { guildId: string; userId: string }) => {
+        (payload: { guildId: string; userId: string; action: "kick" | "ban" | "leave"; reason?: string | null }) => {
             dispatchAppEvent("guild:member:removed", payload);
         }
     );

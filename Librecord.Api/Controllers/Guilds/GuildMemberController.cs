@@ -86,7 +86,7 @@ public class GuildMemberController : AuthenticatedController
 
         var left = await _members.KickMemberAsync(guildId, UserId);
         if (!left) return NotFound("You are not a member of this guild.");
-        await BroadcastMemberRemoved(guildId, UserId);
+        await BroadcastMemberRemoved(guildId, UserId, "leave");
         return Ok();
     }
 
@@ -101,7 +101,7 @@ public class GuildMemberController : AuthenticatedController
 
         var kicked = await _members.KickMemberAsync(guildId, userId);
         if (!kicked) return NotFound("Member not found.");
-        await BroadcastMemberRemoved(guildId, userId);
+        await BroadcastMemberRemoved(guildId, userId, "kick");
         return Ok();
     }
 
@@ -115,11 +115,11 @@ public class GuildMemberController : AuthenticatedController
             return BadRequest("Cannot ban yourself.");
 
         await _members.BanMemberAsync(guildId, userId, UserId, request?.Reason);
-        await BroadcastMemberRemoved(guildId, userId);
+        await BroadcastMemberRemoved(guildId, userId, "ban", request?.Reason);
         return Ok();
     }
 
-    private async Task BroadcastMemberRemoved(Guid guildId, Guid userId)
+    private async Task BroadcastMemberRemoved(Guid guildId, Guid userId, string action, string? reason = null)
     {
         var guild = await _guilds.GetGuildAsync(guildId);
         var channelIds = guild?.Channels.Select(c => c.Id).ToList() ?? [];
@@ -127,6 +127,8 @@ public class GuildMemberController : AuthenticatedController
         {
             GuildId = guildId,
             UserId = userId,
+            Action = action,
+            Reason = reason,
             ChannelIds = channelIds,
         });
     }
