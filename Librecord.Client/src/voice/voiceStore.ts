@@ -22,12 +22,29 @@ export interface VoiceState {
 }
 
 const STORAGE_KEY = "librecord:voiceSession";
+const PREFS_KEY = "librecord:voicePrefs";
+
+interface VoicePrefs {
+    isMuted: boolean;
+    isDeafened: boolean;
+}
+
+export function getVoicePrefs(): VoicePrefs {
+    try {
+        const raw = localStorage.getItem(PREFS_KEY);
+        if (raw) return JSON.parse(raw);
+    } catch { /* ignore */ }
+    return { isMuted: false, isDeafened: false };
+}
+
+export function setVoicePrefs(prefs: Partial<VoicePrefs>) {
+    const current = getVoicePrefs();
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ ...current, ...prefs }));
+}
 
 interface PersistedVoiceSession {
     channelId: string;
     guildId: string;
-    isMuted: boolean;
-    isDeafened: boolean;
 }
 
 const INITIAL_STATE: VoiceState = {
@@ -52,8 +69,6 @@ function persist() {
         const session: PersistedVoiceSession = {
             channelId: state.channelId,
             guildId: state.guildId,
-            isMuted: state.isMuted,
-            isDeafened: state.isDeafened,
         };
         sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
     } else {

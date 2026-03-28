@@ -1,6 +1,6 @@
 import * as signalR from "@microsoft/signalr";
 import { registerListeners } from "./listeners";
-import { getVoiceState, resetVoiceState } from "../voice/voiceStore";
+import { getVoiceState, getVoicePrefs, resetVoiceState } from "../voice/voiceStore";
 import * as livekitClient from "../voice/livekitClient";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -46,10 +46,11 @@ appConnection.onreconnected(async () => {
 
     const voice = getVoiceState();
     if (voice.isConnected && voice.channelId) {
+        const prefs = getVoicePrefs();
         try {
             await appConnection.invoke("RejoinVoiceChannel", voice.channelId, {
-                isMuted: voice.isMuted,
-                isDeafened: voice.isDeafened,
+                isMuted: prefs.isMuted,
+                isDeafened: prefs.isDeafened,
                 isCameraOn: voice.isCameraOn,
                 isScreenSharing: voice.isScreenSharing,
             });
@@ -83,9 +84,10 @@ appConnection.onclose(async (err) => {
 
             const voice = getVoiceState();
             if (voice.channelId) {
+                const prefs = getVoicePrefs();
                 await appConnection.invoke("RejoinVoiceChannel", voice.channelId, {
-                    isMuted: voice.isMuted,
-                    isDeafened: voice.isDeafened,
+                    isMuted: prefs.isMuted,
+                    isDeafened: prefs.isDeafened,
                     isCameraOn: voice.isCameraOn,
                     isScreenSharing: voice.isScreenSharing,
                 });

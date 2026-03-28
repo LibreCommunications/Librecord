@@ -7,6 +7,8 @@ import {
     setVoiceState,
     updateParticipantState,
     resetVoiceState,
+    getVoicePrefs,
+    setVoicePrefs,
     type VoiceState,
     type VoiceParticipant,
 } from "../voice/voiceStore";
@@ -35,18 +37,28 @@ export function useVoice() {
             participants: VoiceParticipant[];
         }>("JoinVoiceChannel", channelId);
 
+        const prefs = getVoicePrefs();
+
         setVoiceState({
             channelId,
             guildId,
             participants: result.participants,
             isConnected: true,
-            isMuted: false,
-            isDeafened: false,
+            isMuted: prefs.isMuted,
+            isDeafened: prefs.isDeafened,
             isCameraOn: false,
             isScreenSharing: false,
         });
 
-        await livekitClient.connectToVoice(result.token, result.wsUrl);
+        await livekitClient.connectToVoice(result.token, result.wsUrl, prefs.isMuted, prefs.isDeafened);
+
+        if (prefs.isMuted || prefs.isDeafened) {
+            appConnection.invoke("UpdateVoiceState", {
+                isMuted: prefs.isMuted,
+                isDeafened: prefs.isDeafened,
+            }).catch(() => {});
+        }
+
         playJoinSound();
     }, []);
 
@@ -64,6 +76,7 @@ export function useVoice() {
     const toggleMute = useCallback(async () => {
         const isMuted = await livekitClient.toggleMute();
         setVoiceState({ isMuted });
+        setVoicePrefs({ isMuted });
         const uid = getLocalUserId();
         if (uid) updateParticipantState(uid, { isMuted });
         await appConnection.invoke("UpdateVoiceState", { isMuted });
@@ -72,6 +85,7 @@ export function useVoice() {
     const toggleDeafen = useCallback(async () => {
         const isDeafened = await livekitClient.toggleDeafen();
         setVoiceState({ isDeafened });
+        setVoicePrefs({ isDeafened });
         const uid = getLocalUserId();
         if (uid) updateParticipantState(uid, { isDeafened });
         await appConnection.invoke("UpdateVoiceState", { isDeafened });
