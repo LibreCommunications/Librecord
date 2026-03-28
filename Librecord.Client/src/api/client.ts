@@ -133,6 +133,7 @@ function mapTransport(msg: TransportMessage): Message {
         createdAt: msg.createdAt,
         editedAt: msg.editedAt ?? null,
         author: msg.author,
+        replyTo: msg.replyTo ?? null,
         attachments: msg.attachments,
         reactions: msg.reactions,
         edits: msg.edits,
