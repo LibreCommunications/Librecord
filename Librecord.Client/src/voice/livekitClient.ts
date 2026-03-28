@@ -2,6 +2,7 @@ import {
     Room,
     RoomEvent,
     Track,
+    VideoPreset,
     type RemoteParticipant,
     type RemoteTrackPublication,
     type LocalParticipant,
@@ -347,27 +348,33 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
     if (!room) return false;
 
     const res = RESOLUTION_MAP[options.resolution];
-    const numericFps = options.frameRate === "source" ? undefined : options.frameRate;
+    const captureFps = options.frameRate === "source" ? 240 : options.frameRate;
+    const encodeFps = options.frameRate === "source" ? 60 : options.frameRate;
 
     let resolution: { width: number; height: number; frameRate?: number } | undefined;
     if (res) {
-        resolution = { ...res, ...(numericFps ? { frameRate: numericFps } : {}) };
+        resolution = { ...res, frameRate: captureFps };
     } else {
-        // "source" — request maximum native resolution/fps
-        resolution = { width: 4096, height: 2160, ...(numericFps ? { frameRate: numericFps } : { frameRate: 240 }) };
+        resolution = { width: 4096, height: 2160, frameRate: captureFps };
     }
 
-    const targetFps = numericFps ?? 60;
+    // Encoding: match user's FPS selection with appropriate bitrate
+    // Based on LiveKit ScreenSharePresets: 1080p30=5Mbps, original=7Mbps
+    const encodingBitrate = encodeFps >= 60 ? 7_000_000 : encodeFps >= 30 ? 5_000_000 : 2_500_000;
 
     try {
         await room.localParticipant.setScreenShareEnabled(true, {
             audio: options.audio,
-            ...(resolution ? { resolution } : {}),
+            resolution,
         }, {
             screenShareEncoding: {
-                maxFramerate: targetFps,
-                maxBitrate: targetFps >= 30 ? 8_000_000 : 3_000_000,
+                maxFramerate: encodeFps,
+                maxBitrate: encodingBitrate,
             },
+            // One simulcast layer for small-tile viewers (960x540 capped at 30fps)
+            screenShareSimulcastLayers: [
+                new VideoPreset(960, 540, 1_500_000, Math.min(encodeFps, 30)),
+            ],
         });
     } catch (e) {
         console.warn("[Voice] Screen share failed, retrying without constraints:", e);
@@ -384,7 +391,7 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
 
     // Some browsers reject contentHint in constraints but accept it post-capture
     try {
-        const hint = numericFps === undefined || numericFps >= 30 ? "motion" : "detail";
+        const hint = encodeFps >= 30 ? "motion" : "detail";
         room.localParticipant.videoTrackPublications.forEach(pub => {
             if (pub.source === Track.Source.ScreenShare && pub.track?.mediaStreamTrack) {
                 pub.track.mediaStreamTrack.contentHint = hint;
