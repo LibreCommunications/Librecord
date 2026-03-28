@@ -27,8 +27,8 @@ public class VoiceServiceTests
     private static Mock<IUnitOfWork> MockUow()
     {
         var uow = new Mock<IUnitOfWork>();
-        uow.Setup(u => u.BeginTransactionAsync()).ReturnsAsync(Mock.Of<IAsyncDisposable>());
-        uow.Setup(u => u.CommitAsync()).Returns(Task.CompletedTask);
+        uow.Setup(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task>>()))
+            .Returns((Func<Task> action) => action());
         uow.Setup(u => u.SaveChangesAsync()).Returns(Task.CompletedTask);
         return uow;
     }

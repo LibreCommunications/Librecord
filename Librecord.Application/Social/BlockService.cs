@@ -24,22 +24,21 @@ public class BlockService : IBlockService
         var existing = await _blocks.GetBlockAsync(blockerId, blockedId);
         if (existing != null) return;
 
-        await using var _ = await _uow.BeginTransactionAsync();
-
-        await _blocks.AddBlockAsync(new UserBlock
+        await _uow.ExecuteInTransactionAsync(async () =>
         {
-            BlockerId = blockerId,
-            BlockedId = blockedId,
-            CreatedAt = DateTime.UtcNow
+            await _blocks.AddBlockAsync(new UserBlock
+            {
+                BlockerId = blockerId,
+                BlockedId = blockedId,
+                CreatedAt = DateTime.UtcNow
+            });
+
+            var friendships = await _friendships.GetFriendshipsForUserAsync(blockerId);
+            foreach (var fs in friendships.Where(f => f.RequesterId == blockedId || f.TargetId == blockedId))
+            {
+                await _friendships.DeleteAsync(fs);
+            }
         });
-
-        var friendships = await _friendships.GetFriendshipsForUserAsync(blockerId);
-        foreach (var fs in friendships.Where(f => f.RequesterId == blockedId || f.TargetId == blockedId))
-        {
-            await _friendships.DeleteAsync(fs);
-        }
-
-        await _uow.CommitAsync();
     }
 
     public async Task<bool> UnblockUserAsync(Guid blockerId, Guid blockedId)

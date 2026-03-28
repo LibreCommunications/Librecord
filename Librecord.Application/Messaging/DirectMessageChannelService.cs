@@ -217,10 +217,11 @@ public class DirectMessageChannelService : IDirectMessageChannelService
                     .ToList();
             }
 
-            await using var _ = await _uow.BeginTransactionAsync();
-            await _readStates.DeleteByChannelIdAsync(channelId);
-            await _dms.DeleteChannelAsync(channel);
-            await _uow.CommitAsync();
+            await _uow.ExecuteInTransactionAsync(async () =>
+            {
+                await _readStates.DeleteByChannelIdAsync(channelId);
+                await _dms.DeleteChannelAsync(channel);
+            });
         }
         else
         {
@@ -264,10 +265,11 @@ public class DirectMessageChannelService : IDirectMessageChannelService
         }
 
         // Delete DB records atomically
-        await using var _ = await _uow.BeginTransactionAsync();
-        await _readStates.DeleteByChannelIdAsync(channelId);
-        await _dms.DeleteChannelAsync(channel);
-        await _uow.CommitAsync();
+        await _uow.ExecuteInTransactionAsync(async () =>
+        {
+            await _readStates.DeleteByChannelIdAsync(channelId);
+            await _dms.DeleteChannelAsync(channel);
+        });
 
         // Clean up storage AFTER DB commit (best-effort)
         foreach (var url in attachmentUrls)

@@ -1,37 +1,27 @@
 using Librecord.Domain;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Librecord.Infra.Database;
 
 public class UnitOfWork : IUnitOfWork
 {
     private readonly LibrecordContext _db;
-    private IDbContextTransaction? _transaction;
 
     public UnitOfWork(LibrecordContext db)
     {
         _db = db;
     }
 
-    public async Task<IAsyncDisposable> BeginTransactionAsync()
+    public Task ExecuteInTransactionAsync(Func<Task> action)
     {
-        _transaction = await _db.Database.BeginTransactionAsync();
-        return _transaction;
-    }
-
-    public async Task CommitAsync()
-    {
-        if (_transaction == null)
-            throw new InvalidOperationException("No active transaction.");
-        await _db.SaveChangesAsync();
-        await _transaction.CommitAsync();
-    }
-
-    public async Task RollbackAsync()
-    {
-        if (_transaction != null)
-            await _transaction.RollbackAsync();
+        var strategy = _db.Database.CreateExecutionStrategy();
+        return strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+            await action();
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+        });
     }
 
     public Task SaveChangesAsync()

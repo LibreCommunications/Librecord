@@ -26,25 +26,24 @@ public class GuildMemberService : IGuildMemberService
 
     public async Task BanMemberAsync(Guid guildId, Guid userId, Guid moderatorId, string? reason)
     {
-        await using var _ = await _uow.BeginTransactionAsync();
-
         var existingBan = await _guilds.GetBanAsync(guildId, userId);
         if (existingBan != null) return;
 
-        var member = await _guilds.GetGuildMemberAsync(guildId, userId);
-        if (member != null)
-            await _guilds.RemoveMemberAsync(member);
-
-        await _guilds.AddBanAsync(new GuildBan
+        await _uow.ExecuteInTransactionAsync(async () =>
         {
-            GuildId = guildId,
-            UserId = userId,
-            ModeratorId = moderatorId,
-            Reason = reason,
-            CreatedAt = DateTime.UtcNow
-        });
+            var member = await _guilds.GetGuildMemberAsync(guildId, userId);
+            if (member != null)
+                await _guilds.RemoveMemberAsync(member);
 
-        await _uow.CommitAsync();
+            await _guilds.AddBanAsync(new GuildBan
+            {
+                GuildId = guildId,
+                UserId = userId,
+                ModeratorId = moderatorId,
+                Reason = reason,
+                CreatedAt = DateTime.UtcNow
+            });
+        });
     }
 
     public async Task<bool> UnbanMemberAsync(Guid guildId, Guid userId)

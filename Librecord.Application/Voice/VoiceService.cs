@@ -58,14 +58,13 @@ public class VoiceService : IVoiceService
         Guid? previousChannelId = null;
         Guid? previousGuildId = null;
 
-        // Remove old state + add new state in one transaction
-        await using var _ = await _uow.BeginTransactionAsync();
-
+        // Remove old state first (separate save to avoid same-PK conflict)
         if (existing is not null)
         {
             previousChannelId = existing.ChannelId;
             previousGuildId = existing.GuildId;
             await _voiceStates.RemoveAsync(userId);
+            await _voiceStates.SaveChangesAsync();
         }
 
         var voiceState = new VoiceState
@@ -76,9 +75,9 @@ public class VoiceService : IVoiceService
         };
 
         await _voiceStates.AddAsync(voiceState);
-        await _uow.CommitAsync();
+        await _voiceStates.SaveChangesAsync();
 
-        // Notify AFTER commit
+        // Notify AFTER save
         if (previousChannelId.HasValue)
         {
             await _notifier.NotifyAsync(new VoiceUserLeft

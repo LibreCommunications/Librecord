@@ -61,48 +61,49 @@ public class GuildInviteService : IGuildInviteService
 
     public async Task<Guild> JoinByCodeAsync(string code, Guid userId)
     {
-        await using var _ = await _uow.BeginTransactionAsync();
+        Guild? guild = null;
 
-        var invite = await _invites.GetByCodeAsync(code)
-            ?? throw new InvalidOperationException("Invalid invite code.");
-
-        if (invite.ExpiresAt.HasValue && invite.ExpiresAt.Value < DateTime.UtcNow)
-            throw new InvalidOperationException("Invite has expired.");
-
-        if (invite.MaxUses.HasValue && invite.UsesCount >= invite.MaxUses.Value)
-            throw new InvalidOperationException("Invite has reached max uses.");
-
-        var existing = await _guilds.GetGuildMemberAsync(invite.GuildId, userId);
-        if (existing != null)
-            throw new InvalidOperationException("Already a member of this guild.");
-
-        var guild = await _guilds.GetGuildAsync(invite.GuildId)
-            ?? throw new InvalidOperationException("Guild not found.");
-
-        var everyoneRole = guild.Roles.FirstOrDefault(r => r.Name == "@everyone")
-            ?? throw new InvalidOperationException("Guild is missing @everyone role.");
-
-        guild.Members.Add(new GuildMember
+        await _uow.ExecuteInTransactionAsync(async () =>
         {
-            UserId = userId,
-            GuildId = guild.Id,
-            JoinedAt = DateTime.UtcNow,
-            Roles =
+            var invite = await _invites.GetByCodeAsync(code)
+                ?? throw new InvalidOperationException("Invalid invite code.");
+
+            if (invite.ExpiresAt.HasValue && invite.ExpiresAt.Value < DateTime.UtcNow)
+                throw new InvalidOperationException("Invite has expired.");
+
+            if (invite.MaxUses.HasValue && invite.UsesCount >= invite.MaxUses.Value)
+                throw new InvalidOperationException("Invite has reached max uses.");
+
+            var existing = await _guilds.GetGuildMemberAsync(invite.GuildId, userId);
+            if (existing != null)
+                throw new InvalidOperationException("Already a member of this guild.");
+
+            guild = await _guilds.GetGuildAsync(invite.GuildId)
+                ?? throw new InvalidOperationException("Guild not found.");
+
+            var everyoneRole = guild.Roles.FirstOrDefault(r => r.Name == "@everyone")
+                ?? throw new InvalidOperationException("Guild is missing @everyone role.");
+
+            guild.Members.Add(new GuildMember
             {
-                new GuildMemberRole
+                UserId = userId,
+                GuildId = guild.Id,
+                JoinedAt = DateTime.UtcNow,
+                Roles =
                 {
-                    UserId = userId,
-                    GuildId = guild.Id,
-                    RoleId = everyoneRole.Id
+                    new GuildMemberRole
+                    {
+                        UserId = userId,
+                        GuildId = guild.Id,
+                        RoleId = everyoneRole.Id
+                    }
                 }
-            }
+            });
+
+            invite.UsesCount++;
         });
 
-        invite.UsesCount++;
-
-        await _uow.CommitAsync();
-
-        return guild;
+        return guild!;
     }
 
     public async Task RevokeInviteAsync(Guid inviteId, Guid userId)
