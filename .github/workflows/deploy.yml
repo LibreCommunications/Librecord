@@ -151,6 +151,7 @@ jobs:
           wait $PID_IMG || exit 1
 
       - name: Restart LiveKit if config changed
+        if: env.IS_PROD == 'true'
         run: |
           RESTART=false
           if git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -q '^livekit\.yaml$'; then
