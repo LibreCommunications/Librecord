@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface Props {
     src: string;
@@ -7,7 +7,13 @@ interface Props {
 }
 
 export function ImageLightbox({ src, alt, onClose }: Props) {
-    const [zoomed, setZoomed] = useState(false);
+    const [scale, setScale] = useState(1);
+    const [translate, setTranslate] = useState({ x: 0, y: 0 });
+    const dragging = useRef(false);
+    const lastPos = useRef({ x: 0, y: 0 });
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const isZoomed = scale > 1.05;
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
@@ -17,24 +23,71 @@ export function ImageLightbox({ src, alt, onClose }: Props) {
         return () => window.removeEventListener("keydown", onKey);
     }, [onClose]);
 
+    // Scroll wheel zoom
+    const handleWheel = useCallback((e: React.WheelEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setScale(prev => Math.min(Math.max(prev - e.deltaY * 0.002, 0.5), 8));
+    }, []);
+
+    // Pan via drag when zoomed
+    const handlePointerDown = useCallback((e: React.PointerEvent) => {
+        if (!isZoomed) return;
+        dragging.current = true;
+        lastPos.current = { x: e.clientX, y: e.clientY };
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    }, [isZoomed]);
+
+    const handlePointerMove = useCallback((e: React.PointerEvent) => {
+        if (!dragging.current) return;
+        const dx = e.clientX - lastPos.current.x;
+        const dy = e.clientY - lastPos.current.y;
+        lastPos.current = { x: e.clientX, y: e.clientY };
+        setTranslate(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+    }, []);
+
+    const handlePointerUp = useCallback(() => {
+        dragging.current = false;
+    }, []);
+
+    // Click image: if not zoomed, zoom to 2x. If zoomed, reset.
+    const handleImageClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (isZoomed) {
+            setScale(1);
+            setTranslate({ x: 0, y: 0 });
+        } else {
+            setScale(2);
+        }
+    }, [isZoomed]);
+
+    // Reset pan when unzooming
+    useEffect(() => {
+        if (!isZoomed) setTranslate({ x: 0, y: 0 });
+    }, [isZoomed]);
+
     return (
         <div
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 animate-[fadeIn_0.15s_ease-out] overflow-auto"
-            onClick={zoomed ? () => setZoomed(false) : onClose}
-            style={{ cursor: zoomed ? "zoom-out" : "default" }}
+            ref={containerRef}
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 animate-[fadeIn_0.15s_ease-out]"
+            onClick={isZoomed ? undefined : onClose}
+            onWheel={handleWheel}
+            style={{ cursor: isZoomed ? (dragging.current ? "grabbing" : "grab") : "zoom-in", touchAction: "none" }}
         >
             <img
                 src={src}
                 alt={alt}
-                className={`rounded-lg shadow-2xl animate-[scaleIn_0.15s_ease-out] transition-transform duration-200 ${
-                    zoomed
-                        ? "max-w-none max-h-none cursor-zoom-out"
-                        : "max-w-[90vw] max-h-[90vh] object-contain cursor-zoom-in"
-                }`}
-                onClick={e => {
-                    e.stopPropagation();
-                    setZoomed(!zoomed);
+                draggable={false}
+                className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl animate-[scaleIn_0.15s_ease-out] select-none"
+                style={{
+                    transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
+                    transition: dragging.current ? "none" : "transform 0.2s ease-out",
+                    cursor: isZoomed ? "grab" : "zoom-in",
                 }}
+                onClick={handleImageClick}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
             />
 
             {/* Close button */}
@@ -47,6 +100,13 @@ export function ImageLightbox({ src, alt, onClose }: Props) {
                     <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
             </button>
+
+            {/* Zoom indicator */}
+            {isZoomed && (
+                <div className="fixed top-4 left-4 px-2 py-1 rounded bg-black/60 text-white text-xs">
+                    {Math.round(scale * 100)}%
+                </div>
+            )}
 
             {/* Open original link */}
             <a

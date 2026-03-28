@@ -61,9 +61,9 @@ export function MessageList({
     const followOutput = useCallback((isAtBottom: boolean) => {
         if (forceScrollOnNextUpdateRef?.current) {
             forceScrollOnNextUpdateRef.current = false;
-            return "smooth";
+            return true; // instant — no animation avoids overshoot jank
         }
-        if (isAtBottom) return "smooth";
+        if (isAtBottom) return true;
         return false;
     }, [forceScrollOnNextUpdateRef]);
 
@@ -86,17 +86,6 @@ export function MessageList({
         virtuosoRef.current?.scrollTo({ top: Number.MAX_SAFE_INTEGER, behavior: "smooth" });
         setNewMsgCount(0);
     }, []);
-
-    // After initial load, silently correct scroll to true bottom once images settle
-    const didInitialScroll = useRef(false);
-    useEffect(() => {
-        if (messages.length === 0 || didInitialScroll.current) return;
-        didInitialScroll.current = true;
-        const t = setTimeout(() => {
-            virtuosoRef.current?.scrollTo({ top: Number.MAX_SAFE_INTEGER });
-        }, 300);
-        return () => clearTimeout(t);
-    }, [messages.length]);
 
     // ESC scrolls to bottom
     useEffect(() => {
