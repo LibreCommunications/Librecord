@@ -1,16 +1,21 @@
 port: 7880
+log_level: info
+
 rtc:
   port_range_start: 50000
   port_range_end: 60000
-  use_external_ip: false
   tcp_port: 7881
-  node_ip: 142.169.255.144
+  use_external_ip: true
 
 turn:
-  enabled: false
-  udp_port: 3478
-  relay_range_start: 40000
-  relay_range_end: 40100
+  enabled: true
+  tls_port: 443
+  udp_port: 443
+  domain: turn.gros-sans-dessein.com
+  cert_file: /etc/letsencrypt/live/turn.gros-sans-dessein.com/fullchain.pem
+  key_file: /etc/letsencrypt/live/turn.gros-sans-dessein.com/privkey.pem
+  relay_range_start: 10000
+  relay_range_end: 30000
 
 keys: {}
 # Keys are injected via LIVEKIT_KEYS env var
