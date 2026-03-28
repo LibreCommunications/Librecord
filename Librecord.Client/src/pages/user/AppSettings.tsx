@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import * as livekitClient from "../../voice/livekitClient";
 
 export default function AppSettings() {
@@ -18,20 +18,19 @@ export default function AppSettings() {
     const [audioOutputs, setAudioOutputs] = useState<MediaDeviceInfo[]>([]);
     const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
     const [prefs, setPrefs] = useState(livekitClient.getAllDevicePrefs);
+    const [devicesLoaded, setDevicesLoaded] = useState(false);
 
-    const loadDevices = useCallback(async () => {
-        // Request permission so labels are populated
+    async function loadDevices() {
+        if (devicesLoaded) return;
+        setDevicesLoaded(true);
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
             stream.getTracks().forEach(t => t.stop());
-        } catch { /* user may deny — labels will be empty but IDs still work */ }
-
+        } catch { /* user may deny */ }
         setAudioInputs(await livekitClient.listAudioInputDevices());
         setAudioOutputs(await livekitClient.listAudioOutputDevices());
         setVideoInputs(await livekitClient.listVideoDevices());
-    }, []);
-
-    useEffect(() => { loadDevices(); }, [loadDevices]);
+    }
 
     function selectDevice(kind: "audioinput" | "videoinput" | "audiooutput", deviceId: string) {
         livekitClient.setDevicePref(kind, deviceId);
@@ -62,7 +61,7 @@ export default function AppSettings() {
             </section>
 
             {/* Voice & Video */}
-            <section>
+            <section ref={() => { loadDevices(); }}>
                 <h2 className="section-label mb-4">Voice & Video</h2>
                 <div className="space-y-3">
                     <DeviceSelect
