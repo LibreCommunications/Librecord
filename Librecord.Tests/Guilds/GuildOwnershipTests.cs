@@ -73,6 +73,7 @@ public class GuildOwnershipTests
         var guild = new Guild { Id = Guid.NewGuid(), Name = "Test", OwnerId = Guid.NewGuid() };
         _guilds.Setup(g => g.GetGuildAsync(guild.Id)).ReturnsAsync(guild);
         _guilds.Setup(g => g.GetChannelIdsAsync(guild.Id)).ReturnsAsync([Guid.NewGuid()]);
+        _attachments.Setup(a => a.GetUrlsByGuildAsync(guild.Id)).ReturnsAsync([]);
 
         var svc = CreateSettingsService();
         var (success, channelIds) = await svc.DeleteGuildAsync(guild.Id);
