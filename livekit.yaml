@@ -9,8 +9,9 @@ rtc:
 
 turn:
   enabled: true
-  tls_port: 443
+  tls_port: 5349
   udp_port: 443
+  external_tls: false
   domain: turn.gros-sans-dessein.com
   cert_file: /etc/letsencrypt/live/turn.gros-sans-dessein.com/fullchain.pem
   key_file: /etc/letsencrypt/live/turn.gros-sans-dessein.com/privkey.pem
