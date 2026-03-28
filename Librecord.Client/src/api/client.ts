@@ -282,9 +282,10 @@ export const invites = {
 };
 
 export interface GuildBanEntry {
-    guildId: string;
     userId: string;
-    moderatorId: string;
+    username: string;
+    displayName: string;
+    moderator: string;
     reason: string | null;
     createdAt: string;
 }

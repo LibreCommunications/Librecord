@@ -70,6 +70,18 @@ public sealed class SignalRGuildRealtimeNotifier : IGuildRealtimeNotifier
         };
     }
 
+    public Task NotifyMemberRemovedAsync(GuildMemberRemoved evt)
+    {
+        var tasks = evt.ChannelIds.Select(channelId =>
+            _hub.Clients.Group(AppHub.GuildGroup(channelId))
+                .SendAsync("guild:member:removed", new
+                {
+                    guildId = evt.GuildId,
+                    userId = evt.UserId,
+                }));
+        return Task.WhenAll(tasks);
+    }
+
     public Task NotifyGuildUpdatedAsync(GuildUpdated evt)
     {
         var tasks = evt.ChannelIds.Select(channelId =>

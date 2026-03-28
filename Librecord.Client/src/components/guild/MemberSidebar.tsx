@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { useGuildMembers, type GuildMember } from "../../hooks/useGuildMembers";
+import { useGuildPermissions } from "../../hooks/useGuildPermissions";
 import { useUserProfile } from "../../hooks/useUserProfile";
+import { useAuth } from "../../hooks/useAuth";
 import { StatusDot } from "../user/StatusDot";
+import { MemberContextMenu } from "./MemberContextMenu";
 import { presence } from "../../api/client";
 import type { AppEventMap } from "../../realtime/events";
 
@@ -12,8 +15,11 @@ interface Props {
 export function MemberSidebar({ guildId }: Props) {
     const { getMembers } = useGuildMembers();
     const { getAvatarUrl } = useUserProfile();
+    const { user } = useAuth();
+    const { permissions } = useGuildPermissions(guildId);
     const [members, setMembers] = useState<GuildMember[]>([]);
     const [presenceMap, setPresenceMap] = useState<Record<string, string>>({});
+    const [ctxMember, setCtxMember] = useState<GuildMember | null>(null);
 
     useEffect(() => {
         function load() {
@@ -32,23 +38,26 @@ export function MemberSidebar({ guildId }: Props) {
 
     useEffect(() => {
         const onPresence = (e: CustomEvent<AppEventMap["guild:user:presence"]>) => {
-            setPresenceMap(prev => ({
-                ...prev,
-                [e.detail.userId]: e.detail.status,
-            }));
+            setPresenceMap(prev => ({ ...prev, [e.detail.userId]: e.detail.status }));
+        };
+        const onRemoved = (e: CustomEvent<AppEventMap["guild:member:removed"]>) => {
+            if (e.detail.guildId !== guildId) return;
+            setMembers(prev => prev.filter(m => m.userId !== e.detail.userId));
         };
 
         window.addEventListener("guild:user:presence", onPresence as EventListener);
-        return () => window.removeEventListener("guild:user:presence", onPresence as EventListener);
-    }, []);
+        window.addEventListener("guild:member:removed", onRemoved as EventListener);
+        return () => {
+            window.removeEventListener("guild:user:presence", onPresence as EventListener);
+            window.removeEventListener("guild:member:removed", onRemoved as EventListener);
+        };
+    }, [guildId]);
+
+    const canModerate = permissions.isOwner || permissions.kickMembers || permissions.banMembers;
 
     const grouped = new Map<string, GuildMember[]>();
-
     for (const member of members) {
-        const roleName = member.roles.length > 0
-            ? member.roles[0].name
-            : "Members";
-
+        const roleName = member.roles.length > 0 ? member.roles[0].name : "Members";
         if (!grouped.has(roleName)) grouped.set(roleName, []);
         grouped.get(roleName)!.push(member);
     }
@@ -68,7 +77,12 @@ export function MemberSidebar({ guildId }: Props) {
                     {roleMembers.map(member => (
                         <div
                             key={member.userId}
-                            className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/5 cursor-pointer"
+                            className="relative flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/5 cursor-pointer"
+                            onContextMenu={e => {
+                                if (!canModerate || member.userId === user?.userId) return;
+                                e.preventDefault();
+                                setCtxMember(member);
+                            }}
                         >
                             <div className="relative flex-shrink-0">
                                 <img
@@ -77,9 +91,7 @@ export function MemberSidebar({ guildId }: Props) {
                                     className="w-8 h-8 rounded-full object-cover"
                                 />
                                 <span className="absolute -bottom-0.5 -right-0.5">
-                                    <StatusDot
-                                        status={presenceMap[member.userId] ?? "offline"}
-                                    />
+                                    <StatusDot status={presenceMap[member.userId] ?? "offline"} />
                                 </span>
                             </div>
                             <div className="min-w-0">
@@ -87,6 +99,18 @@ export function MemberSidebar({ guildId }: Props) {
                                     {member.displayName}
                                 </div>
                             </div>
+
+                            {ctxMember?.userId === member.userId && (
+                                <MemberContextMenu
+                                    guildId={guildId}
+                                    userId={member.userId}
+                                    displayName={member.displayName}
+                                    onClose={() => setCtxMember(null)}
+                                    onMemberRemoved={() => {
+                                        setMembers(prev => prev.filter(m => m.userId !== member.userId));
+                                    }}
+                                />
+                            )}
                         </div>
                     ))}
                 </div>

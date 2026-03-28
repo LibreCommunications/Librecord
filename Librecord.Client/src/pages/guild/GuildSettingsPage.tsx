@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useGuilds } from "../../hooks/useGuilds";
-import { useGuildSettings } from "../../hooks/useGuildSettings";
+import { useGuildSettings, type GuildBanEntry } from "../../hooks/useGuildSettings";
 import { useGuildPermissions } from "../../hooks/useGuildPermissions";
 import { useToast } from "../../hooks/useToast";
 import { guilds as guildsApi, API_URL } from "../../api/client";
@@ -13,7 +13,7 @@ export default function GuildSettingsPage() {
     const { guildId } = useParams<{ guildId: string }>();
     const navigate = useNavigate();
     const { getGuild } = useGuilds();
-    const { updateGuild, deleteGuild, leaveGuild } = useGuildSettings();
+    const { updateGuild, deleteGuild, leaveGuild, unbanMember, getBans } = useGuildSettings();
     const { permissions, loaded: permsLoaded } = useGuildPermissions(guildId);
     const { toast } = useToast();
 
@@ -21,9 +21,11 @@ export default function GuildSettingsPage() {
     const [iconUrl, setIconUrl] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     const [uploadingIcon, setUploadingIcon] = useState(false);
-    const [tab, setTab] = useState<"general" | "roles" | null>(null);
+    const [tab, setTab] = useState<"general" | "roles" | "bans" | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+    const [bans, setBans] = useState<GuildBanEntry[]>([]);
+    const [bansLoaded, setBansLoaded] = useState(false);
     const iconInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -61,11 +63,13 @@ export default function GuildSettingsPage() {
 
     const canAccessGeneral = permissions.isOwner || permissions.manageGuild;
     const canAccessRoles = permissions.isOwner || permissions.manageRoles;
-    const canAccessSettings = canAccessGeneral || canAccessRoles;
+    const canAccessBans = permissions.isOwner || permissions.banMembers;
+    const canAccessSettings = canAccessGeneral || canAccessRoles || canAccessBans;
 
     if (permsLoaded && tab === null) {
         if (canAccessGeneral) setTab("general");
         else if (canAccessRoles) setTab("roles");
+        else if (canAccessBans) setTab("bans");
     }
 
     if (permsLoaded && !canAccessSettings && permissions.isOwner) {
@@ -93,6 +97,14 @@ export default function GuildSettingsPage() {
                             className={`pb-2 text-sm font-medium ${tab === "roles" ? "text-white border-b-2 border-[#5865F2]" : "text-[#949ba4] hover:text-[#dbdee1]"}`}
                         >
                             Roles
+                        </button>
+                    )}
+                    {canAccessBans && (
+                        <button
+                            onClick={() => setTab("bans")}
+                            className={`pb-2 text-sm font-medium ${tab === "bans" ? "text-white border-b-2 border-[#5865F2]" : "text-[#949ba4] hover:text-[#dbdee1]"}`}
+                        >
+                            Bans
                         </button>
                     )}
                 </div>
@@ -174,6 +186,49 @@ export default function GuildSettingsPage() {
 
                 {tab === "roles" && (
                     <GuildRoleSettings guildId={guildId} />
+                )}
+
+                {tab === "bans" && (
+                    <div ref={() => {
+                        if (!bansLoaded) {
+                            setBansLoaded(true);
+                            getBans(guildId).then(setBans);
+                        }
+                    }}>
+                        {!bansLoaded ? (
+                            <Spinner className="text-[#949ba4]" />
+                        ) : bans.length === 0 ? (
+                            <p className="text-[#949ba4] text-sm">No banned users.</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {bans.map(ban => (
+                                    <div key={ban.userId} className="flex items-center justify-between bg-[#2b2d31] rounded-lg px-4 py-3">
+                                        <div>
+                                            <div className="text-sm font-medium text-white">{ban.displayName}</div>
+                                            <div className="text-xs text-[#949ba4]">
+                                                @{ban.username}
+                                                {ban.reason && <> — {ban.reason}</>}
+                                            </div>
+                                            <div className="text-xs text-[#6d6f78] mt-0.5">
+                                                Banned by {ban.moderator} on {new Date(ban.createdAt).toLocaleDateString()}
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={async () => {
+                                                if (await unbanMember(guildId, ban.userId)) {
+                                                    setBans(prev => prev.filter(b => b.userId !== ban.userId));
+                                                    toast(`${ban.displayName} has been unbanned.`, "success");
+                                                }
+                                            }}
+                                            className="px-3 py-1.5 rounded text-sm font-medium bg-[#248046] hover:bg-[#1a6334] text-white transition-colors"
+                                        >
+                                            Unban
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 )}
             </div>
 

@@ -35,6 +35,13 @@ public sealed class GuildMessageDeleted : GuildMessageEvent
 {
 }
 
+public sealed class GuildMemberRemoved
+{
+    public Guid GuildId { get; init; }
+    public Guid UserId { get; init; }
+    public IReadOnlyList<Guid> ChannelIds { get; init; } = [];
+}
+
 public sealed class GuildUpdated
 {
     public Guid GuildId { get; init; }

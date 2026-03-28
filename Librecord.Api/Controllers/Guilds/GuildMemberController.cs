@@ -1,5 +1,6 @@
 using Librecord.Application.Guilds;
 using Librecord.Application.Permissions;
+using Librecord.Application.Realtime.Guild;
 using Librecord.Domain.Permissions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,15 +15,18 @@ public class GuildMemberController : AuthenticatedController
     private readonly IGuildService _guilds;
     private readonly IGuildMemberService _members;
     private readonly IPermissionService _permissions;
+    private readonly IGuildRealtimeNotifier _notifier;
 
     public GuildMemberController(
         IGuildService guilds,
         IGuildMemberService members,
-        IPermissionService permissions)
+        IPermissionService permissions,
+        IGuildRealtimeNotifier notifier)
     {
         _guilds = guilds;
         _members = members;
         _permissions = permissions;
+        _notifier = notifier;
     }
 
     [HttpGet("members")]
@@ -81,7 +85,9 @@ public class GuildMemberController : AuthenticatedController
             return BadRequest("The guild owner cannot leave. Transfer ownership or delete the guild.");
 
         var left = await _members.KickMemberAsync(guildId, UserId);
-        return left ? Ok() : NotFound("You are not a member of this guild.");
+        if (!left) return NotFound("You are not a member of this guild.");
+        await BroadcastMemberRemoved(guildId, UserId);
+        return Ok();
     }
 
     [HttpPost("kick/{userId:guid}")]
@@ -94,7 +100,9 @@ public class GuildMemberController : AuthenticatedController
             return BadRequest("Cannot kick yourself.");
 
         var kicked = await _members.KickMemberAsync(guildId, userId);
-        return kicked ? Ok() : NotFound("Member not found.");
+        if (!kicked) return NotFound("Member not found.");
+        await BroadcastMemberRemoved(guildId, userId);
+        return Ok();
     }
 
     [HttpPost("bans/{userId:guid}")]
@@ -107,7 +115,20 @@ public class GuildMemberController : AuthenticatedController
             return BadRequest("Cannot ban yourself.");
 
         await _members.BanMemberAsync(guildId, userId, UserId, request?.Reason);
+        await BroadcastMemberRemoved(guildId, userId);
         return Ok();
+    }
+
+    private async Task BroadcastMemberRemoved(Guid guildId, Guid userId)
+    {
+        var guild = await _guilds.GetGuildAsync(guildId);
+        var channelIds = guild?.Channels.Select(c => c.Id).ToList() ?? [];
+        await _notifier.NotifyMemberRemovedAsync(new GuildMemberRemoved
+        {
+            GuildId = guildId,
+            UserId = userId,
+            ChannelIds = channelIds,
+        });
     }
 
     [HttpDelete("bans/{userId:guid}")]
