@@ -43,7 +43,7 @@ public static class DependencyInjection
                 policy
                     .WithOrigins(corsOrigins)
                     .WithMethods("GET", "POST", "PUT", "DELETE")
-                    .WithHeaders("Content-Type")
+                    .WithHeaders("Content-Type", "X-Requested-With", "X-SignalR-User-Agent")
                     .AllowCredentials();
             });
         });

@@ -1,9 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { MessageItem } from "./MessageItem";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { EmptyState } from "../ui/EmptyState";
 import { Spinner } from "../ui/Spinner";
 import type { MessageListProps } from "./MessageListProps";
+
+// Virtuoso needs a stable firstItemIndex that decreases as older messages are prepended.
+// We start high and subtract as messages grow, so prepended items get lower indices.
+const START_INDEX = 100_000;
 
 export function MessageList({
                                 messages,
@@ -25,136 +30,54 @@ export function MessageList({
                                 hasMore,
                                 loadingMore,
                             }: MessageListProps) {
-    const containerRef = useRef<HTMLDivElement | null>(null);
-    const isAtBottomRef = useRef(true);
-    const stickyBottomUntilRef = useRef(0);
-    const sentinelRef = useRef<HTMLDivElement | null>(null);
+    const virtuosoRef = useRef<VirtuosoHandle>(null);
     const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
     const [newMsgCount, setNewMsgCount] = useState(0);
-    const prevMsgCountRef = useRef(messages.length);
-    const [prevMsgLen, setPrevMsgLen] = useState(messages.length);
+    const isAtBottomRef = useRef(true);
 
-    if (messages.length === 0 && prevMsgLen > 0) {
-        setPrevMsgLen(0);
-        setNewMsgCount(0);
-    } else if (messages.length !== prevMsgLen) {
-        setPrevMsgLen(messages.length);
-    }
-
-    useEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
-
-        function onScroll() {
-            const el = containerRef.current;
-            if (!el) return;
-
-            // During the sticky period after initial load, always consider at bottom
-            // so media load events keep re-scrolling
-            if (Date.now() < stickyBottomUntilRef.current) {
-                isAtBottomRef.current = true;
-                return;
-            }
-
-            const threshold = 20;
-            const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
-            isAtBottomRef.current = atBottom;
-
-            if (atBottom) setNewMsgCount(0);
-        }
-
-        el.addEventListener("scroll", onScroll);
-        return () => el.removeEventListener("scroll", onScroll);
-    }, []);
-
-    // The load event doesn't bubble, so we use capture to intercept
-    // it on descendant <img>/<video> elements for re-scrolling.
-    useEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
-
-        function onMediaLoad(e: Event) {
-            const tag = (e.target as HTMLElement)?.tagName;
-            if (tag !== "IMG" && tag !== "VIDEO") return;
-            if (isAtBottomRef.current) {
-                el!.scrollTo({ top: el!.scrollHeight, behavior: "instant" });
-            }
-        }
-
-        el.addEventListener("load", onMediaLoad, true);
-        return () => el.removeEventListener("load", onMediaLoad, true);
-    }, []);
-
-    useEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
-
-        if (forceScrollOnNextUpdateRef?.current) {
-            isAtBottomRef.current = true;
-            stickyBottomUntilRef.current = Date.now() + 3000;
-            requestAnimationFrame(() => {
-                el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-            });
-            forceScrollOnNextUpdateRef.current = false;
-            prevMsgCountRef.current = messages.length;
-            return;
-        }
-
-        if (messages.length === 0) {
-            isAtBottomRef.current = true;
-            prevMsgCountRef.current = 0;
-            return;
-        }
-
-        if (loadingMore) {
-            prevMsgCountRef.current = messages.length;
-            return;
-        }
-
-        if (messages.length > prevMsgCountRef.current) {
-            if (prevMsgCountRef.current === 0 || isAtBottomRef.current) {
-                // Use instant scroll for initial load to avoid race with incoming
-                // realtime messages arriving before smooth animation completes
-                const isInitial = prevMsgCountRef.current === 0;
-                if (isInitial) {
-                    stickyBottomUntilRef.current = Date.now() + 3000;
-                    requestAnimationFrame(() => {
-                        el.scrollTo({ top: el.scrollHeight, behavior: "instant" });
-                    });
-                } else {
-                    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-                }
-            } else {
-                const added = messages.length - prevMsgCountRef.current;
-                setNewMsgCount(prev => prev + added);
-            }
-        }
-
-        prevMsgCountRef.current = messages.length;
-    }, [messages, forceScrollOnNextUpdateRef, loadingMore]);
-
-    const handleIntersect = useCallback(
-        (entries: IntersectionObserverEntry[]) => {
-            if (entries[0]?.isIntersecting && hasMore && !loadingMore && !loading && onLoadMore) {
-                onLoadMore();
-            }
-        },
-        [hasMore, loadingMore, loading, onLoadMore]
+    const firstItemIndex = useMemo(
+        () => Math.max(0, START_INDEX - messages.length),
+        [messages.length]
     );
 
-    useEffect(() => {
-        const sentinel = sentinelRef.current;
-        if (!sentinel || !onLoadMore) return;
+    // Date separator logic: determine which messages start a new day
+    const dateSepIndices = useMemo(() => {
+        const result = new Set<number>();
+        let prevDate: string | null = null;
+        for (let i = 0; i < messages.length; i++) {
+            const d = new Date(messages[i].createdAt).toDateString();
+            if (d !== prevDate) {
+                result.add(i);
+                prevDate = d;
+            }
+        }
+        return result;
+    }, [messages]);
 
-        const observer = new IntersectionObserver(handleIntersect, {
-            root: containerRef.current,
-            threshold: 0.1,
-        });
+    // Follow output: auto-scroll to bottom when new messages arrive (if at bottom or force)
+    const followOutput = useCallback((isAtBottom: boolean) => {
+        if (forceScrollOnNextUpdateRef?.current) {
+            forceScrollOnNextUpdateRef.current = false;
+            return "smooth";
+        }
+        if (isAtBottom) return "smooth";
+        return false;
+    }, [forceScrollOnNextUpdateRef]);
 
-        observer.observe(sentinel);
-        return () => observer.disconnect();
-    }, [handleIntersect, onLoadMore]);
+    // Track at-bottom state and new message count
+    const handleAtBottomStateChange = useCallback((atBottom: boolean) => {
+        isAtBottomRef.current = atBottom;
+        if (atBottom) setNewMsgCount(0);
+    }, []);
 
+    // When Virtuoso detects the user scrolled to the top
+    const handleStartReached = useCallback(() => {
+        if (hasMore && !loadingMore && onLoadMore) {
+            onLoadMore();
+        }
+    }, [hasMore, loadingMore, onLoadMore]);
+
+    // Stable callbacks for MessageItem
     const handleToggleMenu = useCallback((id: string) => {
         setMenuOpenId(prev => prev === id ? null : id);
     }, [setMenuOpenId]);
@@ -171,83 +94,113 @@ export function MessageList({
         setDeleteTargetId(id);
     }, []);
 
-    return (
-        <div
-            ref={containerRef}
-            className="flex-1 overflow-y-auto dark-scrollbar"
-        >
-            {onLoadMore && hasMore && (
-                <div ref={sentinelRef} className="flex justify-center py-3">
-                    {loadingMore && <Spinner size="sm" className="text-[#949ba4]" />}
-                </div>
-            )}
+    const renderItem = useCallback((index: number) => {
+        const msgIndex = index - firstItemIndex;
+        const msg = messages[msgIndex];
+        if (!msg) return null;
 
-            {loading && (
-                <div className="flex items-center justify-center py-8">
-                    <Spinner className="text-[#949ba4]" />
-                </div>
-            )}
+        const isAuthor = msg.author.id === currentUserId;
+        const showDateSep = dateSepIndices.has(msgIndex);
 
-            {!loading && messages.length === 0 && (
+        return (
+            <div>
+                {showDateSep && (
+                    <div className="flex items-center gap-2 px-4 py-2 mt-2">
+                        <div className="flex-1 h-px bg-[#3f4147]" />
+                        <span className="text-xs font-semibold text-[#949ba4] shrink-0">
+                            {new Date(msg.createdAt).toLocaleDateString(undefined, {
+                                weekday: "long",
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                            })}
+                        </span>
+                        <div className="flex-1 h-px bg-[#3f4147]" />
+                    </div>
+                )}
+                <MessageItem
+                    msg={msg}
+                    isAuthor={isAuthor}
+                    isEditing={editingId === msg.id}
+                    menuOpen={menuOpenId === msg.id}
+                    currentUserId={currentUserId}
+                    onToggleMenu={handleToggleMenu}
+                    onStartEdit={handleStartEdit}
+                    onCancelEdit={handleCancelEdit}
+                    onDelete={handleDelete}
+                    onPin={onPinMessage}
+                    isPinned={pinnedMessageIds?.has(msg.id)}
+                    onAddReaction={onAddReaction}
+                    onRemoveReaction={onRemoveReaction}
+                    editMessage={editMessage}
+                    getAvatarUrl={getAvatarUrl}
+                />
+            </div>
+        );
+    }, [
+        firstItemIndex, messages, currentUserId, dateSepIndices,
+        editingId, menuOpenId, pinnedMessageIds,
+        handleToggleMenu, handleStartEdit, handleCancelEdit, handleDelete,
+        onPinMessage, onAddReaction, onRemoveReaction, editMessage, getAvatarUrl,
+    ]);
+
+    if (loading) {
+        return (
+            <div className="flex-1 flex items-center justify-center">
+                <Spinner className="text-[#949ba4]" />
+            </div>
+        );
+    }
+
+    if (messages.length === 0) {
+        return (
+            <div className="flex-1">
                 <EmptyState
                     icon="💬"
                     title="No messages yet"
                     description="Send a message to start the conversation!"
                 />
-            )}
+            </div>
+        );
+    }
 
-            {messages.map((msg, idx) => {
-                const isAuthor = msg.author.id === currentUserId;
-
-                const prevMsg = messages[idx - 1];
-                const msgDate = new Date(msg.createdAt).toDateString();
-                const prevDate = prevMsg ? new Date(prevMsg.createdAt).toDateString() : null;
-                const showDateSep = !prevDate || msgDate !== prevDate;
-
-                return (
-                    <div key={msg.id}>
-                        {showDateSep && (
-                            <div className="flex items-center gap-2 px-4 py-2 mt-2">
-                                <div className="flex-1 h-px bg-[#3f4147]" />
-                                <span className="text-xs font-semibold text-[#949ba4] shrink-0">
-                                    {new Date(msg.createdAt).toLocaleDateString(undefined, {
-                                        weekday: "long",
-                                        year: "numeric",
-                                        month: "long",
-                                        day: "numeric",
-                                    })}
-                                </span>
-                                <div className="flex-1 h-px bg-[#3f4147]" />
+    return (
+        <div className="flex-1 relative">
+            <Virtuoso
+                ref={virtuosoRef}
+                className="dark-scrollbar"
+                style={{ height: "100%" }}
+                totalCount={messages.length}
+                firstItemIndex={firstItemIndex}
+                initialTopMostItemIndex={messages.length - 1}
+                itemContent={renderItem}
+                followOutput={followOutput}
+                atBottomStateChange={handleAtBottomStateChange}
+                atBottomThreshold={20}
+                startReached={handleStartReached}
+                overscan={600}
+                increaseViewportBy={{ top: 400, bottom: 200 }}
+                components={{
+                    Header: () => (
+                        loadingMore ? (
+                            <div className="flex justify-center py-3">
+                                <Spinner size="sm" className="text-[#949ba4]" />
                             </div>
-                        )}
-                        <MessageItem
-                            msg={msg}
-                            isAuthor={isAuthor}
-                            isEditing={editingId === msg.id}
-                            menuOpen={menuOpenId === msg.id}
-                            currentUserId={currentUserId}
-                            onToggleMenu={handleToggleMenu}
-                            onStartEdit={handleStartEdit}
-                            onCancelEdit={handleCancelEdit}
-                            onDelete={handleDelete}
-                            onPin={onPinMessage}
-                            isPinned={pinnedMessageIds?.has(msg.id)}
-                            onAddReaction={onAddReaction}
-                            onRemoveReaction={onRemoveReaction}
-                            editMessage={editMessage}
-                            getAvatarUrl={getAvatarUrl}
-                        />
-                    </div>
-                );
-            })}
+                        ) : null
+                    ),
+                }}
+            />
 
             {newMsgCount > 0 && (
                 <button
                     onClick={() => {
-                        containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight, behavior: "smooth" });
+                        virtuosoRef.current?.scrollToIndex({
+                            index: messages.length - 1,
+                            behavior: "smooth",
+                        });
                         setNewMsgCount(0);
                     }}
-                    className="sticky bottom-4 mx-auto flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-medium shadow-lg transition-colors z-10"
+                    className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-medium shadow-lg transition-colors z-10"
                 >
                     {newMsgCount} new message{newMsgCount > 1 ? "s" : ""}
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
