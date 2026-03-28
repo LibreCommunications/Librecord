@@ -30,7 +30,8 @@ public sealed class DirectMessageService : IDirectMessageService
         string content,
         string? clientMessageId = null,
         bool hasAttachments = false,
-        bool skipNotification = false)
+        bool skipNotification = false,
+        Guid? replyToMessageId = null)
     {
         if (string.IsNullOrWhiteSpace(content) && !hasAttachments)
             throw new ArgumentException("Message content or attachments required.");
@@ -60,7 +61,8 @@ public sealed class DirectMessageService : IDirectMessageService
             Id = Guid.NewGuid(),
             UserId = userId,
             ContentText = content,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            ReplyToMessageId = replyToMessageId,
         };
 
         await _messages.AddMessageAsync(message, channelId);
@@ -86,7 +88,16 @@ public sealed class DirectMessageService : IDirectMessageService
                     Username = hydrated.User.UserName!,
                     DisplayName = hydrated.User.DisplayName,
                     AvatarUrl = hydrated.User.AvatarUrl
-                }
+                },
+                ReplyTo = hydrated.ReplyToMessage != null
+                    ? new ReplySnapshot
+                    {
+                        MessageId = hydrated.ReplyToMessage.Id,
+                        Content = hydrated.ReplyToMessage.ContentText ?? "",
+                        AuthorDisplayName = hydrated.ReplyToMessage.User?.DisplayName,
+                        AuthorId = hydrated.ReplyToMessage.UserId,
+                    }
+                    : null,
             });
         }
 

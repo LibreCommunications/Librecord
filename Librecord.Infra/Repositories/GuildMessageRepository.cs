@@ -52,6 +52,7 @@ public sealed class GuildMessageRepository : IGuildMessageRepository
             .OrderByDescending(m => m.CreatedAt)
             .Include(m => m.User)
             .Include(m => m.GuildContext).ThenInclude(gc => gc!.Channel)
+            .Include(m => m.ReplyToMessage).ThenInclude(r => r!.User)
             .Include(m => m.Attachments)
             .Include(m => m.Reactions)
             .ThenInclude(r => r.User)
@@ -112,6 +113,7 @@ public sealed class GuildMessageRepository : IGuildMessageRepository
         => await _db.Messages
             .Include(m => m.User)
             .Include(m => m.GuildContext).ThenInclude(gc => gc!.Channel)
+            .Include(m => m.ReplyToMessage).ThenInclude(r => r!.User)
             .Include(m => m.Attachments)
             .Include(m => m.Reactions).ThenInclude(r => r.User)
             .Include(m => m.Edits).ThenInclude(e => e.Editor)

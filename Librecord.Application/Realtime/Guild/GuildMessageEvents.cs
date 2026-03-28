@@ -20,6 +20,8 @@ public sealed class GuildMessageCreated : GuildMessageEvent
 
     public GuildAuthorSnapshot Author { get; init; } = null!;
 
+    public ReplySnapshot? ReplyTo { get; init; }
+
     public IReadOnlyList<MessageAttachmentSnapshot> Attachments { get; init; } = [];
 }
 

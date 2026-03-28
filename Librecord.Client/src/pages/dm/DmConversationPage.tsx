@@ -70,7 +70,7 @@ export default function DmConversationPage() {
     const config: ChatChannelConfig = useMemo(() => ({
         channelId: metadataReady ? dmId : undefined,
         getMessages: getChannelMessages,
-        sendTextMessage: sendMessage,
+        sendTextMessage: (chId, content, clientMsgId, replyToId) => sendMessage(chId, content, clientMsgId, replyToId),
         sendWithAttachments: sendDmMessageWithAttachments,
         editMessage: async (messageId, dto) => {
             const updated = await dmEditMessage(messageId, dto.content);

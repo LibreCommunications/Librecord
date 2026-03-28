@@ -20,6 +20,8 @@ public sealed class DmMessageCreated : DmMessageEvent
 
     public DmAuthorSnapshot Author { get; init; } = null!;
 
+    public ReplySnapshot? ReplyTo { get; init; }
+
     public IReadOnlyList<MessageAttachmentSnapshot> Attachments { get; init; } = [];
     public IReadOnlyList<MessageReactionSnapshot> Reactions { get; init; } = [];
     public IReadOnlyList<MessageEditSnapshot> Edits { get; init; } = [];

@@ -98,8 +98,8 @@ export const guildMessages = {
     },
     get: (channelId: string, messageId: string) =>
         requestOptional<Message>(`/guild-channels/${channelId}/messages/${messageId}`),
-    create: (channelId: string, content: string, clientMessageId?: string) =>
-        request<Message>(`/guild-channels/${channelId}/messages`, { method: "POST", ...json({ content, clientMessageId }) }),
+    create: (channelId: string, content: string, clientMessageId?: string, replyToMessageId?: string) =>
+        request<Message>(`/guild-channels/${channelId}/messages`, { method: "POST", ...json({ content, clientMessageId, replyToMessageId }) }),
     edit: (channelId: string, messageId: string, content: string) =>
         request<Message>(`/guild-channels/${channelId}/messages/${messageId}`, { method: "PUT", ...json({ content }) }),
     delete: (channelId: string, messageId: string) =>
@@ -150,8 +150,8 @@ export const dmMessages = {
             return [];
         }
     },
-    send: (channelId: string, content: string, clientMessageId: string) =>
-        request<void>(`/dm-messages/channel/${channelId}`, { method: "POST", ...json({ content, clientMessageId }) }),
+    send: (channelId: string, content: string, clientMessageId: string, replyToMessageId?: string) =>
+        request<void>(`/dm-messages/channel/${channelId}`, { method: "POST", ...json({ content, clientMessageId, replyToMessageId }) }),
     edit: async (messageId: string, content: string): Promise<Message> => {
         const msg = await request<TransportMessage>(`/dm-messages/${messageId}`, { method: "PUT", ...json({ content }) });
         return mapTransport(msg);
@@ -336,17 +336,19 @@ export const voice = {
 };
 
 export const uploads = {
-    guildMessage: (channelId: string, content: string, clientMessageId: string, files: File[], signal?: AbortSignal) => {
+    guildMessage: (channelId: string, content: string, clientMessageId: string, files: File[], signal?: AbortSignal, replyToMessageId?: string) => {
         const form = new FormData();
         form.append("content", content);
         form.append("clientMessageId", clientMessageId);
+        if (replyToMessageId) form.append("replyToMessageId", replyToMessageId);
         for (const file of files) form.append("files", file);
         return request<Message>(`/guild-channels/${channelId}/messages/with-attachments`, { method: "POST", body: form, signal });
     },
-    dmMessage: (channelId: string, content: string, clientMessageId: string, files: File[], signal?: AbortSignal) => {
+    dmMessage: (channelId: string, content: string, clientMessageId: string, files: File[], signal?: AbortSignal, replyToMessageId?: string) => {
         const form = new FormData();
         form.append("content", content);
         form.append("clientMessageId", clientMessageId);
+        if (replyToMessageId) form.append("replyToMessageId", replyToMessageId);
         for (const file of files) form.append("files", file);
         return request<Message>(`/dm-messages/channel/${channelId}/with-attachments`, { method: "POST", body: form, signal });
     },

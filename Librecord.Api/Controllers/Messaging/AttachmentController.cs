@@ -39,6 +39,7 @@ public class GuildMessageWithAttachmentController : AuthenticatedController
         Guid channelId,
         [FromForm] string? content,
         [FromForm] string? clientMessageId,
+        [FromForm] string? replyToMessageId,
         [FromForm] List<IFormFile>? files)
     {
         if (string.IsNullOrWhiteSpace(content) && (files == null || files.Count == 0))
@@ -48,9 +49,12 @@ public class GuildMessageWithAttachmentController : AuthenticatedController
             UserId, channelId, ChannelPermission.SendMessages);
         if (!access.Allowed) return Forbid();
 
+        Guid? replyId = Guid.TryParse(replyToMessageId, out var rid) ? rid : null;
+
         var message = await _messages.CreateMessageAsync(
             channelId, UserId, content?.Trim() ?? "", clientMessageId,
-            hasAttachments: files is { Count: > 0 }, skipNotification: true);
+            hasAttachments: files is { Count: > 0 }, skipNotification: true,
+            replyToMessageId: replyId);
 
         if (files is { Count: > 0 })
         {
@@ -84,6 +88,15 @@ public class GuildMessageWithAttachmentController : AuthenticatedController
                 DisplayName = message.User.DisplayName,
                 AvatarUrl = message.User.AvatarUrl
             },
+            ReplyTo = message.ReplyToMessage != null
+                ? new ReplySnapshot
+                {
+                    MessageId = message.ReplyToMessage.Id,
+                    Content = message.ReplyToMessage.ContentText ?? "",
+                    AuthorDisplayName = message.ReplyToMessage.User?.DisplayName,
+                    AuthorId = message.ReplyToMessage.UserId,
+                }
+                : null,
             Attachments = message.Attachments.Select(a => new MessageAttachmentSnapshot
             {
                 Id = a.Id, FileName = a.FileName, ContentType = a.ContentType,
@@ -121,14 +134,18 @@ public class DmMessageWithAttachmentController : AuthenticatedController
         Guid channelId,
         [FromForm] string? content,
         [FromForm] string? clientMessageId,
+        [FromForm] string? replyToMessageId,
         [FromForm] List<IFormFile>? files)
     {
         if (string.IsNullOrWhiteSpace(content) && (files == null || files.Count == 0))
             return BadRequest("Message content or attachments required.");
 
+        Guid? replyId = Guid.TryParse(replyToMessageId, out var rid) ? rid : null;
+
         var message = await _dms.SendMessageAsync(
             channelId, UserId, content?.Trim() ?? "", clientMessageId,
-            hasAttachments: files is { Count: > 0 }, skipNotification: true);
+            hasAttachments: files is { Count: > 0 }, skipNotification: true,
+            replyToMessageId: replyId);
 
         if (files is { Count: > 0 })
         {
@@ -162,6 +179,15 @@ public class DmMessageWithAttachmentController : AuthenticatedController
                 DisplayName = hydrated.User.DisplayName,
                 AvatarUrl = hydrated.User.AvatarUrl
             },
+            ReplyTo = hydrated.ReplyToMessage != null
+                ? new ReplySnapshot
+                {
+                    MessageId = hydrated.ReplyToMessage.Id,
+                    Content = hydrated.ReplyToMessage.ContentText ?? "",
+                    AuthorDisplayName = hydrated.ReplyToMessage.User?.DisplayName,
+                    AuthorId = hydrated.ReplyToMessage.UserId,
+                }
+                : null,
             Attachments = hydrated.Attachments.Select(a => new MessageAttachmentSnapshot
             {
                 Id = a.Id, FileName = a.FileName, ContentType = a.ContentType,

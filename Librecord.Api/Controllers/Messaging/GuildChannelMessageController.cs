@@ -81,7 +81,8 @@ public sealed class GuildChannelMessagesController(
             channelId,
             UserId,
             dto.Content.Trim(),
-            dto.ClientMessageId);
+            dto.ClientMessageId,
+            replyToMessageId: dto.ReplyToMessageId);
 
         return Ok(MessageDto.From(message));
     }

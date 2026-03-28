@@ -76,6 +76,10 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder }
                 deleteMessage={chat.handleDelete}
                 onPinMessage={chat.handlePin}
                 pinnedMessageIds={chat.pinnedIds}
+                onReply={(msgId) => {
+                    const msg = chat.messages.find(m => m.id === msgId);
+                    if (msg) chat.setReplyingTo(msg);
+                }}
                 onAddReaction={chat.handleAddReaction}
                 onRemoveReaction={chat.handleRemoveReaction}
                 getAvatarUrl={getAvatarUrl}
@@ -94,6 +98,25 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder }
             <TypingIndicator typingNames={chat.typingNames} />
 
             <div className="px-4 py-3 shrink-0">
+                {chat.replyingTo && (
+                    <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-[#2b2d31] rounded-t-lg border-l-2 border-[#5865F2]">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#5865F2] shrink-0">
+                            <polyline points="9 17 4 12 9 7" />
+                            <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+                        </svg>
+                        <span className="text-xs text-[#949ba4]">Replying to</span>
+                        <span className="text-xs font-medium text-[#f2f3f5]">{chat.replyingTo.author.displayName}</span>
+                        <span className="text-xs text-[#949ba4] truncate flex-1">{chat.replyingTo.content || "[attachment]"}</span>
+                        <button
+                            onClick={() => chat.setReplyingTo(null)}
+                            className="text-[#949ba4] hover:text-white shrink-0"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                        </button>
+                    </div>
+                )}
                 <AttachmentUpload files={chat.pendingFiles} onFilesChange={chat.setPendingFiles} onReject={handleReject} triggerRef={chat.attachTriggerRef} />
                 {chat.sending && (
                     <div className="flex items-center gap-2 px-4 py-1.5 text-xs text-[#949ba4]">

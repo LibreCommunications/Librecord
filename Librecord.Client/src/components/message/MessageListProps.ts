@@ -25,6 +25,7 @@ export interface MessageListProps {
     onPinMessage?: (messageId: string) => void;
     pinnedMessageIds?: Set<string>;
 
+    onReply: (messageId: string) => void;
     onAddReaction: (messageId: string, emoji: string) => void;
     onRemoveReaction: (messageId: string, emoji: string) => void;
 

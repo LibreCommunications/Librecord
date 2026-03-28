@@ -26,6 +26,9 @@ public class Message
     public Guid UserId { get; set; }
     public User User { get; set; } = null!;
 
+    public Guid? ReplyToMessageId { get; set; }
+    public Message? ReplyToMessage { get; set; }
+
     public List<MessageAttachment> Attachments { get; set; } = [];
     public List<MessageReaction> Reactions { get; set; } = [];
     public List<MessageEdit> Edits { get; set; } = [];

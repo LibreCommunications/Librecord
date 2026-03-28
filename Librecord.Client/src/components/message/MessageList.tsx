@@ -22,6 +22,7 @@ export function MessageList({
                                 deleteMessage,
                                 onPinMessage,
                                 pinnedMessageIds,
+                                onReply,
                                 onAddReaction,
                                 onRemoveReaction,
                                 getAvatarUrl,
@@ -137,6 +138,7 @@ export function MessageList({
                     currentUserId={currentUserId}
                     onToggleMenu={handleToggleMenu}
                     onStartEdit={handleStartEdit}
+                    onReply={onReply}
                     onCancelEdit={handleCancelEdit}
                     onDelete={handleDelete}
                     onPin={onPinMessage}
@@ -152,7 +154,7 @@ export function MessageList({
         firstItemIndex, messages, currentUserId, dateSepIndices,
         editingId, menuOpenId, pinnedMessageIds,
         handleToggleMenu, handleStartEdit, handleCancelEdit, handleDelete,
-        onPinMessage, onAddReaction, onRemoveReaction, editMessage, getAvatarUrl,
+        onPinMessage, onReply, onAddReaction, onRemoveReaction, editMessage, getAvatarUrl,
     ]);
 
     if (loading) {

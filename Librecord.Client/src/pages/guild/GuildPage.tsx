@@ -63,7 +63,7 @@ export default function GuildChannelPage() {
     const config: ChatChannelConfig = useMemo(() => ({
         channelId: metadataReady ? channelId : undefined,
         getMessages: getChannelMessages,
-        sendTextMessage: async (chId, content, clientMsgId) => { await createMessage(chId, content, clientMsgId); },
+        sendTextMessage: async (chId, content, clientMsgId, replyToId) => { await createMessage(chId, content, clientMsgId, replyToId); },
         sendWithAttachments: sendGuildMessageWithAttachments,
         editMessage: async (messageId, dto) => {
             const updated = await guildEditMessage(channelId!, messageId, dto.content);

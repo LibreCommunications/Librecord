@@ -18,7 +18,8 @@ public interface IDirectMessageService
         string content,
         string? clientMessageId = null,
         bool hasAttachments = false,
-        bool skipNotification = false);
+        bool skipNotification = false,
+        Guid? replyToMessageId = null);
 
     Task<Message?> EditMessageAsync(
         Guid messageId,

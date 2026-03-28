@@ -36,6 +36,7 @@ export const MessageItem = memo(function MessageItem({
                                 isPinned,
                                 onToggleMenu,
                                 onStartEdit,
+                                onReply,
                                 onCancelEdit,
                                 onDelete,
                                 onPin,
@@ -49,7 +50,21 @@ export const MessageItem = memo(function MessageItem({
     const moreButtonRef = useRef<HTMLButtonElement>(null);
 
     return (
-        <div className="flex gap-4 px-4 py-1.5 group relative hover:bg-[#2e3035] transition-colors" data-testid={`message-${msg.id}`}>
+        <div className="flex flex-col px-4 py-1.5 group relative hover:bg-[#2e3035] transition-colors" data-testid={`message-${msg.id}`}>
+            {msg.replyTo && (
+                <div className="flex items-center gap-1.5 ml-14 mb-0.5 text-xs text-[#949ba4]">
+                    <svg width="20" height="14" viewBox="0 0 20 14" fill="none" className="shrink-0 text-[#4e5058]">
+                        <path d="M6 7C6 3.68629 8.68629 1 12 1H20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                    </svg>
+                    <span className="font-medium text-[#c4c9ce]">
+                        {msg.replyTo.author?.displayName ?? "Unknown"}
+                    </span>
+                    <span className="truncate max-w-[300px] opacity-70 hover:opacity-100 cursor-pointer">
+                        {msg.replyTo.content || "[attachment]"}
+                    </span>
+                </div>
+            )}
+            <div className="flex gap-4">
             <img
                 src={getAvatarUrl(msg.author.avatarUrl)}
                 loading="lazy"
@@ -182,6 +197,8 @@ export const MessageItem = memo(function MessageItem({
                 />
             </div>
 
+            </div>{/* end flex gap-4 */}
+
             {/* Action buttons - visible on hover */}
             <div className={`absolute -top-3 right-4 transition-opacity ${menuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                 <div className="relative">
@@ -211,9 +228,19 @@ export const MessageItem = memo(function MessageItem({
                             </button>
                         )}
                         <button
+                            onClick={() => onReply(msg.id)}
+                            className="px-2 py-1 text-[#b5bac1] hover:text-white hover:bg-[#35373c] transition-colors"
+                            title="Reply"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="9 17 4 12 9 7" />
+                                <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+                            </svg>
+                        </button>
+                        <button
                             ref={moreButtonRef}
                             onClick={() => onToggleMenu(msg.id)}
-                            className={`px-2 py-1 text-[#b5bac1] hover:text-white hover:bg-[#35373c] transition-colors ${isAuthor ? "" : "rounded-l"} rounded-r`}
+                            className="px-2 py-1 text-[#b5bac1] hover:text-white hover:bg-[#35373c] transition-colors rounded-r"
                             title="More"
                         >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">

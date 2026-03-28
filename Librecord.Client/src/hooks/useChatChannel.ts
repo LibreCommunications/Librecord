@@ -17,8 +17,8 @@ export interface ChatChannelConfig {
     channelId: string | undefined;
 
     getMessages: (channelId: string, limit?: number, before?: string) => Promise<Message[]>;
-    sendTextMessage: (channelId: string, content: string, clientMessageId: string) => Promise<void>;
-    sendWithAttachments: (channelId: string, content: string, clientMessageId: string, files: File[]) => Promise<UploadResult>;
+    sendTextMessage: (channelId: string, content: string, clientMessageId: string, replyToMessageId?: string) => Promise<void>;
+    sendWithAttachments: (channelId: string, content: string, clientMessageId: string, files: File[], replyToMessageId?: string) => Promise<UploadResult>;
     editMessage: (messageId: string, dto: { content: string }) => Promise<{ content: string; editedAt?: string | null }>;
     deleteMessage: (messageId: string) => Promise<void>;
     events: {
@@ -48,6 +48,7 @@ export function useChatChannel(config: ChatChannelConfig) {
     const [sending, setSending] = useState(false);
     const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [replyingTo, setReplyingTo] = useState<Message | null>(null);
     const [showPins, setShowPins] = useState(false);
     const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
     const [hasMore, setHasMore] = useState(true);
@@ -239,9 +240,11 @@ export function useChatChannel(config: ChatChannelConfig) {
         const clientMessageId = createClientMessageId();
         const text = content.trim();
         const filesToSend = [...pendingFiles];
+        const replyMsg = replyingTo;
 
         setContent("");
         setPendingFiles([]);
+        setReplyingTo(null);
         setSending(true);
         shouldAutoScrollRef.current = true;
 
@@ -258,6 +261,11 @@ export function useChatChannel(config: ChatChannelConfig) {
                 displayName: user.displayName,
                 avatarUrl: user.avatarUrl ?? null,
             },
+            replyTo: replyMsg ? {
+                messageId: replyMsg.id,
+                content: replyMsg.content,
+                author: replyMsg.author,
+            } : null,
             attachments: [],
             reactions: [],
             edits: [],
@@ -267,7 +275,7 @@ export function useChatChannel(config: ChatChannelConfig) {
 
         try {
             if (filesToSend.length > 0) {
-                const result = await config.sendWithAttachments(channelId, text, clientMessageId, filesToSend);
+                const result = await config.sendWithAttachments(channelId, text, clientMessageId, filesToSend, replyMsg?.id);
                 if (result.ok) {
                     setMessages(prev => prev.map(m =>
                         m.clientMessageId === clientMessageId ? { ...result.message, clientMessageId } : m
@@ -281,7 +289,7 @@ export function useChatChannel(config: ChatChannelConfig) {
                         : "Failed to send file. The upload may have timed out.", "error");
                 }
             } else {
-                await config.sendTextMessage(channelId, text, clientMessageId);
+                await config.sendTextMessage(channelId, text, clientMessageId, replyMsg?.id);
             }
         } catch {
             setMessages(prev => prev.filter(m => m.clientMessageId !== clientMessageId));
@@ -399,6 +407,7 @@ export function useChatChannel(config: ChatChannelConfig) {
         sending,
         menuOpenId, setMenuOpenId,
         editingId, setEditingId,
+        replyingTo, setReplyingTo,
         showPins, setShowPins,
         pinnedIds,
         hasMore,

@@ -27,6 +27,13 @@ public class MessageConfiguration : IEntityTypeConfiguration<Message>
             .HasForeignKey(m => m.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasOne(m => m.ReplyToMessage)
+            .WithMany()
+            .HasForeignKey(m => m.ReplyToMessageId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasIndex(m => m.ReplyToMessageId);
+
         builder.HasMany(m => m.Attachments)
             .WithOne(a => a.Message)
             .HasForeignKey(a => a.MessageId)
