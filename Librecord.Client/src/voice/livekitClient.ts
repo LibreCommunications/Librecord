@@ -357,10 +357,17 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
         resolution = { width: 4096, height: 2160, ...(numericFps ? { frameRate: numericFps } : { frameRate: 240 }) };
     }
 
+    const targetFps = numericFps ?? 60;
+
     try {
         await room.localParticipant.setScreenShareEnabled(true, {
             audio: options.audio,
             ...(resolution ? { resolution } : {}),
+        }, {
+            screenShareEncoding: {
+                maxFramerate: targetFps,
+                maxBitrate: targetFps >= 30 ? 8_000_000 : 3_000_000,
+            },
         });
     } catch (e) {
         console.warn("[Voice] Screen share failed, retrying without constraints:", e);
