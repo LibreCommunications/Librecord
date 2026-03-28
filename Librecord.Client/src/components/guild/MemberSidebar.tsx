@@ -44,12 +44,20 @@ export function MemberSidebar({ guildId }: Props) {
             if (e.detail.guildId !== guildId) return;
             setMembers(prev => prev.filter(m => m.userId !== e.detail.userId));
         };
+        const onRoles = (e: CustomEvent<AppEventMap["guild:member:roles"]>) => {
+            if (e.detail.guildId !== guildId) return;
+            setMembers(prev => prev.map(m =>
+                m.userId === e.detail.userId ? { ...m, roles: e.detail.roles } : m
+            ));
+        };
 
         window.addEventListener("guild:user:presence", onPresence as EventListener);
         window.addEventListener("guild:member:removed", onRemoved as EventListener);
+        window.addEventListener("guild:member:roles", onRoles as EventListener);
         return () => {
             window.removeEventListener("guild:user:presence", onPresence as EventListener);
             window.removeEventListener("guild:member:removed", onRemoved as EventListener);
+            window.removeEventListener("guild:member:roles", onRoles as EventListener);
         };
     }, [guildId]);
 

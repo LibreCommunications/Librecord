@@ -1,9 +1,11 @@
 using System.Security.Claims;
+using Librecord.Api.Hubs;
 using Librecord.Application.Permissions;
 using Librecord.Domain.Guilds;
 using Librecord.Domain.Permissions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 
 namespace Librecord.Api.Controllers.Guilds;
 
@@ -15,15 +17,18 @@ public class GuildRoleController : AuthenticatedController
     private readonly IRoleRepository _roles;
     private readonly IGuildRepository _guilds;
     private readonly IPermissionService _permissions;
+    private readonly IHubContext<AppHub> _hub;
 
     public GuildRoleController(
         IRoleRepository roles,
         IGuildRepository guilds,
-        IPermissionService permissions)
+        IPermissionService permissions,
+        IHubContext<AppHub> hub)
     {
         _roles = roles;
         _guilds = guilds;
         _permissions = permissions;
+        _hub = hub;
     }
     [HttpGet]
     public async Task<IActionResult> List(Guid guildId)
@@ -167,6 +172,7 @@ public class GuildRoleController : AuthenticatedController
         });
 
         await _guilds.SaveChangesAsync();
+        await BroadcastRoleChange(guildId, userId, member.Roles.Select(r => new { id = r.RoleId, name = r.Role?.Name ?? role.Name }).ToList());
         return Ok();
     }
 
@@ -184,9 +190,22 @@ public class GuildRoleController : AuthenticatedController
         {
             member.Roles.Remove(memberRole);
             await _guilds.SaveChangesAsync();
+            await BroadcastRoleChange(guildId, userId, member.Roles.Select(r => new { id = r.RoleId, name = r.Role?.Name ?? "" }).ToList());
         }
 
         return Ok();
+    }
+
+    private async Task BroadcastRoleChange(Guid guildId, Guid userId, object roles)
+    {
+        var guild = await _guilds.GetGuildAsync(guildId);
+        if (guild == null) return;
+        foreach (var ch in guild.Channels)
+        {
+            await _hub.Clients.Group(AppHub.GuildGroup(ch.Id)).SendAsync(
+                "guild:member:roles",
+                new { guildId, userId, roles });
+        }
     }
 }
 

@@ -3,6 +3,8 @@ import {
     useFriends,
     type FriendshipListDto
 } from "../../hooks/useFriends";
+import { useBlocks } from "../../hooks/useBlocks";
+import type { BlockedUser } from "../../types/block";
 
 import RemoveFriendModal from "../../pages/friends/RemoveFriendModal";
 import { useNavigate } from "react-router-dom";
@@ -10,6 +12,7 @@ import { useDirectMessagesChannel } from "../../hooks/useDirectMessagesChannel";
 import { useToast } from "../../hooks/useToast";
 import { Spinner } from "../../components/ui/Spinner";
 import { EmptyState } from "../../components/ui/EmptyState";
+import { ConfirmModal } from "../../components/ui/ConfirmModal";
 import { API_URL } from "../../api/client";
 
 export default function FriendsListPage() {
@@ -32,8 +35,13 @@ export default function FriendsListPage() {
     const { startDm } = useDirectMessagesChannel();
     const { toast } = useToast();
 
+    const { blockUser, unblockUser, getBlockedUsers } = useBlocks();
+
     const [removeTarget, setRemoveTarget] =
         useState<FriendshipListDto | null>(null);
+    const [blockTarget, setBlockTarget] = useState<{ userId: string; name: string } | null>(null);
+    const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
+    const [blocksLoaded, setBlocksLoaded] = useState(false);
 
     const loadData = useCallback(async function loadData() {
         try {
@@ -202,6 +210,17 @@ export default function FriendsListPage() {
                                 </button>
 
                                 <button
+                                    onClick={() => setBlockTarget({ userId: f.otherUserId, name: f.otherDisplayName })}
+                                    className="w-9 h-9 rounded-full bg-[#2b2d31] hover:bg-[#da373c] text-[#949ba4] hover:text-white flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
+                                    title="Block"
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                                    </svg>
+                                </button>
+
+                                <button
                                     onClick={() => setRemoveTarget(f)}
                                     className="w-9 h-9 rounded-full bg-[#2b2d31] hover:bg-[#da373c] text-[#949ba4] hover:text-white flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
                                     title="Remove friend"
@@ -265,6 +284,48 @@ export default function FriendsListPage() {
                 </section>
             )}
 
+            {/* Blocked users */}
+            <section>
+                <h2 className="text-xs font-bold uppercase text-[#949ba4] tracking-wide mb-3">
+                    Blocked
+                </h2>
+                {!blocksLoaded ? (
+                    <button
+                        onClick={async () => {
+                            setBlockedUsers(await getBlockedUsers());
+                            setBlocksLoaded(true);
+                        }}
+                        className="text-sm text-[#949ba4] hover:text-white"
+                    >
+                        Show blocked users
+                    </button>
+                ) : blockedUsers.length === 0 ? (
+                    <p className="text-sm text-[#949ba4]">No blocked users.</p>
+                ) : (
+                    <div className="space-y-0.5">
+                        {blockedUsers.map(b => (
+                            <div key={b.userId} className="flex items-center justify-between px-3 py-2.5 rounded hover:bg-[#35373c] transition-colors">
+                                <div>
+                                    <span className="text-white font-medium text-sm">{b.displayName}</span>
+                                    <span className="text-xs text-[#949ba4] ml-2">@{b.username}</span>
+                                </div>
+                                <button
+                                    onClick={async () => {
+                                        if (await unblockUser(b.userId)) {
+                                            setBlockedUsers(prev => prev.filter(u => u.userId !== b.userId));
+                                            toast(`${b.displayName} unblocked.`, "success");
+                                        }
+                                    }}
+                                    className="px-3 py-1 rounded text-sm font-medium bg-[#248046] hover:bg-[#1a6334] text-white transition-colors"
+                                >
+                                    Unblock
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </section>
+
             <RemoveFriendModal
                 open={!!removeTarget}
                 username={removeTarget?.otherDisplayName ?? ""}
@@ -276,6 +337,25 @@ export default function FriendsListPage() {
                     toast("Friend removed.", "info");
                     loadData();
                 }}
+            />
+
+            <ConfirmModal
+                open={!!blockTarget}
+                title={`Block ${blockTarget?.name ?? ""}`}
+                description="Blocking will also remove them as a friend. They won't be able to message you or send friend requests."
+                confirmLabel="Block"
+                confirmVariant="danger"
+                onConfirm={async () => {
+                    if (!blockTarget) return;
+                    if (await blockUser(blockTarget.userId)) {
+                        toast(`${blockTarget.name} blocked.`, "info");
+                        loadData();
+                        setBlockedUsers(await getBlockedUsers());
+                        setBlocksLoaded(true);
+                    }
+                    setBlockTarget(null);
+                }}
+                onCancel={() => setBlockTarget(null)}
             />
         </div>
     );

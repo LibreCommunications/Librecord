@@ -36,6 +36,7 @@ export default function DmConversationPage() {
     const [channelName, setChannelName] = useState<string | null>(null);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+    const [showMembers, setShowMembers] = useState(false);
 
     // Load metadata before messages to avoid concurrent requests competing
     // for browser connection slots (max 6, minus 2 WebSockets = 4 free)
@@ -134,6 +135,20 @@ export default function DmConversationPage() {
                             onLeave={() => setShowLeaveConfirm(true)}
                         />
                     </div>
+                    {channel?.isGroup && (
+                        <button
+                            onClick={() => setShowMembers(v => !v)}
+                            className={`p-2 rounded hover:bg-white/10 ${showMembers ? "text-white" : "text-gray-400 hover:text-white"}`}
+                            title="Members"
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                <circle cx="9" cy="7" r="4" />
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                            </svg>
+                        </button>
+                    )}
                     <button
                         onClick={() => chat.setShowPins(v => !v)}
                         className={`p-2 mr-2 rounded hover:bg-white/10 ${chat.showPins ? "text-white" : "text-gray-400 hover:text-white"}`}
@@ -194,6 +209,27 @@ export default function DmConversationPage() {
 
             {chat.showPins && dmId && (
                 <PinnedMessagesPanel channelId={dmId} onClose={() => chat.setShowPins(false)} />
+            )}
+
+            {showMembers && channel?.isGroup && (
+                <div className="w-60 bg-[#2b2d31] border-l border-black/20 flex flex-col overflow-y-auto">
+                    <div className="px-4 pt-4 pb-2 text-xs font-semibold text-gray-400 uppercase">
+                        Members — {channel.members.length}
+                    </div>
+                    {channel.members.map(m => (
+                        <div key={m.id} className="flex items-center gap-2 px-4 py-1.5 rounded hover:bg-white/5 mx-2">
+                            <img
+                                src={getAvatarUrl(m.avatarUrl)}
+                                alt={m.displayName}
+                                className="w-8 h-8 rounded-full object-cover shrink-0"
+                            />
+                            <div className="min-w-0">
+                                <div className="text-sm text-gray-200 truncate">{m.displayName}</div>
+                                <div className="text-xs text-[#949ba4] truncate">@{m.username}</div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             )}
         </div>
     );
