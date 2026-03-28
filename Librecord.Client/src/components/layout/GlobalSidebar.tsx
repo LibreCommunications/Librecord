@@ -114,7 +114,7 @@ export default function GlobalSidebar() {
             const { guildId: id, name, iconUrl } = e.detail;
             setGuilds(prev => prev.map(g =>
                 g.id === id
-                    ? { ...g, ...(name !== undefined && { name }), ...(iconUrl !== undefined && { iconUrl }) }
+                    ? { ...g, ...(name !== undefined && { name }), ...(iconUrl !== undefined && { iconUrl: `${iconUrl}?t=${Date.now()}` }) }
                     : g
             ));
         };

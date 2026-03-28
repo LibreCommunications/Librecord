@@ -172,6 +172,16 @@ public class ChannelController : AuthenticatedController
         channel.Topic = dto.Topic;
 
         await _channels.UpdateChannelAsync(channel);
+
+        // Broadcast to all guild members
+        var guildChannels = await _channels.GetGuildChannelsAsync(channel.GuildId);
+        foreach (var ch in guildChannels)
+        {
+            await _hub.Clients.Group(AppHub.GuildGroup(ch.Id)).SendAsync(
+                "guild:channel:updated",
+                new { channelId = channel.Id, guildId = channel.GuildId, name = channel.Name, topic = channel.Topic });
+        }
+
         return Ok(channel);
     }
 
@@ -193,7 +203,20 @@ public class ChannelController : AuthenticatedController
                 new { error = access.Error }
             );
 
+        var guildId = channel.GuildId;
+        var guildChannels = await _channels.GetGuildChannelsAsync(guildId);
+
         await _channels.DeleteChannelAsync(channelId);
+
+        // Broadcast to all guild members via remaining channels
+        foreach (var ch in guildChannels)
+        {
+            if (ch.Id == channelId) continue;
+            await _hub.Clients.Group(AppHub.GuildGroup(ch.Id)).SendAsync(
+                "guild:channel:deleted",
+                new { channelId, guildId });
+        }
+
         return Ok();
     }
 }

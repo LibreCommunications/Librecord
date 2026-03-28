@@ -48,7 +48,7 @@ export default function GuildSettingsPage() {
         setUploadingIcon(true);
         try {
             const result = await guildsApi.uploadIcon(guildId, file);
-            setIconUrl(result.iconUrl);
+            setIconUrl(`${result.iconUrl}?t=${Date.now()}`);
             toast("Guild icon updated!", "success");
         } catch {
             toast("Failed to upload icon.", "error");

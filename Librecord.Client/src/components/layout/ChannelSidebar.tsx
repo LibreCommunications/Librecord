@@ -4,7 +4,9 @@ import { useChannels, type GuildChannel } from "../../hooks/useChannels";
 import { useReadState } from "../../hooks/useReadState";
 import { useVoice } from "../../hooks/useVoice";
 import { useGuildPermissions } from "../../hooks/useGuildPermissions";
+import { useToast } from "../../hooks/useToast";
 import { UnreadBadge } from "../ui/UnreadBadge";
+import { ConfirmModal } from "../ui/ConfirmModal";
 import CreateChannelModal from "../../pages/guild/CreateChannelModal";
 import type { AppEventMap } from "../../realtime/events";
 import { useAuth } from "../../hooks/useAuth";
@@ -18,18 +20,24 @@ interface Props {
 export default function ChannelSidebar({ guildId }: Props) {
     const { channelId } = useParams();
     const navigate = useNavigate();
-    const { getGuildChannels, createChannel } = useChannels();
+    const { getGuildChannels, createChannel, updateChannel, deleteChannel } = useChannels();
     const { getUnreadCounts } = useReadState();
     const { voiceState, joinVoice } = useVoice();
     const { user } = useAuth();
     const { getAvatarUrl } = useUserProfile();
     const { permissions } = useGuildPermissions(guildId);
+    const { toast } = useToast();
 
     const [channels, setChannels] = useState<GuildChannel[]>([]);
     const [unreads, setUnreads] = useState<Record<string, number>>({});
     const [loadedGuildId, setLoadedGuildId] = useState<string | null>(null);
     const loading = loadedGuildId !== guildId;
     const [showCreate, setShowCreate] = useState(false);
+    const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; channel: GuildChannel } | null>(null);
+    const [editTarget, setEditTarget] = useState<GuildChannel | null>(null);
+    const [editName, setEditName] = useState("");
+    const [editTopic, setEditTopic] = useState("");
+    const [deleteTarget, setDeleteTarget] = useState<GuildChannel | null>(null);
     const [channelParticipants, setChannelParticipants] = useState<Record<string, { userId: string; username: string; displayName: string; avatarUrl: string | null; isMuted: boolean; isDeafened: boolean; isCameraOn: boolean; isScreenSharing: boolean }[]>>({});
 
     const loadChannels = useCallback(async function loadChannels() {
@@ -50,9 +58,30 @@ export default function ChannelSidebar({ guildId }: Props) {
 
     useEffect(() => {
         const refresh = () => { loadChannels(); };
+        const onCreated = (e: CustomEvent<AppEventMap["guild:channel:created"]>) => {
+            if (e.detail.guildId !== guildId) return;
+            setChannels(prev => [...prev, { id: e.detail.channelId, name: e.detail.name, type: e.detail.type, position: e.detail.position, guildId }]);
+        };
+        const onUpdated = (e: CustomEvent<AppEventMap["guild:channel:updated"]>) => {
+            if (e.detail.guildId !== guildId) return;
+            setChannels(prev => prev.map(c => c.id === e.detail.channelId ? { ...c, name: e.detail.name } : c));
+        };
+        const onDeleted = (e: CustomEvent<AppEventMap["guild:channel:deleted"]>) => {
+            if (e.detail.guildId !== guildId) return;
+            setChannels(prev => prev.filter(c => c.id !== e.detail.channelId));
+            if (channelId === e.detail.channelId) navigate(`/app/guild/${guildId}`);
+        };
         window.addEventListener("realtime:reconnected", refresh);
-        return () => window.removeEventListener("realtime:reconnected", refresh);
-    }, [loadChannels]);
+        window.addEventListener("guild:channel:created", onCreated as EventListener);
+        window.addEventListener("guild:channel:updated", onUpdated as EventListener);
+        window.addEventListener("guild:channel:deleted", onDeleted as EventListener);
+        return () => {
+            window.removeEventListener("realtime:reconnected", refresh);
+            window.removeEventListener("guild:channel:created", onCreated as EventListener);
+            window.removeEventListener("guild:channel:updated", onUpdated as EventListener);
+            window.removeEventListener("guild:channel:deleted", onDeleted as EventListener);
+        };
+    }, [loadChannels, guildId, channelId, navigate]);
 
     const fetchVoiceParticipants = useCallback(() => {
         const voiceChs = channels.filter(c => c.type === 1);
@@ -208,6 +237,11 @@ export default function ChannelSidebar({ guildId }: Props) {
                                 return (
                                     <Link key={ch.id} to={`/app/guild/${guildId}/${ch.id}`}>
                                         <div
+                                            onContextMenu={e => {
+                                                if (!permissions.manageChannels) return;
+                                                e.preventDefault();
+                                                setCtxMenu({ x: e.clientX, y: e.clientY, channel: ch });
+                                            }}
                                             className={`
                                                 group relative flex items-center gap-1.5
                                                 mx-2 px-1.5 py-[6px] cursor-pointer
@@ -248,6 +282,11 @@ export default function ChannelSidebar({ guildId }: Props) {
                                                 if (!isInVoiceChannel) {
                                                     joinVoice(ch.id, guildId);
                                                 }
+                                            }}
+                                            onContextMenu={e => {
+                                                if (!permissions.manageChannels) return;
+                                                e.preventDefault();
+                                                setCtxMenu({ x: e.clientX, y: e.clientY, channel: ch });
                                             }}
                                             className={`
                                                 group relative flex items-center gap-1.5
@@ -329,6 +368,107 @@ export default function ChannelSidebar({ guildId }: Props) {
                 open={showCreate}
                 onClose={() => setShowCreate(false)}
                 onCreate={handleCreateChannel}
+            />
+
+            {/* Channel context menu */}
+            {ctxMenu && (
+                <>
+                    <div className="fixed inset-0 z-[998]" onClick={() => setCtxMenu(null)} />
+                    <div
+                        className="fixed z-[999] bg-[#111214] rounded-lg shadow-xl py-1 min-w-[160px] border border-[#2b2d31]"
+                        style={{ top: ctxMenu.y, left: ctxMenu.x }}
+                    >
+                        <button
+                            onClick={() => {
+                                setEditTarget(ctxMenu.channel);
+                                setEditName(ctxMenu.channel.name);
+                                setEditTopic((ctxMenu.channel as GuildChannel & { topic?: string }).topic ?? "");
+                                setCtxMenu(null);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-[#dbdee1] hover:bg-[#4752c4] hover:text-white rounded-[3px] mx-1"
+                        >
+                            Edit Channel
+                        </button>
+                        <button
+                            onClick={() => {
+                                setDeleteTarget(ctxMenu.channel);
+                                setCtxMenu(null);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-[#f23f43] hover:bg-[#da373c] hover:text-white rounded-[3px] mx-1"
+                        >
+                            Delete Channel
+                        </button>
+                    </div>
+                </>
+            )}
+
+            {/* Edit channel modal */}
+            {editTarget && (
+                <>
+                    <div className="fixed inset-0 z-[200] bg-black/60 flex items-center justify-center" onClick={() => setEditTarget(null)}>
+                        <div className="bg-[#313338] rounded-lg p-6 w-full max-w-md shadow-xl" onClick={e => e.stopPropagation()}>
+                            <h2 className="text-lg font-bold text-white mb-4">Edit Channel</h2>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-[#b5bac1] uppercase mb-1">Channel Name</label>
+                                    <input
+                                        value={editName}
+                                        onChange={e => setEditName(e.target.value)}
+                                        maxLength={64}
+                                        className="w-full bg-[#1e1f22] text-[#dbdee1] rounded px-3 py-2 outline-none border border-[#3f4147] focus:border-[#5865F2]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-[#b5bac1] uppercase mb-1">Topic</label>
+                                    <input
+                                        value={editTopic}
+                                        onChange={e => setEditTopic(e.target.value)}
+                                        maxLength={1024}
+                                        placeholder="What's this channel about?"
+                                        className="w-full bg-[#1e1f22] text-[#dbdee1] rounded px-3 py-2 outline-none border border-[#3f4147] focus:border-[#5865F2]"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-3 mt-6">
+                                <button onClick={() => setEditTarget(null)} className="px-4 py-2 text-sm text-white hover:underline">Cancel</button>
+                                <button
+                                    onClick={async () => {
+                                        if (!editName.trim()) return;
+                                        await updateChannel(editTarget.id, { name: editName.trim(), topic: editTopic.trim() || null });
+                                        setChannels(prev => prev.map(c =>
+                                            c.id === editTarget.id ? { ...c, name: editName.trim() } : c
+                                        ));
+                                        toast("Channel updated!", "success");
+                                        setEditTarget(null);
+                                    }}
+                                    className="px-4 py-2 rounded bg-[#5865F2] text-white text-sm font-medium hover:bg-[#4752c4]"
+                                >
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Delete channel confirm */}
+            <ConfirmModal
+                open={!!deleteTarget}
+                title="Delete Channel"
+                description={`Are you sure you want to delete #${deleteTarget?.name}? This cannot be undone.`}
+                confirmLabel="Delete"
+                confirmVariant="danger"
+                onConfirm={async () => {
+                    if (!deleteTarget) return;
+                    const deleted = await deleteChannel(deleteTarget.id);
+                    if (deleted) {
+                        setChannels(prev => prev.filter(c => c.id !== deleteTarget.id));
+                        toast("Channel deleted.", "info");
+                        if (channelId === deleteTarget.id) navigate(`/app/guild/${guildId}`);
+                    }
+                    setDeleteTarget(null);
+                }}
+                onCancel={() => setDeleteTarget(null)}
             />
         </>
     );
