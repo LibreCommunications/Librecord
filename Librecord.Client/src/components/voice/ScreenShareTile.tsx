@@ -4,6 +4,7 @@ import { useTrackBySource } from "../../voice/useTrackBySource";
 import { getRoom } from "../../voice/livekitClient";
 import type { VoiceParticipant } from "../../voice/voiceStore";
 import { ScreenShareIcon } from "./VoiceIcons";
+import { DevOverlay } from "./DevOverlay";
 
 interface Props {
     participant: VoiceParticipant;
@@ -132,6 +133,8 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
                 playsInline
                 className={`w-full h-full ${isFullscreen ? "object-contain bg-black" : "object-contain"}`}
             />
+
+            {isFullscreen && <DevOverlay embedded />}
 
             {trackStatus === "active" && (
                 <div className="absolute bottom-2 left-2 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm rounded-md px-2 py-1">
