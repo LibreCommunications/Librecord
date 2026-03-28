@@ -5,5 +5,13 @@ rtc:
   use_external_ip: true
   tcp_port: 7881
 
+turn:
+  enabled: true
+  udp_port: 3478
+  tls_port: 5349
+  domain: livekit.gros-sans-dessein.com
+  cert_file: /etc/letsencrypt/live/livekit.gros-sans-dessein.com/fullchain.pem
+  key_file: /etc/letsencrypt/live/livekit.gros-sans-dessein.com/privkey.pem
+
 keys: {}
 # Keys are injected via LIVEKIT_KEYS env var
