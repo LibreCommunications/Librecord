@@ -74,6 +74,10 @@ public class GuildInviteService : IGuildInviteService
             if (invite.MaxUses.HasValue && invite.UsesCount >= invite.MaxUses.Value)
                 throw new InvalidOperationException("Invite has reached max uses.");
 
+            var ban = await _guilds.GetBanAsync(invite.GuildId, userId);
+            if (ban != null)
+                throw new InvalidOperationException("You are banned from this guild.");
+
             var existing = await _guilds.GetGuildMemberAsync(invite.GuildId, userId);
             if (existing != null)
                 throw new InvalidOperationException("Already a member of this guild.");
