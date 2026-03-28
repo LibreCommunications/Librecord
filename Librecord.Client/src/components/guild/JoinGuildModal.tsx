@@ -31,12 +31,12 @@ export function JoinGuildModal({ onClose, onJoined }: Props) {
         setLoading(true);
         setError(null);
 
-        const guild = await joinByCode(code.trim());
-        if (guild) {
-            onJoined(guild);
+        const result = await joinByCode(code.trim());
+        if (result.ok) {
+            onJoined(result.guild);
             onClose();
         } else {
-            setError("Failed to join. The invite may be expired or you're already a member.");
+            setError(result.error);
         }
 
         setLoading(false);

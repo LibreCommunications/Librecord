@@ -6,13 +6,15 @@ export class ApiError extends Error {
     status: number;
     statusText: string;
     url: string;
+    body?: string;
 
-    constructor(status: number, statusText: string, url: string) {
-        super(`API ${status} ${statusText}: ${url}`);
+    constructor(status: number, statusText: string, url: string, body?: string) {
+        super(body || `API ${status} ${statusText}: ${url}`);
         this.name = "ApiError";
         this.status = status;
         this.statusText = statusText;
         this.url = url;
+        this.body = body;
     }
 }
 
@@ -23,7 +25,8 @@ async function request<T>(
     const res = await fetchWithAuth(`${API_URL}${path}`, options);
 
     if (!res.ok) {
-        throw new ApiError(res.status, res.statusText, path);
+        const body = await res.text().catch(() => "");
+        throw new ApiError(res.status, res.statusText, path, body);
     }
 
     const text = await res.text();

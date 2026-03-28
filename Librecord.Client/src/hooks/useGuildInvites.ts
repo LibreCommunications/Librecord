@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { invites } from "../api/client";
+import { invites, ApiError } from "../api/client";
 import type { GuildInvite } from "../types/guild";
 
 export type { GuildInvite };
@@ -36,11 +36,17 @@ export function useGuildInvites() {
     );
 
     const joinByCode = useCallback(
-        async (code: string): Promise<{ id: string; name: string } | null> => {
+        async (code: string): Promise<{ ok: true; guild: { id: string; name: string } } | { ok: false; error: string }> => {
             try {
-                return await invites.join(code);
-            } catch {
-                return null;
+                const guild = await invites.join(code);
+                return { ok: true, guild };
+            } catch (e) {
+                if (e instanceof ApiError && e.body) {
+                    // Backend returns plain string or JSON string
+                    try { return { ok: false, error: JSON.parse(e.body) }; } catch { /* not JSON */ }
+                    return { ok: false, error: e.body };
+                }
+                return { ok: false, error: "Failed to join. The invite may be expired or invalid." };
             }
         },
         [],
