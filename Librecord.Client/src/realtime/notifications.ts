@@ -70,8 +70,8 @@ export function initNotifications(userId: string) {
         const { channelId, authorId, authorName } = e.detail;
         if (authorId === currentUserId) return;
         if (document.hasFocus() && isViewingChannel(channelId)) return;
-        playNotificationSound();
-        if (!document.hasFocus()) {
+        if (localStorage.getItem("lr:notif-sounds") !== "false") playNotificationSound();
+        if (!document.hasFocus() && localStorage.getItem("lr:desktop-notifs") !== "false") {
             showDesktopNotification(authorName, "sent you a message");
         }
     }) as EventListener;
@@ -81,8 +81,8 @@ export function initNotifications(userId: string) {
         const { channelId, authorId, authorName } = e.detail;
         if (authorId === currentUserId) return;
         if (document.hasFocus() && isViewingChannel(channelId)) return;
-        playNotificationSound();
-        if (!document.hasFocus()) {
+        if (localStorage.getItem("lr:notif-sounds") !== "false") playNotificationSound();
+        if (!document.hasFocus() && localStorage.getItem("lr:desktop-notifs") !== "false") {
             showDesktopNotification(authorName, "sent a message");
         }
     }) as EventListener;
