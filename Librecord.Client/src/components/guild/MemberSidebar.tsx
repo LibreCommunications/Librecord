@@ -53,7 +53,7 @@ export function MemberSidebar({ guildId }: Props) {
         };
     }, [guildId]);
 
-    const canModerate = permissions.isOwner || permissions.kickMembers || permissions.banMembers;
+    const canModerate = permissions.isOwner || permissions.kickMembers || permissions.banMembers || permissions.manageRoles;
 
     const grouped = new Map<string, GuildMember[]>();
     for (const member of members) {
@@ -105,9 +105,16 @@ export function MemberSidebar({ guildId }: Props) {
                                     guildId={guildId}
                                     userId={member.userId}
                                     displayName={member.displayName}
+                                    memberRoleIds={member.roles.map(r => r.id)}
+                                    canManageRoles={permissions.isOwner || permissions.manageRoles}
+                                    canKick={permissions.isOwner || permissions.kickMembers}
+                                    canBan={permissions.isOwner || permissions.banMembers}
                                     onClose={() => setCtxMember(null)}
                                     onMemberRemoved={() => {
                                         setMembers(prev => prev.filter(m => m.userId !== member.userId));
+                                    }}
+                                    onRolesChanged={() => {
+                                        getMembers(guildId).then(setMembers);
                                     }}
                                 />
                             )}
