@@ -82,7 +82,7 @@ export function DevOverlay() {
     const pingColor = stats.ping === 0 ? "text-[#949ba4]" : stats.ping < 80 ? "text-green-400" : stats.ping < 200 ? "text-yellow-400" : "text-red-400";
 
     return (
-        <div className="fixed bottom-4 right-4 z-[100] bg-black/80 rounded-lg px-3 py-2 text-xs font-mono text-white pointer-events-none select-none space-y-0.5 max-w-[320px]">
+        <div className="fixed bottom-4 right-4 z-[100] bg-black/80 rounded-lg px-3 py-2 text-xs font-mono text-white pointer-events-none select-none space-y-0.5 min-w-[400px]">
             <div className="flex items-center gap-2 border-b border-white/10 pb-1 mb-1">
                 <span className="text-[#949ba4]">PING</span>
                 <span className={`font-bold ${pingColor}`}>{stats.ping === 0 ? "N/A" : `${stats.ping}ms`}</span>
