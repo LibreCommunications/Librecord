@@ -210,6 +210,7 @@ export function MessageList({
                 totalCount={messages.length}
                 firstItemIndex={firstItemIndex}
                 initialTopMostItemIndex={messages.length - 1}
+                alignToBottom
                 itemContent={renderItem}
                 followOutput={followOutput}
                 atBottomStateChange={handleAtBottomStateChange}
