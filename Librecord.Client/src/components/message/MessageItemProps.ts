@@ -11,6 +11,7 @@ export interface MessageItemProps {
     onToggleMenu: (messageId: string) => void;
     onStartEdit: (messageId: string) => void;
     onReply: (messageId: string) => void;
+    onScrollToReply?: (messageId: string) => void;
     onCancelEdit: () => void;
     onDelete: (messageId: string) => void;
     onPin?: (messageId: string) => void;

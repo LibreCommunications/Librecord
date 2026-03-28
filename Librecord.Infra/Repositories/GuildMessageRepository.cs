@@ -53,6 +53,7 @@ public sealed class GuildMessageRepository : IGuildMessageRepository
             .Include(m => m.User)
             .Include(m => m.GuildContext).ThenInclude(gc => gc!.Channel)
             .Include(m => m.ReplyToMessage).ThenInclude(r => r!.User)
+            .Include(m => m.ReplyToMessage).ThenInclude(r => r!.GuildContext)
             .Include(m => m.Attachments)
             .Include(m => m.Reactions)
             .ThenInclude(r => r.User)
@@ -114,6 +115,7 @@ public sealed class GuildMessageRepository : IGuildMessageRepository
             .Include(m => m.User)
             .Include(m => m.GuildContext).ThenInclude(gc => gc!.Channel)
             .Include(m => m.ReplyToMessage).ThenInclude(r => r!.User)
+            .Include(m => m.ReplyToMessage).ThenInclude(r => r!.GuildContext)
             .Include(m => m.Attachments)
             .Include(m => m.Reactions).ThenInclude(r => r.User)
             .Include(m => m.Edits).ThenInclude(e => e.Editor)
@@ -128,6 +130,15 @@ public sealed class GuildMessageRepository : IGuildMessageRepository
             entity.Content,
             gc.EncryptionSalt,
             gc.EncryptionAlgorithm);
+
+        if (entity.ReplyToMessage?.GuildContext != null)
+        {
+            var rc = entity.ReplyToMessage.GuildContext;
+            entity.ReplyToMessage.ContentText = _encryption.Decrypt(
+                entity.ReplyToMessage.Content,
+                rc.EncryptionSalt,
+                rc.EncryptionAlgorithm);
+        }
 
         return entity;
     }

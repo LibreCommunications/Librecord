@@ -106,6 +106,25 @@ export function MessageList({
         setDeleteTargetId(id);
     }, []);
 
+    const handleScrollToReply = useCallback((targetId: string) => {
+        const idx = messages.findIndex(m => m.id === targetId);
+        if (idx >= 0) {
+            virtuosoRef.current?.scrollToIndex({
+                index: firstItemIndex + idx,
+                behavior: "smooth",
+                align: "center",
+            });
+            // Brief highlight flash
+            setTimeout(() => {
+                const el = document.querySelector(`[data-testid="message-${targetId}"]`);
+                if (el) {
+                    el.classList.add("bg-[#3f4147]/50");
+                    setTimeout(() => el.classList.remove("bg-[#3f4147]/50"), 1500);
+                }
+            }, 400);
+        }
+    }, [messages, firstItemIndex]);
+
     const renderItem = useCallback((index: number) => {
         const msgIndex = index - firstItemIndex;
         const msg = messages[msgIndex];
@@ -139,6 +158,7 @@ export function MessageList({
                     onToggleMenu={handleToggleMenu}
                     onStartEdit={handleStartEdit}
                     onReply={onReply}
+                    onScrollToReply={handleScrollToReply}
                     onCancelEdit={handleCancelEdit}
                     onDelete={handleDelete}
                     onPin={onPinMessage}
@@ -153,7 +173,7 @@ export function MessageList({
     }, [
         firstItemIndex, messages, currentUserId, dateSepIndices,
         editingId, menuOpenId, pinnedMessageIds,
-        handleToggleMenu, handleStartEdit, handleCancelEdit, handleDelete,
+        handleToggleMenu, handleStartEdit, handleCancelEdit, handleDelete, handleScrollToReply,
         onPinMessage, onReply, onAddReaction, onRemoveReaction, editMessage, getAvatarUrl,
     ]);
 

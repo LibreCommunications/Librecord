@@ -53,6 +53,7 @@ public sealed class DirectMessageRepository : IDirectMessageRepository
             .Include(m => m.User)
             .Include(m => m.DmContext)
             .Include(m => m.ReplyToMessage).ThenInclude(r => r!.User)
+            .Include(m => m.ReplyToMessage).ThenInclude(r => r!.DmContext)
             .Include(m => m.Attachments)
             .Include(m => m.Reactions).ThenInclude(r => r.User)
             .Include(m => m.Edits).ThenInclude(e => e.Editor)
@@ -122,6 +123,7 @@ public sealed class DirectMessageRepository : IDirectMessageRepository
             .Include(m => m.User)
             .Include(m => m.DmContext)
             .Include(m => m.ReplyToMessage).ThenInclude(r => r!.User)
+            .Include(m => m.ReplyToMessage).ThenInclude(r => r!.DmContext)
             .Include(m => m.Attachments)
             .Include(m => m.Reactions).ThenInclude(r => r.User)
             .Include(m => m.Edits).ThenInclude(e => e.Editor)
@@ -136,6 +138,15 @@ public sealed class DirectMessageRepository : IDirectMessageRepository
             entity.Content,
             ctx.EncryptionSalt,
             ctx.EncryptionAlgorithm);
+
+        if (entity.ReplyToMessage?.DmContext != null)
+        {
+            var rc = entity.ReplyToMessage.DmContext;
+            entity.ReplyToMessage.ContentText = _encryption.Decrypt(
+                entity.ReplyToMessage.Content,
+                rc.EncryptionSalt,
+                rc.EncryptionAlgorithm);
+        }
 
         return entity;
     }

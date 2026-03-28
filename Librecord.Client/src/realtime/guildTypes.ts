@@ -2,6 +2,7 @@ import type {
     MessageAttachment,
     MessageReaction,
     MessageEdit,
+    ReplyInfo,
 } from "../types/message";
 
 export interface GuildRealtimeAuthor {
@@ -20,6 +21,7 @@ export interface GuildRealtimeMessageTransport {
     createdAt: string;
 
     author: GuildRealtimeAuthor;
+    replyTo?: ReplyInfo | null;
 
     attachments?: MessageAttachment[];
     reactions?: MessageReaction[];

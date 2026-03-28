@@ -37,6 +37,7 @@ export const MessageItem = memo(function MessageItem({
                                 onToggleMenu,
                                 onStartEdit,
                                 onReply,
+                                onScrollToReply,
                                 onCancelEdit,
                                 onDelete,
                                 onPin,
@@ -52,17 +53,27 @@ export const MessageItem = memo(function MessageItem({
     return (
         <div className="flex flex-col px-4 py-1.5 group relative hover:bg-[#2e3035] transition-colors" data-testid={`message-${msg.id}`}>
             {msg.replyTo && (
-                <div className="flex items-center gap-1.5 ml-14 mb-0.5 text-xs text-[#949ba4]">
-                    <svg width="20" height="14" viewBox="0 0 20 14" fill="none" className="shrink-0 text-[#4e5058]">
-                        <path d="M6 7C6 3.68629 8.68629 1 12 1H20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                    </svg>
-                    <span className="font-medium text-[#c4c9ce]">
+                <button
+                    type="button"
+                    onClick={() => onScrollToReply?.(msg.replyTo!.messageId)}
+                    className="flex items-center gap-1.5 pl-[30px] mb-0.5 text-xs text-[#949ba4] hover:text-[#dbdee1] cursor-pointer"
+                >
+                    <span className="w-8 h-[13px] border-l-2 border-t-2 border-[#4e5058] rounded-tl-md shrink-0" />
+                    <img
+                        src={getAvatarUrl(msg.replyTo.author?.avatarUrl)}
+                        className="w-4 h-4 rounded-full object-cover shrink-0"
+                        alt=""
+                    />
+                    <span className="font-semibold text-[#c4c9ce]">
                         {msg.replyTo.author?.displayName ?? "Unknown"}
                     </span>
-                    <span className="truncate max-w-[300px] opacity-70 hover:opacity-100 cursor-pointer">
-                        {msg.replyTo.content || "[attachment]"}
+                    <span className="truncate max-w-[400px]">
+                        {msg.replyTo.content
+                            ? msg.replyTo.content.split("\n")[0]
+                            : <span className="italic">📷 Click to see attachment</span>
+                        }
                     </span>
-                </div>
+                </button>
             )}
             <div className="flex gap-4">
             <img

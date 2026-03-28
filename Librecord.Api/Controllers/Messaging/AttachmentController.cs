@@ -93,8 +93,13 @@ public class GuildMessageWithAttachmentController : AuthenticatedController
                 {
                     MessageId = message.ReplyToMessage.Id,
                     Content = message.ReplyToMessage.ContentText ?? "",
-                    AuthorDisplayName = message.ReplyToMessage.User?.DisplayName,
-                    AuthorId = message.ReplyToMessage.UserId,
+                    Author = message.ReplyToMessage.User != null ? new ReplyAuthorSnapshot
+                    {
+                        Id = message.ReplyToMessage.User.Id,
+                        Username = message.ReplyToMessage.User.UserName ?? "",
+                        DisplayName = message.ReplyToMessage.User.DisplayName,
+                        AvatarUrl = message.ReplyToMessage.User.AvatarUrl,
+                    } : null,
                 }
                 : null,
             Attachments = message.Attachments.Select(a => new MessageAttachmentSnapshot
@@ -184,8 +189,13 @@ public class DmMessageWithAttachmentController : AuthenticatedController
                 {
                     MessageId = hydrated.ReplyToMessage.Id,
                     Content = hydrated.ReplyToMessage.ContentText ?? "",
-                    AuthorDisplayName = hydrated.ReplyToMessage.User?.DisplayName,
-                    AuthorId = hydrated.ReplyToMessage.UserId,
+                    Author = hydrated.ReplyToMessage.User != null ? new ReplyAuthorSnapshot
+                    {
+                        Id = hydrated.ReplyToMessage.User.Id,
+                        Username = hydrated.ReplyToMessage.User.UserName ?? "",
+                        DisplayName = hydrated.ReplyToMessage.User.DisplayName,
+                        AvatarUrl = hydrated.ReplyToMessage.User.AvatarUrl,
+                    } : null,
                 }
                 : null,
             Attachments = hydrated.Attachments.Select(a => new MessageAttachmentSnapshot

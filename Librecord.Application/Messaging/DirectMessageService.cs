@@ -94,8 +94,13 @@ public sealed class DirectMessageService : IDirectMessageService
                     {
                         MessageId = hydrated.ReplyToMessage.Id,
                         Content = hydrated.ReplyToMessage.ContentText ?? "",
-                        AuthorDisplayName = hydrated.ReplyToMessage.User?.DisplayName,
-                        AuthorId = hydrated.ReplyToMessage.UserId,
+                        Author = hydrated.ReplyToMessage.User != null ? new ReplyAuthorSnapshot
+                        {
+                            Id = hydrated.ReplyToMessage.User.Id,
+                            Username = hydrated.ReplyToMessage.User.UserName ?? "",
+                            DisplayName = hydrated.ReplyToMessage.User.DisplayName,
+                            AvatarUrl = hydrated.ReplyToMessage.User.AvatarUrl,
+                        } : null,
                     }
                     : null,
             });
