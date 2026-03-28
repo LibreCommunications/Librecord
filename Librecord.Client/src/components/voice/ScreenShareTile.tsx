@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Track } from "livekit-client";
 import { useTrackBySource } from "../../voice/useTrackBySource";
+import { getRoom } from "../../voice/livekitClient";
 import type { VoiceParticipant } from "../../voice/voiceStore";
 import { ScreenShareIcon } from "./VoiceIcons";
 
@@ -21,8 +22,21 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
 
     const track = useTrackBySource(participant.userId, Track.Source.ScreenShare);
 
+    // Subscribe/unsubscribe to save bandwidth when not watching
+    useEffect(() => {
+        if (isSelf) return; // don't unsubscribe from own stream
+        const room = getRoom();
+        if (!room) return;
+        const remote = room.remoteParticipants.get(participant.userId);
+        if (!remote) return;
+        for (const pub of remote.trackPublications.values()) {
+            if (pub.source === Track.Source.ScreenShare) {
+                pub.setSubscribed(isWatching);
+            }
+        }
+    }, [isWatching, participant.userId, isSelf]);
+
     // attach() / detach() following @livekit/components-react pattern.
-    // The SDK handles MediaStream wrapping, Safari/Firefox quirks, and autoplay.
     useEffect(() => {
         const el = videoRef.current;
         if (!el) return;
