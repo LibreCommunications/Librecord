@@ -87,6 +87,17 @@ export function MessageList({
         setNewMsgCount(0);
     }, []);
 
+    // After initial load, silently correct scroll to true bottom once images settle
+    const didInitialScroll = useRef(false);
+    useEffect(() => {
+        if (messages.length === 0 || didInitialScroll.current) return;
+        didInitialScroll.current = true;
+        const t = setTimeout(() => {
+            virtuosoRef.current?.scrollTo({ top: Number.MAX_SAFE_INTEGER });
+        }, 300);
+        return () => clearTimeout(t);
+    }, [messages.length]);
+
     // ESC scrolls to bottom
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
@@ -210,7 +221,6 @@ export function MessageList({
                 totalCount={messages.length}
                 firstItemIndex={firstItemIndex}
                 initialTopMostItemIndex={messages.length - 1}
-                alignToBottom
                 itemContent={renderItem}
                 followOutput={followOutput}
                 atBottomStateChange={handleAtBottomStateChange}
