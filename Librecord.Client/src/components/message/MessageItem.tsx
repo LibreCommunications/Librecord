@@ -142,13 +142,23 @@ export const MessageItem = memo(function MessageItem({
                             const src = resolveAttachmentUrl(att.url);
 
                             if (att.contentType.startsWith("image/")) {
+                                // Constrain to max 448px wide, 320px tall, preserving aspect ratio
+                                const maxW = 448, maxH = 320;
+                                let style: React.CSSProperties | undefined;
+                                if (att.width && att.height) {
+                                    const scale = Math.min(maxW / att.width, maxH / att.height, 1);
+                                    style = { width: att.width * scale, height: att.height * scale };
+                                } else {
+                                    style = { maxWidth: maxW, height: maxH };
+                                }
                                 return (
                                     <img
                                         key={att.id}
                                         src={src}
                                         alt={att.fileName}
                                         onClick={() => setLightboxSrc({ src, alt: att.fileName })}
-                                        className="max-w-md max-h-80 min-h-40 rounded-lg object-contain cursor-zoom-in hover:brightness-110 transition"
+                                        style={style}
+                                        className="rounded-lg object-cover cursor-zoom-in hover:brightness-110 transition"
                                     />
                                 );
                             }
@@ -160,7 +170,8 @@ export const MessageItem = memo(function MessageItem({
                                         src={src}
                                         controls
                                         preload="metadata"
-                                        className="max-w-md max-h-80 rounded-lg"
+                                        className="max-w-md rounded-lg"
+                                        style={{ maxHeight: 320 }}
                                     />
                                 );
                             }

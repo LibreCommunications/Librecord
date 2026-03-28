@@ -49,6 +49,8 @@ export interface MessageAttachment {
     contentType: string;
     size: number;
     isSpoiler: boolean;
+    width?: number | null;
+    height?: number | null;
 }
 
 export interface MessageReaction {
