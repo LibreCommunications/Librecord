@@ -49,6 +49,7 @@ jobs:
             echo "minio_console=9011"    >> "$GITHUB_OUTPUT"
             echo "bucket=librecord-test-attachments" >> "$GITHUB_OUTPUT"
           fi
+          
 
       - name: Checkout
         uses: actions/checkout@v6
