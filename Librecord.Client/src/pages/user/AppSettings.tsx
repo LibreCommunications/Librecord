@@ -8,6 +8,10 @@ export default function AppSettings() {
     const [notifSounds, setNotifSounds] = useState(() => {
         return localStorage.getItem("lr:notif-sounds") !== "false";
     });
+    const [devMode, setDevMode] = useState(() => {
+        return localStorage.getItem("lr:dev-mode") === "true";
+    });
+
     function toggle(key: string, value: boolean, setter: (v: boolean) => void) {
         localStorage.setItem(key, String(value));
         setter(value);
@@ -86,6 +90,19 @@ export default function AppSettings() {
                 <p className="text-xs text-[#949ba4] mt-3">
                     Changes apply the next time you join a voice channel.
                 </p>
+            </section>
+
+            {/* Developer */}
+            <section>
+                <h2 className="section-label mb-4">Developer</h2>
+                <div className="space-y-3">
+                    <ToggleRow
+                        label="Developer Mode"
+                        description="Show connection stats overlay on voice channels: ping, resolution, FPS, codec."
+                        checked={devMode}
+                        onChange={v => toggle("lr:dev-mode", v, setDevMode)}
+                    />
+                </div>
             </section>
         </div>
     );

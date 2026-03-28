@@ -204,7 +204,7 @@ export function VoiceChannelView({ channelId }: Props) {
     }
 
     return (
-        <div className="flex-1 flex flex-col bg-[#313338] overflow-hidden">
+        <div className="flex-1 flex flex-col bg-[#313338] overflow-hidden relative">
             <div className="flex-1 p-6 overflow-auto flex items-center justify-center">
                 <div className={`grid ${getGridClass(participants.length)} gap-3 w-full mx-auto`}>
                     {participants.map(p => {

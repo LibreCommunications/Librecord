@@ -352,6 +352,9 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
     let resolution: { width: number; height: number; frameRate?: number } | undefined;
     if (res) {
         resolution = { ...res, ...(numericFps ? { frameRate: numericFps } : {}) };
+    } else {
+        // "source" — request maximum native resolution/fps
+        resolution = { width: 4096, height: 2160, ...(numericFps ? { frameRate: numericFps } : { frameRate: 240 }) };
     }
 
     try {
