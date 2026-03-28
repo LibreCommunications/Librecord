@@ -52,6 +52,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
 
       - name: Write .env
         run: |
@@ -150,11 +152,20 @@ jobs:
 
       - name: Restart LiveKit if config changed
         run: |
-          if git diff --name-only HEAD~1 HEAD | grep -q '^livekit\.yaml$'; then
-            echo "livekit.yaml changed — restarting LiveKit"
+          RESTART=false
+          if git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -q '^livekit\.yaml$'; then
+            echo "livekit.yaml changed in diff"
+            RESTART=true
+          fi
+          if git log -1 --pretty=%s | grep -qi '\[LIVEKIT\]'; then
+            echo "[LIVEKIT] tag in commit message"
+            RESTART=true
+          fi
+          if [ "$RESTART" = true ]; then
+            echo "Restarting LiveKit..."
             docker compose -p librecord --env-file .env -f docker-compose.yml --profile livekit restart livekit
           else
-            echo "livekit.yaml unchanged — skipping"
+            echo "No LiveKit restart needed — skipping"
           fi
 
       - name: Blue-green deploy backend
