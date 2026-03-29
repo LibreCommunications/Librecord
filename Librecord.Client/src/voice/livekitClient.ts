@@ -147,16 +147,32 @@ function pollSpeaking() {
     animFrameId = requestAnimationFrame(pollSpeaking);
 }
 
+// Per-user audio pipeline: HTMLAudioElement + Web Audio GainNode for volume > 100%
+interface AudioPipeline {
+    audio: HTMLAudioElement;
+    ctx: AudioContext;
+    gain: GainNode;
+    source: MediaElementAudioSourceNode;
+}
+const audioPipelines = new Map<string, AudioPipeline>();
+
+function applyVolume(identity: string, pct: number) {
+    const pipe = audioPipelines.get(identity);
+    if (!pipe) return;
+    // Smooth ramp to avoid audio pops/clicks
+    const target = pct / 100;
+    pipe.gain.gain.cancelScheduledValues(pipe.ctx.currentTime);
+    pipe.gain.gain.setTargetAtTime(target, pipe.ctx.currentTime, 0.015);
+}
+
 // Listen for per-user volume changes and apply to audio elements
 window.addEventListener("voice:volume:changed", ((e: CustomEvent<{ userId: string; volume: number }>) => {
-    const audio = audioElements.get(e.detail.userId);
-    if (audio) audio.volume = Math.min(e.detail.volume / 100, 2);
+    applyVolume(e.detail.userId, e.detail.volume);
 }) as EventListener);
 
 // LiveKit's auto-attach relies on room.startAudio() which can fail
 // if called outside a user gesture context. Explicit <audio> elements
-// guarantee playback.
-const audioElements = new Map<string, HTMLAudioElement>();
+// with Web Audio GainNode guarantee playback and volume boost.
 
 function attachAudioTrack(identity: string, track: MediaStreamTrack) {
     detachAudioTrack(identity);
@@ -165,31 +181,46 @@ function attachAudioTrack(identity: string, track: MediaStreamTrack) {
     audio.srcObject = new MediaStream([track]);
     audio.autoplay = true;
     audio.setAttribute("playsinline", "");
-    // Hidden but must be in the DOM for some browsers to play
     audio.style.display = "none";
+    document.body.appendChild(audio);
+
+    // Web Audio pipeline for gain control (supports > 1.0 for boost)
+    const ctx = new AudioContext();
+    // Resume if browser auto-suspended
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    const source = ctx.createMediaElementSource(audio);
+    const gain = ctx.createGain();
+    source.connect(gain);
+    gain.connect(ctx.destination);
+
     // Apply per-user volume from localStorage
+    let pct = 100;
     try {
         const vols = JSON.parse(localStorage.getItem("librecord:userVolumes") ?? "{}");
-        audio.volume = Math.min((vols[identity] ?? 100) / 100, 2);
-    } catch { /* default volume */ }
-    document.body.appendChild(audio);
+        pct = vols[identity] ?? 100;
+    } catch { /* default */ }
+    gain.gain.value = pct / 100;
+
     audio.play().catch((e) => console.warn("[Voice] Audio play failed:", e));
 
-    audioElements.set(identity, audio);
+    audioPipelines.set(identity, { audio, ctx, gain, source });
 }
 
 function detachAudioTrack(identity: string) {
-    const audio = audioElements.get(identity);
-    if (audio) {
-        audio.pause();
-        audio.srcObject = null;
-        audio.remove();
-        audioElements.delete(identity);
+    const pipe = audioPipelines.get(identity);
+    if (pipe) {
+        pipe.audio.pause();
+        pipe.audio.srcObject = null;
+        pipe.audio.remove();
+        pipe.source.disconnect();
+        pipe.gain.disconnect();
+        pipe.ctx.close().catch(() => {});
+        audioPipelines.delete(identity);
     }
 }
 
 function detachAllAudio() {
-    for (const [id] of audioElements) {
+    for (const [id] of audioPipelines) {
         detachAudioTrack(id);
     }
 }
