@@ -37,6 +37,7 @@ export default function ChannelSidebar({ guildId }: Props) {
     const [editTarget, setEditTarget] = useState<GuildChannel | null>(null);
     const [editName, setEditName] = useState("");
     const [editTopic, setEditTopic] = useState("");
+    const [editParentId, setEditParentId] = useState<string | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<GuildChannel | null>(null);
     const [channelParticipants, setChannelParticipants] = useState<Record<string, { userId: string; username: string; displayName: string; avatarUrl: string | null; isMuted: boolean; isDeafened: boolean; isCameraOn: boolean; isScreenSharing: boolean }[]>>({});
 
@@ -188,8 +189,7 @@ export default function ChannelSidebar({ guildId }: Props) {
     }
 
     const categories = channels.filter(c => c.type === 2);
-    const uncategorizedText = channels.filter(c => c.type === 0 && !c.parentId);
-    const uncategorizedVoice = channels.filter(c => c.type === 1 && !c.parentId);
+    const uncategorized = channels.filter(c => c.type !== 2 && !c.parentId);
 
     const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
     const toggleCategory = (id: string) => setCollapsedCategories(prev => {
@@ -198,15 +198,8 @@ export default function ChannelSidebar({ guildId }: Props) {
         return next;
     });
 
-    const [dragOverCat, setDragOverCat] = useState<string | null>(null);
-
     function getChildChannels(categoryId: string) {
         return channels.filter(c => c.parentId === categoryId && c.type !== 2);
-    }
-
-    async function moveChannelToCategory(channelId: string, parentId: string | null) {
-        await updateChannel(channelId, { parentId });
-        setChannels(prev => prev.map(c => c.id === channelId ? { ...c, parentId } : c));
     }
 
     return (
@@ -246,188 +239,41 @@ export default function ChannelSidebar({ guildId }: Props) {
 
                     {!loading && (
                         <>
-                            {/* Drop here to remove from category */}
-                            <div
-                                className={`px-3 pb-0.5 py-1 rounded transition-colors ${dragOverCat === "none" ? "bg-[#5865F2]/20 border border-dashed border-[#5865F2]" : ""}`}
-                                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverCat("none"); }}
-                                onDragLeave={() => setDragOverCat(null)}
-                                onDrop={async e => {
-                                    e.preventDefault();
-                                    setDragOverCat(null);
-                                    const chId = e.dataTransfer.getData("channelId");
-                                    if (chId) await moveChannelToCategory(chId, null);
-                                }}
-                            >
-                                <h2 className="text-[#949ba4] uppercase text-[11px] font-bold tracking-wide">
-                                    {dragOverCat === "none" ? "Drop to uncategorize" : uncategorizedText.length > 0 ? "Text Channels" : "\u00A0"}
-                                </h2>
-                            </div>
-                            {uncategorizedText.map(ch => {
+                            {/* Uncategorized channels */}
+                            {uncategorized.map(ch => {
+                                const isVoice = ch.type === 1;
+                                const isInVoiceChannel = isVoice && voiceState.isConnected && voiceState.channelId === ch.id;
+                                const voiceParticipants = isVoice ? (channelParticipants[ch.id] ?? []) : [];
                                 const unreadCount = unreads[ch.id] ?? 0;
                                 const isActive = channelId === ch.id;
                                 const hasUnread = unreadCount > 0 && !isActive;
 
-                                return (
-                                    <Link key={ch.id} to={`/app/guild/${guildId}/${ch.id}`} draggable={false}>
-                                        <div
-                                            draggable={permissions.manageChannels}
-                                            onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("channelId", ch.id); e.dataTransfer.effectAllowed = "move"; }}
-                                            onContextMenu={e => {
-                                                if (!permissions.manageChannels) return;
-                                                e.preventDefault();
-                                                setCtxMenu({ x: e.clientX, y: e.clientY, channel: ch });
-                                            }}
-                                            className={`
-                                                group relative flex items-center gap-1.5
-                                                mx-2 px-1.5 py-[6px] cursor-pointer
-                                                rounded-[4px]
-                                                hover:bg-[#35373c]
-                                                ${isActive ? "bg-[#404249] text-white" : "text-[#949ba4] hover:text-[#dbdee1]"}
-                                                ${hasUnread ? "text-[#f2f3f5]" : ""}
-                                            `}
-                                        >
-                                            {isActive && (
-                                                <span className="absolute left-[-8px] top-1/2 -translate-y-1/2 w-1 h-2 bg-white rounded-r-full" />
-                                            )}
-                                            {hasUnread && !isActive && (
-                                                <span className="absolute left-[-8px] top-1/2 -translate-y-1/2 w-1 h-2 bg-white rounded-r-full" />
-                                            )}
-                                            <span className="text-[18px] leading-none opacity-60">#</span>
-                                            <span className={`truncate flex-1 text-[15px] leading-5 ${hasUnread ? "font-medium" : ""}`}>{ch.name}</span>
-                                            {hasUnread && (
-                                                <UnreadBadge count={unreadCount} />
-                                            )}
-                                        </div>
-                                    </Link>
-                                );
-                            })}
-
-                            {/* Categories with children */}
-                            {categories.map(cat => {
-                                const children = getChildChannels(cat.id);
-                                const isCollapsed = collapsedCategories.has(cat.id);
-                                return (
+                                const channelRow = (
                                     <div
-                                        key={cat.id}
-                                        className="mt-3"
-                                        onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverCat(cat.id); }}
-                                        onDragLeave={() => setDragOverCat(null)}
-                                        onDrop={async e => {
-                                            e.preventDefault();
-                                            setDragOverCat(null);
-                                            const chId = e.dataTransfer.getData("channelId");
-                                            if (chId) await moveChannelToCategory(chId, cat.id);
-                                        }}
+                                        onClick={isVoice ? () => { navigate(`/app/guild/${guildId}/${ch.id}`); if (!isInVoiceChannel) joinVoice(ch.id, guildId); } : undefined}
+                                        onContextMenu={e => { if (!permissions.manageChannels) return; e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, channel: ch }); }}
+                                        className={`group relative flex items-center gap-1.5 mx-2 px-1.5 py-[6px] cursor-pointer rounded-[4px] hover:bg-[#35373c]
+                                            ${isActive || isInVoiceChannel ? "bg-[#404249] text-white" : "text-[#949ba4] hover:text-[#dbdee1]"}
+                                            ${hasUnread ? "text-[#f2f3f5]" : ""}`}
                                     >
-                                        <div
-                                            className={`flex items-center gap-0.5 px-1 py-0.5 cursor-pointer text-[#949ba4] hover:text-[#dbdee1] rounded transition-colors ${dragOverCat === cat.id ? "bg-[#5865F2]/20 text-white" : ""}`}
-                                            onClick={() => toggleCategory(cat.id)}
-                                            onContextMenu={e => {
-                                                if (!permissions.manageChannels) return;
-                                                e.preventDefault();
-                                                setCtxMenu({ x: e.clientX, y: e.clientY, channel: cat });
-                                            }}
-                                        >
-                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`transition-transform ${isCollapsed ? "-rotate-90" : ""}`}>
-                                                <polyline points="6 9 12 15 18 9" />
+                                        {(isActive || (hasUnread && !isActive) || isInVoiceChannel) && (
+                                            <span className="absolute left-[-8px] top-1/2 -translate-y-1/2 w-1 h-2 bg-white rounded-r-full" />
+                                        )}
+                                        {isVoice ? (
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 opacity-60">
+                                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
                                             </svg>
-                                            <span className="uppercase text-[11px] font-bold tracking-wide truncate">{cat.name}</span>
-                                        </div>
-                                        {!isCollapsed && children.map(ch => {
-                                            if (ch.type === 1) {
-                                                const isInVoiceChannel = voiceState.isConnected && voiceState.channelId === ch.id;
-                                                const voiceParticipants = channelParticipants[ch.id] ?? [];
-                                                return (
-                                                    <div key={ch.id}>
-                                                        <div
-                                                            draggable={permissions.manageChannels}
-                                                            onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("channelId", ch.id); e.dataTransfer.effectAllowed = "move"; }}
-                                                            onClick={() => { navigate(`/app/guild/${guildId}/${ch.id}`); if (!isInVoiceChannel) joinVoice(ch.id, guildId); }}
-                                                            onContextMenu={e => { if (!permissions.manageChannels) return; e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, channel: ch }); }}
-                                                            className={`group relative flex items-center gap-1.5 mx-2 px-1.5 py-[6px] cursor-pointer rounded-[4px] hover:bg-[#35373c] ${isInVoiceChannel ? "bg-[#404249] text-white" : "text-[#949ba4] hover:text-[#dbdee1]"}`}
-                                                        >
-                                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-60 shrink-0" strokeLinecap="round" strokeLinejoin="round">
-                                                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                                                            </svg>
-                                                            <span className="truncate flex-1 text-[15px] leading-5">{ch.name}</span>
-                                                        </div>
-                                                        {voiceParticipants.length > 0 && (
-                                                            <div className="ml-8 space-y-0.5 mb-1">
-                                                                {voiceParticipants.map(p => (
-                                                                    <div key={p.userId} className="flex items-center gap-1.5 px-1 py-0.5 text-xs text-[#949ba4]">
-                                                                        <img src={getAvatarUrl(p.avatarUrl)} className="w-5 h-5 rounded-full object-cover" alt="" />
-                                                                        <span className="truncate">{p.displayName}</span>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            }
-                                            // Text channel inside category
-                                            const unreadCount = unreads[ch.id] ?? 0;
-                                            const isActive = channelId === ch.id;
-                                            const hasUnread = unreadCount > 0 && !isActive;
-                                            return (
-                                                <Link key={ch.id} to={`/app/guild/${guildId}/${ch.id}`} draggable={false}>
-                                                    <div
-                                                        draggable={permissions.manageChannels}
-                                                        onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("channelId", ch.id); e.dataTransfer.effectAllowed = "move"; }}
-                                                        onContextMenu={e => { if (!permissions.manageChannels) return; e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, channel: ch }); }}
-                                                        className={`group relative flex items-center gap-1.5 mx-2 px-1.5 py-[6px] cursor-pointer rounded-[4px] hover:bg-[#35373c] ${isActive ? "bg-[#404249] text-white" : "text-[#949ba4] hover:text-[#dbdee1]"} ${hasUnread ? "text-[#f2f3f5]" : ""}`}
-                                                    >
-                                                        <span className="text-[18px] leading-none opacity-60">#</span>
-                                                        <span className={`truncate flex-1 text-[15px] leading-5 ${hasUnread ? "font-medium" : ""}`}>{ch.name}</span>
-                                                        {hasUnread && <UnreadBadge count={unreadCount} />}
-                                                    </div>
-                                                </Link>
-                                            );
-                                        })}
+                                        ) : (
+                                            <span className="text-[18px] leading-none opacity-60">#</span>
+                                        )}
+                                        <span className={`truncate flex-1 text-[15px] leading-5 ${hasUnread ? "font-medium" : ""}`}>{ch.name}</span>
+                                        {hasUnread && !isVoice && <UnreadBadge count={unreadCount} />}
                                     </div>
                                 );
-                            })}
-
-                            {/* Uncategorized voice channels */}
-                            {uncategorizedVoice.length > 0 && (
-                                <div className="px-3 pb-0.5 pt-4">
-                                    <h2 className="text-[#949ba4] uppercase text-[11px] font-bold tracking-wide">Voice Channels</h2>
-                                </div>
-                            )}
-                            {uncategorizedVoice.map(ch => {
-                                const isInVoiceChannel = voiceState.isConnected && voiceState.channelId === ch.id;
-                                const voiceParticipants = channelParticipants[ch.id] ?? [];
 
                                 return (
                                     <div key={ch.id}>
-                                        <div
-                                            onClick={() => {
-                                                navigate(`/app/guild/${guildId}/${ch.id}`);
-                                                if (!isInVoiceChannel) {
-                                                    joinVoice(ch.id, guildId);
-                                                }
-                                            }}
-                                            onContextMenu={e => {
-                                                if (!permissions.manageChannels) return;
-                                                e.preventDefault();
-                                                setCtxMenu({ x: e.clientX, y: e.clientY, channel: ch });
-                                            }}
-                                            className={`
-                                                group relative flex items-center gap-1.5
-                                                mx-2 px-1.5 py-[6px] cursor-pointer
-                                                rounded-[4px]
-                                                hover:bg-[#35373c]
-                                                ${isInVoiceChannel || channelId === ch.id ? "bg-[#404249] text-white" : "text-[#949ba4] hover:text-[#dbdee1]"}
-                                            `}
-                                        >
-                                            {isInVoiceChannel && (
-                                                <span className="absolute left-[-8px] top-1/2 -translate-y-1/2 w-1 h-2 bg-white rounded-r-full" />
-                                            )}
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 opacity-60">
-                                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                                                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                                            </svg>
-                                            <span className="truncate flex-1 text-[15px] leading-5">{ch.name}</span>
-                                        </div>
+                                        {isVoice ? channelRow : <Link to={`/app/guild/${guildId}/${ch.id}`}>{channelRow}</Link>}
                                         {voiceParticipants.length > 0 && (
                                             <div className="ml-7 mr-2 mt-0.5 mb-1 space-y-px">
                                                 {voiceParticipants.map(raw => {
@@ -482,6 +328,70 @@ export default function ChannelSidebar({ guildId }: Props) {
                                     </div>
                                 );
                             })}
+
+                            {/* Categories */}
+                            {categories.map(cat => {
+                                const children = getChildChannels(cat.id);
+                                const isCollapsed = collapsedCategories.has(cat.id);
+                                return (
+                                    <div key={cat.id} className="mt-3">
+                                        <div
+                                            className="flex items-center gap-0.5 px-1 py-0.5 cursor-pointer text-[#949ba4] hover:text-[#dbdee1]"
+                                            onClick={() => toggleCategory(cat.id)}
+                                            onContextMenu={e => { if (!permissions.manageChannels) return; e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, channel: cat }); }}
+                                        >
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`transition-transform ${isCollapsed ? "-rotate-90" : ""}`}>
+                                                <polyline points="6 9 12 15 18 9" />
+                                            </svg>
+                                            <span className="uppercase text-[11px] font-bold tracking-wide truncate">{cat.name}</span>
+                                        </div>
+                                        {!isCollapsed && children.map(ch => {
+                                            const isVoice = ch.type === 1;
+                                            const isInVC = isVoice && voiceState.isConnected && voiceState.channelId === ch.id;
+                                            const vp = isVoice ? (channelParticipants[ch.id] ?? []) : [];
+                                            const uc = unreads[ch.id] ?? 0;
+                                            const active = channelId === ch.id;
+                                            const unread = uc > 0 && !active;
+
+                                            const row = (
+                                                <div
+                                                    onClick={isVoice ? () => { navigate(`/app/guild/${guildId}/${ch.id}`); if (!isInVC) joinVoice(ch.id, guildId); } : undefined}
+                                                    onContextMenu={e => { if (!permissions.manageChannels) return; e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, channel: ch }); }}
+                                                    className={`group relative flex items-center gap-1.5 mx-2 px-1.5 py-[6px] cursor-pointer rounded-[4px] hover:bg-[#35373c]
+                                                        ${active || isInVC ? "bg-[#404249] text-white" : "text-[#949ba4] hover:text-[#dbdee1]"}
+                                                        ${unread ? "text-[#f2f3f5]" : ""}`}
+                                                >
+                                                    {isVoice ? (
+                                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 opacity-60">
+                                                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                                                        </svg>
+                                                    ) : (
+                                                        <span className="text-[18px] leading-none opacity-60">#</span>
+                                                    )}
+                                                    <span className={`truncate flex-1 text-[15px] leading-5 ${unread ? "font-medium" : ""}`}>{ch.name}</span>
+                                                    {unread && !isVoice && <UnreadBadge count={uc} />}
+                                                </div>
+                                            );
+
+                                            return (
+                                                <div key={ch.id}>
+                                                    {isVoice ? row : <Link to={`/app/guild/${guildId}/${ch.id}`}>{row}</Link>}
+                                                    {vp.length > 0 && (
+                                                        <div className="ml-7 mr-2 mt-0.5 mb-1 space-y-px">
+                                                            {vp.map(p => (
+                                                                <div key={p.userId} className="flex items-center gap-1.5 text-[13px] text-[#949ba4] py-[3px]">
+                                                                    <img src={getAvatarUrl(p.avatarUrl)} className="w-5 h-5 rounded-full object-cover shrink-0" alt="" />
+                                                                    <span className="truncate">{p.displayName}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                );
+                            })}
                         </>
                     )}
                 </div>
@@ -507,11 +417,12 @@ export default function ChannelSidebar({ guildId }: Props) {
                                 setEditTarget(ctxMenu.channel);
                                 setEditName(ctxMenu.channel.name);
                                 setEditTopic((ctxMenu.channel as GuildChannel & { topic?: string }).topic ?? "");
+                                setEditParentId(ctxMenu.channel.parentId ?? null);
                                 setCtxMenu(null);
                             }}
                             className="w-full text-left px-3 py-2 text-sm text-[#dbdee1] hover:bg-[#4752c4] hover:text-white rounded-[3px] mx-1"
                         >
-                            Edit Channel
+                            {ctxMenu.channel.type === 2 ? "Edit Category" : "Edit Channel"}
                         </button>
                         <button
                             onClick={() => {
@@ -520,21 +431,25 @@ export default function ChannelSidebar({ guildId }: Props) {
                             }}
                             className="w-full text-left px-3 py-2 text-sm text-[#f23f43] hover:bg-[#da373c] hover:text-white rounded-[3px] mx-1"
                         >
-                            Delete Channel
+                            {ctxMenu.channel.type === 2 ? "Delete Category" : "Delete Channel"}
                         </button>
                     </div>
                 </>
             )}
 
-            {/* Edit channel modal */}
+            {/* Edit channel/category modal */}
             {editTarget && (
                 <>
                     <div className="fixed inset-0 z-[200] bg-black/60 flex items-center justify-center" onClick={() => setEditTarget(null)}>
                         <div className="bg-[#313338] rounded-lg p-6 w-full max-w-md shadow-xl" onClick={e => e.stopPropagation()}>
-                            <h2 className="text-lg font-bold text-white mb-4">Edit Channel</h2>
+                            <h2 className="text-lg font-bold text-white mb-4">
+                                {editTarget.type === 2 ? "Edit Category" : "Edit Channel"}
+                            </h2>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-semibold text-[#b5bac1] uppercase mb-1">Channel Name</label>
+                                    <label className="block text-xs font-semibold text-[#b5bac1] uppercase mb-1">
+                                        {editTarget.type === 2 ? "Category Name" : "Channel Name"}
+                                    </label>
                                     <input
                                         value={editName}
                                         onChange={e => setEditName(e.target.value)}
@@ -542,27 +457,47 @@ export default function ChannelSidebar({ guildId }: Props) {
                                         className="w-full bg-[#1e1f22] text-[#dbdee1] rounded px-3 py-2 outline-none border border-[#3f4147] focus:border-[#5865F2]"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-semibold text-[#b5bac1] uppercase mb-1">Topic</label>
-                                    <input
-                                        value={editTopic}
-                                        onChange={e => setEditTopic(e.target.value)}
-                                        maxLength={1024}
-                                        placeholder="What's this channel about?"
-                                        className="w-full bg-[#1e1f22] text-[#dbdee1] rounded px-3 py-2 outline-none border border-[#3f4147] focus:border-[#5865F2]"
-                                    />
-                                </div>
+                                {editTarget.type !== 2 && (
+                                    <div>
+                                        <label className="block text-xs font-semibold text-[#b5bac1] uppercase mb-1">Topic</label>
+                                        <input
+                                            value={editTopic}
+                                            onChange={e => setEditTopic(e.target.value)}
+                                            maxLength={1024}
+                                            placeholder="What's this channel about?"
+                                            className="w-full bg-[#1e1f22] text-[#dbdee1] rounded px-3 py-2 outline-none border border-[#3f4147] focus:border-[#5865F2]"
+                                        />
+                                    </div>
+                                )}
+                                {editTarget.type !== 2 && categories.length > 0 && (
+                                    <div>
+                                        <label className="block text-xs font-semibold text-[#b5bac1] uppercase mb-1">Category</label>
+                                        <select
+                                            value={editParentId ?? ""}
+                                            onChange={e => setEditParentId(e.target.value || null)}
+                                            className="w-full bg-[#1e1f22] text-[#dbdee1] rounded px-3 py-2 outline-none border border-[#3f4147] focus:border-[#5865F2]"
+                                        >
+                                            <option value="">No category</option>
+                                            {categories.map(c => (
+                                                <option key={c.id} value={c.id}>{c.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                             </div>
                             <div className="flex justify-end gap-3 mt-6">
                                 <button onClick={() => setEditTarget(null)} className="px-4 py-2 text-sm text-white hover:underline">Cancel</button>
                                 <button
                                     onClick={async () => {
                                         if (!editName.trim()) return;
-                                        await updateChannel(editTarget.id, { name: editName.trim(), topic: editTopic.trim() || null });
-                                        setChannels(prev => prev.map(c =>
-                                            c.id === editTarget.id ? { ...c, name: editName.trim() } : c
-                                        ));
-                                        toast("Channel updated!", "success");
+                                        if (editTarget.type === 2) {
+                                            await updateChannel(editTarget.id, { name: editName.trim() });
+                                            setChannels(prev => prev.map(c => c.id === editTarget.id ? { ...c, name: editName.trim() } : c));
+                                        } else {
+                                            await updateChannel(editTarget.id, { name: editName.trim(), topic: editTopic.trim() || null, parentId: editParentId });
+                                            setChannels(prev => prev.map(c => c.id === editTarget.id ? { ...c, name: editName.trim(), parentId: editParentId } : c));
+                                        }
+                                        toast(editTarget.type === 2 ? "Category updated!" : "Channel updated!", "success");
                                         setEditTarget(null);
                                     }}
                                     className="px-4 py-2 rounded bg-[#5865F2] text-white text-sm font-medium hover:bg-[#4752c4]"

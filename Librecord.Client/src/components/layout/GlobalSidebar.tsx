@@ -75,6 +75,30 @@ export default function GlobalSidebar() {
     const location = useLocation();
     const { getGuildChannels } = useChannels();
 
+    // ── Remember last visited paths ──────────────────────────
+    const LAST_VISITED_KEY = "librecord:lastVisited";
+
+    function getLastVisited(): Record<string, string> {
+        try { return JSON.parse(localStorage.getItem(LAST_VISITED_KEY) ?? "{}"); } catch { return {}; }
+    }
+
+    const saveLastVisited = useCallback((key: string, path: string) => {
+        const lv = getLastVisited();
+        lv[key] = path;
+        localStorage.setItem(LAST_VISITED_KEY, JSON.stringify(lv));
+    }, []);
+
+    // Save current path on every navigation
+    useEffect(() => {
+        const path = location.pathname;
+        if (path.startsWith("/app/dm/")) {
+            saveLastVisited("dm", path);
+        } else if (path.match(/^\/app\/guild\/[^/]+\/.+/)) {
+            const gId = path.split("/")[3];
+            saveLastVisited(`guild:${gId}`, path);
+        }
+    }, [location.pathname, saveLastVisited]);
+
     const [guilds, setGuilds] = useState<GuildSummary[]>([]);
     const [showCreate, setShowCreate] = useState(false);
     const [showJoin, setShowJoin] = useState(false);
@@ -83,14 +107,29 @@ export default function GlobalSidebar() {
     const { voiceState, leaveVoice } = useVoice();
 
     // ── Guild Folders (client-only, localStorage) ────────────
-    interface GuildFolder { id: string; name?: string; guildIds: string[]; }
+    interface GuildFolder { id: string; name?: string; color?: string; guildIds: string[]; }
     const FOLDERS_KEY = "librecord:guildFolders";
 
     const [folders, setFolders] = useState<GuildFolder[]>(() => {
         try { return JSON.parse(localStorage.getItem(FOLDERS_KEY) ?? "[]"); } catch { return []; }
     });
-    const [expandedFolder, setExpandedFolder] = useState<string | null>(null);
+    const EXPANDED_KEY = "librecord:expandedFolders";
+    const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => {
+        try { return new Set(JSON.parse(localStorage.getItem(EXPANDED_KEY) ?? "[]")); } catch { return new Set(); }
+    });
     const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
+    const [renamingFolder, setRenamingFolder] = useState<string | null>(null);
+    const [renameValue, setRenameValue] = useState("");
+    const [renameColor, setRenameColor] = useState("");
+
+    function toggleExpandFolder(folderId: string) {
+        setExpandedFolders(prev => {
+            const next = new Set(prev);
+            if (next.has(folderId)) next.delete(folderId); else next.add(folderId);
+            localStorage.setItem(EXPANDED_KEY, JSON.stringify([...next]));
+            return next;
+        });
+    }
 
     function saveFolders(next: GuildFolder[]) {
         setFolders(next);
@@ -102,7 +141,11 @@ export default function GlobalSidebar() {
     function createFolder(guildA: string, guildB: string) {
         const folder: GuildFolder = { id: crypto.randomUUID(), guildIds: [guildA, guildB] };
         saveFolders([...folders, folder]);
-        setExpandedFolder(folder.id);
+        toggleExpandFolder(folder.id);
+    }
+
+    function updateFolder(folderId: string, name: string, color?: string) {
+        saveFolders(folders.map(f => f.id === folderId ? { ...f, name: name.trim() || undefined, color: color || undefined } : f));
     }
 
     function removeFromFolder(folderId: string, guildId: string) {
@@ -259,7 +302,7 @@ export default function GlobalSidebar() {
                 }}
             >
 
-                <SidebarIcon to="/app/dm" active={isDmPage} unread={effectiveDmUnread} tooltip="Direct Messages" className="bg-[#313338] hover:bg-[#5865F2] text-white">
+                <SidebarIcon to={getLastVisited().dm || "/app/dm"} active={isDmPage} unread={effectiveDmUnread} tooltip="Direct Messages" className="bg-[#313338] hover:bg-[#5865F2] text-white">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                     </svg>
@@ -271,7 +314,8 @@ export default function GlobalSidebar() {
                 {folders.map(folder => {
                     const folderGuilds = folder.guildIds.map(id => guilds.find(g => g.id === id)).filter(Boolean) as GuildSummary[];
                     if (folderGuilds.length === 0) return null;
-                    const isExpanded = expandedFolder === folder.id;
+                    const isExpanded = expandedFolders.has(folder.id);
+                    const folderColor = folder.color ?? "#5865F2";
                     const hasUnread = folderGuilds.some(g => (effectiveGuildUnreads[g.id] ?? 0) > 0);
                     const hasActive = folderGuilds.some(g => guildId === g.id);
 
@@ -293,8 +337,23 @@ export default function GlobalSidebar() {
                         >
                             {isExpanded ? (
                                 <>
-                                    {/* Expanded: rounded container with guilds inside */}
-                                    <div className="bg-[#2b2d31] rounded-[16px] p-1.5 flex flex-col items-center gap-1">
+                                    {/* Expanded: folder icon on top, guilds below */}
+                                    <div className="rounded-[16px] p-1.5 flex flex-col items-center gap-1" style={{ backgroundColor: `${folderColor}20` }}>
+                                        {/* Close folder icon on top */}
+                                        <SidebarIcon
+                                            onClick={() => toggleExpandFolder(folder.id)}
+                                            tooltip={folder.name || "Close Folder"}
+                                            className="!bg-transparent hover:brightness-125"
+                                        >
+                                            <div
+                                                className="flex items-center justify-center"
+                                                onContextMenu={e => { e.preventDefault(); setRenamingFolder(folder.id); setRenameValue(folder.name ?? ""); setRenameColor(folder.color ?? ""); }}
+                                            >
+                                                <svg width="28" height="28" viewBox="0 0 24 24" fill={folderColor} stroke="none">
+                                                    <path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z" />
+                                                </svg>
+                                            </div>
+                                        </SidebarIcon>
                                         {folderGuilds.map(g => (
                                             <div
                                                 key={g.id}
@@ -302,7 +361,7 @@ export default function GlobalSidebar() {
                                                 onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("guildId", g.id); e.dataTransfer.setData("fromFolder", folder.id); e.dataTransfer.effectAllowed = "move"; }}
                                             >
                                                 <SidebarIcon
-                                                    to={`/app/guild/${g.id}`}
+                                                    to={getLastVisited()[`guild:${g.id}`] || `/app/guild/${g.id}`}
                                                     active={guildId === g.id}
                                                     unread={(effectiveGuildUnreads[g.id] ?? 0) > 0}
                                                     tooltip={g.name}
@@ -316,25 +375,22 @@ export default function GlobalSidebar() {
                                                 </SidebarIcon>
                                             </div>
                                         ))}
-                                        {/* Close folder icon at the bottom */}
-                                        <div
-                                            className="w-12 h-12 rounded-[16px] bg-[#313338] hover:bg-[#5865F2] flex items-center justify-center cursor-pointer transition-colors"
-                                            onClick={() => setExpandedFolder(null)}
-                                        >
-                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#949ba4] group-hover:text-white">
-                                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                                            </svg>
-                                        </div>
                                     </div>
                                 </>
                             ) : (
                                 /* Collapsed: folder pill with mini icons */
                                 <div
-                                    className={`relative w-12 h-12 rounded-[16px] bg-[#2b2d31] cursor-pointer hover:rounded-2xl transition-all flex items-center justify-center
+                                    className={`relative group w-12 h-12 rounded-[16px] cursor-pointer hover:rounded-2xl transition-all flex items-center justify-center
                                         ${hasActive ? "rounded-2xl" : ""}
                                         ${dragOverTarget === `folder:${folder.id}` ? "ring-2 ring-[#5865F2]" : ""}`}
-                                    onClick={() => setExpandedFolder(folder.id)}
+                                    style={{ backgroundColor: `${folderColor}20` }}
+                                    onClick={() => toggleExpandFolder(folder.id)}
+                                    onContextMenu={e => { e.preventDefault(); setRenamingFolder(folder.id); setRenameValue(folder.name ?? ""); setRenameColor(folder.color ?? ""); }}
                                 >
+                                    {/* Tooltip */}
+                                    <div className="fixed left-[80px] px-3 py-1.5 bg-[#111214] text-white text-sm font-medium rounded-md shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                                        {folder.name || `Folder — ${folderGuilds.length} guilds`}
+                                    </div>
                                     <div className="grid grid-cols-2 gap-[3px] w-[34px] h-[34px]">
                                         {folderGuilds.slice(0, 4).map(g => (
                                             <div key={g.id} className="w-[15px] h-[15px] rounded-full overflow-hidden bg-[#313338]">
@@ -378,7 +434,7 @@ export default function GlobalSidebar() {
                         }}
                     >
                         <SidebarIcon
-                            to={`/app/guild/${g.id}`}
+                            to={getLastVisited()[`guild:${g.id}`] || `/app/guild/${g.id}`}
                             active={guildId === g.id}
                             unread={(effectiveGuildUnreads[g.id] ?? 0) > 0}
                             tooltip={g.name}
@@ -458,6 +514,47 @@ export default function GlobalSidebar() {
                         navigate(`/app/guild/${guild.id}`);
                     }}
                 />
+            )}
+
+            {renamingFolder && (
+                <div className="fixed inset-0 z-[300] bg-black/60 flex items-center justify-center" onClick={() => setRenamingFolder(null)}>
+                    <div className="bg-[#313338] rounded-lg p-5 w-[340px] shadow-xl" onClick={e => e.stopPropagation()}>
+                        <h2 className="text-lg font-bold text-white mb-3">Folder Settings</h2>
+
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Name</label>
+                        <input
+                            autoFocus
+                            value={renameValue}
+                            onChange={e => setRenameValue(e.target.value)}
+                            onKeyDown={e => { if (e.key === "Enter") { updateFolder(renamingFolder, renameValue, renameColor); setRenamingFolder(null); } }}
+                            maxLength={32}
+                            placeholder="Folder name"
+                            className="w-full px-3 py-2 rounded bg-[#1e1f22] text-white outline-none border border-[#3f4147] focus:border-[#5865F2] mb-3"
+                        />
+
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Color</label>
+                        <div className="flex gap-2 flex-wrap mb-1">
+                            {["#5865F2", "#57F287", "#FEE75C", "#EB459E", "#ED4245", "#F47B67", "#E78B38", "#949ba4"].map(c => (
+                                <button
+                                    key={c}
+                                    onClick={() => setRenameColor(c)}
+                                    className={`w-8 h-8 rounded-full transition-transform ${renameColor === c ? "ring-2 ring-white scale-110" : "hover:scale-110"}`}
+                                    style={{ backgroundColor: c }}
+                                />
+                            ))}
+                        </div>
+
+                        <div className="flex justify-end gap-2 mt-4">
+                            <button onClick={() => setRenamingFolder(null)} className="px-3 py-1.5 text-sm text-white hover:underline">Cancel</button>
+                            <button
+                                onClick={() => { updateFolder(renamingFolder, renameValue, renameColor); setRenamingFolder(null); }}
+                                className="px-4 py-1.5 rounded bg-[#5865F2] hover:bg-[#4752c4] text-white text-sm font-medium"
+                            >
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {removedNotice && (
