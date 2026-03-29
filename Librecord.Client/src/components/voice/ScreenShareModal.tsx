@@ -3,7 +3,7 @@ import { ScreenShareIcon } from "./VoiceIcons";
 
 export interface ScreenShareOptions {
     resolution: "720p" | "1080p" | "1440p" | "source";
-    frameRate: 15 | 30 | 60 | "source";
+    frameRate: 15 | 30 | 60;
     audio: boolean;
 }
 
@@ -29,7 +29,7 @@ interface Props {
 
 export function ScreenShareModal({ open, onStart, onCancel }: Props) {
     const [resolution, setResolution] = useState<ScreenShareOptions["resolution"]>("1080p");
-    const [frameRate, setFrameRate] = useState<ScreenShareOptions["frameRate"]>("source");
+    const [frameRate, setFrameRate] = useState<ScreenShareOptions["frameRate"]>(30);
     const [audio, setAudio] = useState(true);
 
     if (!open) return null;
@@ -96,8 +96,8 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
                         <label className="text-xs font-semibold uppercase tracking-wide text-[#b5bac1] mb-2 block">
                             Frame Rate
                         </label>
-                        <div className="grid grid-cols-4 gap-2">
-                            {([15, 30, 60, "source"] as const).map((fps) => (
+                        <div className="grid grid-cols-3 gap-2">
+                            {([15, 30, 60] as const).map((fps) => (
                                 <button
                                     key={fps}
                                     onClick={() => setFrameRate(fps)}
@@ -110,7 +110,7 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
                                         }
                                     `}
                                 >
-                                    {fps === "source" ? "Source" : `${fps} FPS`}
+                                    {fps} FPS
                                 </button>
                             ))}
                         </div>

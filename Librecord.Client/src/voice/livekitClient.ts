@@ -334,7 +334,7 @@ export async function switchMicrophone(deviceId: string): Promise<void> {
 
 export interface ScreenShareSettings {
     resolution: "720p" | "1080p" | "1440p" | "source";
-    frameRate: 15 | 30 | 60 | "source";
+    frameRate: 15 | 30 | 60;
     audio: boolean;
 }
 
@@ -348,18 +348,19 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
     if (!room) return false;
 
     const res = RESOLUTION_MAP[options.resolution];
-    const captureFps = options.frameRate === "source" ? 240 : options.frameRate;
-    const encodeFps = options.frameRate === "source" ? 60 : options.frameRate;
+    const encodeFps = options.frameRate;
 
+    // Cap capture at 1080p — larger surfaces tank FPS due to encoding cost.
+    // Only the selected resolution preset (720/1080/1440) overrides this.
+    // "source" resolution caps at 1080p, matching LiveKit SDK defaults.
     let resolution: { width: number; height: number; frameRate?: number } | undefined;
     if (res) {
-        resolution = { ...res, frameRate: captureFps };
+        resolution = { ...res, frameRate: encodeFps };
     } else {
-        resolution = { width: 4096, height: 2160, frameRate: captureFps };
+        resolution = { width: 1920, height: 1080, frameRate: encodeFps };
     }
 
-    // Encoding: match user's FPS selection with appropriate bitrate
-    // Based on LiveKit ScreenSharePresets: 1080p30=5Mbps, original=7Mbps
+    // Encoding: match FPS with appropriate bitrate (LiveKit presets)
     const encodingBitrate = encodeFps >= 60 ? 7_000_000 : encodeFps >= 30 ? 5_000_000 : 2_500_000;
 
     try {
