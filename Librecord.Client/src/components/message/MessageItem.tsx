@@ -2,6 +2,7 @@ import { memo, useRef, useState } from "react";
 import { MessageMenu } from "./MessageMenu";
 import { ReactionBar } from "../messages/ReactionBar";
 import { ImageLightbox } from "../ui/ImageLightbox";
+import { UserHoverCard } from "../user/UserHoverCard";
 import { renderMarkdown } from "../../utils/markdown";
 import type { MessageItemProps } from "./MessageItemProps";
 import { API_URL } from "../../api/client";
@@ -85,12 +86,14 @@ export const MessageItem = memo(function MessageItem({
 
             <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2">
-                    <span
-                        className="font-medium text-[#f2f3f5] hover:underline cursor-pointer"
-                        onClick={() => window.dispatchEvent(new CustomEvent("user:profile:open", { detail: { userId: msg.author.id } }))}
-                    >
-                        {msg.author.displayName}
-                    </span>
+                    <UserHoverCard userId={msg.author.id}>
+                        <span
+                            className="font-medium text-[#f2f3f5] hover:underline cursor-pointer"
+                            onClick={() => window.dispatchEvent(new CustomEvent("user:profile:open", { detail: { userId: msg.author.id } }))}
+                        >
+                            {msg.author.displayName}
+                        </span>
+                    </UserHoverCard>
                     <span className="text-xs text-[#949ba4]">
                         {formatTimestamp(msg.createdAt)}
                     </span>

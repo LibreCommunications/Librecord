@@ -15,4 +15,6 @@ export interface UserProfile {
     createdAt: string;
     isFriend: boolean;
     isSelf: boolean;
+    mutualFriendCount?: number;
+    friendsVisible?: boolean;
 }

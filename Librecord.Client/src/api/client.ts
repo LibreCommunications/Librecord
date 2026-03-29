@@ -56,7 +56,7 @@ function json(body: unknown): RequestInit {
     };
 }
 
-import type { UserProfile } from "../types/user";
+import type { UserProfile, UserSummary as UserSummaryType } from "../types/user";
 
 export const auth = {
     me: () => request<{
@@ -71,12 +71,14 @@ export const auth = {
 
 export const userProfiles = {
     get: (userId: string) => request<UserProfile>(`/users/${userId}`),
+    getFriends: (userId: string) => request<UserSummaryType[]>(`/users/${userId}/friends`).catch(() => [] as UserSummaryType[]),
     updateBio: (bio: string | null) => request<void>("/users/bio", { method: "PUT", ...json({ bio }) }),
     uploadBanner: (file: File) => {
         const form = new FormData();
         form.append("file", file);
         return request<{ bannerUrl: string }>("/users/banner", { method: "POST", body: form });
     },
+    updateFriendsVisible: (visible: boolean) => request<void>("/users/friends-visible", { method: "PUT", ...json({ visible }) }),
 };
 
 import type { GuildSummary, Guild, GuildChannel, GuildMember, GuildPermissions } from "../types/guild";

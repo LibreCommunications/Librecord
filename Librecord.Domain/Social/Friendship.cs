@@ -15,4 +15,6 @@ public class Friendship
     public FriendshipStatus Status { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public Guid OtherUserId(Guid myId) => RequesterId == myId ? TargetId : RequesterId;
 }

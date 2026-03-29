@@ -15,4 +15,5 @@ public interface IUserService
     Task<string?> UpdateAvatarAsync(Guid userId, Stream fileStream, string fileName, string contentType);
     Task<bool> UpdateBioAsync(Guid userId, string? bio);
     Task<string?> UpdateBannerAsync(Guid userId, Stream fileStream, string fileName, string contentType);
+    Task<bool> UpdateFriendsVisibleAsync(Guid userId, bool visible);
 }

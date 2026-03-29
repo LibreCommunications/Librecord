@@ -1,4 +1,5 @@
 using Librecord.Api.Models.UserProfile;
+using Librecord.Application.Friendships;
 using Librecord.Application.Interfaces;
 using Librecord.Domain.Social;
 using Microsoft.AspNetCore.Authorization;
@@ -12,11 +13,13 @@ public class UserProfileController : AuthenticatedController
 {
     private readonly IUserService _users;
     private readonly IFriendshipRepository _friendships;
+    private readonly IFriendshipService _friendService;
 
-    public UserProfileController(IUserService users, IFriendshipRepository friendships)
+    public UserProfileController(IUserService users, IFriendshipRepository friendships, IFriendshipService friendService)
     {
         _users = users;
         _friendships = friendships;
+        _friendService = friendService;
     }
 
     [Authorize]
@@ -27,6 +30,16 @@ public class UserProfileController : AuthenticatedController
         if (user == null) return NotFound();
 
         var isFriend = await _friendships.UsersAreConfirmedFriendsAsync(UserId, userId);
+
+        // Mutual friends — only count if their friends are visible or they're a friend
+        var canSeeFriends = user.FriendsVisible || isFriend || user.Id == UserId;
+        var mutualCount = 0;
+        if (canSeeFriends && user.Id != UserId)
+        {
+            var myFriends = (await _friendService.GetFriendsAsync(UserId)).Select(f => f.UserId).ToHashSet();
+            var theirFriends = (await _friendService.GetFriendsAsync(userId)).Select(f => f.UserId).ToHashSet();
+            mutualCount = myFriends.Intersect(theirFriends).Count();
+        }
 
         return Ok(new
         {
@@ -39,7 +52,39 @@ public class UserProfileController : AuthenticatedController
             createdAt = user.CreatedAt,
             isFriend,
             isSelf = user.Id == UserId,
+            mutualFriendCount = mutualCount,
+            friendsVisible = canSeeFriends,
         });
+    }
+
+    [Authorize]
+    [HttpGet("{userId:guid}/friends")]
+    public async Task<IActionResult> GetUserFriends(Guid userId)
+    {
+        var user = await _users.GetByIdAsync(userId);
+        if (user == null) return NotFound();
+
+        // Respect privacy: only show friends if visible, or viewer is a friend, or it's self
+        var isFriend = await _friendships.UsersAreConfirmedFriendsAsync(UserId, userId);
+        if (!user.FriendsVisible && !isFriend && user.Id != UserId)
+            return Ok(Array.Empty<object>());
+
+        var friends = await _friendService.GetFriendsAsync(userId);
+        return Ok(friends.Select(f => new
+        {
+            id = f.UserId,
+            username = f.Username,
+            displayName = f.DisplayName,
+            avatarUrl = f.AvatarUrl,
+        }));
+    }
+
+    [Authorize]
+    [HttpPut("friends-visible")]
+    public async Task<IActionResult> UpdateFriendsVisible([FromBody] UpdateFriendsVisibleRequest request)
+    {
+        var ok = await _users.UpdateFriendsVisibleAsync(UserId, request.Visible);
+        return ok ? Ok() : Unauthorized();
     }
 
     [Authorize]
@@ -133,4 +178,9 @@ public class UserProfileController : AuthenticatedController
 public class UpdateBioRequest
 {
     public string? Bio { get; set; }
+}
+
+public class UpdateFriendsVisibleRequest
+{
+    public bool Visible { get; set; }
 }

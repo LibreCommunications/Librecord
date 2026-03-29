@@ -12,6 +12,7 @@ public class User : IdentityUser<Guid>
     public string? AvatarUrl { get; set; }
     public string? Bio { get; set; }
     public string? BannerUrl { get; set; }
+    public bool FriendsVisible { get; set; } = true;
 
     public List<GuildMember> GuildMemberships { get; set; } = [];
     public List<GuildChannelMember> ChannelMemberships { get; set; } = [];

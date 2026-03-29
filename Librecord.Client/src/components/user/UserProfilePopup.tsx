@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { userProfiles, API_URL } from "../../api/client";
+import type { UserSummary } from "../../types/user";
 import { useFriends } from "../../hooks/useFriends";
 import { useBlocks } from "../../hooks/useBlocks";
 import { useDirectMessagesChannel } from "../../hooks/useDirectMessagesChannel";
@@ -15,6 +16,8 @@ interface Props {
 export function UserProfilePopup({ userId, onClose }: Props) {
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
+    const [friends, setFriends] = useState<UserSummary[] | null>(null);
+    const [showFriends, setShowFriends] = useState(false);
     const { sendRequest: sendFriendRequest, removeFriend } = useFriends();
     const { blockUser } = useBlocks();
     const { startDm } = useDirectMessagesChannel();
@@ -74,9 +77,43 @@ export function UserProfilePopup({ userId, onClose }: Props) {
                         </div>
                     )}
 
-                    <div className="mt-3 text-xs text-[#949ba4]">
-                        Member since {new Date(profile.createdAt).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+                    <div className="mt-3 flex items-center gap-3 text-xs text-[#949ba4]">
+                        <span>Member since {new Date(profile.createdAt).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</span>
+                        {!profile.isSelf && profile.mutualFriendCount != null && profile.mutualFriendCount > 0 && (
+                            <span className="text-[#5865F2]">{profile.mutualFriendCount} mutual friend{profile.mutualFriendCount > 1 ? "s" : ""}</span>
+                        )}
                     </div>
+
+                    {/* Friends list — only show if profile allows it */}
+                    {!profile.isSelf && profile.friendsVisible && profile.mutualFriendCount != null && profile.mutualFriendCount > 0 && (
+                        <div className="mt-2">
+                            <button
+                                onClick={async () => {
+                                    if (!showFriends && !friends) {
+                                        setFriends(await userProfiles.getFriends(userId));
+                                    }
+                                    setShowFriends(!showFriends);
+                                }}
+                                className="text-xs text-[#5865F2] hover:underline"
+                            >
+                                {showFriends ? "Hide friends" : "Show friends"}
+                            </button>
+                            {showFriends && friends && (
+                                <div className="mt-2 max-h-[120px] overflow-y-auto space-y-1">
+                                    {friends.map(f => (
+                                        <div
+                                            key={f.id}
+                                            className="flex items-center gap-2 px-2 py-1 rounded hover:bg-white/5 cursor-pointer"
+                                            onClick={() => window.dispatchEvent(new CustomEvent("user:profile:open", { detail: { userId: f.id } }))}
+                                        >
+                                            <img src={f.avatarUrl ? `${API_URL}${f.avatarUrl}` : "/default-avatar.png"} className="w-6 h-6 rounded-full object-cover" alt="" />
+                                            <span className="text-xs text-[#dbdee1] truncate">{f.displayName}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Actions */}
                     {!profile.isSelf && (
