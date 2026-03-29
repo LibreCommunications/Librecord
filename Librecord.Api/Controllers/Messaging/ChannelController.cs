@@ -171,11 +171,12 @@ public class ChannelController : AuthenticatedController
         if (!string.IsNullOrWhiteSpace(dto.Name))
             channel.Name = dto.Name.Trim();
 
-        channel.Topic = dto.Topic;
+        // Only update topic when name is also provided (edit modal sends both)
+        // Drag-move only sends parentId, so topic stays untouched
+        if (dto.Name != null)
+            channel.Topic = dto.Topic;
 
-        // ParentId: set if provided (move to category), null removes from category
-        if (dto.ParentId != channel.ParentId)
-            channel.ParentId = dto.ParentId;
+        channel.ParentId = dto.ParentId;
 
         await _channels.UpdateChannelAsync(channel);
 

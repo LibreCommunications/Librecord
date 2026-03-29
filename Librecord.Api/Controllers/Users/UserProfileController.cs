@@ -54,6 +54,7 @@ public class UserProfileController : AuthenticatedController
             isSelf = user.Id == UserId,
             mutualFriendCount = mutualCount,
             friendsVisible = canSeeFriends,
+            friendsVisibleSetting = user.Id == UserId ? user.FriendsVisible : (bool?)null,
         });
     }
 

@@ -18,7 +18,7 @@ export default function UserSettingsPage() {
                             isActive ? "bg-[#404249] text-white" : "hover:bg-[#3a3c43]"
                         }`
                     }>
-                        My Account
+                        Profile & Account
                     </NavLink>
 
                     <NavLink to="app" className={({ isActive }) =>

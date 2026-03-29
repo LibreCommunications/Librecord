@@ -246,9 +246,9 @@ export default function ChannelSidebar({ guildId }: Props) {
 
                     {!loading && (
                         <>
-                            {/* Uncategorized text channels — drop here to remove from category */}
+                            {/* Drop here to remove from category */}
                             <div
-                                className={`px-3 pb-0.5 rounded transition-colors ${dragOverCat === "none" ? "bg-[#5865F2]/20" : ""}`}
+                                className={`px-3 pb-0.5 py-1 rounded transition-colors ${dragOverCat === "none" ? "bg-[#5865F2]/20 border border-dashed border-[#5865F2]" : ""}`}
                                 onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverCat("none"); }}
                                 onDragLeave={() => setDragOverCat(null)}
                                 onDrop={async e => {
@@ -258,9 +258,9 @@ export default function ChannelSidebar({ guildId }: Props) {
                                     if (chId) await moveChannelToCategory(chId, null);
                                 }}
                             >
-                                {uncategorizedText.length > 0 && (
-                                    <h2 className="text-[#949ba4] uppercase text-[11px] font-bold tracking-wide">Text Channels</h2>
-                                )}
+                                <h2 className="text-[#949ba4] uppercase text-[11px] font-bold tracking-wide">
+                                    {dragOverCat === "none" ? "Drop to uncategorize" : uncategorizedText.length > 0 ? "Text Channels" : "\u00A0"}
+                                </h2>
                             </div>
                             {uncategorizedText.map(ch => {
                                 const unreadCount = unreads[ch.id] ?? 0;
@@ -268,10 +268,10 @@ export default function ChannelSidebar({ guildId }: Props) {
                                 const hasUnread = unreadCount > 0 && !isActive;
 
                                 return (
-                                    <Link key={ch.id} to={`/app/guild/${guildId}/${ch.id}`}>
+                                    <Link key={ch.id} to={`/app/guild/${guildId}/${ch.id}`} draggable={false}>
                                         <div
                                             draggable={permissions.manageChannels}
-                                            onDragStart={e => { e.dataTransfer.setData("channelId", ch.id); e.dataTransfer.effectAllowed = "move"; }}
+                                            onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("channelId", ch.id); e.dataTransfer.effectAllowed = "move"; }}
                                             onContextMenu={e => {
                                                 if (!permissions.manageChannels) return;
                                                 e.preventDefault();
@@ -341,7 +341,7 @@ export default function ChannelSidebar({ guildId }: Props) {
                                                     <div key={ch.id}>
                                                         <div
                                                             draggable={permissions.manageChannels}
-                                                            onDragStart={e => { e.dataTransfer.setData("channelId", ch.id); e.dataTransfer.effectAllowed = "move"; }}
+                                                            onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("channelId", ch.id); e.dataTransfer.effectAllowed = "move"; }}
                                                             onClick={() => { navigate(`/app/guild/${guildId}/${ch.id}`); if (!isInVoiceChannel) joinVoice(ch.id, guildId); }}
                                                             onContextMenu={e => { if (!permissions.manageChannels) return; e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, channel: ch }); }}
                                                             className={`group relative flex items-center gap-1.5 mx-2 px-1.5 py-[6px] cursor-pointer rounded-[4px] hover:bg-[#35373c] ${isInVoiceChannel ? "bg-[#404249] text-white" : "text-[#949ba4] hover:text-[#dbdee1]"}`}
@@ -369,10 +369,10 @@ export default function ChannelSidebar({ guildId }: Props) {
                                             const isActive = channelId === ch.id;
                                             const hasUnread = unreadCount > 0 && !isActive;
                                             return (
-                                                <Link key={ch.id} to={`/app/guild/${guildId}/${ch.id}`}>
+                                                <Link key={ch.id} to={`/app/guild/${guildId}/${ch.id}`} draggable={false}>
                                                     <div
                                                         draggable={permissions.manageChannels}
-                                                        onDragStart={e => { e.dataTransfer.setData("channelId", ch.id); e.dataTransfer.effectAllowed = "move"; }}
+                                                        onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("channelId", ch.id); e.dataTransfer.effectAllowed = "move"; }}
                                                         onContextMenu={e => { if (!permissions.manageChannels) return; e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, channel: ch }); }}
                                                         className={`group relative flex items-center gap-1.5 mx-2 px-1.5 py-[6px] cursor-pointer rounded-[4px] hover:bg-[#35373c] ${isActive ? "bg-[#404249] text-white" : "text-[#949ba4] hover:text-[#dbdee1]"} ${hasUnread ? "text-[#f2f3f5]" : ""}`}
                                                     >

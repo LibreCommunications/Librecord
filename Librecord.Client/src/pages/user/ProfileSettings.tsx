@@ -22,6 +22,7 @@ export default function ProfileSettings() {
     const [saving, setSaving] = useState(false);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
+    const [original, setOriginal] = useState({ name: user?.displayName ?? "", bio: "" });
 
     // Load existing profile data on mount
     const loaded = useRef(false);
@@ -31,7 +32,8 @@ export default function ProfileSettings() {
         userProfiles.get(user.userId).then(p => {
             setBio(p.bio ?? "");
             setBannerUrl(p.bannerUrl ?? null);
-            setFriendsVisible(p.friendsVisible ?? true);
+            setFriendsVisible(p.friendsVisibleSetting ?? true);
+            setOriginal({ name: user.displayName, bio: p.bio ?? "" });
         }).catch(() => {});
     }, [user]);
 
@@ -55,7 +57,7 @@ export default function ProfileSettings() {
 
     return (
         <div className="max-w-3xl space-y-6">
-            <h1 className="text-2xl font-bold text-white">My Account</h1>
+            <h1 className="text-2xl font-bold text-white">Profile & Account</h1>
 
             {/* ── Live Profile Preview ──────────────────────── */}
             <div className="bg-[#111214] rounded-xl overflow-hidden border border-[#2b2d31]">
@@ -130,103 +132,132 @@ export default function ProfileSettings() {
                 Preview full profile
             </button>
 
-            {/* ── Edit Fields ──────────────────────────────── */}
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Display Name</label>
-                    <input
-                        value={name}
-                        onChange={e => setName(e.target.value)}
-                        maxLength={32}
-                        className="w-full px-3 py-2 rounded bg-[#1e1f22] text-white outline-none border border-[#3f4147] focus:border-[#5865F2]"
-                    />
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Online Status</label>
-                    <div className="flex gap-1.5 h-[38px]">
-                        {([
-                            { value: "online", label: "Online" },
-                            { value: "idle", label: "Idle" },
-                            { value: "donotdisturb", label: "DND" },
-                            { value: "offline", label: "Invisible" },
-                        ] as const).map(s => (
-                            <button
-                                key={s.value}
-                                onClick={() => setMyStatus(s.value)}
-                                className={`flex-1 flex items-center justify-center gap-1.5 rounded text-xs font-medium transition-colors ${
-                                    myStatus === s.value
-                                        ? "bg-[#5865F2]/20 border border-[#5865F2] text-white"
-                                        : "bg-[#1e1f22] border border-[#3f4147] text-[#b5bac1] hover:text-white"
-                                }`}
-                            >
-                                <StatusDot status={s.value} size="sm" />
-                                {s.label}
-                            </button>
-                        ))}
+            {/* ═══════ CARD 1: Profile ═══════ */}
+            <section className="bg-[#2b2d31] rounded-xl p-5 border border-[#1e1f22] space-y-4">
+                <h2 className="text-sm font-bold text-[#b5bac1] uppercase tracking-wide">Profile</h2>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Display Name</label>
+                        <input
+                            value={name}
+                            onChange={e => setName(e.target.value)}
+                            maxLength={32}
+                            className="w-full px-3 py-2 rounded bg-[#1e1f22] text-white outline-none border border-[#3f4147] focus:border-[#5865F2]"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Online Status</label>
+                        <div className="flex gap-1.5 h-[38px]">
+                            {([
+                                { value: "online", label: "Online" },
+                                { value: "idle", label: "Idle" },
+                                { value: "donotdisturb", label: "DND" },
+                                { value: "offline", label: "Invisible" },
+                            ] as const).map(s => (
+                                <button
+                                    key={s.value}
+                                    onClick={() => setMyStatus(s.value)}
+                                    className={`flex-1 flex items-center justify-center gap-1.5 rounded text-xs font-medium transition-colors ${
+                                        myStatus === s.value
+                                            ? "bg-[#5865F2]/20 border border-[#5865F2] text-white"
+                                            : "bg-[#1e1f22] border border-[#3f4147] text-[#b5bac1] hover:text-white"
+                                    }`}
+                                >
+                                    <StatusDot status={s.value} size="sm" />
+                                    {s.label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div>
-                <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">About Me</label>
-                <textarea
-                    value={bio}
-                    onChange={e => setBio(e.target.value)}
-                    maxLength={500}
-                    rows={3}
-                    placeholder="Tell people about yourself..."
-                    className="w-full px-3 py-2 rounded bg-[#1e1f22] text-white outline-none border border-[#3f4147] focus:border-[#5865F2] resize-none"
-                />
-                <span className="text-xs text-[#949ba4]">{bio.length}/500</span>
-            </div>
-
-            <button
-                onClick={handleSaveAll}
-                disabled={saving}
-                className="px-6 py-2.5 rounded-lg bg-[#5865F2] hover:bg-[#4752c4] text-white font-medium disabled:opacity-50 transition-colors"
-            >
-                {saving ? "Saving..." : "Save Profile"}
-            </button>
-
-            {/* ── Privacy ──────────────────────────────────── */}
-            <div className="flex items-center justify-between bg-[#2b2d31] rounded-lg px-4 py-3">
                 <div>
-                    <div className="text-sm font-medium text-white">Show Friends on Profile</div>
-                    <div className="text-xs text-[#949ba4] mt-0.5">Allow others to see your friend list.</div>
+                    <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">About Me</label>
+                    <textarea
+                        value={bio}
+                        onChange={e => setBio(e.target.value)}
+                        maxLength={500}
+                        rows={3}
+                        placeholder="Tell people about yourself..."
+                        className="w-full px-3 py-2 rounded bg-[#1e1f22] text-white outline-none border border-[#3f4147] focus:border-[#5865F2] resize-none"
+                    />
+                    <span className="text-xs text-[#949ba4]">{bio.length}/500</span>
                 </div>
-                <button
-                    onClick={async () => {
-                        const next = !friendsVisible;
-                        setFriendsVisible(next);
-                        await userProfiles.updateFriendsVisible(next);
-                    }}
-                    className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${friendsVisible ? "bg-[#248046]" : "bg-[#72767d]"}`}
-                >
-                    <span className={`block w-[18px] h-[18px] rounded-full bg-white shadow-md transition-all duration-200 absolute top-[3px] ${friendsVisible ? "left-[23px]" : "left-[3px]"}`} />
-                </button>
-            </div>
 
-            {/* ── Account Info (read-only) ─────────────────── */}
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Username</label>
-                    <div className="px-3 py-2 rounded bg-[#1e1f22] text-[#949ba4] text-sm">{user.username}</div>
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Email</label>
-                    <div className="px-3 py-2 rounded bg-[#1e1f22] text-[#949ba4] text-sm">{user.email}</div>
-                </div>
-            </div>
+                {/* Unsaved changes bar */}
+                {(name !== original.name || bio !== original.bio || avatarFile) && (
+                    <div className="flex items-center justify-between bg-[#111214] rounded-lg px-4 py-2.5">
+                        <span className="text-sm text-[#dbdee1]">Unsaved changes</span>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => {
+                                    setName(original.name);
+                                    setBio(original.bio);
+                                    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+                                    setAvatarPreview(null);
+                                    setAvatarFile(null);
+                                }}
+                                className="px-3 py-1.5 rounded text-sm text-white hover:underline"
+                            >
+                                Revert
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    await handleSaveAll();
+                                    setOriginal({ name: name.trim(), bio: bio.trim() });
+                                }}
+                                disabled={saving}
+                                className="px-4 py-1.5 rounded bg-[#248046] hover:bg-[#1a6334] text-white text-sm font-medium disabled:opacity-50 transition-colors"
+                            >
+                                {saving ? "Saving..." : "Save"}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </section>
 
-            {/* ── Logout ───────────────────────────────────── */}
-            <div className="border-t border-[#3f4147] pt-4">
-                <button
-                    onClick={logout}
-                    className="px-5 py-2.5 rounded bg-[#da373c] hover:bg-[#a12828] text-white font-medium transition-colors"
-                >
-                    Logout
-                </button>
-            </div>
+            {/* ═══════ CARD 2: Account & Privacy ═══════ */}
+            <section className="bg-[#2b2d31] rounded-xl p-5 border border-[#1e1f22] space-y-4">
+                <h2 className="text-sm font-bold text-[#b5bac1] uppercase tracking-wide">Account</h2>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Username</label>
+                        <div className="px-3 py-2 rounded bg-[#1e1f22] text-[#949ba4] text-sm">{user.username}</div>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Email</label>
+                        <div className="px-3 py-2 rounded bg-[#1e1f22] text-[#949ba4] text-sm">{user.email}</div>
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                    <div>
+                        <div className="text-sm font-medium text-white">Show Friends on Profile</div>
+                        <div className="text-xs text-[#949ba4] mt-0.5">Allow others to see your friend list.</div>
+                    </div>
+                    <button
+                        onClick={async () => {
+                            const next = !friendsVisible;
+                            setFriendsVisible(next);
+                            await userProfiles.updateFriendsVisible(next);
+                        }}
+                        className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${friendsVisible ? "bg-[#248046]" : "bg-[#72767d]"}`}
+                    >
+                        <span className={`block w-[18px] h-[18px] rounded-full bg-white shadow-md transition-all duration-200 absolute top-[3px] ${friendsVisible ? "left-[23px]" : "left-[3px]"}`} />
+                    </button>
+                </div>
+
+                <div className="pt-2 border-t border-[#3f4147]">
+                    <button
+                        onClick={logout}
+                        className="px-5 py-2 rounded bg-[#da373c] hover:bg-[#a12828] text-white text-sm font-medium transition-colors"
+                    >
+                        Logout
+                    </button>
+                </div>
+            </section>
         </div>
     );
 }
