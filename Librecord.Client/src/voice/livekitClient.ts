@@ -156,11 +156,21 @@ interface AudioPipeline {
 }
 const audioPipelines = new Map<string, AudioPipeline>();
 
+// Convert slider percentage (0-200) to actual gain value.
+// Uses a cubic curve so the slider feels perceptually linear:
+//   0% → 0.0 (silence)
+//  100% → 1.0 (unity)
+//  200% → 8.0 (heavy boost)
+// This makes quiet adjustments precise and loud boosts meaningful.
+function pctToGain(pct: number): number {
+    const ratio = pct / 100;
+    return ratio * ratio * ratio;
+}
+
 function applyVolume(identity: string, pct: number) {
     const pipe = audioPipelines.get(identity);
     if (!pipe) return;
-    // Smooth ramp to avoid audio pops/clicks
-    const target = pct / 100;
+    const target = pctToGain(pct);
     pipe.gain.gain.cancelScheduledValues(pipe.ctx.currentTime);
     pipe.gain.gain.setTargetAtTime(target, pipe.ctx.currentTime, 0.015);
 }
@@ -182,6 +192,7 @@ function attachAudioTrack(identity: string, track: MediaStreamTrack) {
     audio.autoplay = true;
     audio.setAttribute("playsinline", "");
     audio.style.display = "none";
+    audio.volume = 1; // GainNode handles all volume control
     document.body.appendChild(audio);
 
     // Web Audio pipeline for gain control (supports > 1.0 for boost)
@@ -199,7 +210,7 @@ function attachAudioTrack(identity: string, track: MediaStreamTrack) {
         const vols = JSON.parse(localStorage.getItem("librecord:userVolumes") ?? "{}");
         pct = vols[identity] ?? 100;
     } catch { /* default */ }
-    gain.gain.value = pct / 100;
+    gain.gain.value = pctToGain(pct);
 
     audio.play().catch((e) => console.warn("[Voice] Audio play failed:", e));
 
