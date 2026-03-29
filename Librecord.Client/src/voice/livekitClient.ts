@@ -158,16 +158,15 @@ const audioPipelines = new Map<string, AudioPipeline>();
 
 // dB-linear volume curve (same approach as OBS / Discord / DAWs).
 // Slider maps linearly to decibels, then converted to gain.
-// Human hearing is logarithmic, so equal slider distance = equal perceived loudness change.
 //   0%   → mute (gain 0)
-//   1%   → -40 dB (gain 0.01)
+//   1%   → -60 dB (gain 0.001)
+//  50%   → -30 dB (gain 0.03)
 //  100%  →   0 dB (gain 1.0, unity)
 //  200%  → +26 dB (gain ~20)
 function pctToGain(pct: number): number {
     if (pct <= 0) return 0;
-    // 0-100% maps to -40dB..0dB, 100-200% maps to 0dB..+26dB
     const dB = pct <= 100
-        ? -40 + (pct / 100) * 40      // 1% = -40dB, 100% = 0dB
+        ? -60 + (pct / 100) * 60      // 1% = -60dB, 100% = 0dB
         : ((pct - 100) / 100) * 26;   // 100% = 0dB, 200% = +26dB
     return Math.pow(10, dB / 20);
 }
