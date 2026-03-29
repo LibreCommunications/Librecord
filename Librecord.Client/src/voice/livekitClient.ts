@@ -39,7 +39,6 @@ export function getAllDevicePrefs(): Record<DeviceKind, string | undefined> {
 const SPEAKING_THRESHOLD = 0.015;
 const SPEAKING_OFF_DELAY = 300;
 
-const audioCtxRef: { ctx: AudioContext | null } = { ctx: null };
 const analysers = new Map<string, {
     analyser: AnalyserNode;
     source: MediaStreamAudioSourceNode;
@@ -47,18 +46,6 @@ const analysers = new Map<string, {
     silentSince: number;
 }>();
 let animFrameId: number | null = null;
-
-function getAudioCtx(): AudioContext | null {
-    if (!audioCtxRef.ctx) {
-        try {
-            audioCtxRef.ctx = new AudioContext();
-        } catch {
-            console.warn("[Voice] AudioContext creation failed — speaking detection disabled");
-            return null;
-        }
-    }
-    return audioCtxRef.ctx;
-}
 
 function startAnalysingTrack(identity: string, track: MediaStreamTrack) {
     if (analysers.has(identity)) {
@@ -68,7 +55,7 @@ function startAnalysingTrack(identity: string, track: MediaStreamTrack) {
         analysers.delete(identity);
     }
 
-    const ctx = getAudioCtx();
+    const ctx = getPlaybackCtx();
     if (!ctx) return;
     const stream = new MediaStream([track]);
     const source = ctx.createMediaStreamSource(stream);
@@ -147,11 +134,19 @@ function pollSpeaking() {
     animFrameId = requestAnimationFrame(pollSpeaking);
 }
 
-// Per-user audio pipeline: Web Audio API with GainNode for volume control.
-// Uses MediaStreamSource directly (not MediaElementSource) because
-// createMediaElementSource doesn't work with live MediaStream/WebRTC sources.
+// Single shared AudioContext for all users (browsers limit active contexts to ~6).
+// Each user gets: MediaStreamSource → per-user GainNode → shared destination.
+let _playbackCtx: AudioContext | null = null;
+
+function getPlaybackCtx(): AudioContext {
+    if (!_playbackCtx || _playbackCtx.state === "closed") {
+        _playbackCtx = new AudioContext();
+    }
+    if (_playbackCtx.state === "suspended") _playbackCtx.resume().catch(() => {});
+    return _playbackCtx;
+}
+
 interface AudioPipeline {
-    ctx: AudioContext;
     gain: GainNode;
     source: MediaStreamAudioSourceNode;
 }
@@ -175,26 +170,24 @@ function pctToGain(pct: number): number {
 function applyVolume(identity: string, pct: number) {
     const pipe = audioPipelines.get(identity);
     if (!pipe) return;
+    const ctx = getPlaybackCtx();
     const target = pctToGain(pct);
-    pipe.gain.gain.cancelScheduledValues(pipe.ctx.currentTime);
-    pipe.gain.gain.setTargetAtTime(target, pipe.ctx.currentTime, 0.015);
+    pipe.gain.gain.cancelScheduledValues(ctx.currentTime);
+    pipe.gain.gain.setTargetAtTime(target, ctx.currentTime, 0.015);
 }
 
-// Listen for per-user volume changes and apply to audio elements
+// Listen for per-user volume changes
 window.addEventListener("voice:volume:changed", ((e: CustomEvent<{ userId: string; volume: number }>) => {
     applyVolume(e.detail.userId, e.detail.volume);
 }) as EventListener);
 
-// Web Audio API handles all remote audio playback and per-user volume control.
+// Per-user audio: MediaStreamSource → GainNode → shared AudioContext destination.
 
 function attachAudioTrack(identity: string, track: MediaStreamTrack) {
     detachAudioTrack(identity);
 
+    const ctx = getPlaybackCtx();
     const stream = new MediaStream([track]);
-    const ctx = new AudioContext();
-    if (ctx.state === "suspended") ctx.resume().catch(() => {});
-
-    // MediaStreamSource → GainNode → speakers
     const source = ctx.createMediaStreamSource(stream);
     const gain = ctx.createGain();
     source.connect(gain);
@@ -208,7 +201,7 @@ function attachAudioTrack(identity: string, track: MediaStreamTrack) {
     } catch { /* default */ }
     gain.gain.value = pctToGain(pct);
 
-    audioPipelines.set(identity, { ctx, gain, source });
+    audioPipelines.set(identity, { gain, source });
 }
 
 function detachAudioTrack(identity: string) {
@@ -216,7 +209,6 @@ function detachAudioTrack(identity: string) {
     if (pipe) {
         pipe.source.disconnect();
         pipe.gain.disconnect();
-        pipe.ctx.close().catch(() => {});
         audioPipelines.delete(identity);
     }
 }
