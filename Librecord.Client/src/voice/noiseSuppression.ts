@@ -1,5 +1,6 @@
 import type { Track } from "livekit-client";
 import type { TrackProcessor, AudioProcessorOptions } from "livekit-client";
+import type { RNNoiseHandle } from "./rnnoiseProcessor";
 
 export type NoiseSuppressionMode = "off" | "threshold" | "automatic";
 
@@ -32,36 +33,84 @@ export function setNoiseSuppressionSettings(patch: Partial<NoiseSuppressionSetti
 
 type AudioTrackProcessor = TrackProcessor<Track.Kind.Audio, AudioProcessorOptions>;
 
-let activeProcessor: AudioTrackProcessor | null = null;
+// Threshold mode uses LiveKit's TrackProcessor API
+let activeGateProcessor: AudioTrackProcessor | null = null;
 
+// Automatic mode uses direct WebRTC sender replacement (bypasses TrackProcessor)
+let activeRNNoise: RNNoiseHandle | null = null;
+let originalRawTrack: MediaStreamTrack | null = null;
+
+export interface LocalAudioTrackLike {
+    setProcessor: (p: AudioTrackProcessor) => Promise<void>;
+    stopProcessor: () => Promise<void>;
+    mediaStreamTrack: MediaStreamTrack;
+    sender: RTCRtpSender | undefined;
+}
+
+/**
+ * Apply noise suppression to a LiveKit local audio track.
+ * - "threshold" mode uses TrackProcessor (noise gate, reuses LiveKit's AudioContext)
+ * - "automatic" mode replaces the WebRTC sender's track directly (keeps raw track alive)
+ * Returns the processed MediaStreamTrack (for speaking indicator), or undefined for "off".
+ */
 export async function applyNoiseSuppressionToTrack(
-    track: { setProcessor: (p: AudioTrackProcessor) => Promise<void>; stopProcessor: () => Promise<void> },
-) {
+    track: LocalAudioTrackLike,
+): Promise<MediaStreamTrack | undefined> {
     const settings = getNoiseSuppressionSettings();
 
-    // Tear down existing processor
-    if (activeProcessor) {
-        try { await track.stopProcessor(); } catch { /* may already be stopped */ }
-        activeProcessor = null;
-    }
+    // Tear down previous processors
+    await teardown(track);
 
-    if (settings.mode === "off") return;
+    if (settings.mode === "off") return undefined;
 
     if (settings.mode === "threshold") {
         const { createNoiseGateProcessor } = await import("./noiseGateProcessor");
-        activeProcessor = createNoiseGateProcessor(settings.thresholdDb);
-        await track.setProcessor(activeProcessor);
-    } else if (settings.mode === "automatic") {
-        const { createRNNoiseProcessor } = await import("./rnnoiseProcessor");
-        activeProcessor = createRNNoiseProcessor();
-        await track.setProcessor(activeProcessor);
+        activeGateProcessor = createNoiseGateProcessor(settings.thresholdDb);
+        await track.setProcessor(activeGateProcessor);
+        return activeGateProcessor.processedTrack;
+    }
+
+    if (settings.mode === "automatic") {
+        const { createRNNoiseStream } = await import("./rnnoiseProcessor");
+        const rawTrack = track.mediaStreamTrack;
+        activeRNNoise = await createRNNoiseStream(rawTrack);
+        originalRawTrack = rawTrack;
+
+        // Replace ONLY the WebRTC sender's track — this swaps what goes over the wire
+        // WITHOUT stopping the raw mic track (which our processor reads from).
+        const sender = track.sender;
+        if (sender) {
+            await sender.replaceTrack(activeRNNoise.processedTrack);
+        }
+        return activeRNNoise.processedTrack;
+    }
+
+    return undefined;
+}
+
+async function teardown(track: LocalAudioTrackLike) {
+    if (activeGateProcessor) {
+        try { await track.stopProcessor(); } catch { /* may already be stopped */ }
+        activeGateProcessor = null;
+    }
+    if (activeRNNoise) {
+        // Restore original raw track on the WebRTC sender
+        const sender = track.sender;
+        if (sender && originalRawTrack) {
+            await sender.replaceTrack(originalRawTrack).catch(() => {});
+        }
+        activeRNNoise.destroy();
+        activeRNNoise = null;
+        originalRawTrack = null;
     }
 }
 
-export function getActiveProcessor(): AudioTrackProcessor | null {
-    return activeProcessor;
+export function getProcessedTrack(): MediaStreamTrack | undefined {
+    return activeRNNoise?.processedTrack ?? activeGateProcessor?.processedTrack;
 }
 
 export function clearActiveProcessor() {
-    activeProcessor = null;
+    if (activeRNNoise) { activeRNNoise.destroy(); activeRNNoise = null; }
+    activeGateProcessor = null;
+    originalRawTrack = null;
 }

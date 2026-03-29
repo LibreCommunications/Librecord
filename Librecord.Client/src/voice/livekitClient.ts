@@ -12,6 +12,7 @@ import {
     getNoiseSuppressionSettings,
     applyNoiseSuppressionToTrack,
     clearActiveProcessor,
+    type LocalAudioTrackLike,
 } from "./noiseSuppression";
 
 let room: Room | null = null;
@@ -288,17 +289,28 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
         }
     });
 
-    room.on(RoomEvent.LocalTrackPublished, (pub: LocalTrackPublication) => {
-        if (pub.kind === "audio") {
-            const msTrack = pub.track?.mediaStreamTrack;
-            if (msTrack) {
-                startAnalysingTrack(room!.localParticipant.identity, msTrack);
+    room.on(RoomEvent.LocalTrackPublished, async (pub: LocalTrackPublication) => {
+        if (pub.kind !== "audio" || !pub.track) return;
+        const identity = room!.localParticipant.identity;
+
+        if (getNoiseSuppressionSettings().mode !== "off") {
+            try {
+                const processedTrack = await applyNoiseSuppressionToTrack(
+                    pub.track as unknown as LocalAudioTrackLike,
+                );
+                if (processedTrack) {
+                    startAnalysingTrack(identity, processedTrack);
+                    return;
+                }
+            } catch (err) {
+                console.warn("[Voice] Failed to apply noise suppression:", err);
             }
-            // Apply noise suppression processor to the local audio track
-            if (pub.track && getNoiseSuppressionSettings().mode !== "off") {
-                applyNoiseSuppressionToTrack(pub.track as Parameters<typeof applyNoiseSuppressionToTrack>[0])
-                    .catch(err => console.warn("[Voice] Failed to apply noise suppression:", err));
-            }
+        }
+
+        // Fallback: use raw track when mode is off or processor failed
+        const msTrack = pub.track?.mediaStreamTrack;
+        if (msTrack) {
+            startAnalysingTrack(identity, msTrack);
         }
     });
 
@@ -309,12 +321,19 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
     });
 
     // Listen for runtime noise suppression mode changes
-    const onNsChanged = () => {
+    const onNsChanged = async () => {
         if (!room) return;
         const localAudioTrack = getLocalAudioTrack();
-        if (localAudioTrack) {
-            applyNoiseSuppressionToTrack(localAudioTrack as Parameters<typeof applyNoiseSuppressionToTrack>[0])
-                .catch(err => console.warn("[Voice] Failed to apply noise suppression:", err));
+        if (!localAudioTrack) return;
+        const identity = room.localParticipant.identity;
+        try {
+            const processedTrack = await applyNoiseSuppressionToTrack(
+                localAudioTrack as unknown as LocalAudioTrackLike,
+            );
+            const analyseTrack = processedTrack ?? localAudioTrack.mediaStreamTrack;
+            if (analyseTrack) startAnalysingTrack(identity, analyseTrack);
+        } catch (err) {
+            console.warn("[Voice] Failed to apply noise suppression:", err);
         }
     };
     window.addEventListener("voice:noisesuppression:changed", onNsChanged);
@@ -330,18 +349,8 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
     await room.startAudio();
 
     room.remoteParticipants.forEach(bindRemoteAudioTrack);
-
-    const localAudioPub = room.localParticipant.audioTrackPublications.values().next().value;
-    if (localAudioPub?.track?.mediaStreamTrack) {
-        startAnalysingTrack(room.localParticipant.identity, localAudioPub.track.mediaStreamTrack);
-    }
-
-    // Apply noise suppression to already-published track
-    const existingTrack = getLocalAudioTrack();
-    if (existingTrack && nsSettings.mode !== "off") {
-        applyNoiseSuppressionToTrack(existingTrack as Parameters<typeof applyNoiseSuppressionToTrack>[0])
-            .catch(err => console.warn("[Voice] Failed to apply noise suppression:", err));
-    }
+    // Local track speaking detection + noise suppression are handled
+    // by the LocalTrackPublished event handler above.
 }
 
 export async function disconnect() {
