@@ -13,6 +13,9 @@ interface Props {
     channelName?: string;
 }
 
+// Persists across unmount/remount so "watching" status survives navigation
+let _watchingStreams = new Set<string>();
+
 function PreviewCard({
     participant,
     getAvatarUrl,
@@ -90,13 +93,14 @@ export function VoiceChannelView({ channelId }: Props) {
     const [speakingMap, setSpeakingMap] = useState<Record<string, boolean>>({});
     const [previewParticipants, setPreviewParticipants] = useState<VoiceParticipant[]>([]);
 
-    // Persists across screen share stop/restart so viewers don't need to re-click
-    const [watchingStreams, setWatchingStreams] = useState<Set<string>>(new Set());
+    // Module-level so it survives unmount/remount when navigating away and back
+    const [watchingStreams, setWatchingStreams] = useState<Set<string>>(() => _watchingStreams);
     const toggleWatch = useCallback((userId: string, watching: boolean) => {
         setWatchingStreams(prev => {
             const next = new Set(prev);
             if (watching) next.add(userId);
             else next.delete(userId);
+            _watchingStreams = next;
             return next;
         });
     }, []);
