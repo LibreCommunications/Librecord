@@ -165,10 +165,10 @@ export function MessageList({
         (index: number) => {
             const msgIndex = index - firstItemIndex;
             const msg = messages[msgIndex];
-            if (!msg) return null;
+            if (!msg) return <div style={{ minHeight: 1 }} />;
 
             return (
-                <div>
+                <div style={{ minHeight: 1 }}>
                     {dateSepIndices.has(msgIndex) && (
                         <div className="flex items-center gap-2 px-4 py-2 mt-2">
                             <div className="flex-1 h-px bg-[#3f4147]" />
