@@ -16,6 +16,12 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.AvatarUrl)
             .HasMaxLength(512);
 
+        builder.Property(u => u.Bio)
+            .HasMaxLength(500);
+
+        builder.Property(u => u.BannerUrl)
+            .HasMaxLength(512);
+
         builder.Property(u => u.CreatedAt)
             .IsRequired();
 

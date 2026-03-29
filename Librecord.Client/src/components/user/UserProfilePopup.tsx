@@ -1,0 +1,138 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { userProfiles, API_URL } from "../../api/client";
+import { useFriends } from "../../hooks/useFriends";
+import { useBlocks } from "../../hooks/useBlocks";
+import { useDirectMessagesChannel } from "../../hooks/useDirectMessagesChannel";
+import { useToast } from "../../hooks/useToast";
+import type { UserProfile } from "../../types/user";
+
+interface Props {
+    userId: string;
+    onClose: () => void;
+}
+
+export function UserProfilePopup({ userId, onClose }: Props) {
+    const [profile, setProfile] = useState<UserProfile | null>(null);
+    const [loading, setLoading] = useState(true);
+    const { sendRequest: sendFriendRequest, removeFriend } = useFriends();
+    const { blockUser } = useBlocks();
+    const { startDm } = useDirectMessagesChannel();
+    const { toast } = useToast();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        userProfiles.get(userId).then(p => { setProfile(p); setLoading(false); }).catch(() => setLoading(false));
+    }, [userId]);
+
+    if (loading) {
+        return (
+            <div className="fixed inset-0 z-[300] bg-black/60 flex items-center justify-center" onClick={onClose}>
+                <div className="bg-[#232428] rounded-xl w-[360px] p-6 text-center" onClick={e => e.stopPropagation()}>
+                    <div className="w-8 h-8 border-2 border-[#5865F2] border-t-transparent rounded-full animate-spin mx-auto" />
+                </div>
+            </div>
+        );
+    }
+
+    if (!profile) {
+        onClose();
+        return null;
+    }
+
+    const avatarSrc = profile.avatarUrl ? `${API_URL}${profile.avatarUrl}` : "/default-avatar.png";
+    const bannerSrc = profile.bannerUrl ? `${API_URL}${profile.bannerUrl}` : null;
+
+    return (
+        <div className="fixed inset-0 z-[300] bg-black/60 flex items-center justify-center" onClick={onClose}>
+            <div className="bg-[#232428] rounded-xl w-[360px] overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+                {/* Banner */}
+                <div className={`h-[100px] ${bannerSrc ? "" : "bg-[#5865F2]"}`}>
+                    {bannerSrc && (
+                        <img src={bannerSrc} className="w-full h-full object-cover" alt="" />
+                    )}
+                </div>
+
+                {/* Avatar overlapping banner */}
+                <div className="px-4 -mt-10">
+                    <img
+                        src={avatarSrc}
+                        className="w-20 h-20 rounded-full object-cover border-4 border-[#232428]"
+                        alt=""
+                    />
+                </div>
+
+                {/* Info */}
+                <div className="px-4 pt-2 pb-4">
+                    <h2 className="text-xl font-bold text-white">{profile.displayName}</h2>
+                    <p className="text-sm text-[#949ba4]">@{profile.username}</p>
+
+                    {profile.bio && (
+                        <div className="mt-3 bg-[#2b2d31] rounded-lg px-3 py-2">
+                            <p className="text-xs font-semibold text-[#b5bac1] uppercase mb-1">About Me</p>
+                            <p className="text-sm text-[#dbdee1] whitespace-pre-wrap">{profile.bio}</p>
+                        </div>
+                    )}
+
+                    <div className="mt-3 text-xs text-[#949ba4]">
+                        Member since {new Date(profile.createdAt).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+                    </div>
+
+                    {/* Actions */}
+                    {!profile.isSelf && (
+                        <div className="flex gap-2 mt-4">
+                            <button
+                                onClick={async () => {
+                                    const chId = await startDm(profile.id, "");
+                                    if (chId) { navigate(`/app/dm/${chId}`); onClose(); }
+                                }}
+                                className="flex-1 py-2 rounded-lg text-sm font-medium bg-[#5865F2] text-white hover:bg-[#4752c4] transition-colors"
+                            >
+                                Message
+                            </button>
+
+                            {profile.isFriend ? (
+                                <button
+                                    onClick={async () => {
+                                        await removeFriend(profile.id);
+                                        toast("Friend removed.", "info");
+                                        setProfile(p => p ? { ...p, isFriend: false } : p);
+                                    }}
+                                    className="px-4 py-2 rounded-lg text-sm font-medium bg-[#2b2d31] text-[#f23f43] hover:bg-[#da373c] hover:text-white transition-colors"
+                                >
+                                    Unfriend
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={async () => {
+                                        await sendFriendRequest(profile.username);
+                                        toast("Friend request sent!", "success");
+                                    }}
+                                    className="px-4 py-2 rounded-lg text-sm font-medium bg-[#2b2d31] text-[#248046] hover:bg-[#248046] hover:text-white transition-colors"
+                                >
+                                    Add Friend
+                                </button>
+                            )}
+
+                            <button
+                                onClick={async () => {
+                                    if (await blockUser(profile.id)) {
+                                        toast(`${profile.displayName} blocked.`, "info");
+                                        onClose();
+                                    }
+                                }}
+                                className="px-3 py-2 rounded-lg text-sm bg-[#2b2d31] text-[#949ba4] hover:text-[#f23f43] hover:bg-[#35373c] transition-colors"
+                                title="Block"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                                </svg>
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}

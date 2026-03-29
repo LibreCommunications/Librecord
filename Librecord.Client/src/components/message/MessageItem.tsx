@@ -78,13 +78,17 @@ export const MessageItem = memo(function MessageItem({
             <img
                 src={getAvatarUrl(msg.author.avatarUrl)}
                 loading="lazy"
+                onClick={() => window.dispatchEvent(new CustomEvent("user:profile:open", { detail: { userId: msg.author.id } }))}
                 className="w-10 h-10 rounded-full object-cover mt-0.5 cursor-pointer hover:opacity-80 transition-opacity"
                 alt=""
             />
 
             <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2">
-                    <span className="font-medium text-[#f2f3f5] hover:underline cursor-pointer">
+                    <span
+                        className="font-medium text-[#f2f3f5] hover:underline cursor-pointer"
+                        onClick={() => window.dispatchEvent(new CustomEvent("user:profile:open", { detail: { userId: msg.author.id } }))}
+                    >
                         {msg.author.displayName}
                     </span>
                     <span className="text-xs text-[#949ba4]">

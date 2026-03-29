@@ -75,4 +75,39 @@ public class UserService : IUserService
 
         return user.AvatarUrl;
     }
+
+    public async Task<bool> UpdateBioAsync(Guid userId, string? bio)
+    {
+        var user = await _users.GetByIdAsync(userId);
+        if (user == null) return false;
+
+        user.Bio = bio?.Trim();
+        await _users.UpdateAsync(user);
+        await _users.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<string?> UpdateBannerAsync(Guid userId, Stream fileStream, string fileName, string contentType)
+    {
+        var user = await _users.GetByIdAsync(userId);
+        if (user == null) return null;
+
+        if (!string.IsNullOrEmpty(user.BannerUrl))
+        {
+            var oldKey = user.BannerUrl.Replace("/cdn/", "");
+            try { await _storage.DeleteAsync(oldKey); } catch { }
+        }
+
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+        var fileId = Guid.NewGuid().ToString("N");
+        var objectName = $"banners/{userId}/{fileId}{ext}";
+
+        await _storage.UploadAsync(objectName, fileStream, contentType);
+
+        user.BannerUrl = $"/cdn/public/{objectName}";
+        await _users.UpdateAsync(user);
+        await _users.SaveChangesAsync();
+
+        return user.BannerUrl;
+    }
 }

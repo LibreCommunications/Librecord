@@ -2,8 +2,9 @@ import { useRef, useState } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { usePresence } from "../../hooks/usePresence";
+import { useToast } from "../../hooks/useToast";
 import { StatusDot } from "../../components/user/StatusDot";
-import { API_URL } from "../../api/client";
+import { API_URL, userProfiles } from "../../api/client";
 
 export default function ProfileSettings() {
     const { user, logout } = useAuth();
@@ -14,6 +15,10 @@ export default function ProfileSettings() {
 
     const [name, setName] = useState(user?.displayName ?? "");
     const [isSavingName, setIsSavingName] = useState(false);
+
+    const { toast } = useToast();
+    const [bio, setBio] = useState("");
+    const [savingBio, setSavingBio] = useState(false);
 
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -116,6 +121,34 @@ export default function ProfileSettings() {
                             {uploadingAvatar ? "Uploading…" : "Save Avatar"}
                         </button>
                     )}
+                </div>
+            </section>
+
+            {/* Bio */}
+            <section className="bg-[#2b2d31] rounded-lg p-6 border border-black/20 space-y-3">
+                <h2 className="text-lg font-semibold text-white">About Me</h2>
+                <textarea
+                    value={bio}
+                    onChange={e => setBio(e.target.value)}
+                    maxLength={500}
+                    rows={3}
+                    placeholder="Tell people about yourself..."
+                    className="w-full px-3 py-2 rounded bg-[#1e1f22] text-white outline-none focus:ring-2 focus:ring-[#5865F2] resize-none"
+                />
+                <div className="flex items-center justify-between">
+                    <span className="text-xs text-[#949ba4]">{bio.length}/500</span>
+                    <button
+                        onClick={async () => {
+                            setSavingBio(true);
+                            await userProfiles.updateBio(bio.trim() || null);
+                            setSavingBio(false);
+                            toast("Bio updated!", "success");
+                        }}
+                        disabled={savingBio}
+                        className="px-4 py-2 rounded bg-[#5865F2] hover:bg-[#4752c4] text-white text-sm font-medium disabled:opacity-50"
+                    >
+                        {savingBio ? "Saving..." : "Save Bio"}
+                    </button>
                 </div>
             </section>
 

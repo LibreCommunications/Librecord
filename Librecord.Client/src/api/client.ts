@@ -56,6 +56,8 @@ function json(body: unknown): RequestInit {
     };
 }
 
+import type { UserProfile } from "../types/user";
+
 export const auth = {
     me: () => request<{
         userId: string;
@@ -65,6 +67,16 @@ export const auth = {
         avatarUrl?: string | null;
         guilds?: { guildId: string; name: string; iconUrl: string | null }[];
     }>("/users/me"),
+};
+
+export const userProfiles = {
+    get: (userId: string) => request<UserProfile>(`/users/${userId}`),
+    updateBio: (bio: string | null) => request<void>("/users/bio", { method: "PUT", ...json({ bio }) }),
+    uploadBanner: (file: File) => {
+        const form = new FormData();
+        form.append("file", file);
+        return request<{ bannerUrl: string }>("/users/banner", { method: "POST", body: form });
+    },
 };
 
 import type { GuildSummary, Guild, GuildChannel, GuildMember, GuildPermissions } from "../types/guild";
