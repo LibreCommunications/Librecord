@@ -350,14 +350,12 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
     const res = RESOLUTION_MAP[options.resolution];
     const encodeFps = options.frameRate;
 
-    // Cap capture at 1080p — larger surfaces tank FPS due to encoding cost.
-    // Only the selected resolution preset (720/1080/1440) overrides this.
-    // "source" resolution caps at 1080p, matching LiveKit SDK defaults.
+    // "source" gives sender's native resolution, capped at 4K.
     let resolution: { width: number; height: number; frameRate?: number } | undefined;
     if (res) {
         resolution = { ...res, frameRate: encodeFps };
     } else {
-        resolution = { width: 1920, height: 1080, frameRate: encodeFps };
+        resolution = { width: 3840, height: 2160, frameRate: encodeFps };
     }
 
     // Encoding: match FPS with appropriate bitrate (LiveKit presets)
