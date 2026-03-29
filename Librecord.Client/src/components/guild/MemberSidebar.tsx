@@ -65,7 +65,7 @@ export function MemberSidebar({ guildId }: Props) {
     }
 
     return (
-        <div className="w-60 bg-[#2b2d31] border-l border-black/20 flex flex-col overflow-y-auto">
+        <div className="w-60 shrink-0 bg-[#2b2d31] border-l border-black/20 flex flex-col overflow-y-auto">
             <div className="px-4 pt-4 pb-2 text-xs font-semibold text-gray-400 uppercase">
                 Members — {members.length}
             </div>

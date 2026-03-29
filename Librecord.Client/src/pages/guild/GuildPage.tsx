@@ -16,6 +16,7 @@ import { PinnedMessagesPanel } from "../../components/messages/PinnedMessagesPan
 import { ChatView } from "../../components/chat/ChatView";
 import { VoiceChannelView } from "../../components/voice/VoiceChannelView";
 import { Spinner } from "../../components/ui/Spinner";
+import { PersonPlusIcon, PersonsIcon, PinIcon, ShieldIcon, VoiceChannelIcon } from "../../components/ui/Icons";
 
 export default function GuildChannelPage() {
     const { guildId, channelId } = useParams<{ guildId: string; channelId: string }>();
@@ -109,10 +110,7 @@ export default function GuildChannelPage() {
                 <div className="page-header">
                     <span className="font-semibold flex items-center gap-1.5">
                         {isVoice ? (
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
-                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                            </svg>
+                            <VoiceChannelIcon size={20} className="text-gray-400" />
                         ) : (
                             <span className="text-gray-400">#</span>
                         )}
@@ -133,12 +131,7 @@ export default function GuildChannelPage() {
                             className="icon-btn"
                             title="Invite People"
                         >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                <circle cx="8.5" cy="7" r="4" />
-                                <line x1="20" y1="8" x2="20" y2="14" />
-                                <line x1="23" y1="11" x2="17" y2="11" />
-                            </svg>
+                            <PersonPlusIcon size={18} />
                         </button>
 
                         {!isVoice && (
@@ -147,10 +140,7 @@ export default function GuildChannelPage() {
                                 className={`p-2 rounded hover:bg-white/10 ${chat.showPins ? "text-white" : "text-gray-400 hover:text-white"}`}
                                 title="Pinned Messages"
                             >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <line x1="12" y1="17" x2="12" y2="22" />
-                                    <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
-                                </svg>
+                                <PinIcon size={18} />
                             </button>
                         )}
 
@@ -159,12 +149,7 @@ export default function GuildChannelPage() {
                             className={`p-2 rounded hover:bg-white/10 ${showMembers ? "text-white" : "text-gray-400 hover:text-white"}`}
                             title={showMembers ? "Hide Members" : "Show Members"}
                         >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                <circle cx="9" cy="7" r="4" />
-                                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                            </svg>
+                            <PersonsIcon size={18} />
                         </button>
 
                         {guildId && channelId && permissions.manageChannels && (
@@ -173,9 +158,7 @@ export default function GuildChannelPage() {
                                 className="icon-btn"
                                 title="Channel Permissions"
                             >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                                </svg>
+                                <ShieldIcon size={18} />
                             </Link>
                         )}
 

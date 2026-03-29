@@ -16,7 +16,7 @@ export function FolderSettingsModal({ folderId, initialName, initialColor, onSav
 
     return (
         <div className="fixed inset-0 z-[300] bg-black/60 flex items-center justify-center" onClick={onClose}>
-            <div className="bg-[#313338] rounded-lg p-5 w-[340px] shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="bg-[#313338] rounded-lg p-5 w-full max-w-sm mx-4 shadow-xl" onClick={e => e.stopPropagation()}>
                 <h2 className="text-lg font-bold text-white mb-3">Folder Settings</h2>
 
                 <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Name</label>

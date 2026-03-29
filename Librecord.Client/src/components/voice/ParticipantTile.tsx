@@ -65,7 +65,7 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
                 `}
             >
                 {showVideo ? (
-                    <div className={`${fill ? "h-full" : "aspect-video"} relative`}>
+                    <div className={`aspect-video ${fill ? "max-h-full min-h-16" : ""} relative`}>
                         <video
                             ref={videoRef}
                             autoPlay
@@ -136,7 +136,7 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
             onContextMenu={handleContextMenu}
             className={`
                 relative rounded-xl overflow-hidden cursor-pointer
-                flex items-center justify-center ${fill ? "h-full" : "aspect-video"}
+                flex items-center justify-center aspect-video ${fill ? "max-h-full min-h-16" : ""}
                 bg-[#2b2d31] transition-shadow duration-200
                 ${isSpeaking ? "shadow-[0_0_0_3px_#23a55a,0_0_12px_rgba(35,165,90,0.3)]" : "shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"}
             `}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ShieldIcon, ChevronDownIcon, KickIcon, BanIcon } from "../ui/Icons";
 import { useGuildSettings } from "../../hooks/useGuildSettings";
 import { useGuildRoles } from "../../hooks/useGuildRoles";
 import { ConfirmModal } from "../ui/ConfirmModal";
@@ -81,13 +82,9 @@ export function MemberContextMenu({
                             onClick={() => setShowRoles(!showRoles)}
                             className="w-full text-left px-3 py-1.5 text-sm text-[#dbdee1] hover:bg-[#4752c4] hover:text-white flex items-center gap-2 transition-colors"
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                            </svg>
+                            <ShieldIcon size={16} />
                             Roles
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="ml-auto">
-                                <polyline points={showRoles ? "18 15 12 9 6 15" : "6 9 12 15 18 9"} />
-                            </svg>
+                            <ChevronDownIcon size={12} className={`ml-auto transition-transform ${showRoles ? "rotate-180" : ""}`} />
                         </button>
                         {showRoles && guildRoles.length > 0 && (
                             <div className="px-2 py-1 max-h-40 overflow-y-auto">
@@ -115,12 +112,7 @@ export function MemberContextMenu({
                         onClick={() => setConfirmAction("kick")}
                         className="w-full text-left px-3 py-1.5 text-sm text-[#f0b132] hover:bg-[#f0b132] hover:text-white flex items-center gap-2 transition-colors"
                     >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                            <circle cx="8.5" cy="7" r="4" />
-                            <line x1="18" y1="8" x2="23" y2="13" />
-                            <line x1="23" y1="8" x2="18" y2="13" />
-                        </svg>
+                        <KickIcon size={16} />
                         Kick
                     </button>
                 )}
@@ -129,10 +121,7 @@ export function MemberContextMenu({
                         onClick={() => setConfirmAction("ban")}
                         className="w-full text-left px-3 py-1.5 text-sm text-[#f23f43] hover:bg-[#f23f43] hover:text-white flex items-center gap-2 transition-colors"
                     >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10" />
-                            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                        </svg>
+                        <BanIcon size={16} />
                         Ban
                     </button>
                 )}

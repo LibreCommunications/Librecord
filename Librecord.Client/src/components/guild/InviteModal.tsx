@@ -38,7 +38,7 @@ export function InviteModal({ guildId, onClose }: Props) {
 
     return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 animate-[fadeIn_0.15s_ease-out]" onClick={onClose}>
-            <div role="dialog" aria-modal="true" aria-label="Invite People" data-testid="invite-modal" className="bg-[#313338] rounded-lg p-6 w-[440px] shadow-xl animate-[scaleIn_0.15s_ease-out]" onClick={e => e.stopPropagation()}>
+            <div role="dialog" aria-modal="true" aria-label="Invite People" data-testid="invite-modal" className="bg-[#313338] rounded-lg p-6 w-full max-w-md mx-4 shadow-xl animate-[scaleIn_0.15s_ease-out]" onClick={e => e.stopPropagation()}>
                 <h2 className="text-xl font-bold text-white mb-4">
                     Invite People
                 </h2>

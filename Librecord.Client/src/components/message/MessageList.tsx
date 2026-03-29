@@ -5,6 +5,7 @@ import { ConfirmModal } from "../ui/ConfirmModal";
 import { EmptyState } from "../ui/EmptyState";
 import { Spinner } from "../ui/Spinner";
 import type { MessageListProps } from "./MessageListProps";
+import { ChevronDownIcon } from "../../components/ui/Icons";
 
 const START_INDEX = 100_000;
 const VIEWPORT_INCREASE = { top: 200, bottom: 100 };
@@ -254,9 +255,7 @@ export function MessageList({
                     {newMsgCount > 0
                         ? <>{newMsgCount} new message{newMsgCount > 1 ? "s" : ""}</>
                         : <>Scroll to bottom</>}
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="6 9 12 15 18 9" />
-                    </svg>
+                    <ChevronDownIcon size={16} />
                 </button>
             )}
 

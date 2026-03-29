@@ -27,7 +27,7 @@ export function EditChannelModal({ target, categories, onSave, onClose }: EditCh
 
     return (
         <div className="fixed inset-0 z-[200] bg-black/60 flex items-center justify-center" onClick={onClose}>
-            <div className="bg-[#313338] rounded-lg p-6 w-full max-w-md shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="bg-[#313338] rounded-lg p-6 w-full max-w-md mx-4 shadow-xl" onClick={e => e.stopPropagation()}>
                 <h2 className="text-lg font-bold text-white mb-4">
                     {target.type === 2 ? "Edit Category" : "Edit Channel"}
                 </h2>

@@ -5,7 +5,8 @@ import { useAuth } from "../../hooks/useAuth";
 import { voice } from "../../api/client";
 import { ParticipantTile } from "./ParticipantTile";
 import { ScreenShareTile } from "./ScreenShareTile";
-import { SpeakerIcon } from "./VoiceIcons";
+import { SpeakerIcon, MicOffIcon, HeadphonesOffIcon, ScreenShareIcon } from "./VoiceIcons";
+import { FullscreenIcon, ExitFullscreenIcon } from "../ui/Icons";
 import type { VoiceParticipant } from "../../voice/voiceStore";
 
 interface Props {
@@ -49,28 +50,17 @@ function PreviewCard({
             <div className="absolute bottom-2 left-2 flex items-center gap-1">
                 {participant.isMuted && (
                     <span className="p-1 rounded bg-black/40 text-red-400">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <line x1="1" y1="1" x2="23" y2="23" />
-                            <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
-                            <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2c0 .76-.12 1.5-.34 2.18" />
-                        </svg>
+                        <MicOffIcon size={12} />
                     </span>
                 )}
                 {participant.isDeafened && (
                     <span className="p-1 rounded bg-black/40 text-red-400">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
-                            <line x1="1" y1="1" x2="23" y2="23" />
-                        </svg>
+                        <HeadphonesOffIcon size={12} />
                     </span>
                 )}
                 {participant.isScreenSharing && (
                     <span className="p-1 rounded bg-black/40 text-[#5865f2]">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                            <line x1="8" y1="21" x2="16" y2="21" />
-                            <line x1="12" y1="17" x2="12" y2="21" />
-                        </svg>
+                        <ScreenShareIcon size={12} />
                     </span>
                 )}
             </div>
@@ -78,26 +68,13 @@ function PreviewCard({
     );
 }
 
-const EXPAND_ICON = (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" />
-        <line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
-    </svg>
-);
-const SHRINK_ICON = (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" />
-        <line x1="14" y1="10" x2="21" y2="3" /><line x1="3" y1="21" x2="10" y2="14" />
-    </svg>
-);
-
 function FocusOverlay({ onClick, label }: { onClick: () => void; label: string }) {
     return (
         <div
-            className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-sm text-white text-[11px] font-medium cursor-pointer opacity-0 group-hover/tile:opacity-100 transition-opacity z-10 flex items-center gap-1"
+            className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-sm text-white text-xs font-medium cursor-pointer opacity-0 group-hover/tile:opacity-100 transition-opacity z-10 flex items-center gap-1"
             onClick={e => { e.stopPropagation(); onClick(); }}
         >
-            {label === "Focus" ? EXPAND_ICON : SHRINK_ICON}
+            {label === "Focus" ? <FullscreenIcon size={12} /> : <ExitFullscreenIcon size={12} />}
             {label}
         </div>
     );
@@ -223,7 +200,7 @@ export function VoiceChannelView({ channelId }: Props) {
         return (
             <div className="flex-1 flex flex-col bg-[#313338] overflow-hidden">
                 {/* Focused tile — top */}
-                <div className="p-3 pb-0 relative group/focused" style={{ flex: 3 }}>
+                <div className="p-3 pb-0 relative group/focused" style={{ flex: 2 }}>
                     <div className="h-full">
                         {focusedP.type === "screen" ? (
                             <ScreenShareTile
@@ -246,7 +223,7 @@ export function VoiceChannelView({ channelId }: Props) {
                     {/* Minimize overlay */}
                     <div className="absolute inset-3 bottom-0 rounded-xl pointer-events-none flex items-start justify-center">
                         <div className="mt-2 px-3 py-1 rounded-full bg-black/50 text-white text-xs font-medium flex items-center gap-1.5 opacity-0 group-hover/focused:opacity-100 transition-opacity pointer-events-auto cursor-pointer" onClick={() => setFocusedTile(null)}>
-                            {SHRINK_ICON}
+                            <ExitFullscreenIcon size={12} />
                             Minimize
                         </div>
                     </div>

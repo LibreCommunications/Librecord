@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { BanIcon } from "../ui/Icons";
 import { userProfiles, API_URL } from "../../api/client";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import type { UserSummary } from "../../types/user";
@@ -171,10 +172,7 @@ export function UserProfilePopup({ userId, onClose }: Props) {
                                         className="px-3 py-2 rounded-lg text-sm bg-[#2b2d31] text-[#949ba4] hover:text-[#f23f43] hover:bg-[#35373c] transition-colors"
                                         title="Block"
                                     >
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <circle cx="12" cy="12" r="10" />
-                                            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                                        </svg>
+                                        <BanIcon size={16} />
                                     </button>
                                 </>
                             )}

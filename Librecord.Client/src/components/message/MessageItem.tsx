@@ -6,6 +6,7 @@ import { UserHoverCard } from "../user/UserHoverCard";
 import { renderMarkdown } from "../../utils/markdown";
 import type { MessageItemProps } from "./MessageItemProps";
 import { API_URL } from "../../api/client";
+import { EditIcon, TrashIcon, ReplyIcon, MoreIcon, FileIcon } from "../../components/ui/Icons";
 
 function resolveAttachmentUrl(url: string): string {
     if (url.startsWith("http://") || url.startsWith("https://")) return url;
@@ -202,10 +203,7 @@ export const MessageItem = memo(function MessageItem({
                                     rel="noopener noreferrer"
                                     className="flex items-center gap-3 bg-[#2b2d31] border border-[#1e1f22] rounded-lg px-4 py-3 hover:bg-[#35373c] max-w-md transition-colors"
                                 >
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#949ba4] shrink-0">
-                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                        <polyline points="14 2 14 8 20 8" />
-                                    </svg>
+                                    <FileIcon size={24} className="text-[#949ba4] shrink-0" />
                                     <div className="min-w-0">
                                         <div className="text-sm text-[#00a8fc] truncate hover:underline">{att.fileName}</div>
                                         <div className="text-xs text-[#949ba4]">{(att.size / 1024).toFixed(1)} KB</div>
@@ -240,10 +238,7 @@ export const MessageItem = memo(function MessageItem({
                                 aria-label="Edit message"
                                 data-testid="edit-message-btn"
                             >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                </svg>
+                                <EditIcon size={16} />
                             </button>
                         )}
                         {(isAuthor || canManageMessages) && (
@@ -254,10 +249,7 @@ export const MessageItem = memo(function MessageItem({
                                 aria-label="Delete message"
                                 data-testid="delete-message-btn"
                             >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="3 6 5 6 21 6" />
-                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                </svg>
+                                <TrashIcon size={16} />
                             </button>
                         )}
                         <button
@@ -267,10 +259,7 @@ export const MessageItem = memo(function MessageItem({
                             aria-label="Reply to message"
                             data-testid="reply-message-btn"
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="9 17 4 12 9 7" />
-                                <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
-                            </svg>
+                            <ReplyIcon size={16} />
                         </button>
                         <button
                             ref={moreButtonRef}
@@ -280,11 +269,7 @@ export const MessageItem = memo(function MessageItem({
                             aria-label="More actions"
                             data-testid="more-actions-btn"
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                <circle cx="12" cy="5" r="2" />
-                                <circle cx="12" cy="12" r="2" />
-                                <circle cx="12" cy="19" r="2" />
-                            </svg>
+                            <MoreIcon size={16} />
                         </button>
                     </div>
                     {menuOpen && (

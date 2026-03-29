@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { getUserVolume, setUserVolume } from "../../lib/userVolume";
+import { SpeakerMutedIcon, SpeakerLowIcon, SpeakerFullIcon } from "../ui/Icons";
 
 interface Props {
     userId: string;
@@ -10,30 +11,9 @@ interface Props {
 }
 
 function VolumeIcon({ volume }: { volume: number }) {
-    if (volume === 0) {
-        return (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                <line x1="23" y1="9" x2="17" y2="15" />
-                <line x1="17" y1="9" x2="23" y2="15" />
-            </svg>
-        );
-    }
-    if (volume <= 50) {
-        return (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-            </svg>
-        );
-    }
-    return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-            <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-            <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-        </svg>
-    );
+    if (volume === 0) return <SpeakerMutedIcon size={16} />;
+    if (volume <= 50) return <SpeakerLowIcon size={16} />;
+    return <SpeakerFullIcon size={16} />;
 }
 
 export function VolumePopup({ userId, displayName, x, y, onClose }: Props) {
@@ -103,7 +83,7 @@ export function VolumePopup({ userId, displayName, x, y, onClose }: Props) {
             className="fixed z-[999] bg-[#111214] rounded-lg shadow-xl border border-[#2b2d31] py-2.5 px-3 w-[280px] select-none"
             style={{ top: pos.top, left: pos.left }}
         >
-            <div className="text-[11px] font-semibold text-[#b5bac1] mb-2 truncate uppercase tracking-wide">
+            <div className="text-xs font-semibold text-[#b5bac1] mb-2 truncate uppercase tracking-wide">
                 {displayName}
             </div>
 

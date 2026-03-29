@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ReplyIcon, CloseIcon, PlusIcon } from "../ui/Icons";
 import { MessageList } from "../message/MessageList";
 import { TypingIndicator } from "../messages/TypingIndicator";
 import { AttachmentUpload } from "../messages/AttachmentUpload";
@@ -102,10 +103,7 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, 
             <div className="px-4 py-3 shrink-0">
                 {chat.replyingTo && (
                     <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-[#2b2d31] rounded-t-lg border-l-2 border-[#5865F2]">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#5865F2] shrink-0">
-                            <polyline points="9 17 4 12 9 7" />
-                            <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
-                        </svg>
+                        <ReplyIcon size={16} className="text-[#5865F2] shrink-0" />
                         <span className="text-xs text-[#949ba4]">Replying to</span>
                         <span className="text-xs font-medium text-[#f2f3f5]">{chat.replyingTo.author.displayName}</span>
                         <span className="text-xs text-[#949ba4] truncate flex-1">{chat.replyingTo.content || "[attachment]"}</span>
@@ -114,9 +112,7 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, 
                             className="text-[#949ba4] hover:text-white shrink-0"
                             aria-label="Cancel reply"
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                            </svg>
+                            <CloseIcon size={16} />
                         </button>
                     </div>
                 )}
@@ -138,11 +134,7 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, 
                         data-testid="attach-files-btn"
                         type="button"
                     >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10" />
-                            <line x1="12" y1="8" x2="12" y2="16" />
-                            <line x1="8" y1="12" x2="16" y2="12" />
-                        </svg>
+                        <PlusIcon size={20} />
                     </button>
                     <textarea
                         ref={textareaRef}

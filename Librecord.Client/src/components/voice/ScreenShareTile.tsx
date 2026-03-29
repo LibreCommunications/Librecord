@@ -4,6 +4,7 @@ import { useTrackBySource } from "../../voice/useTrackBySource";
 import { getRoom } from "../../voice/livekitClient";
 import type { VoiceParticipant } from "../../voice/voiceStore";
 import { ScreenShareIcon } from "./VoiceIcons";
+import { PlayIcon, ExitFullscreenIcon, FullscreenIcon } from "../ui/Icons";
 import { DevOverlay } from "./DevOverlay";
 import { VolumePopup } from "./VolumePopup";
 
@@ -91,7 +92,7 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
             <div
                 ref={containerRef}
                 onContextMenu={handleContextMenu}
-                className={`relative rounded-xl overflow-hidden bg-[#1e1f22] ${fill ? "h-full" : "aspect-video"} flex items-center justify-center shadow-[0_0_0_1px_rgba(255,255,255,0.04)]`}
+                className={`relative rounded-xl overflow-hidden bg-[#1e1f22] aspect-video ${fill ? "max-h-full" : ""} flex items-center justify-center shadow-[0_0_0_1px_rgba(255,255,255,0.04)]`}
             >
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3 overflow-hidden">
                     <div className="p-3 rounded-full bg-[#5865F2]/15 shrink-0">
@@ -104,9 +105,7 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
                         onClick={() => onToggleWatch(true)}
                         className="px-4 py-1.5 rounded-lg text-sm font-medium text-white bg-[#5865F2] hover:bg-[#4752c4] transition-colors flex items-center gap-2 shrink-0"
                     >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                            <polygon points="5 3 19 12 5 21 5 3" />
-                        </svg>
+                        <PlayIcon size={14} />
                         Watch
                     </button>
                 </div>
@@ -125,7 +124,7 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
             className={`
                 relative rounded-xl overflow-hidden bg-[#1e1f22]
                 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] group/screen
-                ${isFullscreen ? "rounded-none" : fill ? "h-full" : "aspect-video"}
+                ${isFullscreen ? "rounded-none" : `aspect-video ${fill ? "max-h-full" : ""}`}
             `}
         >
             {trackStatus === "loading" && (
@@ -171,19 +170,9 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
                         className="p-1.5 rounded-md bg-black/60 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/80"
                     >
                         {isFullscreen ? (
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="4 14 10 14 10 20" />
-                                <polyline points="20 10 14 10 14 4" />
-                                <line x1="14" y1="10" x2="21" y2="3" />
-                                <line x1="3" y1="21" x2="10" y2="14" />
-                            </svg>
+                            <ExitFullscreenIcon size={16} />
                         ) : (
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="15 3 21 3 21 9" />
-                                <polyline points="9 21 3 21 3 15" />
-                                <line x1="21" y1="3" x2="14" y2="10" />
-                                <line x1="3" y1="21" x2="10" y2="14" />
-                            </svg>
+                            <FullscreenIcon size={16} />
                         )}
                     </button>
                 </div>

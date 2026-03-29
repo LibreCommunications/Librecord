@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { BackArrowIcon } from "../../components/ui/Icons";
 import { useChannels } from "../../hooks/useChannels";
 import { useGuildRoles, type GuildRole } from "../../hooks/useGuildRoles";
 import { useChannelPermissions, type ChannelOverride } from "../../hooks/useChannelPermissions";
@@ -105,9 +106,7 @@ export default function ChannelPermissionsPage() {
                         onClick={() => navigate(`/app/guild/${guildId}/${channelId}`)}
                         className="text-gray-400 hover:text-white"
                     >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M19 12H5M12 19l-7-7 7-7" />
-                        </svg>
+                        <BackArrowIcon size={20} />
                     </button>
                     <h1 className="text-xl font-bold text-white">
                         # {channelName} — Permissions

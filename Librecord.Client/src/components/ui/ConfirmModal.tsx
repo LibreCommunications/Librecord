@@ -49,7 +49,7 @@ export function ConfirmModal({
                 aria-label={title}
                 data-testid="confirm-modal"
                 onClick={e => e.stopPropagation()}
-                className="w-[440px] modal-card-animated"
+                className="w-full max-w-md mx-4 modal-card-animated"
             >
                 <div className="p-4">
                     <h2 className="text-xl font-semibold text-white mb-2">{title}</h2>

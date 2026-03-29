@@ -13,6 +13,7 @@ import { presence } from "../../api/client";
 import { onCustomEvent, onEvent } from "../../lib/typedEvent";
 import type { AppEventMap } from "../../realtime/events";
 import { CreateGroupModal } from "../dm/CreateGroupModal";
+import { CloseIcon, PersonsIcon } from "../ui/Icons";
 
 export default function DmSidebar() {
     const { dmId } = useParams();
@@ -134,9 +135,9 @@ export default function DmSidebar() {
 
     return (
         <>
-        <aside aria-label="Direct messages" data-testid="dm-sidebar" role="navigation" className="w-60 bg-[#2b2d31] p-2 border-r border-black/20 flex-1">
+        <aside aria-label="Direct messages" data-testid="dm-sidebar" role="navigation" className="w-60 shrink-0 bg-[#2b2d31] p-2 border-r border-black/20 flex-1">
             <div className="flex items-center justify-between px-2 mb-2">
-                <h2 className="text-[#949ba4] uppercase text-[11px] font-bold tracking-wide">
+                <h2 className="text-[#949ba4] uppercase text-xs font-bold tracking-wide">
                     Direct Messages
                 </h2>
                 <button
@@ -158,12 +159,7 @@ export default function DmSidebar() {
                         ${isFriendsPage ? "bg-[#404249] text-white" : "text-[#949ba4] hover:text-[#dbdee1]"}
                     `}
                 >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                        <circle cx="9" cy="7" r="4" />
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
+                    <PersonsIcon size={20} className="shrink-0" />
                     Friends
                 </div>
             </Link>
@@ -221,10 +217,7 @@ export default function DmSidebar() {
                                 title="Leave group"
                                 aria-label="Leave group"
                             >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <line x1="18" y1="6" x2="6" y2="18" />
-                                    <line x1="6" y1="6" x2="18" y2="18" />
-                                </svg>
+                                <CloseIcon size={14} />
                             </button>}
                             {!dm.isGroup && dm.isFriend === false && <button
                                 onClick={(e) => {
@@ -236,10 +229,7 @@ export default function DmSidebar() {
                                 title="Delete conversation"
                                 aria-label="Delete conversation"
                             >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <line x1="18" y1="6" x2="6" y2="18" />
-                                    <line x1="6" y1="6" x2="18" y2="18" />
-                                </svg>
+                                <CloseIcon size={14} />
                             </button>}
                         </div>
                     );
@@ -252,7 +242,7 @@ export default function DmSidebar() {
             const isLast = leaveDm && leaveDm.members.length <= 1;
             return (
             <div className="modal-overlay" onClick={() => setLeaveConfirmId(null)}>
-                <div role="dialog" aria-modal="true" aria-label="Leave Group" className="bg-[#313338] rounded-lg w-[400px] p-5" onClick={e => e.stopPropagation()}>
+                <div role="dialog" aria-modal="true" aria-label="Leave Group" className="bg-[#313338] rounded-lg w-full max-w-md mx-4 p-5" onClick={e => e.stopPropagation()}>
                     <h3 className="text-white text-lg font-semibold mb-2">Leave Group</h3>
                     <p className="text-[#949ba4] text-sm mb-5">
                         {isLast
@@ -283,7 +273,7 @@ export default function DmSidebar() {
 
         {deleteConfirmId && (
             <div className="modal-overlay" onClick={() => setDeleteConfirmId(null)}>
-                <div role="dialog" aria-modal="true" aria-label="Delete Conversation" className="bg-[#313338] rounded-lg w-[400px] p-5" onClick={e => e.stopPropagation()}>
+                <div role="dialog" aria-modal="true" aria-label="Delete Conversation" className="bg-[#313338] rounded-lg w-full max-w-md mx-4 p-5" onClick={e => e.stopPropagation()}>
                     <h3 className="text-white text-lg font-semibold mb-2">Delete Conversation</h3>
                     <p className="text-[#949ba4] text-sm mb-5">
                         Are you sure you want to delete this conversation? All messages and attachments will be permanently removed for both users.

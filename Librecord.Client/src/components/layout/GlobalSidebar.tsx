@@ -18,6 +18,7 @@ import { logger } from "../../lib/logger";
 import { STORAGE } from "../../lib/storageKeys";
 import { useGuildFolders } from "../../hooks/useGuildFolders";
 import { FolderSettingsModal } from "./FolderSettingsModal";
+import { ChatBubbleIcon, PlusIcon, LoginArrowIcon } from "../ui/Icons";
 
 function SidebarIcon({
     children,
@@ -265,9 +266,7 @@ export default function GlobalSidebar() {
             >
 
                 <SidebarIcon to={getLastVisited().dm || "/app/dm"} active={isDmPage} unread={effectiveDmUnread} tooltip="Direct Messages" testId="dm-btn" className="bg-[#313338] hover:bg-[#5865F2] text-white">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                    </svg>
+                    <ChatBubbleIcon size={24} />
                 </SidebarIcon>
 
                 <div className="w-8 h-0.5 bg-[#35373c] rounded-full" />
@@ -426,10 +425,7 @@ export default function GlobalSidebar() {
                     testId="create-guild-btn"
                     className="bg-[#313338] hover:bg-[#248046] text-[#248046] hover:text-white"
                 >
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                        <line x1="12" y1="5" x2="12" y2="19" />
-                        <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
+                    <PlusIcon size={24} />
                 </SidebarIcon>
 
                 <SidebarIcon
@@ -438,11 +434,7 @@ export default function GlobalSidebar() {
                     testId="join-guild-btn"
                     className="bg-[#313338] hover:bg-[#5865F2] text-[#248046] hover:text-white"
                 >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4" />
-                        <polyline points="10 17 15 12 10 7" />
-                        <line x1="15" y1="12" x2="3" y2="12" />
-                    </svg>
+                    <LoginArrowIcon size={20} />
                 </SidebarIcon>
 
                 <div className="flex-1" />

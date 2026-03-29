@@ -52,7 +52,7 @@ export function PinnedMessagesPanel({ channelId, onClose }: Props) {
     }
 
     return (
-        <div className="w-80 bg-[#2b2d31] border-l border-black/20 flex flex-col">
+        <div className="w-72 shrink-0 bg-[#2b2d31] border-l border-black/20 flex flex-col">
             <div className="h-12 flex items-center justify-between px-4 border-b border-black/20">
                 <span className="font-semibold text-sm">Pinned Messages</span>
                 <button onClick={onClose} className="text-gray-400 hover:text-white text-lg">x</button>

@@ -38,7 +38,7 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
         <div className="modal-overlay-animated" onClick={onCancel}>
             <div
                 onClick={(e) => e.stopPropagation()}
-                className="w-[480px] modal-card-animated"
+                className="w-full max-w-[480px] mx-4 modal-card-animated"
             >
                 <div className="p-5 pb-0">
                     <div className="flex items-center gap-3 mb-1">
