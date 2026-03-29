@@ -2,6 +2,7 @@ export interface GuildSummary {
     id: string;
     name: string;
     iconUrl: string | null;
+    ownerId?: string;
 }
 
 export interface Guild {

@@ -45,7 +45,8 @@ public class GuildController : AuthenticatedController
         {
             id = g.Id,
             name = g.Name,
-            iconUrl = g.IconUrl
+            iconUrl = g.IconUrl,
+            ownerId = g.OwnerId,
         }));
     }
 

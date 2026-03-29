@@ -8,6 +8,9 @@ import CreateGuildModal from "../../pages/guild/CreateGuildModal";
 import { JoinGuildModal } from "../../components/guild/JoinGuildModal";
 import { StatusDot } from "../../components/user/StatusDot";
 import { usePresence } from "../../hooks/usePresence";
+import { useGuildSettings } from "../../hooks/useGuildSettings";
+import { useToast } from "../../hooks/useToast";
+import { ConfirmModal } from "../ui/ConfirmModal";
 import type { AppEventMap } from "../../realtime/events";
 import { API_URL } from "../../api/client";
 
@@ -103,8 +106,12 @@ export default function GlobalSidebar() {
     const [showCreate, setShowCreate] = useState(false);
     const [showJoin, setShowJoin] = useState(false);
     const [removedNotice, setRemovedNotice] = useState<{ action: "kick" | "ban"; reason?: string | null } | null>(null);
+    const [guildCtxMenu, setGuildCtxMenu] = useState<{ x: number; y: number; guild: GuildSummary } | null>(null);
+    const [leaveGuildTarget, setLeaveGuildTarget] = useState<GuildSummary | null>(null);
     const { myStatus } = usePresence();
     const { voiceState, leaveVoice } = useVoice();
+    const { leaveGuild } = useGuildSettings();
+    const { toast } = useToast();
 
     // ── Guild Folders (client-only, localStorage) ────────────
     interface GuildFolder { id: string; name?: string; color?: string; guildIds: string[]; }
@@ -359,6 +366,7 @@ export default function GlobalSidebar() {
                                                 key={g.id}
                                                 draggable
                                                 onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("guildId", g.id); e.dataTransfer.setData("fromFolder", folder.id); e.dataTransfer.effectAllowed = "move"; }}
+                                                onContextMenu={e => { e.preventDefault(); setGuildCtxMenu({ x: e.clientX, y: e.clientY, guild: g }); }}
                                             >
                                                 <SidebarIcon
                                                     to={getLastVisited()[`guild:${g.id}`] || `/app/guild/${g.id}`}
@@ -432,6 +440,7 @@ export default function GlobalSidebar() {
                             // Create new folder with these two guilds
                             createFolder(g.id, draggedId);
                         }}
+                        onContextMenu={e => { e.preventDefault(); setGuildCtxMenu({ x: e.clientX, y: e.clientY, guild: g }); }}
                     >
                         <SidebarIcon
                             to={getLastVisited()[`guild:${g.id}`] || `/app/guild/${g.id}`}
@@ -515,6 +524,57 @@ export default function GlobalSidebar() {
                     }}
                 />
             )}
+
+            {/* Guild right-click menu */}
+            {guildCtxMenu && (
+                <>
+                    <div className="fixed inset-0 z-[998]" onClick={() => setGuildCtxMenu(null)} />
+                    <div
+                        className="fixed z-[999] bg-[#111214] rounded-lg shadow-xl py-1 min-w-[160px] border border-[#2b2d31]"
+                        style={{ top: guildCtxMenu.y, left: guildCtxMenu.x }}
+                    >
+                        {guildCtxMenu.guild.ownerId !== user?.userId && (
+                            <button
+                                onClick={() => {
+                                    setLeaveGuildTarget(guildCtxMenu.guild);
+                                    setGuildCtxMenu(null);
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm text-[#f23f43] hover:bg-[#da373c] hover:text-white"
+                            >
+                                Leave Guild
+                            </button>
+                        )}
+                        {guildCtxMenu.guild.ownerId === user?.userId && (
+                            <div className="px-3 py-2 text-sm text-[#949ba4]">No actions available</div>
+                        )}
+                    </div>
+                </>
+            )}
+
+            <ConfirmModal
+                open={!!leaveGuildTarget}
+                title="Leave Guild"
+                description={`Are you sure you want to leave ${leaveGuildTarget?.name ?? "this guild"}? You will need a new invite to rejoin.`}
+                confirmLabel="Leave"
+                confirmVariant="danger"
+                onConfirm={async () => {
+                    if (!leaveGuildTarget) return;
+                    try {
+                        const ok = await leaveGuild(leaveGuildTarget.id);
+                        if (ok) {
+                            setGuilds(prev => prev.filter(g => g.id !== leaveGuildTarget.id));
+                            toast("Left the guild.", "info");
+                            if (guildId === leaveGuildTarget.id) navigate("/app/dm");
+                        } else {
+                            toast("Cannot leave — guild owners must transfer ownership or delete the guild.", "error");
+                        }
+                    } catch {
+                        toast("Cannot leave — guild owners must transfer ownership or delete the guild.", "error");
+                    }
+                    setLeaveGuildTarget(null);
+                }}
+                onCancel={() => setLeaveGuildTarget(null)}
+            />
 
             {renamingFolder && (
                 <div className="fixed inset-0 z-[300] bg-black/60 flex items-center justify-center" onClick={() => setRenamingFolder(null)}>

@@ -219,7 +219,7 @@ export default function DmConversationPage() {
                     const isLast = channel && channel.members.length <= 1;
                     return (
                         <div className="modal-overlay" onClick={() => setShowLeaveConfirm(false)}>
-                            <div className="bg-[#313338] rounded-lg w-[400px] p-5" onClick={e => e.stopPropagation()}>
+                            <div className="bg-[#313338] rounded-lg w-100 p-5" onClick={e => e.stopPropagation()}>
                                 <h3 className="text-white text-lg font-semibold mb-2">Leave Group</h3>
                                 <p className="text-[#949ba4] text-sm mb-5">
                                     {isLast
@@ -252,9 +252,9 @@ export default function DmConversationPage() {
 
             {/* 1-to-1 DM: show other user's profile */}
             {showProfile && otherProfile && !channel?.isGroup && (
-                <div className="w-[280px] bg-[#232428] border-l border-black/20 flex flex-col overflow-y-auto">
+                <div className="w-70 bg-[#232428] border-l border-black/20 flex flex-col overflow-y-auto">
                     {/* Banner */}
-                    <div className={`h-[100px] shrink-0 ${otherProfile.bannerUrl ? "" : "bg-[#5865F2]"}`}>
+                    <div className={`h-25 shrink-0 ${otherProfile.bannerUrl ? "" : "bg-[#5865F2]"}`}>
                         {otherProfile.bannerUrl && <img src={`${API_URL}${otherProfile.bannerUrl}`} className="w-full h-full object-cover" alt="" />}
                     </div>
                     {/* Avatar + Info */}

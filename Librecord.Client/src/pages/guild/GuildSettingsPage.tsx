@@ -13,7 +13,7 @@ export default function GuildSettingsPage() {
     const { guildId } = useParams<{ guildId: string }>();
     const navigate = useNavigate();
     const { getGuild } = useGuilds();
-    const { updateGuild, deleteGuild, leaveGuild, unbanMember, getBans } = useGuildSettings();
+    const { updateGuild, deleteGuild, unbanMember, getBans } = useGuildSettings();
     const { permissions, loaded: permsLoaded } = useGuildPermissions(guildId);
     const { toast } = useToast();
 
@@ -23,7 +23,6 @@ export default function GuildSettingsPage() {
     const [uploadingIcon, setUploadingIcon] = useState(false);
     const [tab, setTab] = useState<"general" | "roles" | "bans" | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
     const [bans, setBans] = useState<GuildBanEntry[]>([]);
     const [bansLoaded, setBansLoaded] = useState(false);
     const iconInputRef = useRef<HTMLInputElement>(null);
@@ -231,38 +230,6 @@ export default function GuildSettingsPage() {
                     </div>
                 )}
             </div>
-
-            {!permissions.isOwner && (
-                <div className="max-w-2xl mx-auto w-full px-8 pb-8">
-                    <div className="pt-4 border-t border-[#3f4147]">
-                        <button
-                            onClick={() => setShowLeaveConfirm(true)}
-                            className="px-4 py-2 rounded-[4px] bg-[#da373c] text-white font-medium hover:bg-[#a12828] transition-colors"
-                        >
-                            Leave Guild
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            <ConfirmModal
-                open={showLeaveConfirm}
-                title="Leave Guild"
-                description="Are you sure you want to leave this guild? You will need a new invite to rejoin."
-                confirmLabel="Leave"
-                confirmVariant="danger"
-                onConfirm={async () => {
-                    if (await leaveGuild(guildId)) {
-                        window.dispatchEvent(
-                            new CustomEvent("guild:deleted", { detail: { guildId } })
-                        );
-                        toast("Left the guild.", "info");
-                        navigate("/app/dm");
-                    }
-                    setShowLeaveConfirm(false);
-                }}
-                onCancel={() => setShowLeaveConfirm(false)}
-            />
 
             <ConfirmModal
                 open={showDeleteConfirm}
