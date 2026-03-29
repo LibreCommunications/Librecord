@@ -18,7 +18,7 @@ import { userProfiles, API_URL } from "../../api/client";
 import { useFriends } from "../../hooks/useFriends";
 import { useBlocks } from "../../hooks/useBlocks";
 import { useToast } from "../../hooks/useToast";
-import type { UserProfile } from "../../types/user";
+import type { UserProfile, UserSummary } from "../../types/user";
 
 import type { AppEventMap } from "../../realtime/events";
 import { onCustomEvent } from "../../lib/typedEvent";
@@ -48,6 +48,7 @@ export default function DmConversationPage() {
     const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
     const [showMembers, setShowMembers] = useState(false);
     const [otherProfile, setOtherProfile] = useState<UserProfile | null>(null);
+    const [otherFriends, setOtherFriends] = useState<UserSummary[]>([]);
     const [showProfile, setShowProfile] = useState(() => localStorage.getItem(STORAGE.showDmProfile) !== "false");
     const [isBlocked, setIsBlocked] = useState(false);
     const [confirmDmAction, setConfirmDmAction] = useState<"block" | "unfriend" | null>(null);
@@ -81,15 +82,17 @@ export default function DmConversationPage() {
                 setChannelName(others.length ? others.map(o => o.displayName).join(", ") : "Direct Message");
             }
             setMetadataReady(true);
-            // Load other user's profile for 1-to-1 DMs
+            // Load other user's profile + friends for 1-to-1 DMs
             if (!ch.isGroup) {
                 const other = ch.members.find(m => m.id !== user?.userId);
                 if (other) {
                     userProfiles.get(other.id).then(setOtherProfile).catch(e => logger.api.warn("Failed to load other user profile", e));
+                    userProfiles.getFriends(other.id).then(setOtherFriends).catch(() => setOtherFriends([]));
                     checkBlocked(other.id).then(setIsBlocked);
                 }
             } else {
                 setOtherProfile(null);
+                setOtherFriends([]);
             }
         });
         return () => { stale = true; };
@@ -283,6 +286,58 @@ export default function DmConversationPage() {
                         <div className="mt-3 text-[10px] text-[#949ba4]">
                             Member since {new Date(otherProfile.createdAt).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
                         </div>
+
+                        {/* Mutual Friends */}
+                        {otherProfile.mutualFriendCount != null && otherProfile.mutualFriendCount > 0 && (
+                            <div className="mt-3 bg-[#1e1f22] rounded-lg px-3 py-2">
+                                <p className="text-[10px] font-semibold text-[#b5bac1] uppercase mb-1.5">
+                                    Mutual Friends — {otherProfile.mutualFriendCount}
+                                </p>
+                                <div className="flex flex-wrap gap-1">
+                                    {otherFriends
+                                        .filter(f => f.id !== user?.userId)
+                                        .slice(0, 10)
+                                        .map(f => (
+                                            <div key={f.id} className="flex items-center gap-1.5 bg-[#2b2d31] rounded-full pl-0.5 pr-2 py-0.5">
+                                                <img
+                                                    src={getAvatarUrl(f.avatarUrl ?? null)}
+                                                    alt={f.displayName}
+                                                    className="w-4 h-4 rounded-full object-cover"
+                                                />
+                                                <span className="text-[10px] text-[#dbdee1] truncate max-w-[60px]">{f.displayName}</span>
+                                            </div>
+                                        ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Friend List */}
+                        {otherProfile.friendsVisible && otherFriends.length > 0 && (
+                            <div className="mt-3 bg-[#1e1f22] rounded-lg px-3 py-2">
+                                <p className="text-[10px] font-semibold text-[#b5bac1] uppercase mb-1.5">
+                                    Friends — {otherFriends.length}
+                                </p>
+                                <div className="space-y-1 max-h-40 overflow-y-auto dark-scrollbar">
+                                    {otherFriends.map(f => (
+                                        <div
+                                            key={f.id}
+                                            className="flex items-center gap-2 py-1 px-1 rounded hover:bg-[#2b2d31] cursor-pointer"
+                                            onClick={() => window.dispatchEvent(new CustomEvent("user:profile:open", { detail: { userId: f.id } }))}
+                                        >
+                                            <img
+                                                src={getAvatarUrl(f.avatarUrl ?? null)}
+                                                alt={f.displayName}
+                                                className="w-6 h-6 rounded-full object-cover shrink-0"
+                                            />
+                                            <div className="min-w-0">
+                                                <p className="text-xs text-[#dbdee1] truncate">{f.displayName}</p>
+                                                <p className="text-[10px] text-[#949ba4] truncate">@{f.username}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Actions */}
                         <div className="flex flex-col gap-1.5 mt-3">

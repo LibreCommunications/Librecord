@@ -1,4 +1,5 @@
-import { memo } from "react";
+import { memo, useState } from "react";
+import { VolumePopup } from "../voice/VolumePopup";
 
 interface VoiceParticipant {
     userId: string;
@@ -21,6 +22,8 @@ interface VoiceParticipantListProps {
 }
 
 export const VoiceParticipantList = memo(function VoiceParticipantList({ participants, localUserId, voiceState, channelId, speakingMap, getAvatarUrl }: VoiceParticipantListProps) {
+    const [volumePopup, setVolumePopup] = useState<{ userId: string; displayName: string; x: number; y: number } | null>(null);
+
     if (participants.length === 0) return null;
 
     const isInVoiceChannel = voiceState.isConnected && voiceState.channelId === channelId;
@@ -32,7 +35,15 @@ export const VoiceParticipantList = memo(function VoiceParticipantList({ partici
                 const p = isLocal ? { ...raw, isMuted: voiceState.isMuted, isDeafened: voiceState.isDeafened, isCameraOn: voiceState.isCameraOn, isScreenSharing: voiceState.isScreenSharing } : raw;
                 const isSpeaking = speakingMap[p.userId] ?? false;
                 return (
-                    <div key={p.userId} className="flex items-center gap-1.5 text-[13px] text-[#949ba4] py-[3px]">
+                    <div
+                        key={p.userId}
+                        className="flex items-center gap-1.5 text-[13px] text-[#949ba4] py-[3px] rounded hover:bg-[#35373c] px-1 cursor-default"
+                        onContextMenu={e => {
+                            if (isLocal) return; // can't adjust own volume
+                            e.preventDefault();
+                            setVolumePopup({ userId: p.userId, displayName: p.displayName, x: e.clientX, y: e.clientY });
+                        }}
+                    >
                         <img
                             src={getAvatarUrl(p.avatarUrl)}
                             alt=""
@@ -73,6 +84,16 @@ export const VoiceParticipantList = memo(function VoiceParticipantList({ partici
                     </div>
                 );
             })}
+
+            {volumePopup && (
+                <VolumePopup
+                    userId={volumePopup.userId}
+                    displayName={volumePopup.displayName}
+                    x={volumePopup.x}
+                    y={volumePopup.y}
+                    onClose={() => setVolumePopup(null)}
+                />
+            )}
         </div>
     );
 });

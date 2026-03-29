@@ -13,9 +13,11 @@ interface Props {
     compact?: boolean;
     /** Whether this is the local user */
     isSelf?: boolean;
+    /** Fill parent instead of using aspect-video (for constrained containers) */
+    fill?: boolean;
 }
 
-export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact, isSelf }: Props) {
+export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact, isSelf, fill }: Props) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [imgError, setImgError] = useState(false);
 
@@ -63,7 +65,7 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
                 `}
             >
                 {showVideo ? (
-                    <div className="aspect-video relative">
+                    <div className={`${fill ? "h-full" : "aspect-video"} relative`}>
                         <video
                             ref={videoRef}
                             autoPlay
@@ -134,7 +136,7 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
             onContextMenu={handleContextMenu}
             className={`
                 relative rounded-xl overflow-hidden cursor-pointer
-                flex items-center justify-center aspect-video
+                flex items-center justify-center ${fill ? "h-full" : "aspect-video"}
                 bg-[#2b2d31] transition-shadow duration-200
                 ${isSpeaking ? "shadow-[0_0_0_3px_#23a55a,0_0_12px_rgba(35,165,90,0.3)]" : "shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"}
             `}
@@ -148,15 +150,15 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
             />
 
             {!showVideo && (
-                <div className="flex flex-col items-center gap-3">
+                <div className="flex flex-col items-center gap-2 overflow-hidden p-2">
                     {imgError ? (
                         <div className={`
-                            w-[72px] h-[72px] rounded-full bg-[#5865f2]
-                            flex items-center justify-center text-2xl text-white font-semibold
+                            w-1/4 max-w-[72px] min-w-[32px] aspect-square rounded-full bg-[#5865f2]
+                            flex items-center justify-center text-white font-semibold shrink-0
                             transition-shadow duration-200
                             ${isSpeaking ? "shadow-[0_0_0_3px_#2b2d31,0_0_0_5px_#23a55a]" : ""}
                         `}>
-                            {participant.displayName[0]?.toUpperCase()}
+                            <span className="text-[clamp(0.75rem,3cqw,1.5rem)]">{participant.displayName[0]?.toUpperCase()}</span>
                         </div>
                     ) : (
                         <img
@@ -164,13 +166,13 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
                             alt={participant.displayName}
                             onError={() => setImgError(true)}
                             className={`
-                                w-[72px] h-[72px] rounded-full object-cover
+                                w-1/4 max-w-[72px] min-w-[32px] aspect-square rounded-full object-cover shrink-0
                                 transition-shadow duration-200
                                 ${isSpeaking ? "shadow-[0_0_0_3px_#2b2d31,0_0_0_5px_#23a55a]" : ""}
                             `}
                         />
                     )}
-                    <span className="text-sm text-[#b5bac1] font-medium truncate max-w-[80%]">
+                    <span className="text-sm text-[#b5bac1] font-medium truncate max-w-full">
                         {participant.displayName}
                     </span>
                 </div>

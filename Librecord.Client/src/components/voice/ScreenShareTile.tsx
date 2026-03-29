@@ -15,9 +15,11 @@ interface Props {
     onToggleWatch: (watching: boolean) => void;
     /** Whether this is the local user's own screen share. */
     isSelf: boolean;
+    /** Fill parent instead of using aspect-video (for constrained containers) */
+    fill?: boolean;
 }
 
-export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf }: Props) {
+export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf, fill }: Props) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -89,28 +91,23 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
             <div
                 ref={containerRef}
                 onContextMenu={handleContextMenu}
-                className="relative rounded-xl overflow-hidden bg-[#1e1f22] aspect-video flex items-center justify-center shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"
+                className={`relative rounded-xl overflow-hidden bg-[#1e1f22] ${fill ? "h-full" : "aspect-video"} flex items-center justify-center shadow-[0_0_0_1px_rgba(255,255,255,0.04)]`}
             >
-                <div className="flex flex-col items-center gap-4">
-                    <div className="p-4 rounded-full bg-[#5865F2]/15">
-                        <ScreenShareIcon size={32} />
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3 overflow-hidden">
+                    <div className="p-3 rounded-full bg-[#5865F2]/15 shrink-0">
+                        <ScreenShareIcon size={24} />
                     </div>
-                    <div className="text-center">
-                        <p className="text-sm font-medium text-[#dbdee1]">
-                            {participant.displayName} is sharing their screen
-                        </p>
-                        <p className="text-xs text-[#949ba4] mt-1">
-                            Click below to start watching
-                        </p>
-                    </div>
+                    <p className="text-sm font-medium text-[#dbdee1] truncate w-full text-center">
+                        {participant.displayName}&apos;s screen
+                    </p>
                     <button
                         onClick={() => onToggleWatch(true)}
-                        className="px-5 py-2 rounded-lg text-sm font-medium text-white bg-[#5865F2] hover:bg-[#4752c4] transition-colors flex items-center gap-2"
+                        className="px-4 py-1.5 rounded-lg text-sm font-medium text-white bg-[#5865F2] hover:bg-[#4752c4] transition-colors flex items-center gap-2 shrink-0"
                     >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                             <polygon points="5 3 19 12 5 21 5 3" />
                         </svg>
-                        Watch Stream
+                        Watch
                     </button>
                 </div>
             </div>
@@ -128,7 +125,7 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
             className={`
                 relative rounded-xl overflow-hidden bg-[#1e1f22]
                 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] group/screen
-                ${isFullscreen ? "rounded-none" : "aspect-video"}
+                ${isFullscreen ? "rounded-none" : fill ? "h-full" : "aspect-video"}
             `}
         >
             {trackStatus === "loading" && (
