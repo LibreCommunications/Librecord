@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { STORAGE } from "../lib/storageKeys";
 
 export interface GuildFolder {
@@ -34,7 +34,7 @@ export function useGuildFolders() {
         localStorage.setItem(STORAGE.guildFolders, JSON.stringify(next));
     }
 
-    const folderedGuildIds = new Set(folders.flatMap(f => f.guildIds));
+    const folderedGuildIds = useMemo(() => new Set(folders.flatMap(f => f.guildIds)), [folders]);
 
     function createFolder(guildA: string, guildB: string) {
         const folder: GuildFolder = { id: crypto.randomUUID(), guildIds: [guildA, guildB] };

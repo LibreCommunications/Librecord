@@ -28,6 +28,7 @@ function SidebarIcon({
     onClick,
     to,
     testId,
+    ariaLabel,
 }: {
     children: React.ReactNode;
     active?: boolean;
@@ -37,6 +38,7 @@ function SidebarIcon({
     onClick?: () => void;
     to?: string;
     testId?: string;
+    ariaLabel?: string;
 }) {
     const inner = (
         <div className="relative group flex items-center" data-testid={testId}>
@@ -48,6 +50,8 @@ function SidebarIcon({
             />
 
             <div
+                role="button"
+                aria-label={ariaLabel ?? tooltip}
                 onClick={onClick}
                 className={`
                     w-12 h-12 flex items-center justify-center relative
@@ -246,6 +250,8 @@ export default function GlobalSidebar() {
         <>
             <aside
                 id="global-sidebar"
+                aria-label="Server navigation"
+                role="navigation"
                 className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 gap-2 overflow-y-auto no-scrollbar"
                 onDragOver={e => e.preventDefault()}
                 onDrop={e => {
@@ -258,7 +264,7 @@ export default function GlobalSidebar() {
                 }}
             >
 
-                <SidebarIcon to={getLastVisited().dm || "/app/dm"} active={isDmPage} unread={effectiveDmUnread} tooltip="Direct Messages" className="bg-[#313338] hover:bg-[#5865F2] text-white">
+                <SidebarIcon to={getLastVisited().dm || "/app/dm"} active={isDmPage} unread={effectiveDmUnread} tooltip="Direct Messages" testId="dm-btn" className="bg-[#313338] hover:bg-[#5865F2] text-white">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                     </svg>
@@ -441,11 +447,11 @@ export default function GlobalSidebar() {
 
                 <div className="flex-1" />
 
-                <Link to="/app/settings/user/profile">
+                <Link to="/app/settings/user/profile" aria-label="User Settings" data-testid="user-avatar-btn">
                     <div className="relative group flex items-center">
                         <img
                             src={avatarSrc}
-                            alt="Settings"
+                            alt="User Settings"
                             className="w-12 h-12 rounded-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
                         />
                         <span className="absolute -bottom-0.5 -right-0.5">
@@ -481,9 +487,12 @@ export default function GlobalSidebar() {
                     <div
                         className="fixed z-[999] bg-[#111214] rounded-lg shadow-xl py-1 min-w-[160px] border border-[#2b2d31]"
                         style={{ top: guildCtxMenu.y, left: guildCtxMenu.x }}
+                        role="menu"
+                        aria-label="Guild actions"
                     >
                         {guildCtxMenu.guild.ownerId !== user?.userId && (
                             <button
+                                role="menuitem"
                                 onClick={() => {
                                     setLeaveGuildTarget(guildCtxMenu.guild);
                                     setGuildCtxMenu(null);
@@ -535,7 +544,7 @@ export default function GlobalSidebar() {
 
             {removedNotice && (
                 <div className="fixed inset-0 z-[300] bg-black/60 flex items-center justify-center" onClick={() => setRemovedNotice(null)}>
-                    <div className="bg-[#313338] rounded-lg p-6 w-full max-w-sm shadow-xl text-center" onClick={e => e.stopPropagation()}>
+                    <div role="dialog" aria-modal="true" aria-label={removedNotice.action === "ban" ? "You have been banned" : "You have been kicked"} className="bg-[#313338] rounded-lg p-6 w-full max-w-sm shadow-xl text-center" onClick={e => e.stopPropagation()}>
                         <div className="text-4xl mb-3">{removedNotice.action === "ban" ? "🔨" : "👋"}</div>
                         <h2 className="text-lg font-bold text-white mb-2">
                             {removedNotice.action === "ban" ? "You have been banned" : "You have been kicked"}

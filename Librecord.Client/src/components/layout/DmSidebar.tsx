@@ -134,7 +134,7 @@ export default function DmSidebar() {
 
     return (
         <>
-        <aside className="w-60 bg-[#2b2d31] p-2 border-r border-black/20 flex-1">
+        <aside aria-label="Direct messages" data-testid="dm-sidebar" role="navigation" className="w-60 bg-[#2b2d31] p-2 border-r border-black/20 flex-1">
             <div className="flex items-center justify-between px-2 mb-2">
                 <h2 className="text-[#949ba4] uppercase text-[11px] font-bold tracking-wide">
                     Direct Messages
@@ -143,6 +143,8 @@ export default function DmSidebar() {
                     onClick={() => setShowCreateGroup(true)}
                     className="text-[#949ba4] hover:text-[#dbdee1] text-base leading-none"
                     title="Create Group DM"
+                    aria-label="Create Group DM"
+                    data-testid="create-group-dm-btn"
                 >
                     +
                 </button>
@@ -166,7 +168,7 @@ export default function DmSidebar() {
                 </div>
             </Link>
 
-            <div className="space-y-0.5 mt-1">
+            <div className="space-y-0.5 mt-1" role="list" aria-label="Conversations">
                 {dms.map(dm => {
                     const others = dm.members.filter(m => m.id !== user?.userId);
                     const name = dm.isGroup
@@ -179,7 +181,7 @@ export default function DmSidebar() {
                     const otherStatus = showAvatar ? (presenceMap[others[0].id] ?? "offline") : undefined;
 
                     return (
-                        <div key={dm.id} className="group relative" data-testid={`dm-sidebar-entry-${dm.id}`}>
+                        <div key={dm.id} className="group relative" data-testid={`dm-item-${dm.id}`}>
                             <Link to={`/app/dm/${dm.id}`}>
                                 <div
                                     className={`
@@ -217,6 +219,7 @@ export default function DmSidebar() {
                                 }}
                                 className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-[#949ba4] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
                                 title="Leave group"
+                                aria-label="Leave group"
                             >
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <line x1="18" y1="6" x2="6" y2="18" />
@@ -231,6 +234,7 @@ export default function DmSidebar() {
                                 }}
                                 className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-[#949ba4] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
                                 title="Delete conversation"
+                                aria-label="Delete conversation"
                             >
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <line x1="18" y1="6" x2="6" y2="18" />
@@ -248,7 +252,7 @@ export default function DmSidebar() {
             const isLast = leaveDm && leaveDm.members.length <= 1;
             return (
             <div className="modal-overlay" onClick={() => setLeaveConfirmId(null)}>
-                <div className="bg-[#313338] rounded-lg w-[400px] p-5" onClick={e => e.stopPropagation()}>
+                <div role="dialog" aria-modal="true" aria-label="Leave Group" className="bg-[#313338] rounded-lg w-[400px] p-5" onClick={e => e.stopPropagation()}>
                     <h3 className="text-white text-lg font-semibold mb-2">Leave Group</h3>
                     <p className="text-[#949ba4] text-sm mb-5">
                         {isLast
@@ -279,7 +283,7 @@ export default function DmSidebar() {
 
         {deleteConfirmId && (
             <div className="modal-overlay" onClick={() => setDeleteConfirmId(null)}>
-                <div className="bg-[#313338] rounded-lg w-[400px] p-5" onClick={e => e.stopPropagation()}>
+                <div role="dialog" aria-modal="true" aria-label="Delete Conversation" className="bg-[#313338] rounded-lg w-[400px] p-5" onClick={e => e.stopPropagation()}>
                     <h3 className="text-white text-lg font-semibold mb-2">Delete Conversation</h3>
                     <p className="text-[#949ba4] text-sm mb-5">
                         Are you sure you want to delete this conversation? All messages and attachments will be permanently removed for both users.

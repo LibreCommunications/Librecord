@@ -31,7 +31,7 @@ export default function LoginPage() {
 
     return (
         <div className="h-screen w-full flex items-center justify-center bg-[#5865F2]">
-            <div className="w-[480px] bg-[#313338] p-8 rounded-2xl shadow-2xl animate-[scaleIn_0.2s_ease-out]">
+            <div className="w-[480px] bg-[#313338] p-8 rounded-2xl shadow-2xl animate-[scaleIn_0.2s_ease-out]" data-testid="login-form">
                 <h1 className="text-2xl font-bold text-white mb-1 text-center">
                     Welcome back!
                 </h1>
@@ -56,6 +56,7 @@ export default function LoginPage() {
                         value={emailOrUsername}
                         onChange={(e) => setEmailOrUsername(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && handleLogin()}
+                        data-testid="login-username"
                         className="input-field mt-2"
                     />
                 </label>
@@ -71,6 +72,7 @@ export default function LoginPage() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && handleLogin()}
+                        data-testid="login-password"
                         className="input-field mt-2"
                     />
                 </label>
@@ -78,6 +80,7 @@ export default function LoginPage() {
                 <button
                     onClick={handleLogin}
                     disabled={loading}
+                    data-testid="login-submit"
                     className="w-full py-2.5 rounded-[4px] font-semibold text-white bg-[#5865F2] hover:bg-[#4752c4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                 >
                     {loading && <Spinner size="sm" />}

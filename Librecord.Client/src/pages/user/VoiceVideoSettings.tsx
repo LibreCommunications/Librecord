@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as livekitClient from "../../voice/livekitClient";
 import { NoiseSuppression } from "../../components/voice/NoiseSuppression";
 import { logger } from "../../lib/logger";
@@ -8,21 +8,21 @@ export default function VoiceVideoSettings() {
     const [audioOutputs, setAudioOutputs] = useState<MediaDeviceInfo[]>([]);
     const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
     const [prefs, setPrefs] = useState(livekitClient.getAllDevicePrefs);
-    const [devicesLoaded, setDevicesLoaded] = useState(false);
+    const devicesLoaded = useRef(false);
 
-    async function loadDevices() {
-        if (devicesLoaded) return;
-        setDevicesLoaded(true);
-        try {
-            // Only request audio — avoids briefly activating the camera.
-            // Device labels for video inputs are typically available after any permission grant.
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            stream.getTracks().forEach(t => t.stop());
-        } catch { /* user may deny */ }
-        setAudioInputs(await livekitClient.listAudioInputDevices());
-        setAudioOutputs(await livekitClient.listAudioOutputDevices());
-        setVideoInputs(await livekitClient.listVideoDevices());
-    }
+    useEffect(() => {
+        if (devicesLoaded.current) return;
+        devicesLoaded.current = true;
+        (async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(t => t.stop());
+            } catch { /* user may deny */ }
+            setAudioInputs(await livekitClient.listAudioInputDevices());
+            setAudioOutputs(await livekitClient.listAudioOutputDevices());
+            setVideoInputs(await livekitClient.listVideoDevices());
+        })();
+    }, []);
 
     function selectDevice(kind: "audioinput" | "videoinput" | "audiooutput", deviceId: string) {
         livekitClient.setDevicePref(kind, deviceId);
@@ -39,7 +39,7 @@ export default function VoiceVideoSettings() {
             <h1 className="text-2xl font-bold text-white">Voice & Video</h1>
 
             {/* Devices */}
-            <section ref={() => { loadDevices(); }}>
+            <section>
                 <h2 className="section-label mb-4">Devices</h2>
                 <div className="space-y-3">
                     <DeviceSelect

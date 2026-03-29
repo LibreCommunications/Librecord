@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import GlobalSidebar from "../components/layout/GlobalSidebar";
 import ChannelSidebar from "../components/layout/ChannelSidebar";
@@ -9,6 +9,7 @@ import { FloatingScreenShare } from "../components/voice/FloatingScreenShare";
 import { UserProfilePopup } from "../components/user/UserProfilePopup";
 import { ConnectionBanner } from "../components/ui/ConnectionBanner";
 import { ErrorBoundary } from "../components/ui/ErrorBoundary";
+import { Spinner } from "../components/ui/Spinner";
 
 import { RealtimeRoot } from "../realtime/RealtimeRoot";
 import { onCustomEvent } from "../lib/typedEvent";
@@ -63,9 +64,11 @@ export default function MainPage() {
             )}
 
             <div className="flex flex-1 min-w-0 min-h-0 overflow-hidden">
-                <ErrorBoundary key={location.pathname} label="Content">
-                    <Outlet />
-                </ErrorBoundary>
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center"><Spinner className="text-[#949ba4]" /></div>}>
+                    <ErrorBoundary key={location.pathname} label="Content">
+                        <Outlet />
+                    </ErrorBoundary>
+                </Suspense>
             </div>
 
             {profileUserId && (

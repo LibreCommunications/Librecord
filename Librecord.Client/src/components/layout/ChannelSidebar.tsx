@@ -182,7 +182,7 @@ export default function ChannelSidebar({ guildId }: Props) {
 
     return (
         <>
-            <aside className="w-60 bg-[#2b2d31] border-r border-black/20 flex-1 flex flex-col">
+            <aside aria-label="Channel navigation" role="navigation" className="w-60 bg-[#2b2d31] border-r border-black/20 flex-1 flex flex-col">
                 <div className="flex items-center justify-between px-3 h-12 border-b border-black/20 shrink-0">
                     <span className="text-white font-semibold text-sm truncate">Channels</span>
                     <div className="flex items-center gap-1">
@@ -191,6 +191,8 @@ export default function ChannelSidebar({ guildId }: Props) {
                                 onClick={() => setShowCreate(true)}
                                 className="p-1 rounded text-[#949ba4] hover:text-[#dbdee1] hover:bg-[#35373c]"
                                 title="Create channel"
+                                aria-label="Create channel"
+                                data-testid="create-channel-btn"
                             >
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <line x1="12" y1="5" x2="12" y2="19" />
@@ -203,6 +205,8 @@ export default function ChannelSidebar({ guildId }: Props) {
                                 to={`/app/guild/${guildId}/settings`}
                                 className="p-1 rounded text-[#949ba4] hover:text-[#dbdee1] hover:bg-[#35373c]"
                                 title="Guild Settings"
+                                aria-label="Guild Settings"
+                                data-testid="guild-settings-link"
                             >
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <circle cx="12" cy="12" r="3" />
@@ -212,7 +216,7 @@ export default function ChannelSidebar({ guildId }: Props) {
                         )}
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto dark-scrollbar pt-2">
+                <div className="flex-1 overflow-y-auto dark-scrollbar pt-2" data-testid="channel-list" role="list" aria-label="Channel list">
                     {loading && <div className="text-xs text-gray-500 px-4 py-2">Loading channels…</div>}
 
                     {!loading && (
@@ -230,6 +234,8 @@ export default function ChannelSidebar({ guildId }: Props) {
                                     <div
                                         onClick={isVoice ? () => { navigate(`/app/guild/${guildId}/${ch.id}`); if (!isInVoiceChannel) joinVoice(ch.id, guildId); } : undefined}
                                         onContextMenu={e => { if (!permissions.manageChannels) return; e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, channel: ch }); }}
+                                        data-testid={isVoice ? `voice-channel-${ch.id}` : `text-channel-${ch.id}`}
+                                        role="listitem"
                                         className={`group relative flex items-center gap-1.5 mx-2 px-1.5 py-[6px] cursor-pointer rounded-[4px] hover:bg-[#35373c]
                                             ${isActive || isInVoiceChannel ? "bg-[#404249] text-white" : "text-[#949ba4] hover:text-[#dbdee1]"}
                                             ${hasUnread ? "text-[#f2f3f5]" : ""}`}
@@ -292,6 +298,8 @@ export default function ChannelSidebar({ guildId }: Props) {
                                                 <div
                                                     onClick={isVoice ? () => { navigate(`/app/guild/${guildId}/${ch.id}`); if (!isInVC) joinVoice(ch.id, guildId); } : undefined}
                                                     onContextMenu={e => { if (!permissions.manageChannels) return; e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, channel: ch }); }}
+                                                    data-testid={isVoice ? `voice-channel-${ch.id}` : `text-channel-${ch.id}`}
+                                                    role="listitem"
                                                     className={`group relative flex items-center gap-1.5 mx-2 px-1.5 py-[6px] cursor-pointer rounded-[4px] hover:bg-[#35373c]
                                                         ${active || isInVC ? "bg-[#404249] text-white" : "text-[#949ba4] hover:text-[#dbdee1]"}
                                                         ${unread ? "text-[#f2f3f5]" : ""}`}
@@ -344,8 +352,11 @@ export default function ChannelSidebar({ guildId }: Props) {
                     <div
                         className="fixed z-[999] bg-[#111214] rounded-lg shadow-xl py-1 min-w-[160px] border border-[#2b2d31]"
                         style={{ top: ctxMenu.y, left: ctxMenu.x }}
+                        role="menu"
+                        aria-label="Channel actions"
                     >
                         <button
+                            role="menuitem"
                             onClick={() => {
                                 setEditTarget(ctxMenu.channel);
                                 setCtxMenu(null);
@@ -355,6 +366,7 @@ export default function ChannelSidebar({ guildId }: Props) {
                             {ctxMenu.channel.type === 2 ? "Edit Category" : "Edit Channel"}
                         </button>
                         <button
+                            role="menuitem"
                             onClick={() => {
                                 setDeleteTarget(ctxMenu.channel);
                                 setCtxMenu(null);

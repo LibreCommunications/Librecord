@@ -112,6 +112,7 @@ export const MessageItem = memo(function MessageItem({
                         <textarea
                             value={editContent}
                             autoFocus
+                            aria-label="Edit message"
                             onChange={e => setEditContent(e.target.value)}
                             onKeyDown={e => {
                                 if (e.key === "Enter" && !e.shiftKey) {
@@ -236,6 +237,8 @@ export const MessageItem = memo(function MessageItem({
                                 onClick={() => onStartEdit(msg.id)}
                                 className="px-2 py-1 text-[#b5bac1] hover:text-white hover:bg-[#35373c] transition-colors rounded-l"
                                 title="Edit"
+                                aria-label="Edit message"
+                                data-testid="edit-message-btn"
                             >
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -248,6 +251,8 @@ export const MessageItem = memo(function MessageItem({
                                 onClick={() => onDelete(msg.id)}
                                 className="px-2 py-1 text-[#b5bac1] hover:text-[#f23f43] hover:bg-[#35373c] transition-colors"
                                 title="Delete"
+                                aria-label="Delete message"
+                                data-testid="delete-message-btn"
                             >
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <polyline points="3 6 5 6 21 6" />
@@ -259,6 +264,8 @@ export const MessageItem = memo(function MessageItem({
                             onClick={() => onReply(msg.id)}
                             className="px-2 py-1 text-[#b5bac1] hover:text-white hover:bg-[#35373c] transition-colors"
                             title="Reply"
+                            aria-label="Reply to message"
+                            data-testid="reply-message-btn"
                         >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <polyline points="9 17 4 12 9 7" />
@@ -270,6 +277,8 @@ export const MessageItem = memo(function MessageItem({
                             onClick={() => onToggleMenu(msg.id)}
                             className="px-2 py-1 text-[#b5bac1] hover:text-white hover:bg-[#35373c] transition-colors rounded-r"
                             title="More"
+                            aria-label="More actions"
+                            data-testid="more-actions-btn"
                         >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                                 <circle cx="12" cy="5" r="2" />

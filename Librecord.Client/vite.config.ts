@@ -51,4 +51,16 @@ export default defineConfig({
     tailwindcss(),
     versionPlugin(),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/react-dom") || id.includes("node_modules/react/") || id.includes("node_modules/react-router")) return "vendor";
+          if (id.includes("node_modules/@microsoft/signalr")) return "signalr";
+          if (id.includes("node_modules/livekit-client")) return "livekit";
+          if (id.includes("node_modules/@shiguredo/rnnoise-wasm")) return "rnnoise";
+        },
+      },
+    },
+  },
 });

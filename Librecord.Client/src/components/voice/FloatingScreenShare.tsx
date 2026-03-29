@@ -22,8 +22,7 @@ export function FloatingScreenShare() {
             if (onVoicePage) { setVisible(false); return; }
 
             // Find any remote screenshare track
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            let screenTrack: any = null;
+            let screenTrack: Track | null = null;
             let name = "";
             for (const p of room.remoteParticipants.values()) {
                 for (const pub of p.trackPublications.values()) {

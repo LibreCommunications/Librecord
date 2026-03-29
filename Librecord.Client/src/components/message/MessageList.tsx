@@ -7,6 +7,7 @@ import { Spinner } from "../ui/Spinner";
 import type { MessageListProps } from "./MessageListProps";
 
 const START_INDEX = 100_000;
+const VIEWPORT_INCREASE = { top: 200, bottom: 100 };
 
 export function MessageList({
     messages,
@@ -103,27 +104,6 @@ export function MessageList({
         virtuosoRef.current?.scrollTo({ top: Number.MAX_SAFE_INTEGER, behavior: "smooth" });
         setNewMsgCount(0);
     }, []);
-
-    // Snap to bottom after initial load by targeting the Virtuoso scroller directly
-    const hasSnapped = useRef(false);
-    useEffect(() => {
-        if (loading) { hasSnapped.current = false; return; }
-        if (hasSnapped.current || messages.length === 0) return;
-        hasSnapped.current = true;
-
-        // Find the actual scroll container Virtuoso creates and force it to bottom
-        const el = virtuosoRef.current;
-        if (!el) return;
-
-        // Poll until the scroller has content, then snap
-        let attempts = 0;
-        const poll = setInterval(() => {
-            attempts++;
-            el.scrollTo({ top: Number.MAX_SAFE_INTEGER });
-            if (attempts >= 10) clearInterval(poll);
-        }, 100);
-        return () => clearInterval(poll);
-    }, [loading, messages.length]);
 
     // ESC hotkey
     useEffect(() => {
@@ -224,6 +204,8 @@ export function MessageList({
         [loadingMore],
     );
 
+    const headerComponents = useMemo(() => ({ Header: headerComponent }), [headerComponent]);
+
     // ── Early returns ────────────────────────────────────────────
     if (loading) {
         return (
@@ -242,13 +224,14 @@ export function MessageList({
     }
 
     return (
-        <div className="flex-1 relative min-h-0 overflow-hidden">
+        <div className="flex-1 relative min-h-0 overflow-hidden" data-testid="message-list" aria-label="Message list">
             <Virtuoso
                 ref={virtuosoRef}
                 className="dark-scrollbar"
                 style={{ height: "100%" }}
                 totalCount={messages.length}
                 firstItemIndex={firstItemIndex}
+                alignToBottom
                 initialTopMostItemIndex={messages.length - 1}
                 itemContent={renderItem}
                 followOutput={followOutput}
@@ -257,13 +240,15 @@ export function MessageList({
                 startReached={handleStartReached}
                 onScroll={handleScroll}
                 overscan={400}
-                increaseViewportBy={{ top: 200, bottom: 100 }}
-                components={{ Header: headerComponent }}
+                increaseViewportBy={VIEWPORT_INCREASE}
+                components={headerComponents}
             />
 
             {showScrollBtn && (
                 <button
                     onClick={scrollToBottom}
+                    aria-label="Scroll to bottom"
+                    data-testid="scroll-to-bottom-btn"
                     className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#5865F2] hover:bg-[#4752c4] text-white text-sm font-medium shadow-lg transition-colors z-10"
                 >
                     {newMsgCount > 0

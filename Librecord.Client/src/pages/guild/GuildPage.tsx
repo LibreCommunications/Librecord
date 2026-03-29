@@ -67,10 +67,14 @@ export default function GuildChannelPage() {
         sendTextMessage: async (chId, content, clientMsgId, replyToId) => { await createMessage(chId, content, clientMsgId, replyToId); },
         sendWithAttachments: sendGuildMessageWithAttachments,
         editMessage: async (messageId, dto) => {
-            const updated = await guildEditMessage(channelId!, messageId, dto.content);
+            if (!channelId) throw new Error("No channelId");
+            const updated = await guildEditMessage(channelId, messageId, dto.content);
             return { content: updated!.content, editedAt: updated!.editedAt };
         },
-        deleteMessage: async (messageId) => { await guildDeleteMessage(channelId!, messageId); },
+        deleteMessage: async (messageId) => {
+            if (!channelId) throw new Error("No channelId");
+            await guildDeleteMessage(channelId, messageId);
+        },
         events: {
             messageNew: "guild:message:new",
             messageEdited: "guild:message:edited",

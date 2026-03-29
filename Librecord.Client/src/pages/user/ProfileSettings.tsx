@@ -144,6 +144,7 @@ export default function ProfileSettings() {
                             value={name}
                             onChange={e => setName(e.target.value)}
                             maxLength={32}
+                            data-testid="profile-display-name"
                             className="w-full px-3 py-2 rounded bg-[#1e1f22] text-white outline-none border border-[#3f4147] focus:border-[#5865F2]"
                         />
                     </div>
@@ -181,6 +182,7 @@ export default function ProfileSettings() {
                         maxLength={500}
                         rows={3}
                         placeholder="Tell people about yourself..."
+                        data-testid="profile-bio"
                         className="w-full px-3 py-2 rounded bg-[#1e1f22] text-white outline-none border border-[#3f4147] focus:border-[#5865F2] resize-none"
                     />
                     <span className="text-xs text-[#949ba4]">{bio.length}/500</span>
@@ -199,6 +201,7 @@ export default function ProfileSettings() {
                                     setAvatarPreview(null);
                                     setAvatarFile(null);
                                 }}
+                                data-testid="profile-revert-btn"
                                 className="px-3 py-1.5 rounded text-sm text-white hover:underline"
                             >
                                 Revert
@@ -209,6 +212,7 @@ export default function ProfileSettings() {
                                     setOriginal({ name: name.trim(), bio: bio.trim() });
                                 }}
                                 disabled={saving}
+                                data-testid="profile-save-btn"
                                 className="px-4 py-1.5 rounded bg-[#248046] hover:bg-[#1a6334] text-white text-sm font-medium disabled:opacity-50 transition-colors"
                             >
                                 {saving ? "Saving..." : "Save"}
@@ -244,6 +248,8 @@ export default function ProfileSettings() {
                             setFriendsVisible(next);
                             await userProfiles.updateFriendsVisible(next);
                         }}
+                        aria-label="Toggle friends visibility"
+                        data-testid="toggle-friends-visible"
                         className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${friendsVisible ? "bg-[#248046]" : "bg-[#72767d]"}`}
                     >
                         <span className={`block w-[18px] h-[18px] rounded-full bg-white shadow-md transition-all duration-200 absolute top-[3px] ${friendsVisible ? "left-[23px]" : "left-[3px]"}`} />
@@ -253,6 +259,7 @@ export default function ProfileSettings() {
                 <div className="pt-2 border-t border-[#3f4147]">
                     <button
                         onClick={logout}
+                        data-testid="logout-btn"
                         className="px-5 py-2 rounded bg-[#da373c] hover:bg-[#a12828] text-white text-sm font-medium transition-colors"
                     >
                         Logout

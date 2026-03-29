@@ -6,7 +6,7 @@ import { useTypingIndicator } from "./useTypingIndicator";
 import { usePins } from "./usePins";
 import { useToast } from "./useToast";
 import { logger } from "../lib/logger";
-import { onCustomEvent } from "../lib/typedEvent";
+import { onCustomEvent, onEvent } from "../lib/typedEvent";
 import type { Message } from "../types/message";
 import type { UploadResult } from "./useAttachmentUpload";
 
@@ -111,6 +111,24 @@ export function useChatChannel(config: ChatChannelConfig) {
         }
         return next;
     }, []);
+
+    // Refetch recent messages after reconnect to catch anything missed during the gap
+    useEffect(() => {
+        if (!channelId) return;
+        return onEvent("realtime:reconnected", () => {
+            config.getMessages(channelId).then(msgs => {
+                const reversed = msgs.slice().reverse();
+                setMessages(prev => {
+                    const existingIds = new Set(prev.map(m => m.id));
+                    const newMsgs = reversed.filter(m => !existingIds.has(m.id));
+                    if (newMsgs.length === 0) return prev;
+                    return [...prev, ...newMsgs];
+                });
+                if (reversed.length > 0) markAsRead(channelId, reversed[reversed.length - 1].id);
+            }).catch(() => { /* silent — will show on next user action */ });
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [channelId]);
 
     useEffect(() => {
         if (!channelId) return;

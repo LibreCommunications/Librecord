@@ -44,6 +44,10 @@ export function ConfirmModal({
             onClick={onCancel}
         >
             <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={title}
+                data-testid="confirm-modal"
                 onClick={e => e.stopPropagation()}
                 className="w-[440px] modal-card-animated"
             >
@@ -56,6 +60,7 @@ export function ConfirmModal({
                     <button
                         onClick={onCancel}
                         disabled={loading}
+                        data-testid="cancel-btn"
                         className="px-4 py-2 text-sm text-white hover:underline"
                     >
                         Cancel

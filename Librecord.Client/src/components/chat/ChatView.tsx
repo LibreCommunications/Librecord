@@ -61,7 +61,7 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, 
             }}
         >
             {dragging && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#5865F2]/20 border-2 border-dashed border-[#5865F2] rounded-lg pointer-events-none">
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#5865F2]/20 border-2 border-dashed border-[#5865F2] rounded-lg pointer-events-none" aria-label="Drop files to upload">
                     <span className="text-white text-lg font-medium">Drop files to upload</span>
                 </div>
             )}
@@ -112,6 +112,7 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, 
                         <button
                             onClick={() => chat.setReplyingTo(null)}
                             className="text-[#949ba4] hover:text-white shrink-0"
+                            aria-label="Cancel reply"
                         >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -133,6 +134,8 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, 
                         onClick={() => chat.attachTriggerRef.current?.open()}
                         className="px-3 py-2.5 text-[#b5bac1] hover:text-[#dbdee1] shrink-0"
                         title="Attach files"
+                        aria-label="Attach files"
+                        data-testid="attach-files-btn"
                         type="button"
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -147,6 +150,8 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, 
                         disabled={chat.sending}
                         maxLength={4000}
                         rows={1}
+                        aria-label="Message input"
+                        data-testid="message-input"
                         onChange={e => {
                             chat.setContent(e.target.value);
                             if (e.target.value) chat.sendTyping();
