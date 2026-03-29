@@ -533,15 +533,14 @@ export default function GlobalSidebar() {
                         />
 
                         <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Color</label>
-                        <div className="flex gap-2 flex-wrap mb-1">
-                            {["#5865F2", "#57F287", "#FEE75C", "#EB459E", "#ED4245", "#F47B67", "#E78B38", "#949ba4"].map(c => (
-                                <button
-                                    key={c}
-                                    onClick={() => setRenameColor(c)}
-                                    className={`w-8 h-8 rounded-full transition-transform ${renameColor === c ? "ring-2 ring-white scale-110" : "hover:scale-110"}`}
-                                    style={{ backgroundColor: c }}
-                                />
-                            ))}
+                        <div className="flex items-center gap-3 mb-1">
+                            <input
+                                type="color"
+                                value={renameColor || "#5865F2"}
+                                onChange={e => setRenameColor(e.target.value)}
+                                className="w-10 h-10 rounded-full border-0 cursor-pointer bg-transparent [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-full [&::-webkit-color-swatch]:border-2 [&::-webkit-color-swatch]:border-white/20 [&::-moz-color-swatch]:rounded-full [&::-moz-color-swatch]:border-2 [&::-moz-color-swatch]:border-white/20"
+                            />
+                            <span className="text-sm text-[#949ba4] font-mono">{(renameColor || "#5865F2").toUpperCase()}</span>
                         </div>
 
                         <div className="flex justify-end gap-2 mt-4">
