@@ -143,20 +143,18 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
                 </div>
             )}
 
+            {trackStatus === "active" && !isSelf && (
+                <button
+                    onClick={() => onToggleWatch(false)}
+                    className="absolute top-2 right-2 text-white/60 hover:text-white text-xl font-bold leading-none z-10"
+                    title="Stop watching"
+                >
+                    ✕
+                </button>
+            )}
+
             {trackStatus === "active" && (
-                <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
-                    {!isSelf && (
-                        <button
-                            onClick={() => onToggleWatch(false)}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#da373c]/90 hover:bg-[#da373c] text-white text-xs font-medium backdrop-blur-sm transition-colors"
-                        >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="18" y1="6" x2="6" y2="18" />
-                                <line x1="6" y1="6" x2="18" y2="18" />
-                            </svg>
-                            Stop Watching
-                        </button>
-                    )}
+                <div className="absolute bottom-2 right-2 flex items-center gap-1.5 opacity-0 group-hover/screen:opacity-100 transition-opacity">
                     <button
                         onClick={toggleFullscreen}
                         title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}

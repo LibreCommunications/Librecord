@@ -39,11 +39,14 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
     const avatarSrc = getAvatarUrl(participant.avatarUrl);
     const avatarSize = compact ? 36 : 72;
 
+    const openProfile = () => window.dispatchEvent(new CustomEvent("user:profile:open", { detail: { userId: participant.userId } }));
+
     if (compact) {
         return (
             <div
+                onClick={openProfile}
                 className={`
-                    relative rounded-lg overflow-hidden
+                    relative rounded-lg overflow-hidden cursor-pointer
                     bg-[#232428] transition-shadow duration-200
                     ${isSpeaking ? "shadow-[0_0_0_2px_#23a55a]" : "shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"}
                 `}
@@ -113,8 +116,9 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
 
     return (
         <div
+            onClick={openProfile}
             className={`
-                relative rounded-xl overflow-hidden
+                relative rounded-xl overflow-hidden cursor-pointer
                 flex items-center justify-center aspect-video
                 bg-[#2b2d31] transition-shadow duration-200
                 ${isSpeaking ? "shadow-[0_0_0_3px_#23a55a,0_0_12px_rgba(35,165,90,0.3)]" : "shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"}

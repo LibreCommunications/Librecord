@@ -11,7 +11,13 @@ import { useChatChannel, type ChatChannelConfig } from "../../hooks/useChatChann
 import { AddParticipantModal } from "./AddParticipantModal";
 import { DmHeader } from "./DmHeader";
 import { ChatView } from "../../components/chat/ChatView";
+import { ConfirmModal } from "../../components/ui/ConfirmModal";
 import { PinnedMessagesPanel } from "../../components/messages/PinnedMessagesPanel";
+import { userProfiles, API_URL } from "../../api/client";
+import { useFriends } from "../../hooks/useFriends";
+import { useBlocks } from "../../hooks/useBlocks";
+import { useToast } from "../../hooks/useToast";
+import type { UserProfile } from "../../types/user";
 
 import type { AppEventMap } from "../../realtime/events";
 
@@ -37,6 +43,13 @@ export default function DmConversationPage() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
     const [showMembers, setShowMembers] = useState(false);
+    const [otherProfile, setOtherProfile] = useState<UserProfile | null>(null);
+    const [showProfile, setShowProfile] = useState(() => localStorage.getItem("lr:show-dm-profile") !== "false");
+    const [isBlocked, setIsBlocked] = useState(false);
+    const [confirmDmAction, setConfirmDmAction] = useState<"block" | "unfriend" | null>(null);
+    const { removeFriend } = useFriends();
+    const { blockUser, unblockUser, isBlocked: checkBlocked } = useBlocks();
+    const { toast } = useToast();
 
     // Load metadata before messages to avoid concurrent requests competing
     // for browser connection slots (max 6, minus 2 WebSockets = 4 free)
@@ -64,9 +77,19 @@ export default function DmConversationPage() {
                 setChannelName(others.length ? others.map(o => o.displayName).join(", ") : "Direct Message");
             }
             setMetadataReady(true);
+            // Load other user's profile for 1-to-1 DMs
+            if (!ch.isGroup) {
+                const other = ch.members.find(m => m.id !== user?.userId);
+                if (other) {
+                    userProfiles.get(other.id).then(setOtherProfile).catch(() => {});
+                    checkBlocked(other.id).then(setIsBlocked);
+                }
+            } else {
+                setOtherProfile(null);
+            }
         });
         return () => { stale = true; };
-    }, [dmId, getDmChannel, user?.userId]);
+    }, [dmId, getDmChannel, user?.userId, checkBlocked]);
 
     const config: ChatChannelConfig = useMemo(() => ({
         channelId: metadataReady ? dmId : undefined,
@@ -135,6 +158,22 @@ export default function DmConversationPage() {
                             onLeave={() => setShowLeaveConfirm(true)}
                         />
                     </div>
+                    {!channel?.isGroup && (
+                        <button
+                            onClick={() => {
+                                const next = !showProfile;
+                                setShowProfile(next);
+                                localStorage.setItem("lr:show-dm-profile", String(next));
+                            }}
+                            className={`p-2 rounded hover:bg-white/10 ${showProfile ? "text-white" : "text-gray-400 hover:text-white"}`}
+                            title={showProfile ? "Hide Profile" : "Show Profile"}
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                <circle cx="12" cy="7" r="4" />
+                            </svg>
+                        </button>
+                    )}
                     {channel?.isGroup && (
                         <button
                             onClick={() => setShowMembers(v => !v)}
@@ -211,6 +250,71 @@ export default function DmConversationPage() {
                 <PinnedMessagesPanel channelId={dmId} onClose={() => chat.setShowPins(false)} />
             )}
 
+            {/* 1-to-1 DM: show other user's profile */}
+            {showProfile && otherProfile && !channel?.isGroup && (
+                <div className="w-[280px] bg-[#232428] border-l border-black/20 flex flex-col overflow-y-auto">
+                    {/* Banner */}
+                    <div className={`h-[100px] shrink-0 ${otherProfile.bannerUrl ? "" : "bg-[#5865F2]"}`}>
+                        {otherProfile.bannerUrl && <img src={`${API_URL}${otherProfile.bannerUrl}`} className="w-full h-full object-cover" alt="" />}
+                    </div>
+                    {/* Avatar + Info */}
+                    <div className="px-4 -mt-8">
+                        <img
+                            src={otherProfile.avatarUrl ? `${API_URL}${otherProfile.avatarUrl}` : "/default-avatar.png"}
+                            className="w-16 h-16 rounded-full object-cover border-4 border-[#232428]"
+                            alt=""
+                        />
+                    </div>
+                    <div className="px-4 pt-1 pb-3">
+                        <p className="text-base font-bold text-white">{otherProfile.displayName}</p>
+                        <p className="text-xs text-[#949ba4]">@{otherProfile.username}</p>
+                        {otherProfile.bio && (
+                            <div className="mt-3 bg-[#1e1f22] rounded-lg px-3 py-2">
+                                <p className="text-[10px] font-semibold text-[#b5bac1] uppercase mb-1">About Me</p>
+                                <p className="text-xs text-[#dbdee1] whitespace-pre-wrap">{otherProfile.bio}</p>
+                            </div>
+                        )}
+                        <div className="mt-3 text-[10px] text-[#949ba4]">
+                            Member since {new Date(otherProfile.createdAt).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex flex-col gap-1.5 mt-3">
+                            {isBlocked ? (
+                                <button
+                                    onClick={async () => {
+                                        if (await unblockUser(otherProfile.id)) {
+                                            setIsBlocked(false);
+                                            toast(`${otherProfile.displayName} unblocked.`, "success");
+                                        }
+                                    }}
+                                    className="w-full py-1.5 rounded text-xs font-medium bg-[#248046] text-white hover:bg-[#1a6334] transition-colors"
+                                >
+                                    Unblock
+                                </button>
+                            ) : (
+                                <>
+                                    {otherProfile.isFriend && (
+                                        <button
+                                            onClick={() => setConfirmDmAction("unfriend")}
+                                            className="w-full py-1.5 rounded text-xs font-medium bg-[#2b2d31] text-[#f23f43] hover:bg-[#da373c] hover:text-white transition-colors"
+                                        >
+                                            Remove Friend
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setConfirmDmAction("block")}
+                                        className="w-full py-1.5 rounded text-xs font-medium bg-[#2b2d31] text-[#949ba4] hover:text-[#f23f43] transition-colors"
+                                    >
+                                        Block
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {showMembers && channel?.isGroup && (
                 <div className="w-60 bg-[#2b2d31] border-l border-black/20 flex flex-col overflow-y-auto">
                     <div className="px-4 pt-4 pb-2 text-xs font-semibold text-gray-400 uppercase">
@@ -230,6 +334,41 @@ export default function DmConversationPage() {
                         </div>
                     ))}
                 </div>
+            )}
+            {otherProfile && confirmDmAction === "unfriend" && (
+                <ConfirmModal
+                    open
+                    title={`Remove ${otherProfile.displayName}`}
+                    description={`Are you sure you want to remove ${otherProfile.displayName} as a friend?`}
+                    confirmLabel="Remove Friend"
+                    confirmVariant="danger"
+                    onConfirm={async () => {
+                        await removeFriend(otherProfile.id);
+                        setOtherProfile(p => p ? { ...p, isFriend: false } : p);
+                        toast("Friend removed.", "info");
+                        setConfirmDmAction(null);
+                    }}
+                    onCancel={() => setConfirmDmAction(null)}
+                />
+            )}
+
+            {otherProfile && confirmDmAction === "block" && (
+                <ConfirmModal
+                    open
+                    title={`Block ${otherProfile.displayName}`}
+                    description={`Are you sure you want to block ${otherProfile.displayName}? ${otherProfile.isFriend ? "This will also remove them as a friend. " : ""}They won't be able to message you.`}
+                    confirmLabel="Block"
+                    confirmVariant="danger"
+                    onConfirm={async () => {
+                        if (await blockUser(otherProfile.id)) {
+                            setIsBlocked(true);
+                            setOtherProfile(p => p ? { ...p, isFriend: false } : p);
+                            toast(`${otherProfile.displayName} blocked.`, "info");
+                        }
+                        setConfirmDmAction(null);
+                    }}
+                    onCancel={() => setConfirmDmAction(null)}
+                />
             )}
         </div>
     );
