@@ -120,6 +120,7 @@ public class ChannelController : AuthenticatedController
             Type = (GuildChannelType)dto.Type,
             Position = dto.Position,
             Topic = dto.Topic,
+            ParentId = dto.ParentId,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -139,7 +140,8 @@ public class ChannelController : AuthenticatedController
                     guildId,
                     name = channel.Name,
                     type = (int)channel.Type,
-                    position = channel.Position
+                    position = channel.Position,
+                    parentId = channel.ParentId
                 });
         }
 
@@ -171,6 +173,10 @@ public class ChannelController : AuthenticatedController
 
         channel.Topic = dto.Topic;
 
+        // ParentId: set if provided (move to category), null removes from category
+        if (dto.ParentId != channel.ParentId)
+            channel.ParentId = dto.ParentId;
+
         await _channels.UpdateChannelAsync(channel);
 
         // Broadcast to all guild members
@@ -179,7 +185,7 @@ public class ChannelController : AuthenticatedController
         {
             await _hub.Clients.Group(AppHub.GuildGroup(ch.Id)).SendAsync(
                 "guild:channel:updated",
-                new { channelId = channel.Id, guildId = channel.GuildId, name = channel.Name, topic = channel.Topic });
+                new { channelId = channel.Id, guildId = channel.GuildId, name = channel.Name, topic = channel.Topic, parentId = channel.ParentId });
         }
 
         return Ok(channel);

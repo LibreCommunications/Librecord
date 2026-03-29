@@ -88,9 +88,9 @@ export const guilds = {
 };
 
 export const channels = {
-    create: (guildId: string, data: { name: string; type: number; position: number }) =>
+    create: (guildId: string, data: { name: string; type: number; position: number; parentId?: string | null }) =>
         request<GuildChannel>(`/channels/guild/${guildId}`, { method: "POST", ...json(data) }),
-    update: (channelId: string, data: { name?: string; topic?: string | null }) =>
+    update: (channelId: string, data: { name?: string; topic?: string | null; parentId?: string | null }) =>
         request<GuildChannel>(`/channels/${channelId}`, { method: "PUT", ...json(data) }),
     delete: (channelId: string) =>
         request<void>(`/channels/${channelId}`, { method: "DELETE" }),

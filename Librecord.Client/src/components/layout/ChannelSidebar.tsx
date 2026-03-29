@@ -60,11 +60,11 @@ export default function ChannelSidebar({ guildId }: Props) {
         const refresh = () => { loadChannels(); };
         const onCreated = (e: CustomEvent<AppEventMap["guild:channel:created"]>) => {
             if (e.detail.guildId !== guildId) return;
-            setChannels(prev => [...prev, { id: e.detail.channelId, name: e.detail.name, type: e.detail.type, position: e.detail.position, guildId }]);
+            setChannels(prev => [...prev, { id: e.detail.channelId, name: e.detail.name, type: e.detail.type, position: e.detail.position, parentId: e.detail.parentId, guildId }]);
         };
         const onUpdated = (e: CustomEvent<AppEventMap["guild:channel:updated"]>) => {
             if (e.detail.guildId !== guildId) return;
-            setChannels(prev => prev.map(c => c.id === e.detail.channelId ? { ...c, name: e.detail.name } : c));
+            setChannels(prev => prev.map(c => c.id === e.detail.channelId ? { ...c, name: e.detail.name, parentId: e.detail.parentId } : c));
         };
         const onDeleted = (e: CustomEvent<AppEventMap["guild:channel:deleted"]>) => {
             if (e.detail.guildId !== guildId) return;
@@ -181,13 +181,33 @@ export default function ChannelSidebar({ guildId }: Props) {
         name: string;
         type: number;
         topic?: string | null;
+        parentId?: string | null;
     }) {
         await createChannel(guildId, { ...data, position: channels.length });
         await loadChannels();
     }
 
-    const textChannels = channels.filter(c => c.type === 0);
-    const voiceChannels = channels.filter(c => c.type === 1);
+    const categories = channels.filter(c => c.type === 2);
+    const uncategorizedText = channels.filter(c => c.type === 0 && !c.parentId);
+    const uncategorizedVoice = channels.filter(c => c.type === 1 && !c.parentId);
+
+    const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+    const toggleCategory = (id: string) => setCollapsedCategories(prev => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+    });
+
+    const [dragOverCat, setDragOverCat] = useState<string | null>(null);
+
+    function getChildChannels(categoryId: string) {
+        return channels.filter(c => c.parentId === categoryId && c.type !== 2);
+    }
+
+    async function moveChannelToCategory(channelId: string, parentId: string | null) {
+        await updateChannel(channelId, { parentId });
+        setChannels(prev => prev.map(c => c.id === channelId ? { ...c, parentId } : c));
+    }
 
     return (
         <>
@@ -226,10 +246,23 @@ export default function ChannelSidebar({ guildId }: Props) {
 
                     {!loading && (
                         <>
-                            <div className="px-3 pb-0.5">
-                                <h2 className="text-[#949ba4] uppercase text-[11px] font-bold tracking-wide">Text Channels</h2>
+                            {/* Uncategorized text channels — drop here to remove from category */}
+                            <div
+                                className={`px-3 pb-0.5 rounded transition-colors ${dragOverCat === "none" ? "bg-[#5865F2]/20" : ""}`}
+                                onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverCat("none"); }}
+                                onDragLeave={() => setDragOverCat(null)}
+                                onDrop={async e => {
+                                    e.preventDefault();
+                                    setDragOverCat(null);
+                                    const chId = e.dataTransfer.getData("channelId");
+                                    if (chId) await moveChannelToCategory(chId, null);
+                                }}
+                            >
+                                {uncategorizedText.length > 0 && (
+                                    <h2 className="text-[#949ba4] uppercase text-[11px] font-bold tracking-wide">Text Channels</h2>
+                                )}
                             </div>
-                            {textChannels.map(ch => {
+                            {uncategorizedText.map(ch => {
                                 const unreadCount = unreads[ch.id] ?? 0;
                                 const isActive = channelId === ch.id;
                                 const hasUnread = unreadCount > 0 && !isActive;
@@ -237,6 +270,8 @@ export default function ChannelSidebar({ guildId }: Props) {
                                 return (
                                     <Link key={ch.id} to={`/app/guild/${guildId}/${ch.id}`}>
                                         <div
+                                            draggable={permissions.manageChannels}
+                                            onDragStart={e => { e.dataTransfer.setData("channelId", ch.id); e.dataTransfer.effectAllowed = "move"; }}
                                             onContextMenu={e => {
                                                 if (!permissions.manageChannels) return;
                                                 e.preventDefault();
@@ -267,10 +302,98 @@ export default function ChannelSidebar({ guildId }: Props) {
                                 );
                             })}
 
-                            <div className="px-3 pb-0.5 pt-4">
-                                <h2 className="text-[#949ba4] uppercase text-[11px] font-bold tracking-wide">Voice Channels</h2>
-                            </div>
-                            {voiceChannels.map(ch => {
+                            {/* Categories with children */}
+                            {categories.map(cat => {
+                                const children = getChildChannels(cat.id);
+                                const isCollapsed = collapsedCategories.has(cat.id);
+                                return (
+                                    <div
+                                        key={cat.id}
+                                        className="mt-3"
+                                        onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverCat(cat.id); }}
+                                        onDragLeave={() => setDragOverCat(null)}
+                                        onDrop={async e => {
+                                            e.preventDefault();
+                                            setDragOverCat(null);
+                                            const chId = e.dataTransfer.getData("channelId");
+                                            if (chId) await moveChannelToCategory(chId, cat.id);
+                                        }}
+                                    >
+                                        <div
+                                            className={`flex items-center gap-0.5 px-1 py-0.5 cursor-pointer text-[#949ba4] hover:text-[#dbdee1] rounded transition-colors ${dragOverCat === cat.id ? "bg-[#5865F2]/20 text-white" : ""}`}
+                                            onClick={() => toggleCategory(cat.id)}
+                                            onContextMenu={e => {
+                                                if (!permissions.manageChannels) return;
+                                                e.preventDefault();
+                                                setCtxMenu({ x: e.clientX, y: e.clientY, channel: cat });
+                                            }}
+                                        >
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`transition-transform ${isCollapsed ? "-rotate-90" : ""}`}>
+                                                <polyline points="6 9 12 15 18 9" />
+                                            </svg>
+                                            <span className="uppercase text-[11px] font-bold tracking-wide truncate">{cat.name}</span>
+                                        </div>
+                                        {!isCollapsed && children.map(ch => {
+                                            if (ch.type === 1) {
+                                                const isInVoiceChannel = voiceState.isConnected && voiceState.channelId === ch.id;
+                                                const voiceParticipants = channelParticipants[ch.id] ?? [];
+                                                return (
+                                                    <div key={ch.id}>
+                                                        <div
+                                                            draggable={permissions.manageChannels}
+                                                            onDragStart={e => { e.dataTransfer.setData("channelId", ch.id); e.dataTransfer.effectAllowed = "move"; }}
+                                                            onClick={() => { navigate(`/app/guild/${guildId}/${ch.id}`); if (!isInVoiceChannel) joinVoice(ch.id, guildId); }}
+                                                            onContextMenu={e => { if (!permissions.manageChannels) return; e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, channel: ch }); }}
+                                                            className={`group relative flex items-center gap-1.5 mx-2 px-1.5 py-[6px] cursor-pointer rounded-[4px] hover:bg-[#35373c] ${isInVoiceChannel ? "bg-[#404249] text-white" : "text-[#949ba4] hover:text-[#dbdee1]"}`}
+                                                        >
+                                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-60 shrink-0" strokeLinecap="round" strokeLinejoin="round">
+                                                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                                                            </svg>
+                                                            <span className="truncate flex-1 text-[15px] leading-5">{ch.name}</span>
+                                                        </div>
+                                                        {voiceParticipants.length > 0 && (
+                                                            <div className="ml-8 space-y-0.5 mb-1">
+                                                                {voiceParticipants.map(p => (
+                                                                    <div key={p.userId} className="flex items-center gap-1.5 px-1 py-0.5 text-xs text-[#949ba4]">
+                                                                        <img src={getAvatarUrl(p.avatarUrl)} className="w-5 h-5 rounded-full object-cover" alt="" />
+                                                                        <span className="truncate">{p.displayName}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            }
+                                            // Text channel inside category
+                                            const unreadCount = unreads[ch.id] ?? 0;
+                                            const isActive = channelId === ch.id;
+                                            const hasUnread = unreadCount > 0 && !isActive;
+                                            return (
+                                                <Link key={ch.id} to={`/app/guild/${guildId}/${ch.id}`}>
+                                                    <div
+                                                        draggable={permissions.manageChannels}
+                                                        onDragStart={e => { e.dataTransfer.setData("channelId", ch.id); e.dataTransfer.effectAllowed = "move"; }}
+                                                        onContextMenu={e => { if (!permissions.manageChannels) return; e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, channel: ch }); }}
+                                                        className={`group relative flex items-center gap-1.5 mx-2 px-1.5 py-[6px] cursor-pointer rounded-[4px] hover:bg-[#35373c] ${isActive ? "bg-[#404249] text-white" : "text-[#949ba4] hover:text-[#dbdee1]"} ${hasUnread ? "text-[#f2f3f5]" : ""}`}
+                                                    >
+                                                        <span className="text-[18px] leading-none opacity-60">#</span>
+                                                        <span className={`truncate flex-1 text-[15px] leading-5 ${hasUnread ? "font-medium" : ""}`}>{ch.name}</span>
+                                                        {hasUnread && <UnreadBadge count={unreadCount} />}
+                                                    </div>
+                                                </Link>
+                                            );
+                                        })}
+                                    </div>
+                                );
+                            })}
+
+                            {/* Uncategorized voice channels */}
+                            {uncategorizedVoice.length > 0 && (
+                                <div className="px-3 pb-0.5 pt-4">
+                                    <h2 className="text-[#949ba4] uppercase text-[11px] font-bold tracking-wide">Voice Channels</h2>
+                                </div>
+                            )}
+                            {uncategorizedVoice.map(ch => {
                                 const isInVoiceChannel = voiceState.isConnected && voiceState.channelId === ch.id;
                                 const voiceParticipants = channelParticipants[ch.id] ?? [];
 
@@ -366,6 +489,7 @@ export default function ChannelSidebar({ guildId }: Props) {
 
             <CreateChannelModal
                 open={showCreate}
+                categories={categories}
                 onClose={() => setShowCreate(false)}
                 onCreate={handleCreateChannel}
             />

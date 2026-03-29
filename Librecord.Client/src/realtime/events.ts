@@ -134,6 +134,7 @@ export interface AppEventMap {
         name: string;
         type: number;
         position: number;
+        parentId?: string | null;
     };
 
     "guild:member:roles": {
@@ -154,6 +155,7 @@ export interface AppEventMap {
         guildId: string;
         name: string;
         topic?: string | null;
+        parentId?: string | null;
     };
 
     "guild:channel:deleted": {
