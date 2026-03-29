@@ -205,7 +205,7 @@ export default function ChannelSidebar({ guildId }: Props) {
     return (
         <>
             <aside className="w-60 bg-[#2b2d31] border-r border-black/20 flex-1 flex flex-col">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-black/20 shrink-0">
+                <div className="flex items-center justify-between px-3 h-12 border-b border-black/20 shrink-0">
                     <span className="text-white font-semibold text-sm truncate">Channels</span>
                     <div className="flex items-center gap-1">
                         {permissions.manageChannels && (
@@ -234,7 +234,7 @@ export default function ChannelSidebar({ guildId }: Props) {
                         )}
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto dark-scrollbar pt-3">
+                <div className="flex-1 overflow-y-auto dark-scrollbar pt-2">
                     {loading && <div className="text-xs text-gray-500 px-4 py-2">Loading channels…</div>}
 
                     {!loading && (
@@ -330,11 +330,11 @@ export default function ChannelSidebar({ guildId }: Props) {
                             })}
 
                             {/* Categories */}
-                            {categories.map(cat => {
+                            {categories.map((cat, catIdx) => {
                                 const children = getChildChannels(cat.id);
                                 const isCollapsed = collapsedCategories.has(cat.id);
                                 return (
-                                    <div key={cat.id} className="mt-3">
+                                    <div key={cat.id} className={(catIdx > 0 || uncategorized.length > 0) ? "mt-3" : ""}>
                                         <div
                                             className="flex items-center gap-0.5 px-1 py-0.5 cursor-pointer text-[#949ba4] hover:text-[#dbdee1]"
                                             onClick={() => toggleCategory(cat.id)}
