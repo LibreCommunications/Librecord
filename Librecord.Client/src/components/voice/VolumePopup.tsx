@@ -19,6 +19,18 @@ export function setUserVolume(userId: string, volume: number) {
     window.dispatchEvent(new CustomEvent("voice:volume:changed", { detail: { userId, volume } }));
 }
 
+// Quadratic curve: slider position (0-200) → actual gain
+// Makes the slider feel natural — small changes near quiet are more precise,
+// and boosting above 100% requires more slider movement.
+function sliderToGain(slider: number): number {
+    return Math.round((slider / 100) * (slider / 100) * 100);
+}
+
+// Inverse: actual gain (stored %) → slider position
+function gainToSlider(gain: number): number {
+    return Math.round(Math.sqrt(gain / 100) * 100);
+}
+
 interface Props {
     userId: string;
     displayName: string;
@@ -29,6 +41,7 @@ interface Props {
 
 export function VolumePopup({ userId, displayName, x, y, onClose }: Props) {
     const [volume, setVolume] = useState(() => getUserVolume(userId));
+    const slider = gainToSlider(volume);
     const popupRef = useRef<HTMLDivElement>(null);
     const [pos, setPos] = useState({ top: y, left: x });
 
@@ -49,19 +62,25 @@ export function VolumePopup({ userId, displayName, x, y, onClose }: Props) {
         return () => document.removeEventListener("mousedown", onClick);
     }, [onClose]);
 
-    function handleChange(val: number) {
-        setVolume(val);
-        setUserVolume(userId, val);
+    function handleSliderChange(sliderVal: number) {
+        const gain = sliderToGain(sliderVal);
+        setVolume(gain);
+        setUserVolume(userId, gain);
+    }
+
+    function handleReset() {
+        setVolume(100);
+        setUserVolume(userId, 100);
     }
 
     return (
         <div
             ref={popupRef}
-            className="fixed z-[999] bg-[#111214] rounded-lg shadow-xl border border-[#2b2d31] p-3 w-[200px]"
+            className="fixed z-[999] bg-[#111214] rounded-lg shadow-xl border border-[#2b2d31] p-3 w-[280px]"
             style={{ top: pos.top, left: pos.left }}
         >
             <div className="text-xs font-semibold text-[#b5bac1] mb-2 truncate">{displayName}</div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#949ba4] shrink-0">
                     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
                 </svg>
@@ -69,15 +88,15 @@ export function VolumePopup({ userId, displayName, x, y, onClose }: Props) {
                     type="range"
                     min={0}
                     max={200}
-                    value={volume}
-                    onChange={e => handleChange(Number(e.target.value))}
+                    value={slider}
+                    onChange={e => handleSliderChange(Number(e.target.value))}
                     className="flex-1 accent-[#5865F2] h-1.5"
                 />
-                <span className="text-xs text-[#dbdee1] w-8 text-right font-mono">{volume}%</span>
+                <span className="text-xs text-[#dbdee1] w-10 text-right font-mono">{volume}%</span>
             </div>
             {volume !== 100 && (
                 <button
-                    onClick={() => handleChange(100)}
+                    onClick={handleReset}
                     className="text-[10px] text-[#5865F2] hover:underline mt-1"
                 >
                     Reset to 100%
