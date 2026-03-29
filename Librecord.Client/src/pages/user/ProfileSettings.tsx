@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { usePresence } from "../../hooks/usePresence";
@@ -10,140 +10,63 @@ export default function ProfileSettings() {
     const { user, logout } = useAuth();
     const { updateDisplayName, uploadAvatar } = useUserProfile();
     const { myStatus, setMyStatus } = usePresence();
+    const { toast } = useToast();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const bannerInputRef = useRef<HTMLInputElement>(null);
 
     const [name, setName] = useState(user?.displayName ?? "");
-    const [isSavingName, setIsSavingName] = useState(false);
-
-    const { toast } = useToast();
     const [bio, setBio] = useState("");
-    const [savingBio, setSavingBio] = useState(false);
+    const [bannerUrl, setBannerUrl] = useState<string | null>(null);
     const [friendsVisible, setFriendsVisible] = useState(true);
-
+    const [saving, setSaving] = useState(false);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
-    const [uploadingAvatar, setUploadingAvatar] = useState(false);
-    const bannerInputRef = useRef<HTMLInputElement>(null);
-    const [bannerUrl, setBannerUrl] = useState<string | null>(null);
-    const [uploadingBanner, setUploadingBanner] = useState(false);
+
+    // Load existing profile data on mount
+    const loaded = useRef(false);
+    useEffect(() => {
+        if (!user || loaded.current) return;
+        loaded.current = true;
+        userProfiles.get(user.userId).then(p => {
+            setBio(p.bio ?? "");
+            setBannerUrl(p.bannerUrl ?? null);
+            setFriendsVisible(p.friendsVisible ?? true);
+        }).catch(() => {});
+    }, [user]);
 
     if (!user) return null;
 
-    const avatarSrc =
-        avatarPreview ||
-        (user.avatarUrl ? `${API_URL}${user.avatarUrl}` : "/default-avatar.png");
+    const avatarSrc = avatarPreview || (user.avatarUrl ? `${API_URL}${user.avatarUrl}` : "/default-avatar.png");
 
-    function handleAvatarSelect(e: React.ChangeEvent<HTMLInputElement>) {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        setAvatarFile(file);
-        if (avatarPreview) URL.revokeObjectURL(avatarPreview);
-        setAvatarPreview(URL.createObjectURL(file));
-    }
-
-    async function handleAvatarUpload() {
-        if (!avatarFile) return;
-
-        setUploadingAvatar(true);
-        await uploadAvatar(avatarFile);
-        setUploadingAvatar(false);
-
+    async function handleSaveAll() {
+        setSaving(true);
+        const promises: Promise<unknown>[] = [];
+        if (name.trim() !== user?.displayName) promises.push(updateDisplayName(name.trim()));
+        promises.push(userProfiles.updateBio(bio.trim() || null));
+        if (avatarFile) promises.push(uploadAvatar(avatarFile));
+        await Promise.all(promises);
         if (avatarPreview) URL.revokeObjectURL(avatarPreview);
         setAvatarPreview(null);
         setAvatarFile(null);
-    }
-
-    async function saveDisplayName() {
-        if (!name.trim()) return;
-
-        setIsSavingName(true);
-        await updateDisplayName(name.trim());
-        setIsSavingName(false);
+        setSaving(false);
+        toast("Profile saved!", "success");
     }
 
     return (
-        <div className="space-y-12 max-w-3xl">
+        <div className="max-w-3xl space-y-6">
+            <h1 className="text-2xl font-bold text-white">My Account</h1>
 
-            <h1 className="text-2xl font-bold text-white">
-                My Account
-            </h1>
-
-            {/* --------------------------------
-                PROFILE PICTURE
-            -------------------------------- */}
-            <section className="bg-[#2b2d31] rounded-lg p-6 border border-black/20">
-                <h2 className="text-lg font-semibold text-white mb-4">
-                    Profile Picture
-                </h2>
-
-                <div className="flex items-center gap-6">
-                    <div
-                        onClick={() => fileInputRef.current?.click()}
-                        className="relative w-24 h-24 rounded-full cursor-pointer group"
-                    >
-                        <img
-                            src={avatarSrc}
-                            alt="Avatar"
-                            className="w-full h-full rounded-full object-cover border border-black/40"
-                        />
-
-                        <div
-                            className="
-                                absolute inset-0 rounded-full
-                                bg-black/60 opacity-0
-                                group-hover:opacity-100
-                                flex items-center justify-center
-                                text-xs font-semibold
-                                transition
-                            "
-                        >
-                            Change Avatar
-                        </div>
-                    </div>
-
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleAvatarSelect}
-                        className="hidden"
-                    />
-
-                    {avatarFile && (
-                        <button
-                            onClick={handleAvatarUpload}
-                            disabled={uploadingAvatar}
-                            className="
-                                px-4 py-2 rounded
-                                bg-[#5865F2] hover:bg-[#4752c4]
-                                text-white text-sm font-medium
-                                disabled:opacity-50
-                            "
-                        >
-                            {uploadingAvatar ? "Uploading…" : "Save Avatar"}
-                        </button>
-                    )}
-                </div>
-            </section>
-
-            {/* Banner */}
-            <section className="bg-[#2b2d31] rounded-lg p-6 border border-black/20">
-                <h2 className="text-lg font-semibold text-white mb-4">Profile Banner</h2>
+            {/* ── Live Profile Preview ──────────────────────── */}
+            <div className="bg-[#111214] rounded-xl overflow-hidden border border-[#2b2d31]">
+                {/* Banner — decorative only */}
                 <div
                     onClick={() => bannerInputRef.current?.click()}
-                    className="relative h-[120px] rounded-lg overflow-hidden cursor-pointer group border-2 border-dashed border-[#4e5058] hover:border-[#5865F2]"
+                    className={`h-24 relative cursor-pointer group ${bannerUrl ? "" : "bg-[#5865F2]"}`}
                 >
-                    {bannerUrl ? (
-                        <img src={`${API_URL}${bannerUrl}`} className="w-full h-full object-cover" alt="" />
-                    ) : (
-                        <div className="w-full h-full bg-[#5865F2]/20 flex items-center justify-center text-[#949ba4]">
-                            Click to upload a banner
-                        </div>
-                    )}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-sm font-medium transition">
-                        {uploadingBanner ? "Uploading..." : "Change Banner"}
+                    {bannerUrl && <img src={`${API_URL}${bannerUrl}`} className="w-full h-full object-cover" alt="" />}
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 bg-black/40 flex items-center justify-center text-white text-xs font-medium transition">
+                        Change Banner
                     </div>
                 </div>
                 <input
@@ -155,173 +78,155 @@ export default function ProfileSettings() {
                         const f = e.target.files?.[0];
                         if (!f) return;
                         if (f.size > 5 * 1024 * 1024) { toast("Banner must be under 5 MB.", "error"); return; }
-                        setUploadingBanner(true);
                         try {
                             const result = await userProfiles.uploadBanner(f);
                             setBannerUrl(result.bannerUrl);
                             toast("Banner updated!", "success");
                         } catch { toast("Failed to upload banner.", "error"); }
-                        setUploadingBanner(false);
                         e.target.value = "";
                     }}
                 />
-                <p className="text-xs text-[#949ba4] mt-2">Recommended: 600x200. Max 5 MB.</p>
-            </section>
 
-            {/* Bio */}
-            <section className="bg-[#2b2d31] rounded-lg p-6 border border-black/20 space-y-3">
-                <h2 className="text-lg font-semibold text-white">About Me</h2>
+                {/* Info section — solid bg, separate from banner */}
+                <div className="bg-[#232428] px-4 pt-0 pb-4">
+                    {/* Avatar straddles the banner/info boundary */}
+                    <div className="flex items-end gap-3 -mt-8">
+                        <div
+                            onClick={() => fileInputRef.current?.click()}
+                            className="relative w-[72px] h-[72px] rounded-full cursor-pointer group shrink-0"
+                        >
+                            <img src={avatarSrc} className="w-[72px] h-[72px] rounded-full object-cover border-4 border-[#232428]" alt="" />
+                            <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[10px] font-semibold text-white transition">
+                                Change
+                            </div>
+                        </div>
+                        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setAvatarFile(file);
+                            if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+                            setAvatarPreview(URL.createObjectURL(file));
+                        }} />
+                        <div className="pb-1 min-w-0">
+                            <p className="text-base font-bold text-white truncate">{name || user.displayName}</p>
+                            <p className="text-xs text-[#949ba4]">@{user.username}</p>
+                        </div>
+                    </div>
+
+                    {/* Bio preview */}
+                    {bio && (
+                        <div className="mt-3 bg-[#1e1f22] rounded-lg px-3 py-2">
+                            <p className="text-[10px] font-semibold text-[#b5bac1] uppercase mb-1">About Me</p>
+                            <p className="text-sm text-[#dbdee1] whitespace-pre-wrap">{bio}</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <button
+                onClick={() => window.dispatchEvent(new CustomEvent("user:profile:open", { detail: { userId: user.userId } }))}
+                className="text-sm text-[#5865F2] hover:underline"
+            >
+                Preview full profile
+            </button>
+
+            {/* ── Edit Fields ──────────────────────────────── */}
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Display Name</label>
+                    <input
+                        value={name}
+                        onChange={e => setName(e.target.value)}
+                        maxLength={32}
+                        className="w-full px-3 py-2 rounded bg-[#1e1f22] text-white outline-none border border-[#3f4147] focus:border-[#5865F2]"
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Online Status</label>
+                    <div className="flex gap-1.5 h-[38px]">
+                        {([
+                            { value: "online", label: "Online" },
+                            { value: "idle", label: "Idle" },
+                            { value: "donotdisturb", label: "DND" },
+                            { value: "offline", label: "Invisible" },
+                        ] as const).map(s => (
+                            <button
+                                key={s.value}
+                                onClick={() => setMyStatus(s.value)}
+                                className={`flex-1 flex items-center justify-center gap-1.5 rounded text-xs font-medium transition-colors ${
+                                    myStatus === s.value
+                                        ? "bg-[#5865F2]/20 border border-[#5865F2] text-white"
+                                        : "bg-[#1e1f22] border border-[#3f4147] text-[#b5bac1] hover:text-white"
+                                }`}
+                            >
+                                <StatusDot status={s.value} size="sm" />
+                                {s.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">About Me</label>
                 <textarea
                     value={bio}
                     onChange={e => setBio(e.target.value)}
                     maxLength={500}
                     rows={3}
                     placeholder="Tell people about yourself..."
-                    className="w-full px-3 py-2 rounded bg-[#1e1f22] text-white outline-none focus:ring-2 focus:ring-[#5865F2] resize-none"
+                    className="w-full px-3 py-2 rounded bg-[#1e1f22] text-white outline-none border border-[#3f4147] focus:border-[#5865F2] resize-none"
                 />
-                <div className="flex items-center justify-between">
-                    <span className="text-xs text-[#949ba4]">{bio.length}/500</span>
-                    <button
-                        onClick={async () => {
-                            setSavingBio(true);
-                            await userProfiles.updateBio(bio.trim() || null);
-                            setSavingBio(false);
-                            toast("Bio updated!", "success");
-                        }}
-                        disabled={savingBio}
-                        className="px-4 py-2 rounded bg-[#5865F2] hover:bg-[#4752c4] text-white text-sm font-medium disabled:opacity-50"
-                    >
-                        {savingBio ? "Saving..." : "Save Bio"}
-                    </button>
-                </div>
-            </section>
+                <span className="text-xs text-[#949ba4]">{bio.length}/500</span>
+            </div>
 
-            {/* Privacy */}
-            <section className="bg-[#2b2d31] rounded-lg p-6 border border-black/20">
-                <h2 className="text-lg font-semibold text-white mb-4">Privacy</h2>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <div className="text-sm font-medium text-white">Show Friends on Profile</div>
-                        <div className="text-xs text-[#949ba4] mt-0.5">Allow others to see your friend list on your profile.</div>
-                    </div>
-                    <button
-                        onClick={async () => {
-                            const next = !friendsVisible;
-                            setFriendsVisible(next);
-                            await userProfiles.updateFriendsVisible(next);
-                            toast(next ? "Friends visible on profile." : "Friends hidden from profile.", "info");
-                        }}
-                        className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${friendsVisible ? "bg-[#248046]" : "bg-[#72767d]"}`}
-                    >
-                        <span className={`block w-[18px] h-[18px] rounded-full bg-white shadow-md transition-all duration-200 absolute top-[3px] ${friendsVisible ? "left-[23px]" : "left-[3px]"}`} />
-                    </button>
-                </div>
-            </section>
+            <button
+                onClick={handleSaveAll}
+                disabled={saving}
+                className="px-6 py-2.5 rounded-lg bg-[#5865F2] hover:bg-[#4752c4] text-white font-medium disabled:opacity-50 transition-colors"
+            >
+                {saving ? "Saving..." : "Save Profile"}
+            </button>
 
-            {/* --------------------------------
-                ACCOUNT INFO
-            -------------------------------- */}
-            <section className="bg-[#2b2d31] rounded-lg p-6 border border-black/20 space-y-5">
-                <h2 className="text-lg font-semibold text-white">
-                    Account Info
-                </h2>
-
+            {/* ── Privacy ──────────────────────────────────── */}
+            <div className="flex items-center justify-between bg-[#2b2d31] rounded-lg px-4 py-3">
                 <div>
-                    <label className="text-xs uppercase text-gray-400">
-                        Username
-                    </label>
-                    <div className="mt-1 px-3 py-2 rounded bg-[#1e1f22] text-gray-300">
-                        {user.username}
-                    </div>
+                    <div className="text-sm font-medium text-white">Show Friends on Profile</div>
+                    <div className="text-xs text-[#949ba4] mt-0.5">Allow others to see your friend list.</div>
                 </div>
+                <button
+                    onClick={async () => {
+                        const next = !friendsVisible;
+                        setFriendsVisible(next);
+                        await userProfiles.updateFriendsVisible(next);
+                    }}
+                    className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${friendsVisible ? "bg-[#248046]" : "bg-[#72767d]"}`}
+                >
+                    <span className={`block w-[18px] h-[18px] rounded-full bg-white shadow-md transition-all duration-200 absolute top-[3px] ${friendsVisible ? "left-[23px]" : "left-[3px]"}`} />
+                </button>
+            </div>
 
+            {/* ── Account Info (read-only) ─────────────────── */}
+            <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="text-xs uppercase text-gray-400">
-                        Email
-                    </label>
-                    <div className="mt-1 px-3 py-2 rounded bg-[#1e1f22] text-gray-300">
-                        {user.email}
-                    </div>
+                    <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Username</label>
+                    <div className="px-3 py-2 rounded bg-[#1e1f22] text-[#949ba4] text-sm">{user.username}</div>
                 </div>
-
                 <div>
-                    <label className="text-xs uppercase text-gray-400">
-                        Display Name
-                    </label>
-                    <input
-                        value={name}
-                        onChange={e => setName(e.target.value)}
-                        maxLength={32}
-                        className="
-                            mt-1 w-full px-3 py-2 rounded
-                            bg-[#1e1f22] text-white
-                            outline-none
-                            focus:ring-2 focus:ring-[#5865F2]
-                        "
-                    />
-
-                    <button
-                        onClick={saveDisplayName}
-                        disabled={isSavingName}
-                        className="
-                            mt-3 px-4 py-2 rounded
-                            bg-[#5865F2] hover:bg-[#4752c4]
-                            text-white text-sm font-medium
-                            disabled:opacity-50
-                        "
-                    >
-                        {isSavingName ? "Saving…" : "Save Changes"}
-                    </button>
+                    <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Email</label>
+                    <div className="px-3 py-2 rounded bg-[#1e1f22] text-[#949ba4] text-sm">{user.email}</div>
                 </div>
-            </section>
+            </div>
 
-            {/* --------------------------------
-                ONLINE STATUS
-            -------------------------------- */}
-            <section className="bg-[#2b2d31] rounded-lg p-6 border border-black/20">
-                <h2 className="text-lg font-semibold text-white mb-4">
-                    Online Status
-                </h2>
-                <div className="grid grid-cols-2 gap-2">
-                    {([
-                        { value: "online", label: "Online" },
-                        { value: "idle", label: "Idle" },
-                        { value: "donotdisturb", label: "Do Not Disturb" },
-                        { value: "offline", label: "Invisible" },
-                    ] as const).map(s => (
-                        <button
-                            key={s.value}
-                            onClick={() => setMyStatus(s.value)}
-                            className={`
-                                flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors
-                                ${myStatus === s.value
-                                    ? "bg-[#5865F2]/20 border border-[#5865F2] text-white"
-                                    : "bg-[#1e1f22] border border-transparent text-[#b5bac1] hover:bg-[#35373c] hover:text-white"
-                                }
-                            `}
-                        >
-                            <StatusDot status={s.value} size="md" />
-                            {s.label}
-                        </button>
-                    ))}
-                </div>
-            </section>
-
-            {/* --------------------------------
-                DANGER ZONE
-            -------------------------------- */}
-            <section className="border-t border-red-500/30 pt-6">
+            {/* ── Logout ───────────────────────────────────── */}
+            <div className="border-t border-[#3f4147] pt-4">
                 <button
                     onClick={logout}
-                    className="
-                        px-5 py-3 rounded
-                        bg-red-600 hover:bg-red-700
-                        text-white font-semibold
-                    "
+                    className="px-5 py-2.5 rounded bg-[#da373c] hover:bg-[#a12828] text-white font-medium transition-colors"
                 >
                     Logout
                 </button>
-            </section>
+            </div>
         </div>
     );
 }
