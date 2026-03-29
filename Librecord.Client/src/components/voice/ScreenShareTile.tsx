@@ -146,7 +146,7 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
             {trackStatus === "active" && !isSelf && (
                 <button
                     onClick={() => onToggleWatch(false)}
-                    className="absolute top-2 right-2 text-white/60 hover:text-white text-xl font-bold leading-none z-10"
+                    className="absolute top-2 right-2 text-[#f23f43] hover:text-[#da373c] text-xl font-bold leading-none z-10 drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]"
                     title="Stop watching"
                 >
                     ✕
