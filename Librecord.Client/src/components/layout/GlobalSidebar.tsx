@@ -82,6 +82,35 @@ export default function GlobalSidebar() {
     const { myStatus } = usePresence();
     const { voiceState, leaveVoice } = useVoice();
 
+    // ── Guild Folders (client-only, localStorage) ────────────
+    interface GuildFolder { id: string; name?: string; guildIds: string[]; }
+    const FOLDERS_KEY = "librecord:guildFolders";
+
+    const [folders, setFolders] = useState<GuildFolder[]>(() => {
+        try { return JSON.parse(localStorage.getItem(FOLDERS_KEY) ?? "[]"); } catch { return []; }
+    });
+    const [expandedFolder, setExpandedFolder] = useState<string | null>(null);
+    const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
+
+    function saveFolders(next: GuildFolder[]) {
+        setFolders(next);
+        localStorage.setItem(FOLDERS_KEY, JSON.stringify(next));
+    }
+
+    const folderedGuildIds = new Set(folders.flatMap(f => f.guildIds));
+
+    function createFolder(guildA: string, guildB: string) {
+        const folder: GuildFolder = { id: crypto.randomUUID(), guildIds: [guildA, guildB] };
+        saveFolders([...folders, folder]);
+        setExpandedFolder(folder.id);
+    }
+
+    function removeFromFolder(folderId: string, guildId: string) {
+        const updated = folders.map(f => f.id === folderId ? { ...f, guildIds: f.guildIds.filter(id => id !== guildId) } : f)
+            .filter(f => f.guildIds.length >= 2); // dissolve folders with < 2 guilds
+        saveFolders(updated);
+    }
+
     const [guildUnreads, setGuildUnreads] = useState<Record<string, number>>({});
     const [dmUnread, setDmUnread] = useState(false);
     const channelToGuildRef = useRef<Record<string, string>>({});
@@ -216,7 +245,19 @@ export default function GlobalSidebar() {
 
     return (
         <>
-            <aside id="global-sidebar" className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 gap-2 overflow-y-auto no-scrollbar">
+            <aside
+                id="global-sidebar"
+                className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 gap-2 overflow-y-auto no-scrollbar"
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => {
+                    const draggedId = e.dataTransfer.getData("guildId");
+                    const fromFolder = e.dataTransfer.getData("fromFolder");
+                    if (draggedId && fromFolder) {
+                        e.preventDefault();
+                        removeFromFolder(fromFolder, draggedId);
+                    }
+                }}
+            >
 
                 <SidebarIcon to="/app/dm" active={isDmPage} unread={effectiveDmUnread} tooltip="Direct Messages" className="bg-[#313338] hover:bg-[#5865F2] text-white">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -226,28 +267,126 @@ export default function GlobalSidebar() {
 
                 <div className="w-8 h-0.5 bg-[#35373c] rounded-full" />
 
-                {guilds.map(g => (
-                    <SidebarIcon
+                {/* Folders */}
+                {folders.map(folder => {
+                    const folderGuilds = folder.guildIds.map(id => guilds.find(g => g.id === id)).filter(Boolean) as GuildSummary[];
+                    if (folderGuilds.length === 0) return null;
+                    const isExpanded = expandedFolder === folder.id;
+                    const hasUnread = folderGuilds.some(g => (effectiveGuildUnreads[g.id] ?? 0) > 0);
+                    const hasActive = folderGuilds.some(g => guildId === g.id);
+
+                    return (
+                        <div
+                            key={folder.id}
+                            onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverTarget(`folder:${folder.id}`); }}
+                            onDragLeave={() => setDragOverTarget(null)}
+                            onDrop={e => {
+                                e.preventDefault();
+                                setDragOverTarget(null);
+                                const draggedId = e.dataTransfer.getData("guildId");
+                                if (draggedId && !folder.guildIds.includes(draggedId)) {
+                                    // Remove from any other folder first
+                                    const cleaned = folders.map(f => ({ ...f, guildIds: f.guildIds.filter(id => id !== draggedId) }));
+                                    saveFolders(cleaned.map(f => f.id === folder.id ? { ...f, guildIds: [...f.guildIds, draggedId] } : f).filter(f => f.guildIds.length >= 2));
+                                }
+                            }}
+                        >
+                            {/* Folder icon — click to expand */}
+                            <div
+                                className={`relative group flex items-center justify-center w-12 h-12 rounded-2xl cursor-pointer transition-all
+                                    ${isExpanded || hasActive ? "rounded-2xl" : "rounded-full hover:rounded-2xl"}
+                                    ${dragOverTarget === `folder:${folder.id}` ? "ring-2 ring-[#5865F2]" : ""}
+                                    bg-[#313338] hover:bg-[#5865F2]`}
+                                onClick={() => setExpandedFolder(isExpanded ? null : folder.id)}
+                            >
+                                {/* Mini grid of guild icons */}
+                                <div className="grid grid-cols-2 gap-0.5 w-8 h-8 overflow-hidden rounded-lg">
+                                    {folderGuilds.slice(0, 4).map(g => (
+                                        g.iconUrl ? (
+                                            <img key={g.id} src={`${API_URL}${g.iconUrl}`} className="w-full h-full object-cover" alt="" />
+                                        ) : (
+                                            <div key={g.id} className="w-full h-full bg-[#5865F2] flex items-center justify-center text-[8px] text-white font-bold">
+                                                {g.name[0]}
+                                            </div>
+                                        )
+                                    ))}
+                                </div>
+                                {hasUnread && !hasActive && (
+                                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-[#f23f43] rounded-full border-2 border-[#1e1f22]" />
+                                )}
+                            </div>
+
+                            {/* Expanded folder contents */}
+                            {isExpanded && (
+                                <div className="flex flex-col items-center gap-1 mt-1 mb-1 pl-1 border-l-2 border-[#5865F2] ml-5">
+                                    {folderGuilds.map(g => (
+                                        <div
+                                            key={g.id}
+                                            draggable
+                                            onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("guildId", g.id); e.dataTransfer.setData("fromFolder", folder.id); e.dataTransfer.effectAllowed = "move"; }}
+                                        >
+                                            <SidebarIcon
+                                                to={`/app/guild/${g.id}`}
+                                                active={guildId === g.id}
+                                                unread={(effectiveGuildUnreads[g.id] ?? 0) > 0}
+                                                tooltip={g.name}
+                                                className="bg-[#313338] hover:bg-[#5865F2] text-white"
+                                            >
+                                                {g.iconUrl ? (
+                                                    <img src={`${API_URL}${g.iconUrl}`} className="w-full h-full rounded-[inherit] object-cover" alt="" />
+                                                ) : (
+                                                    <span className="text-lg font-medium">{g.name[0].toUpperCase()}</span>
+                                                )}
+                                            </SidebarIcon>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+
+                {/* Unfoldered guilds */}
+                {guilds.filter(g => !folderedGuildIds.has(g.id)).map(g => (
+                    <div
                         key={g.id}
-                        to={`/app/guild/${g.id}`}
-                        active={guildId === g.id}
-                        unread={(effectiveGuildUnreads[g.id] ?? 0) > 0}
-                        tooltip={g.name}
-                        testId={`guild-icon-${g.id}`}
-                        className="bg-[#313338] hover:bg-[#5865F2] text-white"
+                        draggable
+                        onDragStart={e => { e.dataTransfer.setData("guildId", g.id); e.dataTransfer.effectAllowed = "move"; }}
+                        onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverTarget(`guild:${g.id}`); }}
+                        onDragLeave={() => setDragOverTarget(null)}
+                        onDrop={e => {
+                            e.preventDefault();
+                            setDragOverTarget(null);
+                            const draggedId = e.dataTransfer.getData("guildId");
+                            const fromFolder = e.dataTransfer.getData("fromFolder");
+                            if (!draggedId || draggedId === g.id) return;
+                            // Remove from source folder if any
+                            if (fromFolder) removeFromFolder(fromFolder, draggedId);
+                            // Create new folder with these two guilds
+                            createFolder(g.id, draggedId);
+                        }}
                     >
-                        {g.iconUrl ? (
-                            <img
-                                src={`${API_URL}${g.iconUrl}`}
-                                className="w-full h-full rounded-[inherit] object-cover"
-                                alt=""
-                            />
-                        ) : (
-                            <span className="text-lg font-medium">
-                                {g.name[0].toUpperCase()}
-                            </span>
-                        )}
-                    </SidebarIcon>
+                        <SidebarIcon
+                            to={`/app/guild/${g.id}`}
+                            active={guildId === g.id}
+                            unread={(effectiveGuildUnreads[g.id] ?? 0) > 0}
+                            tooltip={g.name}
+                            testId={`guild-icon-${g.id}`}
+                            className={`bg-[#313338] hover:bg-[#5865F2] text-white ${dragOverTarget === `guild:${g.id}` ? "ring-2 ring-[#5865F2]" : ""}`}
+                        >
+                            {g.iconUrl ? (
+                                <img
+                                    src={`${API_URL}${g.iconUrl}`}
+                                    className="w-full h-full rounded-[inherit] object-cover"
+                                    alt=""
+                                />
+                            ) : (
+                                <span className="text-lg font-medium">
+                                    {g.name[0].toUpperCase()}
+                                </span>
+                            )}
+                        </SidebarIcon>
+                    </div>
                 ))}
 
                 <SidebarIcon
