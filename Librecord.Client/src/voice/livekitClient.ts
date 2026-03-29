@@ -147,6 +147,12 @@ function pollSpeaking() {
     animFrameId = requestAnimationFrame(pollSpeaking);
 }
 
+// Listen for per-user volume changes and apply to audio elements
+window.addEventListener("voice:volume:changed", ((e: CustomEvent<{ userId: string; volume: number }>) => {
+    const audio = audioElements.get(e.detail.userId);
+    if (audio) audio.volume = Math.min(e.detail.volume / 100, 2);
+}) as EventListener);
+
 // LiveKit's auto-attach relies on room.startAudio() which can fail
 // if called outside a user gesture context. Explicit <audio> elements
 // guarantee playback.
@@ -161,6 +167,11 @@ function attachAudioTrack(identity: string, track: MediaStreamTrack) {
     audio.setAttribute("playsinline", "");
     // Hidden but must be in the DOM for some browsers to play
     audio.style.display = "none";
+    // Apply per-user volume from localStorage
+    try {
+        const vols = JSON.parse(localStorage.getItem("librecord:userVolumes") ?? "{}");
+        audio.volume = Math.min((vols[identity] ?? 100) / 100, 2);
+    } catch { /* default volume */ }
     document.body.appendChild(audio);
     audio.play().catch((e) => console.warn("[Voice] Audio play failed:", e));
 

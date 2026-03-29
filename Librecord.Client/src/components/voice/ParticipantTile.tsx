@@ -3,6 +3,7 @@ import { Track } from "livekit-client";
 import { useTrackBySource } from "../../voice/useTrackBySource";
 import type { VoiceParticipant } from "../../voice/voiceStore";
 import { MicOffIcon, HeadphonesOffIcon, CameraIcon, ScreenShareIcon } from "./VoiceIcons";
+import { VolumePopup } from "./VolumePopup";
 
 interface Props {
     participant: VoiceParticipant;
@@ -10,9 +11,11 @@ interface Props {
     getAvatarUrl: (avatarUrl: string | null) => string;
     /** Compact mode for the screen-share sidebar strip */
     compact?: boolean;
+    /** Whether this is the local user */
+    isSelf?: boolean;
 }
 
-export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact }: Props) {
+export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact, isSelf }: Props) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [imgError, setImgError] = useState(false);
 
@@ -40,11 +43,19 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
     const avatarSize = compact ? 36 : 72;
 
     const openProfile = () => window.dispatchEvent(new CustomEvent("user:profile:open", { detail: { userId: participant.userId } }));
+    const [volumePopup, setVolumePopup] = useState<{ x: number; y: number } | null>(null);
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+        if (isSelf) return;
+        e.preventDefault();
+        setVolumePopup({ x: e.clientX, y: e.clientY });
+    };
 
     if (compact) {
-        return (
+        return (<>
             <div
                 onClick={openProfile}
+                onContextMenu={handleContextMenu}
                 className={`
                     relative rounded-lg overflow-hidden cursor-pointer
                     bg-[#232428] transition-shadow duration-200
@@ -111,12 +122,16 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
                     </div>
                 )}
             </div>
-        );
+            {volumePopup && (
+                <VolumePopup userId={participant.userId} displayName={participant.displayName} x={volumePopup.x} y={volumePopup.y} onClose={() => setVolumePopup(null)} />
+            )}
+        </>);
     }
 
-    return (
+    return (<>
         <div
             onClick={openProfile}
+            onContextMenu={handleContextMenu}
             className={`
                 relative rounded-xl overflow-hidden cursor-pointer
                 flex items-center justify-center aspect-video
@@ -192,5 +207,8 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
                 )}
             </div>
         </div>
-    );
+        {volumePopup && (
+            <VolumePopup userId={participant.userId} displayName={participant.displayName} x={volumePopup.x} y={volumePopup.y} onClose={() => setVolumePopup(null)} />
+        )}
+    </>);
 }

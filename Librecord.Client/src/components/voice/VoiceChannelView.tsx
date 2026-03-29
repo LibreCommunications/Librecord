@@ -199,6 +199,7 @@ export function VoiceChannelView({ channelId }: Props) {
                             participant={p}
                             isSpeaking={speakingMap[p.userId] ?? false}
                             getAvatarUrl={getAvatarUrl}
+                            isSelf={p.userId === user?.userId}
                             compact
                         />
                     ))}
@@ -219,6 +220,7 @@ export function VoiceChannelView({ channelId }: Props) {
                                     participant={p}
                                     isSpeaking={speakingMap[p.userId] ?? false}
                                     getAvatarUrl={getAvatarUrl}
+                                    isSelf={p.userId === user?.userId}
                                 />
                             );
                         }

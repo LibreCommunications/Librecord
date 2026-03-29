@@ -5,6 +5,7 @@ import { getRoom } from "../../voice/livekitClient";
 import type { VoiceParticipant } from "../../voice/voiceStore";
 import { ScreenShareIcon } from "./VoiceIcons";
 import { DevOverlay } from "./DevOverlay";
+import { VolumePopup } from "./VolumePopup";
 
 interface Props {
     participant: VoiceParticipant;
@@ -20,6 +21,7 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [volumePopup, setVolumePopup] = useState<{ x: number; y: number } | null>(null);
 
     const track = useTrackBySource(participant.userId, Track.Source.ScreenShare);
 
@@ -76,10 +78,17 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
         }
     }, []);
 
+    const handleContextMenu = (e: React.MouseEvent) => {
+        if (isSelf) return;
+        e.preventDefault();
+        setVolumePopup({ x: e.clientX, y: e.clientY });
+    };
+
     if (!isWatching) {
-        return (
+        return (<>
             <div
                 ref={containerRef}
+                onContextMenu={handleContextMenu}
                 className="relative rounded-xl overflow-hidden bg-[#1e1f22] aspect-video flex items-center justify-center shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"
             >
                 <div className="flex flex-col items-center gap-4">
@@ -105,13 +114,17 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
                     </button>
                 </div>
             </div>
-        );
+            {volumePopup && (
+                <VolumePopup userId={participant.userId} displayName={participant.displayName} x={volumePopup.x} y={volumePopup.y} onClose={() => setVolumePopup(null)} />
+            )}
+        </>);
     }
 
-    return (
+    return (<>
         <div
             ref={containerRef}
             onDoubleClick={toggleFullscreen}
+            onContextMenu={handleContextMenu}
             className={`
                 relative rounded-xl overflow-hidden bg-[#1e1f22]
                 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] group/screen
@@ -179,5 +192,8 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
                 </div>
             )}
         </div>
-    );
+        {volumePopup && (
+            <VolumePopup userId={participant.userId} displayName={participant.displayName} x={volumePopup.x} y={volumePopup.y} onClose={() => setVolumePopup(null)} />
+        )}
+    </>);
 }
