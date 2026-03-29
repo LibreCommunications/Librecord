@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePins, type PinnedMessage } from "../../hooks/usePins";
+import { onCustomEvent } from "../../lib/typedEvent";
 
 interface Props {
     channelId: string;
@@ -32,17 +33,16 @@ export function PinnedMessagesPanel({ channelId, onClose }: Props) {
     }, [getPins, channelId]);
 
     useEffect(() => {
-        const onPinChanged = (e: CustomEvent<{ channelId: string; messageId: string }>) => {
-            if (e.detail.channelId !== channelId) return;
+        const handler = (detail: { channelId: string; messageId: string }) => {
+            if (detail.channelId !== channelId) return;
             loadPins();
         };
 
-        window.addEventListener("channel:message:pinned", onPinChanged as EventListener);
-        window.addEventListener("channel:message:unpinned", onPinChanged as EventListener);
-        return () => {
-            window.removeEventListener("channel:message:pinned", onPinChanged as EventListener);
-            window.removeEventListener("channel:message:unpinned", onPinChanged as EventListener);
-        };
+        const cleanups = [
+            onCustomEvent<{ channelId: string; messageId: string }>("channel:message:pinned", handler),
+            onCustomEvent<{ channelId: string; messageId: string }>("channel:message:unpinned", handler),
+        ];
+        return () => cleanups.forEach(fn => fn());
     }, [channelId, loadPins]);
 
     async function handleUnpin(messageId: string) {

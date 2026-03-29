@@ -11,8 +11,13 @@ import { usePresence } from "../../hooks/usePresence";
 import { useGuildSettings } from "../../hooks/useGuildSettings";
 import { useToast } from "../../hooks/useToast";
 import { ConfirmModal } from "../ui/ConfirmModal";
+import { onCustomEvent, onEvent } from "../../lib/typedEvent";
 import type { AppEventMap } from "../../realtime/events";
 import { API_URL } from "../../api/client";
+import { logger } from "../../lib/logger";
+import { STORAGE } from "../../lib/storageKeys";
+import { useGuildFolders } from "../../hooks/useGuildFolders";
+import { FolderSettingsModal } from "./FolderSettingsModal";
 
 function SidebarIcon({
     children,
@@ -79,16 +84,14 @@ export default function GlobalSidebar() {
     const { getGuildChannels } = useChannels();
 
     // ── Remember last visited paths ──────────────────────────
-    const LAST_VISITED_KEY = "librecord:lastVisited";
-
     function getLastVisited(): Record<string, string> {
-        try { return JSON.parse(localStorage.getItem(LAST_VISITED_KEY) ?? "{}"); } catch { return {}; }
+        try { return JSON.parse(localStorage.getItem(STORAGE.lastVisited) ?? "{}"); } catch { return {}; }
     }
 
     const saveLastVisited = useCallback((key: string, path: string) => {
         const lv = getLastVisited();
         lv[key] = path;
-        localStorage.setItem(LAST_VISITED_KEY, JSON.stringify(lv));
+        localStorage.setItem(STORAGE.lastVisited, JSON.stringify(lv));
     }, []);
 
     // Save current path on every navigation
@@ -114,52 +117,12 @@ export default function GlobalSidebar() {
     const { toast } = useToast();
 
     // ── Guild Folders (client-only, localStorage) ────────────
-    interface GuildFolder { id: string; name?: string; color?: string; guildIds: string[]; }
-    const FOLDERS_KEY = "librecord:guildFolders";
-
-    const [folders, setFolders] = useState<GuildFolder[]>(() => {
-        try { return JSON.parse(localStorage.getItem(FOLDERS_KEY) ?? "[]"); } catch { return []; }
-    });
-    const EXPANDED_KEY = "librecord:expandedFolders";
-    const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => {
-        try { return new Set(JSON.parse(localStorage.getItem(EXPANDED_KEY) ?? "[]")); } catch { return new Set(); }
-    });
-    const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
-    const [renamingFolder, setRenamingFolder] = useState<string | null>(null);
-    const [renameValue, setRenameValue] = useState("");
-    const [renameColor, setRenameColor] = useState("");
-
-    function toggleExpandFolder(folderId: string) {
-        setExpandedFolders(prev => {
-            const next = new Set(prev);
-            if (next.has(folderId)) next.delete(folderId); else next.add(folderId);
-            localStorage.setItem(EXPANDED_KEY, JSON.stringify([...next]));
-            return next;
-        });
-    }
-
-    function saveFolders(next: GuildFolder[]) {
-        setFolders(next);
-        localStorage.setItem(FOLDERS_KEY, JSON.stringify(next));
-    }
-
-    const folderedGuildIds = new Set(folders.flatMap(f => f.guildIds));
-
-    function createFolder(guildA: string, guildB: string) {
-        const folder: GuildFolder = { id: crypto.randomUUID(), guildIds: [guildA, guildB] };
-        saveFolders([...folders, folder]);
-        toggleExpandFolder(folder.id);
-    }
-
-    function updateFolder(folderId: string, name: string, color?: string) {
-        saveFolders(folders.map(f => f.id === folderId ? { ...f, name: name.trim() || undefined, color: color || undefined } : f));
-    }
-
-    function removeFromFolder(folderId: string, guildId: string) {
-        const updated = folders.map(f => f.id === folderId ? { ...f, guildIds: f.guildIds.filter(id => id !== guildId) } : f)
-            .filter(f => f.guildIds.length >= 2); // dissolve folders with < 2 guilds
-        saveFolders(updated);
-    }
+    const {
+        folders, expandedFolders, dragOverTarget, setDragOverTarget,
+        renamingFolder, setRenamingFolder, renameValue, setRenameValue,
+        renameColor, setRenameColor, toggleExpandFolder, saveFolders,
+        createFolder, updateFolder, removeFromFolder, folderedGuildIds,
+    } = useGuildFolders();
 
     const [guildUnreads, setGuildUnreads] = useState<Record<string, number>>({});
     const [dmUnread, setDmUnread] = useState(false);
@@ -180,33 +143,29 @@ export default function GlobalSidebar() {
                 for (const ch of channels) map[ch.id] = g.id;
             }
             channelToGuildRef.current = map;
-        }).catch(() => {});
+        }).catch(e => logger.api.warn("Failed to load guilds", e));
     }, [getGuilds, getGuildChannels]);
 
     useEffect(() => { loadGuilds(); }, [loadGuilds]);
 
     useEffect(() => {
-        const refresh = () => { loadGuilds(); };
-        window.addEventListener("realtime:reconnected", refresh);
-        return () => window.removeEventListener("realtime:reconnected", refresh);
+        return onEvent("realtime:reconnected", () => { loadGuilds(); });
     }, [loadGuilds]);
 
     useEffect(() => {
-        const onGuildUpdated = (e: CustomEvent<AppEventMap["guild:updated"]>) => {
-            const { guildId: id, name, iconUrl } = e.detail;
+        return onCustomEvent<AppEventMap["guild:updated"]>("guild:updated", (detail) => {
+            const { guildId: id, name, iconUrl } = detail;
             setGuilds(prev => prev.map(g =>
                 g.id === id
                     ? { ...g, ...(name !== undefined && { name }), ...(iconUrl !== undefined && { iconUrl: `${iconUrl}?t=${Date.now()}` }) }
                     : g
             ));
-        };
-        window.addEventListener("guild:updated", onGuildUpdated as EventListener);
-        return () => window.removeEventListener("guild:updated", onGuildUpdated as EventListener);
+        });
     }, []);
 
     useEffect(() => {
-        const onGuildDeleted = (e: CustomEvent<AppEventMap["guild:deleted"]>) => {
-            const deletedId = e.detail.guildId;
+        return onCustomEvent<AppEventMap["guild:deleted"]>("guild:deleted", (detail) => {
+            const deletedId = detail.guildId;
             setGuilds(prev => prev.filter(g => g.id !== deletedId));
             setGuildUnreads(prev => {
                 const next = { ...prev };
@@ -216,16 +175,13 @@ export default function GlobalSidebar() {
             if (guildId === deletedId) {
                 navigate("/app/dm");
             }
-        };
-
-        window.addEventListener("guild:deleted", onGuildDeleted as EventListener);
-        return () => window.removeEventListener("guild:deleted", onGuildDeleted as EventListener);
+        });
     }, [guildId, navigate]);
 
     useEffect(() => {
-        const onMemberRemoved = (e: CustomEvent<AppEventMap["guild:member:removed"]>) => {
-            if (e.detail.userId !== user?.userId) return; // not us
-            const removedGuildId = e.detail.guildId;
+        return onCustomEvent<AppEventMap["guild:member:removed"]>("guild:member:removed", (detail) => {
+            if (detail.userId !== user?.userId) return; // not us
+            const removedGuildId = detail.guildId;
 
             // Remove guild from sidebar
             setGuilds(prev => prev.filter(g => g.id !== removedGuildId));
@@ -240,37 +196,30 @@ export default function GlobalSidebar() {
                 navigate("/app/dm");
             }
 
-            // Show notice for kick/ban (not leave — that's voluntary)
-            if (e.detail.action !== "leave") {
-                setRemovedNotice({ action: e.detail.action, reason: e.detail.reason });
+            // Show notice for kick/ban (not leave -- that's voluntary)
+            if (detail.action !== "leave") {
+                setRemovedNotice({ action: detail.action, reason: detail.reason });
             }
-        };
-
-        window.addEventListener("guild:member:removed", onMemberRemoved as EventListener);
-        return () => window.removeEventListener("guild:member:removed", onMemberRemoved as EventListener);
+        });
     }, [user?.userId, guildId, voiceState.isConnected, voiceState.guildId, leaveVoice, navigate]);
 
     useEffect(() => {
-        const onGuildPing = (e: CustomEvent<AppEventMap["guild:message:ping"]>) => {
-            const { channelId: pingCh, authorId } = e.detail;
+        return onCustomEvent<AppEventMap["guild:message:ping"]>("guild:message:ping", (detail) => {
+            const { channelId: pingCh, authorId } = detail;
             if (authorId === user?.userId) return;
             const pingGuildId = channelToGuildRef.current[pingCh];
             if (!pingGuildId) return;
             if (guildId === pingGuildId) return;
             setGuildUnreads(prev => ({ ...prev, [pingGuildId]: (prev[pingGuildId] ?? 0) + 1 }));
-        };
-        window.addEventListener("guild:message:ping", onGuildPing as EventListener);
-        return () => window.removeEventListener("guild:message:ping", onGuildPing as EventListener);
+        });
     }, [guildId, user?.userId]);
 
     useEffect(() => {
-        const onDmPing = (e: CustomEvent<AppEventMap["dm:message:ping"]>) => {
-            if (e.detail.authorId === user?.userId) return;
+        return onCustomEvent<AppEventMap["dm:message:ping"]>("dm:message:ping", (detail) => {
+            if (detail.authorId === user?.userId) return;
             if (isDmPage) return;
             setDmUnread(true);
-        };
-        window.addEventListener("dm:message:ping", onDmPing as EventListener);
-        return () => window.removeEventListener("dm:message:ping", onDmPing as EventListener);
+        });
     }, [isDmPage, user?.userId]);
 
     const effectiveGuildUnreads = guildId
@@ -576,45 +525,13 @@ export default function GlobalSidebar() {
                 onCancel={() => setLeaveGuildTarget(null)}
             />
 
-            {renamingFolder && (
-                <div className="fixed inset-0 z-[300] bg-black/60 flex items-center justify-center" onClick={() => setRenamingFolder(null)}>
-                    <div className="bg-[#313338] rounded-lg p-5 w-[340px] shadow-xl" onClick={e => e.stopPropagation()}>
-                        <h2 className="text-lg font-bold text-white mb-3">Folder Settings</h2>
-
-                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Name</label>
-                        <input
-                            autoFocus
-                            value={renameValue}
-                            onChange={e => setRenameValue(e.target.value)}
-                            onKeyDown={e => { if (e.key === "Enter") { updateFolder(renamingFolder, renameValue, renameColor); setRenamingFolder(null); } }}
-                            maxLength={32}
-                            placeholder="Folder name"
-                            className="w-full px-3 py-2 rounded bg-[#1e1f22] text-white outline-none border border-[#3f4147] focus:border-[#5865F2] mb-3"
-                        />
-
-                        <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Color</label>
-                        <div className="flex items-center gap-3 mb-1">
-                            <input
-                                type="color"
-                                value={renameColor || "#5865F2"}
-                                onChange={e => setRenameColor(e.target.value)}
-                                className="w-10 h-10 rounded-full border-0 cursor-pointer bg-transparent [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-full [&::-webkit-color-swatch]:border-2 [&::-webkit-color-swatch]:border-white/20 [&::-moz-color-swatch]:rounded-full [&::-moz-color-swatch]:border-2 [&::-moz-color-swatch]:border-white/20"
-                            />
-                            <span className="text-sm text-[#949ba4] font-mono">{(renameColor || "#5865F2").toUpperCase()}</span>
-                        </div>
-
-                        <div className="flex justify-end gap-2 mt-4">
-                            <button onClick={() => setRenamingFolder(null)} className="px-3 py-1.5 text-sm text-white hover:underline">Cancel</button>
-                            <button
-                                onClick={() => { updateFolder(renamingFolder, renameValue, renameColor); setRenamingFolder(null); }}
-                                className="px-4 py-1.5 rounded bg-[#5865F2] hover:bg-[#4752c4] text-white text-sm font-medium"
-                            >
-                                Save
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <FolderSettingsModal
+                folderId={renamingFolder}
+                initialName={renameValue}
+                initialColor={renameColor}
+                onSave={(name, color) => { updateFolder(renamingFolder!, name, color); setRenamingFolder(null); }}
+                onClose={() => setRenamingFolder(null)}
+            />
 
             {removedNotice && (
                 <div className="fixed inset-0 z-[300] bg-black/60 flex items-center justify-center" onClick={() => setRemovedNotice(null)}>

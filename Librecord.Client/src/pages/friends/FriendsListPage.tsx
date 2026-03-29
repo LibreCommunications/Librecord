@@ -13,6 +13,7 @@ import { useToast } from "../../hooks/useToast";
 import { Spinner } from "../../components/ui/Spinner";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { ConfirmModal } from "../../components/ui/ConfirmModal";
+import { onEvent } from "../../lib/typedEvent";
 import { API_URL } from "../../api/client";
 
 export default function FriendsListPage() {
@@ -64,18 +65,13 @@ export default function FriendsListPage() {
 
     useEffect(() => {
         const refresh = () => { loadData(); };
-
-        window.addEventListener("friend:request:received", refresh as EventListener);
-        window.addEventListener("friend:request:accepted", refresh as EventListener);
-        window.addEventListener("friend:request:declined", refresh as EventListener);
-        window.addEventListener("friend:removed", refresh as EventListener);
-
-        return () => {
-            window.removeEventListener("friend:request:received", refresh as EventListener);
-            window.removeEventListener("friend:request:accepted", refresh as EventListener);
-            window.removeEventListener("friend:request:declined", refresh as EventListener);
-            window.removeEventListener("friend:removed", refresh as EventListener);
-        };
+        const cleanups = [
+            onEvent("friend:request:received", refresh),
+            onEvent("friend:request:accepted", refresh),
+            onEvent("friend:request:declined", refresh),
+            onEvent("friend:removed", refresh),
+        ];
+        return () => cleanups.forEach(fn => fn());
     }, [loadData]);
 
     function avatar(url: string | null) {

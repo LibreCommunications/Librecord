@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { STORAGE } from "../../lib/storageKeys";
 
 declare const __BUILD_ID__: string | undefined;
 
@@ -32,7 +33,7 @@ export function UpdateBanner() {
 
     function handleRefresh() {
         // Save current page so it can be restored after reload
-        sessionStorage.setItem("librecord:returnUrl", window.location.pathname);
+        sessionStorage.setItem(STORAGE.returnUrl, window.location.pathname);
         window.location.reload();
     }
 

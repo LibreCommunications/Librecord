@@ -10,6 +10,7 @@ import { useReadState } from "../../hooks/useReadState";
 import { UnreadBadge } from "../ui/UnreadBadge";
 import { StatusDot } from "../user/StatusDot";
 import { presence } from "../../api/client";
+import { onCustomEvent, onEvent } from "../../lib/typedEvent";
 import type { AppEventMap } from "../../realtime/events";
 import { CreateGroupModal } from "../dm/CreateGroupModal";
 
@@ -58,21 +59,18 @@ export default function DmSidebar() {
 
     useEffect(() => {
         const refresh = () => { loadDms(); };
-        window.addEventListener("friend:removed", refresh as EventListener);
-        window.addEventListener("dm:channel:created", refresh as EventListener);
-        window.addEventListener("dm:member:added", refresh as EventListener);
-        window.addEventListener("realtime:reconnected", refresh);
-        return () => {
-            window.removeEventListener("friend:removed", refresh as EventListener);
-            window.removeEventListener("dm:channel:created", refresh as EventListener);
-            window.removeEventListener("dm:member:added", refresh as EventListener);
-            window.removeEventListener("realtime:reconnected", refresh);
-        };
+        const cleanups = [
+            onEvent("friend:removed", refresh),
+            onEvent("dm:channel:created", refresh),
+            onEvent("dm:member:added", refresh),
+            onEvent("realtime:reconnected", refresh),
+        ];
+        return () => cleanups.forEach(fn => fn());
     }, [loadDms]);
 
     useEffect(() => {
-        const onMemberLeft = (e: CustomEvent<AppEventMap["dm:member:left"]>) => {
-            const { channelId, userId } = e.detail;
+        return onCustomEvent<AppEventMap["dm:member:left"]>("dm:member:left", (detail) => {
+            const { channelId, userId } = detail;
             if (userId === user?.userId) {
                 setDms(prev => prev.filter(d => d.id !== channelId));
                 if (dmId === channelId) navigate("/app/dm");
@@ -83,36 +81,29 @@ export default function DmSidebar() {
                         : d
                 ));
             }
-        };
-        window.addEventListener("dm:member:left", onMemberLeft as EventListener);
-        return () => window.removeEventListener("dm:member:left", onMemberLeft as EventListener);
+        });
     }, [dmId, user?.userId, navigate]);
 
     useEffect(() => {
-        const onDeleted = (e: CustomEvent<AppEventMap["dm:channel:deleted"]>) => {
-            const { channelId } = e.detail;
+        return onCustomEvent<AppEventMap["dm:channel:deleted"]>("dm:channel:deleted", (detail) => {
+            const { channelId } = detail;
             setDms(prev => prev.filter(d => d.id !== channelId));
             if (dmId === channelId) navigate("/app/dm");
-        };
-        window.addEventListener("dm:channel:deleted", onDeleted as EventListener);
-        return () => window.removeEventListener("dm:channel:deleted", onDeleted as EventListener);
+        });
     }, [dmId, navigate]);
 
     useEffect(() => {
-        const onPresence = (e: CustomEvent<AppEventMap["dm:user:presence"]>) => {
+        return onCustomEvent<AppEventMap["dm:user:presence"]>("dm:user:presence", (detail) => {
             setPresenceMap(prev => ({
                 ...prev,
-                [e.detail.userId]: e.detail.status,
+                [detail.userId]: detail.status,
             }));
-        };
-
-        window.addEventListener("dm:user:presence", onPresence as EventListener);
-        return () => window.removeEventListener("dm:user:presence", onPresence as EventListener);
+        });
     }, []);
 
     useEffect(() => {
-        const onPing = (e: CustomEvent<AppEventMap["dm:message:ping"]>) => {
-            const { channelId: pingChannel, authorId } = e.detail;
+        return onCustomEvent<AppEventMap["dm:message:ping"]>("dm:message:ping", (detail) => {
+            const { channelId: pingChannel, authorId } = detail;
             if (pingChannel === dmId) return;
             if (authorId === user?.userId) return;
 
@@ -128,10 +119,7 @@ export default function DmSidebar() {
                 ...prev,
                 [pingChannel]: (prev[pingChannel] ?? 0) + 1,
             }));
-        };
-
-        window.addEventListener("dm:message:ping", onPing as EventListener);
-        return () => window.removeEventListener("dm:message:ping", onPing as EventListener);
+        });
     }, [dmId, user?.userId, loadDms]);
 
     const [prevActiveDmId, setPrevActiveDmId] = useState(dmId);

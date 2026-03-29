@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { userProfiles, API_URL } from "../../api/client";
 import type { UserProfile } from "../../types/user";
+import { logger } from "../../lib/logger";
 
 interface Props {
     userId: string;
@@ -18,7 +19,7 @@ export function UserHoverCard({ userId, children }: Props) {
         timeoutRef.current = setTimeout(() => {
             setShow(true);
             if (!profile) {
-                userProfiles.get(userId).then(setProfile).catch(() => {});
+                userProfiles.get(userId).then(setProfile).catch(e => logger.api.warn("Failed to fetch user profile for hover card", e));
             }
         }, 400);
     }

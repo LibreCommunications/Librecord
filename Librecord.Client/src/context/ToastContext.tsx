@@ -1,4 +1,4 @@
-import { createContext, useCallback, useState, type ReactNode } from "react";
+import { createContext, useCallback, useEffect, useState, type ReactNode } from "react";
 
 export type ToastType = "success" | "error" | "info";
 
@@ -26,6 +26,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             setToasts(prev => prev.filter(t => t.id !== id));
         }, 3500);
     }, []);
+
+    // Listen for global toast events (from non-React code)
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const { message, type } = (e as CustomEvent<{ message: string; type: ToastType }>).detail;
+            toast(message, type);
+        };
+        window.addEventListener("app:toast", handler);
+        return () => window.removeEventListener("app:toast", handler);
+    }, [toast]);
 
     return (
         <ToastContext.Provider value={{ toast }}>

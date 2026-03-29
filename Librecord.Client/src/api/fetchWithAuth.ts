@@ -1,3 +1,5 @@
+import { logger } from "../lib/logger";
+
 type RefreshFn = () => Promise<boolean>;
 
 let _refreshAccessToken: RefreshFn = async () => false;
@@ -33,7 +35,7 @@ export async function fetchWithAuth(
     const refreshed = await refreshOnce();
 
     if (!refreshed) {
-        console.warn("[fetch] token refresh failed");
+        logger.api.warn("Token refresh failed");
         return res;
     }
 

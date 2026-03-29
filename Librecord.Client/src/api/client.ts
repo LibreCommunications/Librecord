@@ -1,4 +1,5 @@
 import { fetchWithAuth } from "./fetchWithAuth";
+import { logger } from "../lib/logger";
 
 export const API_URL: string = import.meta.env.VITE_API_URL;
 
@@ -49,6 +50,14 @@ async function requestOptional<T>(
     }
 }
 
+/** Log API errors but return a fallback value so callers always get data. */
+function fallback<T>(label: string, value: T) {
+    return (err: unknown) => {
+        logger.api.warn(label, err);
+        return value;
+    };
+}
+
 function json(body: unknown): RequestInit {
     return {
         headers: { "Content-Type": "application/json" },
@@ -71,7 +80,7 @@ export const auth = {
 
 export const userProfiles = {
     get: (userId: string) => request<UserProfile>(`/users/${userId}`),
-    getFriends: (userId: string) => request<UserSummaryType[]>(`/users/${userId}/friends`).catch(() => [] as UserSummaryType[]),
+    getFriends: (userId: string) => request<UserSummaryType[]>(`/users/${userId}/friends`).catch(fallback("getFriends", [] as UserSummaryType[])),
     updateBio: (bio: string | null) => request<void>("/users/bio", { method: "PUT", ...json({ bio }) }),
     uploadBanner: (file: File) => {
         const form = new FormData();
@@ -84,15 +93,15 @@ export const userProfiles = {
 import type { GuildSummary, Guild, GuildChannel, GuildMember, GuildPermissions } from "../types/guild";
 
 export const guilds = {
-    list: () => request<GuildSummary[]>("/guilds").catch(() => [] as GuildSummary[]),
+    list: () => request<GuildSummary[]>("/guilds").catch(fallback("guilds.list", [] as GuildSummary[])),
     get: (id: string) => requestOptional<Guild>(`/guilds/${id}`),
     create: (name: string) => request<Guild>("/guilds", { method: "POST", ...json({ name }) }),
     update: (id: string, data: { name: string }) => request<Guild>(`/guilds/${id}`, { method: "PUT", ...json(data) }),
     delete: (id: string) => request<void>(`/guilds/${id}`, { method: "DELETE" }),
 
-    channels: (guildId: string) => request<GuildChannel[]>(`/guilds/${guildId}/channels`).catch(() => [] as GuildChannel[]),
+    channels: (guildId: string) => request<GuildChannel[]>(`/guilds/${guildId}/channels`).catch(fallback("guilds.channels", [] as GuildChannel[])),
     getChannel: (channelId: string) => requestOptional<GuildChannel & { topic?: string }>(`/channels/${channelId}`),
-    members: (guildId: string) => request<GuildMember[]>(`/guilds/${guildId}/members`).catch(() => [] as GuildMember[]),
+    members: (guildId: string) => request<GuildMember[]>(`/guilds/${guildId}/members`).catch(fallback("guilds.members", [] as GuildMember[])),
     myPermissions: (guildId: string) => requestOptional<GuildPermissions>(`/guilds/${guildId}/permissions/me`),
     uploadIcon: (guildId: string, file: File) => {
         const form = new FormData();
@@ -116,7 +125,7 @@ export const guildMessages = {
     list: (channelId: string, limit = 50, before?: string) => {
         const params = new URLSearchParams({ limit: String(limit) });
         if (before) params.set("before", before);
-        return request<Message[]>(`/guild-channels/${channelId}/messages?${params}`).catch(() => [] as Message[]);
+        return request<Message[]>(`/guild-channels/${channelId}/messages?${params}`).catch(fallback("guildMessages.list", [] as Message[]));
     },
     get: (channelId: string, messageId: string) =>
         requestOptional<Message>(`/guild-channels/${channelId}/messages/${messageId}`),
@@ -131,7 +140,7 @@ export const guildMessages = {
 import type { DmChannel } from "../types/dm";
 
 export const dms = {
-    list: () => request<DmChannel[]>("/dms").catch(() => [] as DmChannel[]),
+    list: () => request<DmChannel[]>("/dms").catch(fallback("dms.list", [] as DmChannel[])),
     get: (channelId: string) => requestOptional<DmChannel>(`/dms/${channelId}`),
     start: (targetUserId: string) =>
         request<{ channelId: string }>(`/dms/start/${targetUserId}`, { method: "POST", ...json({ content: "" }) }),
@@ -169,7 +178,8 @@ export const dmMessages = {
         try {
             const data = await request<TransportMessage[]>(`/dm-messages/channel/${channelId}?${params}`);
             return data.map(mapTransport);
-        } catch {
+        } catch (err) {
+            logger.api.warn("dmMessages.list", err);
             return [];
         }
     },
@@ -186,7 +196,7 @@ export const dmMessages = {
 import type { Friend, FriendRequests } from "../types/friend";
 
 export const friends = {
-    list: () => request<Friend[]>("/friends/list").catch(() => [] as Friend[]),
+    list: () => request<Friend[]>("/friends/list").catch(fallback("friends.list", [] as Friend[])),
     requests: () => requestOptional<FriendRequests>("/friends/requests"),
     sendRequest: (username: string) =>
         request<{ success: boolean }>("/friends/request", { method: "POST", ...json({ username }) }),
@@ -201,14 +211,14 @@ export const friends = {
     suggest: (query: string) =>
         request<{ id: string; username: string; displayName: string; avatarUrl: string | null }[]>(
             `/friends/suggest?query=${encodeURIComponent(query)}`
-        ).catch(() => []),
+        ).catch(fallback("friends.suggest", [])),
 };
 
 import type { PinnedMessage } from "../types/pin";
 
 export const pins = {
     list: (channelId: string) =>
-        request<PinnedMessage[]>(`/channels/${channelId}/pins`).catch(() => [] as PinnedMessage[]),
+        request<PinnedMessage[]>(`/channels/${channelId}/pins`).catch(fallback("pins.list", [] as PinnedMessage[])),
     pin: (channelId: string, messageId: string) =>
         request<void>(`/channels/${channelId}/pins/${messageId}`, { method: "POST" }),
     unpin: (channelId: string, messageId: string) =>
@@ -227,7 +237,7 @@ export const readState = {
         request<void>(`/channels/${channelId}/ack`, { method: "POST", ...json({ messageId }) }),
     getUnreadCounts: (channelIds: string[]) =>
         request<Record<string, number>>("/channels/unread", { method: "POST", ...json({ channelIds }) })
-            .catch(() => ({} as Record<string, number>)),
+            .catch(fallback("readState.getUnreadCounts", {} as Record<string, number>)),
 };
 
 export const presence = {
@@ -236,7 +246,7 @@ export const presence = {
         request<{ status: string }>("/presence", { method: "PUT", ...json({ status }) }),
     bulk: (userIds: string[]) =>
         request<Record<string, string>>("/presence/bulk", { method: "POST", ...json({ userIds }) })
-            .catch(() => ({} as Record<string, string>)),
+            .catch(fallback("presence.bulk", {} as Record<string, string>)),
 };
 
 export const userProfile = {
@@ -257,22 +267,22 @@ export const search = {
         if (opts.limit) params.set("limit", String(opts.limit));
         return request<{ id: string; channelId: string; content: string; createdAt: string; author: { id: string; username: string; displayName: string; avatarUrl: string | null } }[]>(
             `/search?${params}`
-        ).catch(() => []);
+        ).catch(fallback("search.messages", []));
     },
 };
 
 export const blocks = {
-    list: () => request<{ userId: string; username: string; displayName: string; blockedAt: string }[]>("/blocks").catch(() => []),
+    list: () => request<{ userId: string; username: string; displayName: string; blockedAt: string }[]>("/blocks").catch(fallback("blocks.list", [])),
     block: (userId: string) => request<void>(`/blocks/${userId}`, { method: "PUT" }),
     unblock: (userId: string) => request<void>(`/blocks/${userId}`, { method: "DELETE" }),
     isBlocked: (userId: string) =>
-        request<{ blocked: boolean }>(`/blocks/${userId}`).then(d => d.blocked).catch(() => false),
+        request<{ blocked: boolean }>(`/blocks/${userId}`).then(d => d.blocked).catch(fallback("blocks.isBlocked", false)),
 };
 
 import type { GuildRole } from "../types/guild";
 
 export const roles = {
-    list: (guildId: string) => request<GuildRole[]>(`/guilds/${guildId}/roles`).catch(() => [] as GuildRole[]),
+    list: (guildId: string) => request<GuildRole[]>(`/guilds/${guildId}/roles`).catch(fallback("roles.list", [] as GuildRole[])),
     create: (guildId: string, name: string) =>
         request<GuildRole>(`/guilds/${guildId}/roles`, { method: "POST", ...json({ name }) }),
     update: (guildId: string, roleId: string, data: { name?: string; position?: number }) =>
@@ -292,7 +302,7 @@ import type { GuildInvite } from "../types/guild";
 export const invites = {
     create: (guildId: string, opts?: { maxUses?: number; expiresInHours?: number }) =>
         request<GuildInvite>(`/guilds/${guildId}/invites`, { method: "POST", ...json(opts ?? {}) }),
-    list: (guildId: string) => request<GuildInvite[]>(`/guilds/${guildId}/invites`).catch(() => [] as GuildInvite[]),
+    list: (guildId: string) => request<GuildInvite[]>(`/guilds/${guildId}/invites`).catch(fallback("invites.list", [] as GuildInvite[])),
     getByCode: (code: string) => requestOptional<{ code: string; guild: { id: string; name: string; iconUrl: string | null } }>(`/invites/${code}`),
     join: (code: string) => request<{ id: string; name: string; iconUrl: string | null }>(`/invites/${code}/join`, { method: "POST" }),
     revoke: (inviteId: string) => request<void>(`/invites/${inviteId}`, { method: "DELETE" }),
@@ -317,7 +327,7 @@ export const guildModeration = {
     unban: (guildId: string, userId: string) =>
         request<void>(`/guilds/${guildId}/bans/${userId}`, { method: "DELETE" }),
     getBans: (guildId: string) =>
-        request<GuildBanEntry[]>(`/guilds/${guildId}/bans`).catch(() => [] as GuildBanEntry[]),
+        request<GuildBanEntry[]>(`/guilds/${guildId}/bans`).catch(fallback("guildModeration.getBans", [] as GuildBanEntry[])),
 };
 
 export interface ChannelOverride {
@@ -331,7 +341,7 @@ export interface ChannelOverride {
 
 export const channelPermissions = {
     getOverrides: (channelId: string) =>
-        request<ChannelOverride[]>(`/channels/${channelId}/permissions`).catch(() => [] as ChannelOverride[]),
+        request<ChannelOverride[]>(`/channels/${channelId}/permissions`).catch(fallback("channelPermissions.getOverrides", [] as ChannelOverride[])),
     setOverride: (channelId: string, opts: { roleId?: string | null; userId?: string | null; permissionId: string; allow: boolean | null }) =>
         request<void>(`/channels/${channelId}/permissions`, { method: "PUT", ...json(opts) }),
 };
@@ -342,11 +352,11 @@ export const threads = {
     create: (channelId: string, parentMessageId: string, name: string) =>
         requestOptional<Thread>(`/channels/${channelId}/threads`, { method: "POST", ...json({ parentMessageId, name }) }),
     list: (channelId: string) =>
-        request<Thread[]>(`/channels/${channelId}/threads`).catch(() => [] as Thread[]),
+        request<Thread[]>(`/channels/${channelId}/threads`).catch(fallback("threads.list", [] as Thread[])),
     messages: (channelId: string, threadId: string, limit = 50, before?: string) => {
         const params = new URLSearchParams({ limit: String(limit) });
         if (before) params.set("before", before);
-        return request<ThreadMessage[]>(`/channels/${channelId}/threads/${threadId}/messages?${params}`).catch(() => [] as ThreadMessage[]);
+        return request<ThreadMessage[]>(`/channels/${channelId}/threads/${threadId}/messages?${params}`).catch(fallback("threads.messages", [] as ThreadMessage[]));
     },
     postMessage: (channelId: string, threadId: string, content: string) =>
         requestOptional<ThreadMessage>(`/channels/${channelId}/threads/${threadId}/messages`, { method: "POST", ...json({ content }) }),
@@ -356,7 +366,7 @@ export const voice = {
     participants: (channelId: string) =>
         request<{ userId: string; username: string; displayName: string; avatarUrl: string | null; isMuted: boolean; isDeafened: boolean; isCameraOn: boolean; isScreenSharing: boolean; joinedAt: string }[]>(
             `/voice/channels/${channelId}/participants`
-        ).catch(() => []),
+        ).catch(fallback("voice.participants", [])),
 };
 
 export const uploads = {

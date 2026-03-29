@@ -50,8 +50,16 @@ function playNotificationSound() {
     }
 }
 
-let dmListener: EventListener | null = null;
-let guildListener: EventListener | null = null;
+import { onCustomEvent } from "../lib/typedEvent";
+import { STORAGE } from "../lib/storageKeys";
+
+let cleanupFns: (() => void)[] = [];
+
+interface MessagePing {
+    channelId: string;
+    authorId: string;
+    authorName: string;
+}
 
 export function initNotifications(userId: string) {
     cleanupNotifications();
@@ -66,38 +74,31 @@ export function initNotifications(userId: string) {
         permissionGranted = Notification.permission === "granted";
     }
 
-    dmListener = ((e: CustomEvent) => {
-        const { channelId, authorId, authorName } = e.detail;
-        if (authorId === currentUserId) return;
-        if (document.hasFocus() && isViewingChannel(channelId)) return;
-        if (localStorage.getItem("lr:notif-sounds") !== "false") playNotificationSound();
-        if (!document.hasFocus() && localStorage.getItem("lr:desktop-notifs") !== "false") {
-            showDesktopNotification(authorName, "sent you a message");
-        }
-    }) as EventListener;
-    window.addEventListener("dm:message:ping", dmListener);
-
-    guildListener = ((e: CustomEvent) => {
-        const { channelId, authorId, authorName } = e.detail;
-        if (authorId === currentUserId) return;
-        if (document.hasFocus() && isViewingChannel(channelId)) return;
-        if (localStorage.getItem("lr:notif-sounds") !== "false") playNotificationSound();
-        if (!document.hasFocus() && localStorage.getItem("lr:desktop-notifs") !== "false") {
-            showDesktopNotification(authorName, "sent a message");
-        }
-    }) as EventListener;
-    window.addEventListener("guild:message:ping", guildListener);
+    cleanupFns = [
+        onCustomEvent<MessagePing>("dm:message:ping", (detail) => {
+            const { channelId, authorId, authorName } = detail;
+            if (authorId === currentUserId) return;
+            if (document.hasFocus() && isViewingChannel(channelId)) return;
+            if (localStorage.getItem(STORAGE.notifSounds) !== "false") playNotificationSound();
+            if (!document.hasFocus() && localStorage.getItem(STORAGE.desktopNotifs) !== "false") {
+                showDesktopNotification(authorName, "sent you a message");
+            }
+        }),
+        onCustomEvent<MessagePing>("guild:message:ping", (detail) => {
+            const { channelId, authorId, authorName } = detail;
+            if (authorId === currentUserId) return;
+            if (document.hasFocus() && isViewingChannel(channelId)) return;
+            if (localStorage.getItem(STORAGE.notifSounds) !== "false") playNotificationSound();
+            if (!document.hasFocus() && localStorage.getItem(STORAGE.desktopNotifs) !== "false") {
+                showDesktopNotification(authorName, "sent a message");
+            }
+        }),
+    ];
 }
 
 export function cleanupNotifications() {
-    if (dmListener) {
-        window.removeEventListener("dm:message:ping", dmListener);
-        dmListener = null;
-    }
-    if (guildListener) {
-        window.removeEventListener("guild:message:ping", guildListener);
-        guildListener = null;
-    }
+    cleanupFns.forEach(fn => fn());
+    cleanupFns = [];
     currentUserId = null;
 }
 

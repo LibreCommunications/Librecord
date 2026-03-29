@@ -13,6 +13,7 @@ import {
     type VoiceParticipant,
 } from "../voice/voiceStore";
 import { playJoinSound, playLeaveSound, playStreamStartSound, playStreamStopSound } from "../voice/sounds";
+import { logger } from "../lib/logger";
 
 function getLocalUserId(): string | null {
     const lp = livekitClient.getLocalParticipant();
@@ -56,7 +57,7 @@ export function useVoice() {
             appConnection.invoke("UpdateVoiceState", {
                 isMuted: prefs.isMuted,
                 isDeafened: prefs.isDeafened,
-            }).catch(() => {});
+            }).catch(e => logger.voice.warn("Failed to sync initial voice state", e));
         }
 
         playJoinSound();
@@ -113,7 +114,7 @@ export function useVoice() {
         try {
             await appConnection.invoke("UpdateVoiceState", { isScreenSharing: true });
         } catch (e) {
-            console.warn("[Voice] Failed to notify server of screen share start:", e);
+            logger.voice.warn("Failed to notify server of screen share start", e);
         }
     }, []);
 
@@ -126,12 +127,12 @@ export function useVoice() {
         try {
             await livekitClient.stopScreenShare();
         } catch (e) {
-            console.warn("[Voice] Failed to stop LiveKit screen share:", e);
+            logger.voice.warn("Failed to stop LiveKit screen share", e);
         }
         try {
             await appConnection.invoke("UpdateVoiceState", { isScreenSharing: false });
         } catch (e) {
-            console.warn("[Voice] Failed to notify server of screen share stop:", e);
+            logger.voice.warn("Failed to notify server of screen share stop", e);
         }
     }, []);
 

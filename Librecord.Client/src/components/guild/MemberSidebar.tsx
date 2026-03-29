@@ -7,6 +7,7 @@ import { StatusDot } from "../user/StatusDot";
 import { MemberContextMenu } from "./MemberContextMenu";
 import { presence } from "../../api/client";
 import type { AppEventMap } from "../../realtime/events";
+import { onCustomEvent, onEvent } from "../../lib/typedEvent";
 
 interface Props {
     guildId: string;
@@ -32,33 +33,26 @@ export function MemberSidebar({ guildId }: Props) {
         }
         load();
 
-        window.addEventListener("realtime:reconnected", load);
-        return () => window.removeEventListener("realtime:reconnected", load);
+        return onEvent("realtime:reconnected", load);
     }, [guildId, getMembers]);
 
     useEffect(() => {
-        const onPresence = (e: CustomEvent<AppEventMap["guild:user:presence"]>) => {
-            setPresenceMap(prev => ({ ...prev, [e.detail.userId]: e.detail.status }));
-        };
-        const onRemoved = (e: CustomEvent<AppEventMap["guild:member:removed"]>) => {
-            if (e.detail.guildId !== guildId) return;
-            setMembers(prev => prev.filter(m => m.userId !== e.detail.userId));
-        };
-        const onRoles = (e: CustomEvent<AppEventMap["guild:member:roles"]>) => {
-            if (e.detail.guildId !== guildId) return;
-            setMembers(prev => prev.map(m =>
-                m.userId === e.detail.userId ? { ...m, roles: e.detail.roles } : m
-            ));
-        };
-
-        window.addEventListener("guild:user:presence", onPresence as EventListener);
-        window.addEventListener("guild:member:removed", onRemoved as EventListener);
-        window.addEventListener("guild:member:roles", onRoles as EventListener);
-        return () => {
-            window.removeEventListener("guild:user:presence", onPresence as EventListener);
-            window.removeEventListener("guild:member:removed", onRemoved as EventListener);
-            window.removeEventListener("guild:member:roles", onRoles as EventListener);
-        };
+        const cleanups = [
+            onCustomEvent<AppEventMap["guild:user:presence"]>("guild:user:presence", (detail) => {
+                setPresenceMap(prev => ({ ...prev, [detail.userId]: detail.status }));
+            }),
+            onCustomEvent<AppEventMap["guild:member:removed"]>("guild:member:removed", (detail) => {
+                if (detail.guildId !== guildId) return;
+                setMembers(prev => prev.filter(m => m.userId !== detail.userId));
+            }),
+            onCustomEvent<AppEventMap["guild:member:roles"]>("guild:member:roles", (detail) => {
+                if (detail.guildId !== guildId) return;
+                setMembers(prev => prev.map(m =>
+                    m.userId === detail.userId ? { ...m, roles: detail.roles } : m
+                ));
+            }),
+        ];
+        return () => cleanups.forEach(fn => fn());
     }, [guildId]);
 
     const canModerate = permissions.isOwner || permissions.kickMembers || permissions.banMembers || permissions.manageRoles;

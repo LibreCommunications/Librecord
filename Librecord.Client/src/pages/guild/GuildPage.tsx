@@ -15,6 +15,7 @@ import { SearchBar } from "../../components/messages/SearchBar";
 import { PinnedMessagesPanel } from "../../components/messages/PinnedMessagesPanel";
 import { ChatView } from "../../components/chat/ChatView";
 import { VoiceChannelView } from "../../components/voice/VoiceChannelView";
+import { Spinner } from "../../components/ui/Spinner";
 
 export default function GuildChannelPage() {
     const { guildId, channelId } = useParams<{ guildId: string; channelId: string }>();
@@ -84,6 +85,14 @@ export default function GuildChannelPage() {
         return (
             <div className="flex-1 flex items-center justify-center text-gray-400">
                 Select a channel
+            </div>
+        );
+    }
+
+    if (!metadataReady) {
+        return (
+            <div className="flex-1 flex items-center justify-center bg-[#313338]">
+                <Spinner className="text-[#949ba4]" />
             </div>
         );
     }

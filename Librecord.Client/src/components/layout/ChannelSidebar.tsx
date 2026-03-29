@@ -8,10 +8,13 @@ import { useToast } from "../../hooks/useToast";
 import { UnreadBadge } from "../ui/UnreadBadge";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import CreateChannelModal from "../../pages/guild/CreateChannelModal";
+import { onCustomEvent, onEvent } from "../../lib/typedEvent";
 import type { AppEventMap } from "../../realtime/events";
 import { useAuth } from "../../hooks/useAuth";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { voice } from "../../api/client";
+import { VoiceParticipantList } from "./VoiceParticipantList";
+import { EditChannelModal } from "./EditChannelModal";
 
 interface Props {
     guildId: string;
@@ -35,9 +38,6 @@ export default function ChannelSidebar({ guildId }: Props) {
     const [showCreate, setShowCreate] = useState(false);
     const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; channel: GuildChannel } | null>(null);
     const [editTarget, setEditTarget] = useState<GuildChannel | null>(null);
-    const [editName, setEditName] = useState("");
-    const [editTopic, setEditTopic] = useState("");
-    const [editParentId, setEditParentId] = useState<string | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<GuildChannel | null>(null);
     const [channelParticipants, setChannelParticipants] = useState<Record<string, { userId: string; username: string; displayName: string; avatarUrl: string | null; isMuted: boolean; isDeafened: boolean; isCameraOn: boolean; isScreenSharing: boolean }[]>>({});
 
@@ -59,29 +59,23 @@ export default function ChannelSidebar({ guildId }: Props) {
 
     useEffect(() => {
         const refresh = () => { loadChannels(); };
-        const onCreated = (e: CustomEvent<AppEventMap["guild:channel:created"]>) => {
-            if (e.detail.guildId !== guildId) return;
-            setChannels(prev => [...prev, { id: e.detail.channelId, name: e.detail.name, type: e.detail.type, position: e.detail.position, parentId: e.detail.parentId, guildId }]);
-        };
-        const onUpdated = (e: CustomEvent<AppEventMap["guild:channel:updated"]>) => {
-            if (e.detail.guildId !== guildId) return;
-            setChannels(prev => prev.map(c => c.id === e.detail.channelId ? { ...c, name: e.detail.name, parentId: e.detail.parentId } : c));
-        };
-        const onDeleted = (e: CustomEvent<AppEventMap["guild:channel:deleted"]>) => {
-            if (e.detail.guildId !== guildId) return;
-            setChannels(prev => prev.filter(c => c.id !== e.detail.channelId));
-            if (channelId === e.detail.channelId) navigate(`/app/guild/${guildId}`);
-        };
-        window.addEventListener("realtime:reconnected", refresh);
-        window.addEventListener("guild:channel:created", onCreated as EventListener);
-        window.addEventListener("guild:channel:updated", onUpdated as EventListener);
-        window.addEventListener("guild:channel:deleted", onDeleted as EventListener);
-        return () => {
-            window.removeEventListener("realtime:reconnected", refresh);
-            window.removeEventListener("guild:channel:created", onCreated as EventListener);
-            window.removeEventListener("guild:channel:updated", onUpdated as EventListener);
-            window.removeEventListener("guild:channel:deleted", onDeleted as EventListener);
-        };
+        const cleanups = [
+            onEvent("realtime:reconnected", refresh),
+            onCustomEvent<AppEventMap["guild:channel:created"]>("guild:channel:created", (detail) => {
+                if (detail.guildId !== guildId) return;
+                setChannels(prev => [...prev, { id: detail.channelId, name: detail.name, type: detail.type, position: detail.position, parentId: detail.parentId, guildId }]);
+            }),
+            onCustomEvent<AppEventMap["guild:channel:updated"]>("guild:channel:updated", (detail) => {
+                if (detail.guildId !== guildId) return;
+                setChannels(prev => prev.map(c => c.id === detail.channelId ? { ...c, name: detail.name, parentId: detail.parentId } : c));
+            }),
+            onCustomEvent<AppEventMap["guild:channel:deleted"]>("guild:channel:deleted", (detail) => {
+                if (detail.guildId !== guildId) return;
+                setChannels(prev => prev.filter(c => c.id !== detail.channelId));
+                if (channelId === detail.channelId) navigate(`/app/guild/${guildId}`);
+            }),
+        ];
+        return () => cleanups.forEach(fn => fn());
     }, [loadChannels, guildId, channelId, navigate]);
 
     const fetchVoiceParticipants = useCallback(() => {
@@ -101,60 +95,47 @@ export default function ChannelSidebar({ guildId }: Props) {
 
     useEffect(() => {
         fetchVoiceParticipants();
-
-        window.addEventListener("realtime:reconnected", fetchVoiceParticipants);
-        return () => window.removeEventListener("realtime:reconnected", fetchVoiceParticipants);
+        return onEvent("realtime:reconnected", fetchVoiceParticipants);
     }, [fetchVoiceParticipants]);
 
     useEffect(() => {
-        const onJoin = (e: CustomEvent<AppEventMap["voice:user:joined"]>) => {
-            const p = e.detail;
-            setChannelParticipants(prev => ({
-                ...prev,
-                [p.channelId]: [...(prev[p.channelId] ?? []).filter(x => x.userId !== p.userId), p],
-            }));
-        };
-        const onLeave = (e: CustomEvent<AppEventMap["voice:user:left"]>) => {
-            const { channelId: chId, userId } = e.detail;
-            setChannelParticipants(prev => ({
-                ...prev,
-                [chId]: (prev[chId] ?? []).filter(x => x.userId !== userId),
-            }));
-        };
-        const onState = (e: CustomEvent<AppEventMap["voice:user:state"]>) => {
-            const { channelId: chId, userId, isMuted, isDeafened, isCameraOn, isScreenSharing } = e.detail;
-            setChannelParticipants(prev => ({
-                ...prev,
-                [chId]: (prev[chId] ?? []).map(x =>
-                    x.userId === userId ? { ...x, isMuted, isDeafened, isCameraOn, isScreenSharing } : x
-                ),
-            }));
-        };
-        window.addEventListener("voice:user:joined", onJoin as EventListener);
-        window.addEventListener("voice:user:left", onLeave as EventListener);
-        window.addEventListener("voice:user:state", onState as EventListener);
-        return () => {
-            window.removeEventListener("voice:user:joined", onJoin as EventListener);
-            window.removeEventListener("voice:user:left", onLeave as EventListener);
-            window.removeEventListener("voice:user:state", onState as EventListener);
-        };
+        const cleanups = [
+            onCustomEvent<AppEventMap["voice:user:joined"]>("voice:user:joined", (p) => {
+                setChannelParticipants(prev => ({
+                    ...prev,
+                    [p.channelId]: [...(prev[p.channelId] ?? []).filter(x => x.userId !== p.userId), p],
+                }));
+            }),
+            onCustomEvent<AppEventMap["voice:user:left"]>("voice:user:left", (detail) => {
+                const { channelId: chId, userId } = detail;
+                setChannelParticipants(prev => ({
+                    ...prev,
+                    [chId]: (prev[chId] ?? []).filter(x => x.userId !== userId),
+                }));
+            }),
+            onCustomEvent<AppEventMap["voice:user:state"]>("voice:user:state", (detail) => {
+                const { channelId: chId, userId, isMuted, isDeafened, isCameraOn, isScreenSharing } = detail;
+                setChannelParticipants(prev => ({
+                    ...prev,
+                    [chId]: (prev[chId] ?? []).map(x =>
+                        x.userId === userId ? { ...x, isMuted, isDeafened, isCameraOn, isScreenSharing } : x
+                    ),
+                }));
+            }),
+        ];
+        return () => cleanups.forEach(fn => fn());
     }, []);
 
     const [speakingMap, setSpeakingMap] = useState<Record<string, boolean>>({});
     useEffect(() => {
-        const handler = (e: Event) => {
-            const detail = (e as CustomEvent<{ identity: string; speaking: boolean }>).detail;
-            if (detail) {
-                setSpeakingMap(prev => ({ ...prev, [detail.identity]: detail.speaking }));
-            }
-        };
-        window.addEventListener("voice:speaking:changed", handler);
-        return () => window.removeEventListener("voice:speaking:changed", handler);
+        return onCustomEvent<{ identity: string; speaking: boolean }>("voice:speaking:changed", (detail) => {
+            setSpeakingMap(prev => ({ ...prev, [detail.identity]: detail.speaking }));
+        });
     }, []);
 
     useEffect(() => {
-        const onPing = (e: CustomEvent<AppEventMap["guild:message:ping"]>) => {
-            const { channelId: pingChannel, authorId } = e.detail;
+        return onCustomEvent<AppEventMap["guild:message:ping"]>("guild:message:ping", (detail) => {
+            const { channelId: pingChannel, authorId } = detail;
             if (pingChannel === channelId) return;
             if (authorId === user?.userId) return;
 
@@ -162,10 +143,7 @@ export default function ChannelSidebar({ guildId }: Props) {
                 ...prev,
                 [pingChannel]: (prev[pingChannel] ?? 0) + 1,
             }));
-        };
-
-        window.addEventListener("guild:message:ping", onPing as EventListener);
-        return () => window.removeEventListener("guild:message:ping", onPing as EventListener);
+        });
     }, [channelId, user?.userId]);
 
     const [prevActiveChannelId, setPrevActiveChannelId] = useState(channelId);
@@ -274,57 +252,14 @@ export default function ChannelSidebar({ guildId }: Props) {
                                 return (
                                     <div key={ch.id}>
                                         {isVoice ? channelRow : <Link to={`/app/guild/${guildId}/${ch.id}`}>{channelRow}</Link>}
-                                        {voiceParticipants.length > 0 && (
-                                            <div className="ml-7 mr-2 mt-0.5 mb-1 space-y-px">
-                                                {voiceParticipants.map(raw => {
-                                                    // For the local user, voiceState is the source of truth
-                                                    const isLocal = raw.userId === user?.userId && isInVoiceChannel;
-                                                    const p = isLocal ? { ...raw, isMuted: voiceState.isMuted, isDeafened: voiceState.isDeafened, isCameraOn: voiceState.isCameraOn, isScreenSharing: voiceState.isScreenSharing } : raw;
-                                                    const isSpeaking = speakingMap[p.userId] ?? false;
-                                                    return (
-                                                        <div key={p.userId} className="flex items-center gap-1.5 text-[13px] text-[#949ba4] py-[3px]">
-                                                            <img
-                                                                src={getAvatarUrl(p.avatarUrl)}
-                                                                alt=""
-                                                                className={`
-                                                                    w-5 h-5 rounded-full object-cover shrink-0
-                                                                    transition-shadow duration-150
-                                                                    ${isSpeaking ? "shadow-[0_0_0_2px_#23a55a]" : ""}
-                                                                `}
-                                                            />
-                                                            <span className="truncate flex-1">{p.displayName}</span>
-                                                            <span className="flex items-center gap-0.5 shrink-0">
-                                                                {p.isScreenSharing && (
-                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#5865f2]">
-                                                                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                                                                        <line x1="8" y1="21" x2="16" y2="21" />
-                                                                        <line x1="12" y1="17" x2="12" y2="21" />
-                                                                    </svg>
-                                                                )}
-                                                                {p.isCameraOn && (
-                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#dbdee1]">
-                                                                        <polygon points="23 7 16 12 23 17 23 7" />
-                                                                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                                                                    </svg>
-                                                                )}
-                                                                {p.isMuted && (
-                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-400">
-                                                                        <line x1="1" y1="1" x2="23" y2="23" />
-                                                                        <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
-                                                                    </svg>
-                                                                )}
-                                                                {p.isDeafened && (
-                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-400">
-                                                                        <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
-                                                                        <line x1="1" y1="1" x2="23" y2="23" />
-                                                                    </svg>
-                                                                )}
-                                                            </span>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
+                                        <VoiceParticipantList
+                                            participants={voiceParticipants}
+                                            localUserId={user?.userId}
+                                            voiceState={voiceState}
+                                            channelId={ch.id}
+                                            speakingMap={speakingMap}
+                                            getAvatarUrl={getAvatarUrl}
+                                        />
                                     </div>
                                 );
                             })}
@@ -376,16 +311,14 @@ export default function ChannelSidebar({ guildId }: Props) {
                                             return (
                                                 <div key={ch.id}>
                                                     {isVoice ? row : <Link to={`/app/guild/${guildId}/${ch.id}`}>{row}</Link>}
-                                                    {vp.length > 0 && (
-                                                        <div className="ml-7 mr-2 mt-0.5 mb-1 space-y-px">
-                                                            {vp.map(p => (
-                                                                <div key={p.userId} className="flex items-center gap-1.5 text-[13px] text-[#949ba4] py-[3px]">
-                                                                    <img src={getAvatarUrl(p.avatarUrl)} className="w-5 h-5 rounded-full object-cover shrink-0" alt="" />
-                                                                    <span className="truncate">{p.displayName}</span>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
+                                                    <VoiceParticipantList
+                                                        participants={vp}
+                                                        localUserId={user?.userId}
+                                                        voiceState={voiceState}
+                                                        channelId={ch.id}
+                                                        speakingMap={speakingMap}
+                                                        getAvatarUrl={getAvatarUrl}
+                                                    />
                                                 </div>
                                             );
                                         })}
@@ -415,9 +348,6 @@ export default function ChannelSidebar({ guildId }: Props) {
                         <button
                             onClick={() => {
                                 setEditTarget(ctxMenu.channel);
-                                setEditName(ctxMenu.channel.name);
-                                setEditTopic((ctxMenu.channel as GuildChannel & { topic?: string }).topic ?? "");
-                                setEditParentId(ctxMenu.channel.parentId ?? null);
                                 setCtxMenu(null);
                             }}
                             className="w-full text-left px-3 py-2 text-sm text-[#dbdee1] hover:bg-[#4752c4] hover:text-white rounded-[3px] mx-1"
@@ -438,77 +368,17 @@ export default function ChannelSidebar({ guildId }: Props) {
             )}
 
             {/* Edit channel/category modal */}
-            {editTarget && (
-                <>
-                    <div className="fixed inset-0 z-[200] bg-black/60 flex items-center justify-center" onClick={() => setEditTarget(null)}>
-                        <div className="bg-[#313338] rounded-lg p-6 w-full max-w-md shadow-xl" onClick={e => e.stopPropagation()}>
-                            <h2 className="text-lg font-bold text-white mb-4">
-                                {editTarget.type === 2 ? "Edit Category" : "Edit Channel"}
-                            </h2>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-xs font-semibold text-[#b5bac1] uppercase mb-1">
-                                        {editTarget.type === 2 ? "Category Name" : "Channel Name"}
-                                    </label>
-                                    <input
-                                        value={editName}
-                                        onChange={e => setEditName(e.target.value)}
-                                        maxLength={64}
-                                        className="w-full bg-[#1e1f22] text-[#dbdee1] rounded px-3 py-2 outline-none border border-[#3f4147] focus:border-[#5865F2]"
-                                    />
-                                </div>
-                                {editTarget.type !== 2 && (
-                                    <div>
-                                        <label className="block text-xs font-semibold text-[#b5bac1] uppercase mb-1">Topic</label>
-                                        <input
-                                            value={editTopic}
-                                            onChange={e => setEditTopic(e.target.value)}
-                                            maxLength={1024}
-                                            placeholder="What's this channel about?"
-                                            className="w-full bg-[#1e1f22] text-[#dbdee1] rounded px-3 py-2 outline-none border border-[#3f4147] focus:border-[#5865F2]"
-                                        />
-                                    </div>
-                                )}
-                                {editTarget.type !== 2 && categories.length > 0 && (
-                                    <div>
-                                        <label className="block text-xs font-semibold text-[#b5bac1] uppercase mb-1">Category</label>
-                                        <select
-                                            value={editParentId ?? ""}
-                                            onChange={e => setEditParentId(e.target.value || null)}
-                                            className="w-full bg-[#1e1f22] text-[#dbdee1] rounded px-3 py-2 outline-none border border-[#3f4147] focus:border-[#5865F2]"
-                                        >
-                                            <option value="">No category</option>
-                                            {categories.map(c => (
-                                                <option key={c.id} value={c.id}>{c.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="flex justify-end gap-3 mt-6">
-                                <button onClick={() => setEditTarget(null)} className="px-4 py-2 text-sm text-white hover:underline">Cancel</button>
-                                <button
-                                    onClick={async () => {
-                                        if (!editName.trim()) return;
-                                        if (editTarget.type === 2) {
-                                            await updateChannel(editTarget.id, { name: editName.trim() });
-                                            setChannels(prev => prev.map(c => c.id === editTarget.id ? { ...c, name: editName.trim() } : c));
-                                        } else {
-                                            await updateChannel(editTarget.id, { name: editName.trim(), topic: editTopic.trim() || null, parentId: editParentId });
-                                            setChannels(prev => prev.map(c => c.id === editTarget.id ? { ...c, name: editName.trim(), parentId: editParentId } : c));
-                                        }
-                                        toast(editTarget.type === 2 ? "Category updated!" : "Channel updated!", "success");
-                                        setEditTarget(null);
-                                    }}
-                                    className="px-4 py-2 rounded bg-[#5865F2] text-white text-sm font-medium hover:bg-[#4752c4]"
-                                >
-                                    Save
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </>
-            )}
+            <EditChannelModal
+                target={editTarget}
+                categories={categories}
+                onSave={async (channelId, data) => {
+                    await updateChannel(channelId, data);
+                    setChannels(prev => prev.map(c => c.id === channelId ? { ...c, name: data.name, parentId: data.parentId ?? c.parentId } : c));
+                    toast(editTarget?.type === 2 ? "Category updated!" : "Channel updated!", "success");
+                    setEditTarget(null);
+                }}
+                onClose={() => setEditTarget(null)}
+            />
 
             {/* Delete channel confirm */}
             <ConfirmModal

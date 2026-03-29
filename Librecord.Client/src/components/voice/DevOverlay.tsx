@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getRoom } from "../../voice/livekitClient";
 import { API_URL } from "../../api/client";
+import { STORAGE } from "../../lib/storageKeys";
 
 interface TrackStats {
     label: string;
@@ -29,7 +30,7 @@ export function DevOverlay({ embedded }: { embedded?: boolean } = {}) {
 
     useEffect(() => {
         const interval = setInterval(async () => {
-            if (localStorage.getItem("lr:dev-mode") !== "true") { setStats(null); return; }
+            if (localStorage.getItem(STORAGE.devMode) !== "true") { setStats(null); return; }
 
             const room = getRoom();
             if (!room) { setStats(null); return; }

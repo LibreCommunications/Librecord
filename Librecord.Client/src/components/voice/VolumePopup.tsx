@@ -1,22 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-
-const VOLUMES_KEY = "librecord:userVolumes";
-
-export function getUserVolume(userId: string): number {
-    try {
-        const vols = JSON.parse(localStorage.getItem(VOLUMES_KEY) ?? "{}");
-        return vols[userId] ?? 100;
-    } catch { return 100; }
-}
-
-export function setUserVolume(userId: string, volume: number) {
-    try {
-        const vols = JSON.parse(localStorage.getItem(VOLUMES_KEY) ?? "{}");
-        vols[userId] = volume;
-        localStorage.setItem(VOLUMES_KEY, JSON.stringify(vols));
-    } catch { /* ignore */ }
-    window.dispatchEvent(new CustomEvent("voice:volume:changed", { detail: { userId, volume } }));
-}
+import { getUserVolume, setUserVolume } from "../../lib/userVolume";
 
 interface Props {
     userId: string;

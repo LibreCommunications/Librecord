@@ -1,6 +1,7 @@
 import { createContext, useCallback, useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { presence } from "../api/client";
+import { logger } from "../lib/logger";
 
 interface PresenceContextValue {
     myStatus: string;
@@ -20,7 +21,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
         if (!user) return;
         presence.me()
             .then(data => { if (data?.status) setStatus(data.status); })
-            .catch(() => {});
+            .catch(e => logger.api.warn("Failed to fetch presence status", e));
     }, [user]);
 
     const setMyStatus = useCallback(async (status: string) => {

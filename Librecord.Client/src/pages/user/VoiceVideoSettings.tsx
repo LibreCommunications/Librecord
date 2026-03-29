@@ -1,6 +1,7 @@
 import { useState } from "react";
 import * as livekitClient from "../../voice/livekitClient";
 import { NoiseSuppression } from "../../components/voice/NoiseSuppression";
+import { logger } from "../../lib/logger";
 
 export default function VoiceVideoSettings() {
     const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
@@ -30,7 +31,7 @@ export default function VoiceVideoSettings() {
         const mediaKind: MediaDeviceKind =
             kind === "audioinput" ? "audioinput" :
             kind === "audiooutput" ? "audiooutput" : "videoinput";
-        livekitClient.switchActiveDevice(mediaKind, deviceId).catch(() => {});
+        livekitClient.switchActiveDevice(mediaKind, deviceId).catch(e => logger.voice.warn("Failed to switch active device", e));
     }
 
     return (

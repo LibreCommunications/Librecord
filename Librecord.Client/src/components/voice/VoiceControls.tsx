@@ -7,6 +7,7 @@ import {
 } from "./VoiceIcons";
 import { ScreenShareModal, type ScreenShareOptions } from "./ScreenShareModal";
 import * as livekitClient from "../../voice/livekitClient";
+import { ConnectionQuality } from "livekit-client";
 
 export function VoiceControls() {
     const {
@@ -22,7 +23,16 @@ export function VoiceControls() {
     const [showScreenShareModal, setShowScreenShareModal] = useState(false);
     const [showCameraMenu, setShowCameraMenu] = useState(false);
     const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+    const [connQuality, setConnQuality] = useState<ConnectionQuality>(ConnectionQuality.Excellent);
     const cameraMenuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handler = (e: Event) => {
+            setConnQuality((e as CustomEvent<{ quality: ConnectionQuality }>).detail.quality);
+        };
+        window.addEventListener("voice:quality:changed", handler);
+        return () => window.removeEventListener("voice:quality:changed", handler);
+    }, []);
 
     useEffect(() => {
         if (!showCameraMenu) return;
@@ -55,8 +65,20 @@ export function VoiceControls() {
         <>
             <div className="bg-[#232428] border-t border-black/30 px-3 py-2">
                 <div className="flex items-center gap-2 mb-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
-                    <span className="text-xs text-green-400 font-medium">Voice Connected</span>
+                    <div className={`w-2 h-2 rounded-full ${
+                        connQuality === ConnectionQuality.Poor ? "bg-red-500" :
+                        connQuality === ConnectionQuality.Good ? "bg-yellow-500" :
+                        "bg-green-500"
+                    }`} />
+                    <span className={`text-xs font-medium ${
+                        connQuality === ConnectionQuality.Poor ? "text-red-400" :
+                        connQuality === ConnectionQuality.Good ? "text-yellow-400" :
+                        "text-green-400"
+                    }`}>
+                        {connQuality === ConnectionQuality.Poor ? "Poor Connection" :
+                         connQuality === ConnectionQuality.Good ? "Unstable Connection" :
+                         "Voice Connected"}
+                    </span>
                 </div>
 
                 <div className="flex items-center gap-1">

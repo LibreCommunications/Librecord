@@ -7,6 +7,7 @@ import { useUserProfile } from "../../hooks/useUserProfile";
 import { useAuth } from "../../hooks/useAuth";
 import { useAttachmentUpload } from "../../hooks/useAttachmentUpload";
 import { useChatChannel, type ChatChannelConfig } from "../../hooks/useChatChannel";
+import { Spinner } from "../../components/ui/Spinner";
 
 import { AddParticipantModal } from "./AddParticipantModal";
 import { DmHeader } from "./DmHeader";
@@ -20,6 +21,9 @@ import { useToast } from "../../hooks/useToast";
 import type { UserProfile } from "../../types/user";
 
 import type { AppEventMap } from "../../realtime/events";
+import { onCustomEvent } from "../../lib/typedEvent";
+import { logger } from "../../lib/logger";
+import { STORAGE } from "../../lib/storageKeys";
 
 export default function DmConversationPage() {
     const { dmId } = useParams();
@@ -44,7 +48,7 @@ export default function DmConversationPage() {
     const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
     const [showMembers, setShowMembers] = useState(false);
     const [otherProfile, setOtherProfile] = useState<UserProfile | null>(null);
-    const [showProfile, setShowProfile] = useState(() => localStorage.getItem("lr:show-dm-profile") !== "false");
+    const [showProfile, setShowProfile] = useState(() => localStorage.getItem(STORAGE.showDmProfile) !== "false");
     const [isBlocked, setIsBlocked] = useState(false);
     const [confirmDmAction, setConfirmDmAction] = useState<"block" | "unfriend" | null>(null);
     const { removeFriend } = useFriends();
@@ -81,7 +85,7 @@ export default function DmConversationPage() {
             if (!ch.isGroup) {
                 const other = ch.members.find(m => m.id !== user?.userId);
                 if (other) {
-                    userProfiles.get(other.id).then(setOtherProfile).catch(() => {});
+                    userProfiles.get(other.id).then(setOtherProfile).catch(e => logger.api.warn("Failed to load other user profile", e));
                     checkBlocked(other.id).then(setIsBlocked);
                 }
             } else {
@@ -113,35 +117,37 @@ export default function DmConversationPage() {
 
     useEffect(() => {
         if (!dmId) return;
-        const handler = (event: CustomEvent<AppEventMap["dm:channel:deleted"]>) => {
-            if (event.detail.channelId !== dmId) return;
+        return onCustomEvent<AppEventMap["dm:channel:deleted"]>("dm:channel:deleted", (detail) => {
+            if (detail.channelId !== dmId) return;
             navigate("/app/dm");
-        };
-        window.addEventListener("dm:channel:deleted", handler as EventListener);
-        return () => window.removeEventListener("dm:channel:deleted", handler as EventListener);
+        });
     }, [dmId, navigate]);
 
     useEffect(() => {
         if (!dmId) return;
 
-        const onLeft = (event: CustomEvent<AppEventMap["dm:member:left"]>) => {
-            if (event.detail.channelId !== dmId) return;
-            setChannel(prev => prev ? { ...prev, members: prev.members.filter(m => m.id !== event.detail.userId) } : prev);
-        };
-        const onAdded = (event: CustomEvent<AppEventMap["dm:member:added"]>) => {
-            if (event.detail.channelId !== dmId) return;
-            getDmChannel(dmId).then(ch => { if (ch) setChannel(ch); });
-        };
-
-        window.addEventListener("dm:member:left", onLeft as EventListener);
-        window.addEventListener("dm:member:added", onAdded as EventListener);
-        return () => {
-            window.removeEventListener("dm:member:left", onLeft as EventListener);
-            window.removeEventListener("dm:member:added", onAdded as EventListener);
-        };
+        const cleanups = [
+            onCustomEvent<AppEventMap["dm:member:left"]>("dm:member:left", (detail) => {
+                if (detail.channelId !== dmId) return;
+                setChannel(prev => prev ? { ...prev, members: prev.members.filter(m => m.id !== detail.userId) } : prev);
+            }),
+            onCustomEvent<AppEventMap["dm:member:added"]>("dm:member:added", (detail) => {
+                if (detail.channelId !== dmId) return;
+                getDmChannel(dmId).then(ch => { if (ch) setChannel(ch); });
+            }),
+        ];
+        return () => cleanups.forEach(fn => fn());
     }, [dmId, getDmChannel]);
 
     if (!dmId) return null;
+
+    if (!metadataReady) {
+        return (
+            <div className="flex-1 flex items-center justify-center bg-[#313338]">
+                <Spinner className="text-[#949ba4]" />
+            </div>
+        );
+    }
 
     return (
         <div className="flex-1 flex bg-[#313338] overflow-hidden">
@@ -163,7 +169,7 @@ export default function DmConversationPage() {
                             onClick={() => {
                                 const next = !showProfile;
                                 setShowProfile(next);
-                                localStorage.setItem("lr:show-dm-profile", String(next));
+                                localStorage.setItem(STORAGE.showDmProfile, String(next));
                             }}
                             className={`p-2 rounded hover:bg-white/10 ${showProfile ? "text-white" : "text-gray-400 hover:text-white"}`}
                             title={showProfile ? "Hide Profile" : "Show Profile"}

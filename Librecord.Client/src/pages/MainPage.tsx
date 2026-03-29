@@ -11,6 +11,7 @@ import { ConnectionBanner } from "../components/ui/ConnectionBanner";
 import { ErrorBoundary } from "../components/ui/ErrorBoundary";
 
 import { RealtimeRoot } from "../realtime/RealtimeRoot";
+import { onCustomEvent } from "../lib/typedEvent";
 
 export default function MainPage() {
     const location = useLocation();
@@ -22,11 +23,9 @@ export default function MainPage() {
 
     // Global event for opening profile popups from anywhere
     useEffect(() => {
-        const handler = (e: CustomEvent<{ userId: string }>) => {
-            setProfileUserId(e.detail.userId);
-        };
-        window.addEventListener("user:profile:open", handler as EventListener);
-        return () => window.removeEventListener("user:profile:open", handler as EventListener);
+        return onCustomEvent<{ userId: string }>("user:profile:open", (detail) => {
+            setProfileUserId(detail.userId);
+        });
     }, []);
 
     return (
@@ -37,12 +36,16 @@ export default function MainPage() {
             <DevOverlay />
             <FloatingScreenShare />
 
-            <GlobalSidebar />
+            <ErrorBoundary variant="section" label="GlobalSidebar">
+                <GlobalSidebar />
+            </ErrorBoundary>
 
             {isDm && (
                 <div className="flex flex-col h-full bg-[#2a2c31]">
                     <div className="flex-1 min-h-0 overflow-auto">
-                        <DmSidebar />
+                        <ErrorBoundary variant="section" label="DmSidebar">
+                            <DmSidebar />
+                        </ErrorBoundary>
                     </div>
                     <VoiceControls />
                 </div>
@@ -51,14 +54,16 @@ export default function MainPage() {
             {isGuild && guildId && (
                 <div className="flex flex-col h-full bg-[#2a2c31]">
                     <div className="flex-1 min-h-0 overflow-auto">
-                        <ChannelSidebar guildId={guildId} />
+                        <ErrorBoundary variant="section" label="ChannelSidebar">
+                            <ChannelSidebar guildId={guildId} />
+                        </ErrorBoundary>
                     </div>
                     <VoiceControls />
                 </div>
             )}
 
             <div className="flex flex-1 min-w-0 min-h-0 overflow-hidden">
-                <ErrorBoundary key={location.pathname}>
+                <ErrorBoundary key={location.pathname} label="Content">
                     <Outlet />
                 </ErrorBoundary>
             </div>

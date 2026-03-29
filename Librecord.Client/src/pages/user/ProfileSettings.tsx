@@ -5,6 +5,7 @@ import { usePresence } from "../../hooks/usePresence";
 import { useToast } from "../../hooks/useToast";
 import { StatusDot } from "../../components/user/StatusDot";
 import { API_URL, userProfiles } from "../../api/client";
+import { logger } from "../../lib/logger";
 
 export default function ProfileSettings() {
     const { user, logout } = useAuth();
@@ -34,7 +35,7 @@ export default function ProfileSettings() {
             setBannerUrl(p.bannerUrl ?? null);
             setFriendsVisible(p.friendsVisibleSetting ?? true);
             setOriginal({ name: user.displayName, bio: p.bio ?? "" });
-        }).catch(() => {});
+        }).catch(e => logger.api.warn("Failed to load user profile", e));
     }, [user]);
 
     if (!user) return null;

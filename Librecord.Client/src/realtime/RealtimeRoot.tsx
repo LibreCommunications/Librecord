@@ -3,8 +3,10 @@ import { appConnection, setConnectionState } from "./connection";
 import { registerListeners } from "./listeners";
 import { initNotifications, cleanupNotifications } from "./notifications";
 import { resetVoiceState, getPersistedVoiceSession, clearPersistedVoiceSession, setVoiceState, getVoicePrefs } from "../voice/voiceStore";
+import { logger } from "../lib/logger";
 import * as livekitClient from "../voice/livekitClient";
 import { useAuth } from "../hooks/useAuth";
+import { STORAGE } from "../lib/storageKeys";
 import type { VoiceParticipant } from "../voice/voiceStore";
 
 declare global {
@@ -61,18 +63,18 @@ async function tryRestoreVoiceSession() {
             appConnection.invoke("UpdateVoiceState", {
                 isMuted: prefs.isMuted,
                 isDeafened: prefs.isDeafened,
-            }).catch(() => {});
+            }).catch(e => logger.realtime.warn("Failed to sync voice state", e));
         }
     } catch (e) {
-        console.warn("[Realtime] Failed to restore voice session:", e);
+        logger.realtime.warn("Failed to restore voice session", e);
         clearPersistedVoiceSession();
     }
 }
 
 function restoreReturnUrl() {
-    const returnUrl = sessionStorage.getItem("librecord:returnUrl");
+    const returnUrl = sessionStorage.getItem(STORAGE.returnUrl);
     if (returnUrl) {
-        sessionStorage.removeItem("librecord:returnUrl");
+        sessionStorage.removeItem(STORAGE.returnUrl);
         if (returnUrl !== window.location.pathname) {
             window.history.replaceState(null, "", returnUrl);
         }
@@ -104,7 +106,7 @@ export function RealtimeRoot() {
             // the connection is established and voice session is restored.
             window.dispatchEvent(new Event("realtime:reconnected"));
         }).catch(err => {
-            console.error("[Realtime] Connection failed", err);
+            logger.realtime.error("Connection failed", err);
             setConnectionState("disconnected");
         });
     });
@@ -120,9 +122,9 @@ export function RealtimeRoot() {
             window.__realtimeReady = false;
 
             cleanupNotifications();
-            livekitClient.disconnect().catch(() => {});
+            livekitClient.disconnect().catch(e => logger.realtime.warn("Disconnect cleanup failed", e));
             resetVoiceState();
-            appConnection.stop().catch(() => {});
+            appConnection.stop().catch(e => logger.realtime.warn("Connection stop failed", e));
         }
     }, [user]);
 

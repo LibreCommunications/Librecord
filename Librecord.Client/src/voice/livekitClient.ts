@@ -3,17 +3,24 @@ import {
     RoomEvent,
     Track,
     VideoPreset,
+    ConnectionQuality,
+    DisconnectReason,
     type RemoteParticipant,
     type RemoteTrackPublication,
     type LocalParticipant,
     type LocalTrackPublication,
 } from "livekit-client";
+import { showToast } from "../lib/toast";
+import { getUserVolume } from "../lib/userVolume";
 import {
     getNoiseSuppressionSettings,
     applyNoiseSuppressionToTrack,
     clearActiveProcessor,
     type LocalAudioTrackLike,
 } from "./noiseSuppression";
+import { logger } from "../lib/logger";
+import { onCustomEvent } from "../lib/typedEvent";
+import { STORAGE } from "../lib/storageKeys";
 
 let room: Room | null = null;
 let nsChangeListener: (() => void) | null = null;
@@ -27,27 +34,26 @@ function getLocalAudioTrack() {
 }
 
 // ── Device preferences (localStorage) ────────────────────────
-const DEVICE_PREFS_KEY = "librecord:devicePrefs";
 type DeviceKind = "audioinput" | "videoinput" | "audiooutput";
 
 export function getDevicePref(kind: DeviceKind): string | undefined {
     try {
-        const prefs = JSON.parse(localStorage.getItem(DEVICE_PREFS_KEY) ?? "{}");
+        const prefs = JSON.parse(localStorage.getItem(STORAGE.devicePrefs) ?? "{}");
         return prefs[kind] || undefined;
     } catch { return undefined; }
 }
 
 export function setDevicePref(kind: DeviceKind, deviceId: string) {
     try {
-        const prefs = JSON.parse(localStorage.getItem(DEVICE_PREFS_KEY) ?? "{}");
+        const prefs = JSON.parse(localStorage.getItem(STORAGE.devicePrefs) ?? "{}");
         prefs[kind] = deviceId;
-        localStorage.setItem(DEVICE_PREFS_KEY, JSON.stringify(prefs));
+        localStorage.setItem(STORAGE.devicePrefs, JSON.stringify(prefs));
     } catch { /* ignore */ }
 }
 
 export function getAllDevicePrefs(): Record<DeviceKind, string | undefined> {
     try {
-        const prefs = JSON.parse(localStorage.getItem(DEVICE_PREFS_KEY) ?? "{}");
+        const prefs = JSON.parse(localStorage.getItem(STORAGE.devicePrefs) ?? "{}");
         return { audioinput: prefs.audioinput, videoinput: prefs.videoinput, audiooutput: prefs.audiooutput };
     } catch { return { audioinput: undefined, videoinput: undefined, audiooutput: undefined }; }
 }
@@ -158,7 +164,7 @@ function getPlaybackCtx(): AudioContext {
     if (!_playbackCtx || _playbackCtx.state === "closed") {
         _playbackCtx = new AudioContext();
     }
-    if (_playbackCtx.state === "suspended") _playbackCtx.resume().catch(() => {});
+    if (_playbackCtx.state === "suspended") _playbackCtx.resume().catch(e => logger.voice.warn("AudioContext resume failed", e));
     return _playbackCtx;
 }
 
@@ -193,9 +199,9 @@ function applyVolume(identity: string, pct: number) {
 }
 
 // Listen for per-user volume changes
-window.addEventListener("voice:volume:changed", ((e: CustomEvent<{ userId: string; volume: number }>) => {
-    applyVolume(e.detail.userId, e.detail.volume);
-}) as EventListener);
+onCustomEvent<{ userId: string; volume: number }>("voice:volume:changed", (detail) => {
+    applyVolume(detail.userId, detail.volume);
+});
 
 // Per-user audio: MediaStreamSource → GainNode → shared AudioContext destination.
 
@@ -209,13 +215,7 @@ function attachAudioTrack(identity: string, track: MediaStreamTrack) {
     source.connect(gain);
     gain.connect(ctx.destination);
 
-    // Apply per-user volume from localStorage
-    let pct = 100;
-    try {
-        const vols = JSON.parse(localStorage.getItem("librecord:userVolumes") ?? "{}");
-        pct = vols[identity] ?? 100;
-    } catch { /* default */ }
-    gain.gain.value = pctToGain(pct);
+    gain.gain.value = pctToGain(getUserVolume(identity));
 
     audioPipelines.set(identity, { gain, source });
 }
@@ -268,6 +268,39 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
         },
     });
 
+    // ── LiveKit observability ─────────────────────────────────
+    room.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
+        logger.voice.warn("Room disconnected", reason);
+    });
+
+    room.on(RoomEvent.Reconnecting, () => {
+        logger.voice.info("Reconnecting to voice server...");
+        showToast("Reconnecting to voice...", "info");
+    });
+
+    room.on(RoomEvent.Reconnected, () => {
+        logger.voice.info("Reconnected to voice server");
+        showToast("Voice reconnected", "success");
+    });
+
+    room.on(RoomEvent.SignalReconnecting, () => {
+        logger.voice.info("Signal connection reconnecting...");
+    });
+
+    room.on(RoomEvent.MediaDevicesError, (error: Error) => {
+        logger.voice.error("Media device error", error);
+        showToast(`Microphone/camera error: ${error.message}`, "error");
+    });
+
+    room.on(RoomEvent.ConnectionQualityChanged, (quality: ConnectionQuality, participant) => {
+        if (participant.identity === room!.localParticipant.identity) {
+            if (quality === ConnectionQuality.Poor) {
+                logger.voice.warn("Connection quality degraded to Poor");
+            }
+            window.dispatchEvent(new CustomEvent("voice:quality:changed", { detail: { quality } }));
+        }
+    });
+
     room.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
         stopAnalysingTrack(p.identity);
     });
@@ -303,7 +336,7 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
                     return;
                 }
             } catch (err) {
-                console.warn("[Voice] Failed to apply noise suppression:", err);
+                logger.voice.warn("Failed to apply noise suppression", err);
             }
         }
 
@@ -333,7 +366,7 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
             const analyseTrack = processedTrack ?? localAudioTrack.mediaStreamTrack;
             if (analyseTrack) startAnalysingTrack(identity, analyseTrack);
         } catch (err) {
-            console.warn("[Voice] Failed to apply noise suppression:", err);
+            logger.voice.warn("Failed to apply noise suppression", err);
         }
     };
     window.addEventListener("voice:noisesuppression:changed", onNsChanged);
@@ -474,14 +507,15 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
             ],
         });
     } catch (e) {
-        console.warn("[Voice] Screen share failed, retrying without constraints:", e);
+        logger.voice.warn("Screen share failed, retrying without constraints", e);
         try {
             // Fallback: no constraints — maximum browser compatibility
             await room.localParticipant.setScreenShareEnabled(true, {
                 audio: options.audio,
             });
         } catch (e2) {
-            console.warn("[Voice] Screen share failed entirely:", e2);
+            logger.voice.warn("Screen share failed entirely", e2);
+            showToast("Screen share failed", "error");
             return false;
         }
     }

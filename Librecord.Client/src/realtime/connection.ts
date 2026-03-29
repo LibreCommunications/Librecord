@@ -2,6 +2,7 @@ import * as signalR from "@microsoft/signalr";
 import { registerListeners } from "./listeners";
 import { getVoiceState, getVoicePrefs, resetVoiceState } from "../voice/voiceStore";
 import * as livekitClient from "../voice/livekitClient";
+import { logger } from "../lib/logger";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -55,7 +56,7 @@ appConnection.onreconnected(async () => {
                 isScreenSharing: voice.isScreenSharing,
             });
         } catch (e) {
-            console.warn("[Realtime] Failed to rejoin voice channel:", e);
+            logger.realtime.warn("Failed to rejoin voice channel", e);
         }
     }
 
@@ -63,19 +64,19 @@ appConnection.onreconnected(async () => {
 });
 
 appConnection.onreconnecting(err => {
-    console.warn("[Realtime] Reconnecting...", err?.message);
+    logger.realtime.warn("Reconnecting...", err?.message);
     setConnectionState("reconnecting");
 });
 
 // All retry attempts exhausted. If we're in a voice call, try one more
 // fresh connection before nuking state — LiveKit media is still flowing.
 appConnection.onclose(async (err) => {
-    console.warn("[Realtime] Connection closed", err?.message);
+    logger.realtime.warn("Connection closed", err?.message);
 
     const wasInVoice = getVoiceState().isConnected;
 
     if (wasInVoice) {
-        console.info("[Realtime] Was in voice call — attempting fresh connection...");
+        logger.realtime.info("Was in voice call — attempting fresh connection...");
         setConnectionState("reconnecting");
         try {
             await appConnection.start();
@@ -96,11 +97,11 @@ appConnection.onclose(async (err) => {
             window.dispatchEvent(new Event("realtime:reconnected"));
             return;
         } catch (e) {
-            console.warn("[Realtime] Fresh connection failed:", e);
+            logger.realtime.warn("Fresh connection failed", e);
         }
     }
 
     setConnectionState("disconnected");
-    livekitClient.disconnect().catch(() => {});
+    livekitClient.disconnect().catch(e => logger.realtime.warn("Disconnect cleanup failed", e));
     resetVoiceState();
 });

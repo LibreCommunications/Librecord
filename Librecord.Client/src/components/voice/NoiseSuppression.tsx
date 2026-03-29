@@ -5,6 +5,7 @@ import {
     type NoiseSuppressionMode,
 } from "../../voice/noiseSuppression";
 import { getDevicePref } from "../../voice/livekitClient";
+import { logger } from "../../lib/logger";
 
 const MODES: { value: NoiseSuppressionMode; label: string; description: string }[] = [
     { value: "off", label: "Off", description: "No noise suppression" },
@@ -135,7 +136,7 @@ function ThresholdSlider({
                 }
                 poll();
             } catch (err) {
-                console.warn("[NoiseSuppression] Could not access mic for preview:", err);
+                logger.voice.warn("Could not access mic for preview", err);
             }
         }
 
@@ -145,7 +146,7 @@ function ThresholdSlider({
             cancelled = true;
             if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
             streamRef.current?.getTracks().forEach(t => t.stop());
-            ctxRef.current?.close().catch(() => {});
+            ctxRef.current?.close().catch(e => logger.voice.warn("Failed to close AudioContext", e));
             streamRef.current = null;
             ctxRef.current = null;
             analyserRef.current = null;
