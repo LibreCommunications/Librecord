@@ -28,6 +28,14 @@ export default function UserSettingsPage() {
                     }>
                         App Settings
                     </NavLink>
+
+                    <NavLink to="voice" className={({ isActive }) =>
+                        `px-3 py-2 rounded transition ${
+                            isActive ? "bg-[#404249] text-white" : "hover:bg-[#3a3c43]"
+                        }`
+                    }>
+                        Voice & Video
+                    </NavLink>
                 </nav>
             </aside>
 

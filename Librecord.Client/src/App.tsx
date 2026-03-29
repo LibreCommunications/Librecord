@@ -15,6 +15,7 @@ const ChannelPermissionsPage = lazy(() => import("./pages/guild/ChannelPermissio
 const UserSettingsPage = lazy(() => import("./pages/user/UserSettingsPage"));
 const ProfileSettings = lazy(() => import("./pages/user/ProfileSettings"));
 const AppSettings = lazy(() => import("./pages/user/AppSettings"));
+const VoiceVideoSettings = lazy(() => import("./pages/user/VoiceVideoSettings"));
 
 function ProtectedRoute() {
     const { isAuthenticated, authLoading } = useAuth();
@@ -49,6 +50,7 @@ export default function App() {
                                 <Route index element={<Navigate to="profile" replace />} />
                                 <Route path="profile" element={<ProfileSettings />} />
                                 <Route path="app" element={<AppSettings />} />
+                                <Route path="voice" element={<VoiceVideoSettings />} />
                             </Route>
                         </Route>
                     </Route>

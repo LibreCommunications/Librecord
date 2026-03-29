@@ -6,9 +6,24 @@ import {
     type RemoteParticipant,
     type RemoteTrackPublication,
     type LocalParticipant,
+    type LocalTrackPublication,
 } from "livekit-client";
+import {
+    getNoiseSuppressionSettings,
+    applyNoiseSuppressionToTrack,
+    clearActiveProcessor,
+} from "./noiseSuppression";
 
 let room: Room | null = null;
+let nsChangeListener: (() => void) | null = null;
+
+function getLocalAudioTrack() {
+    if (!room) return null;
+    for (const pub of room.localParticipant.audioTrackPublications.values()) {
+        if (pub.track) return pub.track;
+    }
+    return null;
+}
 
 // ── Device preferences (localStorage) ────────────────────────
 const DEVICE_PREFS_KEY = "librecord:devicePrefs";
@@ -234,12 +249,16 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
     const micId = getDevicePref("audioinput");
     const camId = getDevicePref("videoinput");
 
+    const nsSettings = getNoiseSuppressionSettings();
+    // Disable browser's built-in noise suppression when we handle it ourselves
+    const browserNS = nsSettings.mode === "off";
+
     room = new Room({
         dynacast: true,
         adaptiveStream: true,
         audioCaptureDefaults: {
             autoGainControl: true,
-            noiseSuppression: true,
+            noiseSuppression: browserNS,
             echoCancellation: true,
             ...(micId && { deviceId: micId }),
         },
@@ -269,11 +288,16 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
         }
     });
 
-    room.on(RoomEvent.LocalTrackPublished, (pub) => {
+    room.on(RoomEvent.LocalTrackPublished, (pub: LocalTrackPublication) => {
         if (pub.kind === "audio") {
             const msTrack = pub.track?.mediaStreamTrack;
             if (msTrack) {
                 startAnalysingTrack(room!.localParticipant.identity, msTrack);
+            }
+            // Apply noise suppression processor to the local audio track
+            if (pub.track && getNoiseSuppressionSettings().mode !== "off") {
+                applyNoiseSuppressionToTrack(pub.track as Parameters<typeof applyNoiseSuppressionToTrack>[0])
+                    .catch(err => console.warn("[Voice] Failed to apply noise suppression:", err));
             }
         }
     });
@@ -283,6 +307,18 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
             stopAnalysingTrack(room!.localParticipant.identity);
         }
     });
+
+    // Listen for runtime noise suppression mode changes
+    const onNsChanged = () => {
+        if (!room) return;
+        const localAudioTrack = getLocalAudioTrack();
+        if (localAudioTrack) {
+            applyNoiseSuppressionToTrack(localAudioTrack as Parameters<typeof applyNoiseSuppressionToTrack>[0])
+                .catch(err => console.warn("[Voice] Failed to apply noise suppression:", err));
+        }
+    };
+    window.addEventListener("voice:noisesuppression:changed", onNsChanged);
+    nsChangeListener = onNsChanged;
 
     await room.connect(wsUrl, token);
     await room.localParticipant.setMicrophoneEnabled(!initialMuted);
@@ -299,11 +335,23 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
     if (localAudioPub?.track?.mediaStreamTrack) {
         startAnalysingTrack(room.localParticipant.identity, localAudioPub.track.mediaStreamTrack);
     }
+
+    // Apply noise suppression to already-published track
+    const existingTrack = getLocalAudioTrack();
+    if (existingTrack && nsSettings.mode !== "off") {
+        applyNoiseSuppressionToTrack(existingTrack as Parameters<typeof applyNoiseSuppressionToTrack>[0])
+            .catch(err => console.warn("[Voice] Failed to apply noise suppression:", err));
+    }
 }
 
 export async function disconnect() {
     stopAllAnalysers();
     detachAllAudio();
+    if (nsChangeListener) {
+        window.removeEventListener("voice:noisesuppression:changed", nsChangeListener);
+        nsChangeListener = null;
+    }
+    clearActiveProcessor();
     if (!room) return;
     await room.disconnect(true);
     room = null;
@@ -366,6 +414,11 @@ export async function listAudioOutputDevices(): Promise<MediaDeviceInfo[]> {
 export async function switchMicrophone(deviceId: string): Promise<void> {
     if (!room) return;
     await room.localParticipant.setMicrophoneEnabled(true, { deviceId });
+}
+
+export async function switchActiveDevice(kind: MediaDeviceKind, deviceId: string): Promise<void> {
+    if (!room) return;
+    await room.switchActiveDevice(kind, deviceId);
 }
 
 export interface ScreenShareSettings {
