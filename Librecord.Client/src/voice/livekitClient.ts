@@ -147,12 +147,13 @@ function pollSpeaking() {
     animFrameId = requestAnimationFrame(pollSpeaking);
 }
 
-// Per-user audio pipeline: HTMLAudioElement + Web Audio GainNode for volume > 100%
+// Per-user audio pipeline: Web Audio API with GainNode for volume control.
+// Uses MediaStreamSource directly (not MediaElementSource) because
+// createMediaElementSource doesn't work with live MediaStream/WebRTC sources.
 interface AudioPipeline {
-    audio: HTMLAudioElement;
     ctx: AudioContext;
     gain: GainNode;
-    source: MediaElementAudioSourceNode;
+    source: MediaStreamAudioSourceNode;
 }
 const audioPipelines = new Map<string, AudioPipeline>();
 
@@ -184,26 +185,17 @@ window.addEventListener("voice:volume:changed", ((e: CustomEvent<{ userId: strin
     applyVolume(e.detail.userId, e.detail.volume);
 }) as EventListener);
 
-// LiveKit's auto-attach relies on room.startAudio() which can fail
-// if called outside a user gesture context. Explicit <audio> elements
-// with Web Audio GainNode guarantee playback and volume boost.
+// Web Audio API handles all remote audio playback and per-user volume control.
 
 function attachAudioTrack(identity: string, track: MediaStreamTrack) {
     detachAudioTrack(identity);
 
-    const audio = document.createElement("audio");
-    audio.srcObject = new MediaStream([track]);
-    audio.autoplay = true;
-    audio.setAttribute("playsinline", "");
-    audio.style.display = "none";
-    audio.volume = 1; // GainNode handles all volume control
-    document.body.appendChild(audio);
-
-    // Web Audio pipeline for gain control (supports > 1.0 for boost)
+    const stream = new MediaStream([track]);
     const ctx = new AudioContext();
-    // Resume if browser auto-suspended
     if (ctx.state === "suspended") ctx.resume().catch(() => {});
-    const source = ctx.createMediaElementSource(audio);
+
+    // MediaStreamSource → GainNode → speakers
+    const source = ctx.createMediaStreamSource(stream);
     const gain = ctx.createGain();
     source.connect(gain);
     gain.connect(ctx.destination);
@@ -216,17 +208,12 @@ function attachAudioTrack(identity: string, track: MediaStreamTrack) {
     } catch { /* default */ }
     gain.gain.value = pctToGain(pct);
 
-    audio.play().catch((e) => console.warn("[Voice] Audio play failed:", e));
-
-    audioPipelines.set(identity, { audio, ctx, gain, source });
+    audioPipelines.set(identity, { ctx, gain, source });
 }
 
 function detachAudioTrack(identity: string) {
     const pipe = audioPipelines.get(identity);
     if (pipe) {
-        pipe.audio.pause();
-        pipe.audio.srcObject = null;
-        pipe.audio.remove();
         pipe.source.disconnect();
         pipe.gain.disconnect();
         pipe.ctx.close().catch(() => {});
