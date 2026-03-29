@@ -291,55 +291,66 @@ export default function GlobalSidebar() {
                                 }
                             }}
                         >
-                            {/* Folder icon — click to expand */}
-                            <div
-                                className={`relative group flex items-center justify-center w-12 h-12 rounded-2xl cursor-pointer transition-all
-                                    ${isExpanded || hasActive ? "rounded-2xl" : "rounded-full hover:rounded-2xl"}
-                                    ${dragOverTarget === `folder:${folder.id}` ? "ring-2 ring-[#5865F2]" : ""}
-                                    bg-[#313338] hover:bg-[#5865F2]`}
-                                onClick={() => setExpandedFolder(isExpanded ? null : folder.id)}
-                            >
-                                {/* Mini grid of guild icons */}
-                                <div className="grid grid-cols-2 gap-0.5 w-8 h-8 overflow-hidden rounded-lg">
-                                    {folderGuilds.slice(0, 4).map(g => (
-                                        g.iconUrl ? (
-                                            <img key={g.id} src={`${API_URL}${g.iconUrl}`} className="w-full h-full object-cover" alt="" />
-                                        ) : (
-                                            <div key={g.id} className="w-full h-full bg-[#5865F2] flex items-center justify-center text-[8px] text-white font-bold">
-                                                {g.name[0]}
-                                            </div>
-                                        )
-                                    ))}
-                                </div>
-                                {hasUnread && !hasActive && (
-                                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-[#f23f43] rounded-full border-2 border-[#1e1f22]" />
-                                )}
-                            </div>
-
-                            {/* Expanded folder contents */}
-                            {isExpanded && (
-                                <div className="flex flex-col items-center gap-1 mt-1 mb-1 pl-1 border-l-2 border-[#5865F2] ml-5">
-                                    {folderGuilds.map(g => (
-                                        <div
-                                            key={g.id}
-                                            draggable
-                                            onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("guildId", g.id); e.dataTransfer.setData("fromFolder", folder.id); e.dataTransfer.effectAllowed = "move"; }}
-                                        >
-                                            <SidebarIcon
-                                                to={`/app/guild/${g.id}`}
-                                                active={guildId === g.id}
-                                                unread={(effectiveGuildUnreads[g.id] ?? 0) > 0}
-                                                tooltip={g.name}
-                                                className="bg-[#313338] hover:bg-[#5865F2] text-white"
+                            {isExpanded ? (
+                                <>
+                                    {/* Expanded: rounded container with guilds inside */}
+                                    <div className="bg-[#2b2d31] rounded-[16px] p-1.5 flex flex-col items-center gap-1">
+                                        {folderGuilds.map(g => (
+                                            <div
+                                                key={g.id}
+                                                draggable
+                                                onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("guildId", g.id); e.dataTransfer.setData("fromFolder", folder.id); e.dataTransfer.effectAllowed = "move"; }}
                                             >
-                                                {g.iconUrl ? (
-                                                    <img src={`${API_URL}${g.iconUrl}`} className="w-full h-full rounded-[inherit] object-cover" alt="" />
-                                                ) : (
-                                                    <span className="text-lg font-medium">{g.name[0].toUpperCase()}</span>
-                                                )}
-                                            </SidebarIcon>
+                                                <SidebarIcon
+                                                    to={`/app/guild/${g.id}`}
+                                                    active={guildId === g.id}
+                                                    unread={(effectiveGuildUnreads[g.id] ?? 0) > 0}
+                                                    tooltip={g.name}
+                                                    className="bg-[#313338] hover:bg-[#5865F2] text-white"
+                                                >
+                                                    {g.iconUrl ? (
+                                                        <img src={`${API_URL}${g.iconUrl}`} className="w-full h-full rounded-[inherit] object-cover" alt="" />
+                                                    ) : (
+                                                        <span className="text-lg font-medium">{g.name[0].toUpperCase()}</span>
+                                                    )}
+                                                </SidebarIcon>
+                                            </div>
+                                        ))}
+                                        {/* Close folder icon at the bottom */}
+                                        <div
+                                            className="w-12 h-12 rounded-[16px] bg-[#313338] hover:bg-[#5865F2] flex items-center justify-center cursor-pointer transition-colors"
+                                            onClick={() => setExpandedFolder(null)}
+                                        >
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#949ba4] group-hover:text-white">
+                                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                                            </svg>
                                         </div>
-                                    ))}
+                                    </div>
+                                </>
+                            ) : (
+                                /* Collapsed: folder pill with mini icons */
+                                <div
+                                    className={`relative w-12 h-12 rounded-[16px] bg-[#2b2d31] cursor-pointer hover:rounded-2xl transition-all flex items-center justify-center
+                                        ${hasActive ? "rounded-2xl" : ""}
+                                        ${dragOverTarget === `folder:${folder.id}` ? "ring-2 ring-[#5865F2]" : ""}`}
+                                    onClick={() => setExpandedFolder(folder.id)}
+                                >
+                                    <div className="grid grid-cols-2 gap-[3px] w-[34px] h-[34px]">
+                                        {folderGuilds.slice(0, 4).map(g => (
+                                            <div key={g.id} className="w-[15px] h-[15px] rounded-full overflow-hidden bg-[#313338]">
+                                                {g.iconUrl ? (
+                                                    <img src={`${API_URL}${g.iconUrl}`} className="w-full h-full object-cover" alt="" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-[7px] text-white font-bold">
+                                                        {g.name[0]}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {hasUnread && !hasActive && (
+                                        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-[#f23f43] rounded-full border-2 border-[#1e1f22]" />
+                                    )}
                                 </div>
                             )}
                         </div>
