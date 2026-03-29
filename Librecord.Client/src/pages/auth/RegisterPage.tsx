@@ -108,7 +108,7 @@ export default function RegisterPage() {
                 <button
                     onClick={handleRegister}
                     disabled={loading}
-                    className="w-full py-2.5 rounded-[4px] font-semibold text-white bg-[#5865F2] hover:bg-[#4752C4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    className="w-full py-2.5 rounded-[4px] font-semibold text-white bg-[#5865F2] hover:bg-[#4752c4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                 >
                     {loading && <Spinner size="sm" />}
                     {loading ? "Creating account..." : "Continue"}

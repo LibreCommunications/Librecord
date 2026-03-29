@@ -264,7 +264,7 @@ export function MessageList({
             {showScrollBtn && (
                 <button
                     onClick={scrollToBottom}
-                    className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-medium shadow-lg transition-colors z-10"
+                    className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#5865F2] hover:bg-[#4752c4] text-white text-sm font-medium shadow-lg transition-colors z-10"
                 >
                     {newMsgCount > 0
                         ? <>{newMsgCount} new message{newMsgCount > 1 ? "s" : ""}</>

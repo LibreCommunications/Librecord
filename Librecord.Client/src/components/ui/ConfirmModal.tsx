@@ -36,7 +36,7 @@ export function ConfirmModal({
     const confirmClass =
         confirmVariant === "danger"
             ? "bg-[#da373c] hover:bg-[#a12828]"
-            : "bg-[#5865F2] hover:bg-[#4752C4]";
+            : "bg-[#5865F2] hover:bg-[#4752c4]";
 
     return (
         <div

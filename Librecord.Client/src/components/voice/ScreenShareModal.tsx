@@ -153,7 +153,7 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
                     </button>
                     <button
                         onClick={() => onStart({ resolution, frameRate, audio })}
-                        className="px-5 py-2 rounded text-sm font-medium text-white bg-[#5865F2] hover:bg-[#4752C4] transition-colors"
+                        className="px-5 py-2 rounded text-sm font-medium text-white bg-[#5865F2] hover:bg-[#4752c4] transition-colors"
                     >
                         Go Live
                     </button>

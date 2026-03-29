@@ -167,7 +167,7 @@ export default function ChannelPermissionsPage() {
                                                                 ${state === true
                                                                     ? "bg-green-600/20 text-green-400 border border-green-600/40"
                                                                     : state === false
-                                                                        ? "bg-red-600/20 text-red-400 border border-red-600/40"
+                                                                        ? "bg-[#da373c]/20 text-[#f23f43] border border-[#da373c]/40"
                                                                         : "bg-[#2b2d31] text-gray-400 border border-gray-600/30"
                                                                 }
                                                             `}

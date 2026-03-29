@@ -96,7 +96,7 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
                     </div>
                     <button
                         onClick={() => onToggleWatch(true)}
-                        className="px-5 py-2 rounded-lg text-sm font-medium text-white bg-[#5865F2] hover:bg-[#4752C4] transition-colors flex items-center gap-2"
+                        className="px-5 py-2 rounded-lg text-sm font-medium text-white bg-[#5865F2] hover:bg-[#4752c4] transition-colors flex items-center gap-2"
                     >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                             <polygon points="5 3 19 12 5 21 5 3" />
@@ -144,17 +144,17 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
             )}
 
             {trackStatus === "active" && (
-                <div className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 group-hover/screen:opacity-100 transition-opacity">
+                <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
                     {!isSelf && (
                         <button
                             onClick={() => onToggleWatch(false)}
-                            title="Stop watching"
-                            className="p-1.5 rounded-md bg-black/60 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/80"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#da373c]/90 hover:bg-[#da373c] text-white text-xs font-medium backdrop-blur-sm transition-colors"
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <line x1="18" y1="6" x2="6" y2="18" />
                                 <line x1="6" y1="6" x2="18" y2="18" />
                             </svg>
+                            Stop Watching
                         </button>
                     )}
                     <button

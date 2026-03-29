@@ -172,7 +172,7 @@ export function GuildRoleSettings({ guildId }: Props) {
                     {selected.name !== "@everyone" && selected.name !== "Owner" && (
                         <button
                             onClick={handleDelete}
-                            className="px-3 py-2 rounded bg-red-600 text-white text-sm hover:bg-red-700"
+                            className="px-3 py-2 rounded bg-[#da373c] text-white text-sm hover:bg-[#a12828]"
                         >
                             Delete Role
                         </button>
