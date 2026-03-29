@@ -18,15 +18,17 @@ export function UserProfilePopup({ userId, onClose }: Props) {
     const [loading, setLoading] = useState(true);
     const [friends, setFriends] = useState<UserSummary[] | null>(null);
     const [showFriends, setShowFriends] = useState(false);
+    const [isBlocked, setIsBlocked] = useState(false);
     const { sendRequest: sendFriendRequest, removeFriend } = useFriends();
-    const { blockUser } = useBlocks();
+    const { blockUser, unblockUser, isBlocked: checkBlocked } = useBlocks();
     const { startDm } = useDirectMessagesChannel();
     const { toast } = useToast();
     const navigate = useNavigate();
 
     useEffect(() => {
         userProfiles.get(userId).then(p => { setProfile(p); setLoading(false); }).catch(() => setLoading(false));
-    }, [userId]);
+        checkBlocked(userId).then(setIsBlocked);
+    }, [userId, checkBlocked]);
 
     if (loading) {
         return (
@@ -118,54 +120,71 @@ export function UserProfilePopup({ userId, onClose }: Props) {
                     {/* Actions */}
                     {!profile.isSelf && (
                         <div className="flex gap-2 mt-4">
-                            <button
-                                onClick={async () => {
-                                    const chId = await startDm(profile.id, "");
-                                    if (chId) { navigate(`/app/dm/${chId}`); onClose(); }
-                                }}
-                                className="flex-1 py-2 rounded-lg text-sm font-medium bg-[#5865F2] text-white hover:bg-[#4752c4] transition-colors"
-                            >
-                                Message
-                            </button>
-
-                            {profile.isFriend ? (
+                            {isBlocked ? (
                                 <button
                                     onClick={async () => {
-                                        await removeFriend(profile.id);
-                                        toast("Friend removed.", "info");
-                                        setProfile(p => p ? { ...p, isFriend: false } : p);
+                                        if (await unblockUser(profile.id)) {
+                                            setIsBlocked(false);
+                                            toast(`${profile.displayName} unblocked.`, "success");
+                                        }
                                     }}
-                                    className="px-4 py-2 rounded-lg text-sm font-medium bg-[#2b2d31] text-[#f23f43] hover:bg-[#da373c] hover:text-white transition-colors"
+                                    className="flex-1 py-2 rounded-lg text-sm font-medium bg-[#248046] text-white hover:bg-[#1a6334] transition-colors"
                                 >
-                                    Unfriend
+                                    Unblock
                                 </button>
                             ) : (
-                                <button
-                                    onClick={async () => {
-                                        await sendFriendRequest(profile.username);
-                                        toast("Friend request sent!", "success");
-                                    }}
-                                    className="px-4 py-2 rounded-lg text-sm font-medium bg-[#2b2d31] text-[#248046] hover:bg-[#248046] hover:text-white transition-colors"
-                                >
-                                    Add Friend
-                                </button>
-                            )}
+                                <>
+                                    <button
+                                        onClick={async () => {
+                                            const chId = await startDm(profile.id, "");
+                                            if (chId) { navigate(`/app/dm/${chId}`); onClose(); }
+                                            else toast("Can't message this user.", "error");
+                                        }}
+                                        className="flex-1 py-2 rounded-lg text-sm font-medium bg-[#5865F2] text-white hover:bg-[#4752c4] transition-colors"
+                                    >
+                                        Message
+                                    </button>
 
-                            <button
-                                onClick={async () => {
-                                    if (await blockUser(profile.id)) {
-                                        toast(`${profile.displayName} blocked.`, "info");
-                                        onClose();
-                                    }
-                                }}
-                                className="px-3 py-2 rounded-lg text-sm bg-[#2b2d31] text-[#949ba4] hover:text-[#f23f43] hover:bg-[#35373c] transition-colors"
-                                title="Block"
-                            >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <circle cx="12" cy="12" r="10" />
-                                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                                </svg>
-                            </button>
+                                    {profile.isFriend ? (
+                                        <button
+                                            onClick={async () => {
+                                                await removeFriend(profile.id);
+                                                toast("Friend removed.", "info");
+                                                setProfile(p => p ? { ...p, isFriend: false } : p);
+                                            }}
+                                            className="px-4 py-2 rounded-lg text-sm font-medium bg-[#2b2d31] text-[#f23f43] hover:bg-[#da373c] hover:text-white transition-colors"
+                                        >
+                                            Unfriend
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={async () => {
+                                                await sendFriendRequest(profile.username);
+                                                toast("Friend request sent!", "success");
+                                            }}
+                                            className="px-4 py-2 rounded-lg text-sm font-medium bg-[#2b2d31] text-[#248046] hover:bg-[#248046] hover:text-white transition-colors"
+                                        >
+                                            Add Friend
+                                        </button>
+                                    )}
+
+                                    <button
+                                        onClick={async () => {
+                                            if (await blockUser(profile.id)) {
+                                                setIsBlocked(true);
+                                                toast(`${profile.displayName} blocked.`, "info");
+                                            }
+                                        }}
+                                        className="px-3 py-2 rounded-lg text-sm bg-[#2b2d31] text-[#949ba4] hover:text-[#f23f43] hover:bg-[#35373c] transition-colors"
+                                        title="Block"
+                                    >
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <circle cx="12" cy="12" r="10" />
+                                            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                                        </svg>
+                                    </button>
+                                </>
+                            )}
                         </div>
                     )}
                 </div>
