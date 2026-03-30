@@ -60,8 +60,8 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
                 onContextMenu={handleContextMenu}
                 className={`
                     relative rounded-lg overflow-hidden cursor-pointer
-                    bg-[#232428] transition-shadow duration-200
-                    ${isSpeaking ? "shadow-[0_0_0_2px_#23a55a]" : "shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"}
+                    bg-[#232428] transition-all duration-200
+                    ${isSpeaking ? "ring-2 ring-[#23a55a]" : "ring-1 ring-white/[0.04]"}
                 `}
             >
                 {showVideo ? (
@@ -135,19 +135,21 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
             onClick={openProfile}
             onContextMenu={handleContextMenu}
             className={`
-                relative rounded-xl overflow-hidden cursor-pointer
+                relative rounded-xl cursor-pointer
                 flex items-center justify-center aspect-video ${fill ? "max-h-full min-h-16" : ""}
-                bg-[#2b2d31] transition-shadow duration-200
-                ${isSpeaking ? "shadow-[0_0_0_3px_#23a55a,0_0_12px_rgba(35,165,90,0.3)]" : "shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"}
+                bg-[#2b2d31] transition-all duration-200
+                ${isSpeaking ? "ring-[3px] ring-[#23a55a]" : "ring-1 ring-white/[0.04]"}
             `}
         >
-            <video
-                ref={!compact ? videoRef : undefined}
-                autoPlay
-                playsInline
-                muted
-                className={`absolute inset-0 w-full h-full object-cover ${showVideo ? "" : "hidden"}`}
-            />
+            <div className="absolute inset-0 rounded-xl overflow-hidden">
+                <video
+                    ref={!compact ? videoRef : undefined}
+                    autoPlay
+                    playsInline
+                    muted
+                    className={`w-full h-full object-cover ${showVideo ? "" : "hidden"}`}
+                />
+            </div>
 
             {!showVideo && (
                 <div className="flex flex-col items-center gap-2 overflow-hidden p-2">

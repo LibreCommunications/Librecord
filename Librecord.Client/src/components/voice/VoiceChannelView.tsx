@@ -81,9 +81,9 @@ function FocusOverlay({ onClick, label }: { onClick: () => void; label: string }
 }
 
 function getGridClass(count: number): string {
-    if (count <= 1) return "grid-cols-1 max-w-lg";
-    if (count <= 2) return "grid-cols-2 max-w-3xl";
-    if (count <= 4) return "grid-cols-2 max-w-4xl";
+    if (count <= 1) return "grid-cols-1 max-w-md";
+    if (count <= 2) return "grid-cols-2 max-w-2xl";
+    if (count <= 4) return "grid-cols-2 max-w-3xl";
     if (count <= 9) return "grid-cols-3 max-w-5xl";
     return "grid-cols-4 max-w-6xl";
 }
