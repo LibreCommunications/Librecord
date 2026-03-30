@@ -28,23 +28,29 @@ export function IncomingCallModal() {
         clearTimeout(timeoutRef.current);
     }
 
-    // Listen for incoming calls
+    // Dismiss if we join a call (accepted from another tab, or already connected)
+    if (call && voiceState.isConnected) {
+        setCall(null);
+        stopRingtone();
+    }
+
+    // Listen for incoming calls — use ref-free approach by checking state inside handler
     useEffect(() => {
         return onCustomEvent<AppEventMap["dm:call:incoming"]>(
             "dm:call:incoming",
             (detail) => {
-                // Don't show if already in a call
-                if (voiceState.isConnected) return;
-
-                setCall({
-                    channelId: detail.channelId,
-                    callerId: detail.callerId,
-                    callerDisplayName: detail.callerDisplayName,
-                    callerAvatarUrl: detail.callerAvatarUrl,
+                setCall(prev => {
+                    // Don't show if already ringing
+                    if (prev) return prev;
+                    return {
+                        channelId: detail.channelId,
+                        callerId: detail.callerId,
+                        callerDisplayName: detail.callerDisplayName,
+                        callerAvatarUrl: detail.callerAvatarUrl,
+                    };
                 });
                 playRingtone();
 
-                // Auto-dismiss after timeout
                 clearTimeout(timeoutRef.current);
                 timeoutRef.current = setTimeout(() => {
                     setCall(null);
@@ -52,7 +58,7 @@ export function IncomingCallModal() {
                 }, RING_TIMEOUT);
             },
         );
-    }, [voiceState.isConnected]);
+    }, []);
 
     // Dismiss if caller leaves before we answer
     useEffect(() => {
@@ -66,6 +72,9 @@ export function IncomingCallModal() {
             },
         );
     }, [call]);
+
+    // Cleanup ringtone on unmount
+    useEffect(() => () => stopRingtone(), []);
 
     if (!call) return null;
 

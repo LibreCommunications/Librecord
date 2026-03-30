@@ -343,11 +343,11 @@ public class AppHub : Hub
             UserId, channelId);
 
         var existing = await _voice.GetVoiceStateAsync(UserId);
+        var isDmCall = existing is not null
+            ? existing.GuildId == Guid.Empty
+            : await _channels.IsMemberAsync(channelId, UserId);
 
-        // Route to correct group based on guild vs DM call
-        var group = existing?.GuildId == Guid.Empty
-            ? DmGroup(channelId)
-            : GuildGroup(channelId);
+        var group = isDmCall ? DmGroup(channelId) : GuildGroup(channelId);
         await Groups.AddToGroupAsync(Context.ConnectionId, group);
 
         if (existing is not null && existing.ChannelId == channelId)
@@ -356,11 +356,10 @@ public class AppHub : Hub
             return null;
         }
 
-        // Row was lost — full rejoin (guild only, DM calls don't auto-rejoin)
-        if (existing?.GuildId != Guid.Empty)
-            return await _voice.JoinVoiceChannelAsync(channelId, UserId);
-
-        return await _voice.JoinDmVoiceCallAsync(channelId, UserId);
+        // Row was lost — full rejoin
+        return isDmCall
+            ? await _voice.JoinDmVoiceCallAsync(channelId, UserId)
+            : await _voice.JoinVoiceChannelAsync(channelId, UserId);
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
