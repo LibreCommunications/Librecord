@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Track } from "livekit-client";
 import { useTrackBySource } from "../../voice/useTrackBySource";
+import { getRoom } from "../../voice/livekitClient";
 import type { VoiceParticipant } from "../../voice/voiceStore";
 import { ScreenShareIcon } from "./VoiceIcons";
+import { PlayIcon, ExitFullscreenIcon, FullscreenIcon } from "../ui/Icons";
+import { DevOverlay } from "./DevOverlay";
+import { VolumePopup } from "./VolumePopup";
 
 interface Props {
     participant: VoiceParticipant;
@@ -12,17 +16,33 @@ interface Props {
     onToggleWatch: (watching: boolean) => void;
     /** Whether this is the local user's own screen share. */
     isSelf: boolean;
+    /** Fill parent instead of using aspect-video (for constrained containers) */
+    fill?: boolean;
 }
 
-export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf }: Props) {
+export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf, fill }: Props) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [volumePopup, setVolumePopup] = useState<{ x: number; y: number } | null>(null);
 
     const track = useTrackBySource(participant.userId, Track.Source.ScreenShare);
 
+    // Subscribe/unsubscribe to save bandwidth when not watching
+    useEffect(() => {
+        if (isSelf) return; // don't unsubscribe from own stream
+        const room = getRoom();
+        if (!room) return;
+        const remote = room.remoteParticipants.get(participant.userId);
+        if (!remote) return;
+        for (const pub of remote.trackPublications.values()) {
+            if (pub.source === Track.Source.ScreenShare) {
+                pub.setSubscribed(isWatching);
+            }
+        }
+    }, [isWatching, participant.userId, isSelf]);
+
     // attach() / detach() following @livekit/components-react pattern.
-    // The SDK handles MediaStream wrapping, Safari/Firefox quirks, and autoplay.
     useEffect(() => {
         const el = videoRef.current;
         if (!el) return;
@@ -61,46 +81,50 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
         }
     }, []);
 
+    const handleContextMenu = (e: React.MouseEvent) => {
+        if (isSelf) return;
+        e.preventDefault();
+        setVolumePopup({ x: e.clientX, y: e.clientY });
+    };
+
     if (!isWatching) {
-        return (
+        return (<>
             <div
                 ref={containerRef}
-                className="relative rounded-xl overflow-hidden bg-[#1e1f22] aspect-video flex items-center justify-center shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"
+                onContextMenu={handleContextMenu}
+                className={`relative rounded-xl overflow-hidden bg-[#1e1f22] aspect-video ${fill ? "max-h-full" : ""} flex items-center justify-center shadow-[0_0_0_1px_rgba(255,255,255,0.04)]`}
             >
-                <div className="flex flex-col items-center gap-4">
-                    <div className="p-4 rounded-full bg-[#5865F2]/15">
-                        <ScreenShareIcon size={32} />
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3 overflow-hidden">
+                    <div className="p-3 rounded-full bg-[#5865F2]/15 shrink-0">
+                        <ScreenShareIcon size={24} />
                     </div>
-                    <div className="text-center">
-                        <p className="text-sm font-medium text-[#dbdee1]">
-                            {participant.displayName} is sharing their screen
-                        </p>
-                        <p className="text-xs text-[#949ba4] mt-1">
-                            Click below to start watching
-                        </p>
-                    </div>
+                    <p className="text-sm font-medium text-[#dbdee1] truncate w-full text-center">
+                        {participant.displayName}&apos;s screen
+                    </p>
                     <button
                         onClick={() => onToggleWatch(true)}
-                        className="px-5 py-2 rounded-lg text-sm font-medium text-white bg-[#5865F2] hover:bg-[#4752C4] transition-colors flex items-center gap-2"
+                        className="px-4 py-1.5 rounded-lg text-sm font-medium text-white bg-[#5865F2] hover:bg-[#4752c4] transition-colors flex items-center gap-2 shrink-0"
                     >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                            <polygon points="5 3 19 12 5 21 5 3" />
-                        </svg>
-                        Watch Stream
+                        <PlayIcon size={14} />
+                        Watch
                     </button>
                 </div>
             </div>
-        );
+            {volumePopup && (
+                <VolumePopup userId={participant.userId} displayName={participant.displayName} x={volumePopup.x} y={volumePopup.y} onClose={() => setVolumePopup(null)} />
+            )}
+        </>);
     }
 
-    return (
+    return (<>
         <div
             ref={containerRef}
             onDoubleClick={toggleFullscreen}
+            onContextMenu={handleContextMenu}
             className={`
                 relative rounded-xl overflow-hidden bg-[#1e1f22]
                 shadow-[0_0_0_1px_rgba(255,255,255,0.04)] group/screen
-                ${isFullscreen ? "rounded-none" : "aspect-video"}
+                ${isFullscreen ? "rounded-none" : `aspect-video ${fill ? "max-h-full" : ""}`}
             `}
         >
             {trackStatus === "loading" && (
@@ -119,6 +143,8 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
                 className={`w-full h-full ${isFullscreen ? "object-contain bg-black" : "object-contain"}`}
             />
 
+            {isFullscreen && <DevOverlay embedded />}
+
             {trackStatus === "active" && (
                 <div className="absolute bottom-2 left-2 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm rounded-md px-2 py-1">
                     <span className="text-[#5865f2]"><ScreenShareIcon size={12} /></span>
@@ -126,43 +152,34 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
                 </div>
             )}
 
+            {trackStatus === "active" && !isSelf && (
+                <button
+                    onClick={() => onToggleWatch(false)}
+                    className="absolute top-2 right-2 p-1.5 rounded-md bg-black/60 backdrop-blur-sm text-[#f23f43] hover:text-white hover:bg-[#da373c] text-sm font-bold leading-none z-10 transition-colors"
+                    title="Stop watching"
+                >
+                    ✕
+                </button>
+            )}
+
             {trackStatus === "active" && (
-                <div className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 group-hover/screen:opacity-100 transition-opacity">
-                    {!isSelf && (
-                        <button
-                            onClick={() => onToggleWatch(false)}
-                            title="Stop watching"
-                            className="p-1.5 rounded-md bg-black/60 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/80"
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="18" y1="6" x2="6" y2="18" />
-                                <line x1="6" y1="6" x2="18" y2="18" />
-                            </svg>
-                        </button>
-                    )}
+                <div className="absolute bottom-2 right-2 flex items-center gap-1.5 opacity-0 group-hover/screen:opacity-100 transition-opacity">
                     <button
                         onClick={toggleFullscreen}
                         title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
                         className="p-1.5 rounded-md bg-black/60 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/80"
                     >
                         {isFullscreen ? (
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="4 14 10 14 10 20" />
-                                <polyline points="20 10 14 10 14 4" />
-                                <line x1="14" y1="10" x2="21" y2="3" />
-                                <line x1="3" y1="21" x2="10" y2="14" />
-                            </svg>
+                            <ExitFullscreenIcon size={16} />
                         ) : (
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="15 3 21 3 21 9" />
-                                <polyline points="9 21 3 21 3 15" />
-                                <line x1="21" y1="3" x2="14" y2="10" />
-                                <line x1="3" y1="21" x2="10" y2="14" />
-                            </svg>
+                            <FullscreenIcon size={16} />
                         )}
                     </button>
                 </div>
             )}
         </div>
-    );
+        {volumePopup && (
+            <VolumePopup userId={participant.userId} displayName={participant.displayName} x={volumePopup.x} y={volumePopup.y} onClose={() => setVolumePopup(null)} />
+        )}
+    </>);
 }

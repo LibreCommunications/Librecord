@@ -2,6 +2,7 @@ import { appConnection } from "./connection";
 import { mapDmRealtimeToMessage, mapDmRealtimeEdit } from "./dmMappers";
 import { mapGuildRealtimeToMessage, mapGuildRealtimeEdit } from "./guildMappers";
 import { dispatchAppEvent } from "./eventHelpers";
+import { logger } from "../lib/logger";
 import {
     addParticipant,
     removeParticipant,
@@ -51,6 +52,11 @@ export function registerListeners() {
     appConnection.off("guild:user:stop-typing");
     appConnection.off("guild:user:presence");
     appConnection.off("guild:channel:created");
+    appConnection.off("guild:member:roles");
+    appConnection.off("guild:member:removed");
+    appConnection.off("guild:channel:updated");
+    appConnection.off("guild:channel:deleted");
+    appConnection.off("guild:updated");
     appConnection.off("guild:deleted");
     appConnection.off("voice:user:joined");
     appConnection.off("voice:user:left");
@@ -156,7 +162,7 @@ export function registerListeners() {
         (payload: { channelId: string }) => {
             // Join the new channel's SignalR group so we receive messages
             appConnection.invoke("JoinDmChannel", payload.channelId).catch((err) => {
-                console.warn("[SignalR] Failed to join new DM channel group", err);
+                logger.realtime.warn("Failed to join new DM channel group", err);
             });
             dispatchAppEvent("dm:channel:created", payload);
         }
@@ -186,7 +192,7 @@ export function registerListeners() {
     appConnection.on(
         "dm:leave:ack",
         (payload: { channelId: string }) => {
-            appConnection.invoke("LeaveDmChannel", payload.channelId).catch(() => {});
+            appConnection.invoke("LeaveDmChannel", payload.channelId).catch(e => logger.realtime.warn("Failed to leave DM channel group", e));
         }
     );
 
@@ -250,9 +256,44 @@ export function registerListeners() {
         (payload: { channelId: string; guildId: string; name: string; type: number; position: number }) => {
             // Join the new channel group so we receive real-time events for it
             appConnection.invoke("JoinGuildChannel", payload.channelId).catch((err) => {
-                console.warn("[SignalR] Failed to join new channel group", err);
+                logger.realtime.warn("Failed to join new channel group", err);
             });
             dispatchAppEvent("guild:channel:created", payload);
+        }
+    );
+
+    appConnection.on(
+        "guild:member:roles",
+        (payload: { guildId: string; userId: string; roles: { id: string; name: string }[] }) => {
+            dispatchAppEvent("guild:member:roles", payload);
+        }
+    );
+
+    appConnection.on(
+        "guild:member:removed",
+        (payload: { guildId: string; userId: string; action: "kick" | "ban" | "leave"; reason?: string | null }) => {
+            dispatchAppEvent("guild:member:removed", payload);
+        }
+    );
+
+    appConnection.on(
+        "guild:channel:updated",
+        (payload: { channelId: string; guildId: string; name: string; topic?: string | null }) => {
+            dispatchAppEvent("guild:channel:updated", payload);
+        }
+    );
+
+    appConnection.on(
+        "guild:channel:deleted",
+        (payload: { channelId: string; guildId: string }) => {
+            dispatchAppEvent("guild:channel:deleted", payload);
+        }
+    );
+
+    appConnection.on(
+        "guild:updated",
+        (payload: { guildId: string; name?: string; iconUrl?: string | null }) => {
+            dispatchAppEvent("guild:updated", payload);
         }
     );
 

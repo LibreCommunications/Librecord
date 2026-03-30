@@ -20,6 +20,8 @@ public sealed class GuildMessageCreated : GuildMessageEvent
 
     public GuildAuthorSnapshot Author { get; init; } = null!;
 
+    public ReplySnapshot? ReplyTo { get; init; }
+
     public IReadOnlyList<MessageAttachmentSnapshot> Attachments { get; init; } = [];
 }
 
@@ -31,6 +33,23 @@ public sealed class GuildMessageEdited : GuildMessageEvent
 
 public sealed class GuildMessageDeleted : GuildMessageEvent
 {
+}
+
+public sealed class GuildMemberRemoved
+{
+    public Guid GuildId { get; init; }
+    public Guid UserId { get; init; }
+    public string Action { get; init; } = "kick"; // "kick", "ban", "leave"
+    public string? Reason { get; init; }
+    public IReadOnlyList<Guid> ChannelIds { get; init; } = [];
+}
+
+public sealed class GuildUpdated
+{
+    public Guid GuildId { get; init; }
+    public string? Name { get; init; }
+    public string? IconUrl { get; init; }
+    public IReadOnlyList<Guid> ChannelIds { get; init; } = [];
 }
 
 // Uses ChannelId to target broadcast groups

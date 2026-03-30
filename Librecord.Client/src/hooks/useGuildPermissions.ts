@@ -9,6 +9,7 @@ const NONE: GuildPermissions = {
     manageGuild: false,
     manageChannels: false,
     manageRoles: false,
+    manageMessages: false,
     kickMembers: false,
     banMembers: false,
     inviteMembers: false,

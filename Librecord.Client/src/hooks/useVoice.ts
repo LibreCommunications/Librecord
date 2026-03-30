@@ -7,10 +7,13 @@ import {
     setVoiceState,
     updateParticipantState,
     resetVoiceState,
+    getVoicePrefs,
+    setVoicePrefs,
     type VoiceState,
     type VoiceParticipant,
 } from "../voice/voiceStore";
 import { playJoinSound, playLeaveSound, playStreamStartSound, playStreamStopSound } from "../voice/sounds";
+import { logger } from "../lib/logger";
 
 function getLocalUserId(): string | null {
     const lp = livekitClient.getLocalParticipant();
@@ -35,18 +38,28 @@ export function useVoice() {
             participants: VoiceParticipant[];
         }>("JoinVoiceChannel", channelId);
 
+        const prefs = getVoicePrefs();
+
         setVoiceState({
             channelId,
             guildId,
             participants: result.participants,
             isConnected: true,
-            isMuted: false,
-            isDeafened: false,
+            isMuted: prefs.isMuted,
+            isDeafened: prefs.isDeafened,
             isCameraOn: false,
             isScreenSharing: false,
         });
 
-        await livekitClient.connectToVoice(result.token, result.wsUrl);
+        await livekitClient.connectToVoice(result.token, result.wsUrl, prefs.isMuted, prefs.isDeafened);
+
+        if (prefs.isMuted || prefs.isDeafened) {
+            appConnection.invoke("UpdateVoiceState", {
+                isMuted: prefs.isMuted,
+                isDeafened: prefs.isDeafened,
+            }).catch(e => logger.voice.warn("Failed to sync initial voice state", e));
+        }
+
         playJoinSound();
     }, []);
 
@@ -64,6 +77,7 @@ export function useVoice() {
     const toggleMute = useCallback(async () => {
         const isMuted = await livekitClient.toggleMute();
         setVoiceState({ isMuted });
+        setVoicePrefs({ isMuted });
         const uid = getLocalUserId();
         if (uid) updateParticipantState(uid, { isMuted });
         await appConnection.invoke("UpdateVoiceState", { isMuted });
@@ -72,6 +86,7 @@ export function useVoice() {
     const toggleDeafen = useCallback(async () => {
         const isDeafened = await livekitClient.toggleDeafen();
         setVoiceState({ isDeafened });
+        setVoicePrefs({ isDeafened });
         const uid = getLocalUserId();
         if (uid) updateParticipantState(uid, { isDeafened });
         await appConnection.invoke("UpdateVoiceState", { isDeafened });
@@ -99,7 +114,7 @@ export function useVoice() {
         try {
             await appConnection.invoke("UpdateVoiceState", { isScreenSharing: true });
         } catch (e) {
-            console.warn("[Voice] Failed to notify server of screen share start:", e);
+            logger.voice.warn("Failed to notify server of screen share start", e);
         }
     }, []);
 
@@ -112,12 +127,12 @@ export function useVoice() {
         try {
             await livekitClient.stopScreenShare();
         } catch (e) {
-            console.warn("[Voice] Failed to stop LiveKit screen share:", e);
+            logger.voice.warn("Failed to stop LiveKit screen share", e);
         }
         try {
             await appConnection.invoke("UpdateVoiceState", { isScreenSharing: false });
         } catch (e) {
-            console.warn("[Voice] Failed to notify server of screen share stop:", e);
+            logger.voice.warn("Failed to notify server of screen share stop", e);
         }
     }, []);
 

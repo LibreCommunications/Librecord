@@ -16,9 +16,9 @@ export function useGuildChannelMessages() {
     );
 
     const createMessage = useCallback(
-        async (channelId: string, content: string, clientMessageId?: string): Promise<Message | null> => {
+        async (channelId: string, content: string, clientMessageId?: string, replyToMessageId?: string): Promise<Message | null> => {
             try {
-                return await guildMessages.create(channelId, content, clientMessageId);
+                return await guildMessages.create(channelId, content, clientMessageId, replyToMessageId);
             } catch {
                 return null;
             }

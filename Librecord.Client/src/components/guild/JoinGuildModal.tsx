@@ -31,12 +31,12 @@ export function JoinGuildModal({ onClose, onJoined }: Props) {
         setLoading(true);
         setError(null);
 
-        const guild = await joinByCode(code.trim());
-        if (guild) {
-            onJoined(guild);
+        const result = await joinByCode(code.trim());
+        if (result.ok) {
+            onJoined(result.guild);
             onClose();
         } else {
-            setError("Failed to join. The invite may be expired or you're already a member.");
+            setError(result.error);
         }
 
         setLoading(false);
@@ -76,7 +76,7 @@ export function JoinGuildModal({ onClose, onJoined }: Props) {
                     disabled={loading || !code.trim()}
                     className="w-full py-2 rounded bg-[#5865F2] text-white font-medium hover:bg-[#4752c4] disabled:opacity-50"
                 >
-                    {loading ? "Joining..." : "Join Server"}
+                    {loading ? "Joining..." : "Join Guild"}
                 </button>
 
                 <button

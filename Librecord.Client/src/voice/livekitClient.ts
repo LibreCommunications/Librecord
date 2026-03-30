@@ -2,17 +2,65 @@ import {
     Room,
     RoomEvent,
     Track,
+    VideoPreset,
+    ConnectionQuality,
+    DisconnectReason,
     type RemoteParticipant,
     type RemoteTrackPublication,
     type LocalParticipant,
+    type LocalTrackPublication,
 } from "livekit-client";
+import { showToast } from "../lib/toast";
+import { getUserVolume } from "../lib/userVolume";
+import {
+    getNoiseSuppressionSettings,
+    applyNoiseSuppressionToTrack,
+    clearActiveProcessor,
+    type LocalAudioTrackLike,
+} from "./noiseSuppression";
+import { logger } from "../lib/logger";
+import { onCustomEvent } from "../lib/typedEvent";
+import { STORAGE } from "../lib/storageKeys";
 
 let room: Room | null = null;
+let nsChangeListener: (() => void) | null = null;
+
+function getLocalAudioTrack() {
+    if (!room) return null;
+    for (const pub of room.localParticipant.audioTrackPublications.values()) {
+        if (pub.track) return pub.track;
+    }
+    return null;
+}
+
+// ── Device preferences (localStorage) ────────────────────────
+type DeviceKind = "audioinput" | "videoinput" | "audiooutput";
+
+export function getDevicePref(kind: DeviceKind): string | undefined {
+    try {
+        const prefs = JSON.parse(localStorage.getItem(STORAGE.devicePrefs) ?? "{}");
+        return prefs[kind] || undefined;
+    } catch { return undefined; }
+}
+
+export function setDevicePref(kind: DeviceKind, deviceId: string) {
+    try {
+        const prefs = JSON.parse(localStorage.getItem(STORAGE.devicePrefs) ?? "{}");
+        prefs[kind] = deviceId;
+        localStorage.setItem(STORAGE.devicePrefs, JSON.stringify(prefs));
+    } catch { /* ignore */ }
+}
+
+export function getAllDevicePrefs(): Record<DeviceKind, string | undefined> {
+    try {
+        const prefs = JSON.parse(localStorage.getItem(STORAGE.devicePrefs) ?? "{}");
+        return { audioinput: prefs.audioinput, videoinput: prefs.videoinput, audiooutput: prefs.audiooutput };
+    } catch { return { audioinput: undefined, videoinput: undefined, audiooutput: undefined }; }
+}
 
 const SPEAKING_THRESHOLD = 0.015;
 const SPEAKING_OFF_DELAY = 300;
 
-const audioCtxRef: { ctx: AudioContext | null } = { ctx: null };
 const analysers = new Map<string, {
     analyser: AnalyserNode;
     source: MediaStreamAudioSourceNode;
@@ -20,18 +68,6 @@ const analysers = new Map<string, {
     silentSince: number;
 }>();
 let animFrameId: number | null = null;
-
-function getAudioCtx(): AudioContext | null {
-    if (!audioCtxRef.ctx) {
-        try {
-            audioCtxRef.ctx = new AudioContext();
-        } catch {
-            console.warn("[Voice] AudioContext creation failed — speaking detection disabled");
-            return null;
-        }
-    }
-    return audioCtxRef.ctx;
-}
 
 function startAnalysingTrack(identity: string, track: MediaStreamTrack) {
     if (analysers.has(identity)) {
@@ -41,7 +77,7 @@ function startAnalysingTrack(identity: string, track: MediaStreamTrack) {
         analysers.delete(identity);
     }
 
-    const ctx = getAudioCtx();
+    const ctx = getPlaybackCtx();
     if (!ctx) return;
     const stream = new MediaStream([track]);
     const source = ctx.createMediaStreamSource(stream);
@@ -120,38 +156,81 @@ function pollSpeaking() {
     animFrameId = requestAnimationFrame(pollSpeaking);
 }
 
-// LiveKit's auto-attach relies on room.startAudio() which can fail
-// if called outside a user gesture context. Explicit <audio> elements
-// guarantee playback.
-const audioElements = new Map<string, HTMLAudioElement>();
+// Single shared AudioContext for all users (browsers limit active contexts to ~6).
+// Each user gets: MediaStreamSource → per-user GainNode → shared destination.
+let _playbackCtx: AudioContext | null = null;
+
+function getPlaybackCtx(): AudioContext {
+    if (!_playbackCtx || _playbackCtx.state === "closed") {
+        _playbackCtx = new AudioContext();
+    }
+    if (_playbackCtx.state === "suspended") _playbackCtx.resume().catch(e => logger.voice.warn("AudioContext resume failed", e));
+    return _playbackCtx;
+}
+
+interface AudioPipeline {
+    gain: GainNode;
+    source: MediaStreamAudioSourceNode;
+}
+const audioPipelines = new Map<string, AudioPipeline>();
+
+// dB-linear volume curve (same approach as OBS / Discord / DAWs).
+// Slider maps linearly to decibels, then converted to gain.
+//   0%   → mute (gain 0)
+//   1%   → -40 dB (gain 0.01)
+//  50%   → -20 dB (gain 0.1)
+//  100%  →   0 dB (gain 1.0, unity)
+//  200%  → +26 dB (gain ~20)
+export function pctToGain(pct: number): number {
+    if (pct <= 0) return 0;
+    const dB = pct <= 100
+        ? -40 + (pct / 100) * 40      // 1% = -40dB, 100% = 0dB
+        : ((pct - 100) / 100) * 26;   // 100% = 0dB, 200% = +26dB
+    return Math.pow(10, dB / 20);
+}
+
+function applyVolume(identity: string, pct: number) {
+    const pipe = audioPipelines.get(identity);
+    if (!pipe) return;
+    const ctx = getPlaybackCtx();
+    const target = pctToGain(pct);
+    pipe.gain.gain.cancelScheduledValues(ctx.currentTime);
+    pipe.gain.gain.setTargetAtTime(target, ctx.currentTime, 0.015);
+}
+
+// Listen for per-user volume changes
+onCustomEvent<{ userId: string; volume: number }>("voice:volume:changed", (detail) => {
+    applyVolume(detail.userId, detail.volume);
+});
+
+// Per-user audio: MediaStreamSource → GainNode → shared AudioContext destination.
 
 function attachAudioTrack(identity: string, track: MediaStreamTrack) {
     detachAudioTrack(identity);
 
-    const audio = document.createElement("audio");
-    audio.srcObject = new MediaStream([track]);
-    audio.autoplay = true;
-    audio.setAttribute("playsinline", "");
-    // Hidden but must be in the DOM for some browsers to play
-    audio.style.display = "none";
-    document.body.appendChild(audio);
-    audio.play().catch((e) => console.warn("[Voice] Audio play failed:", e));
+    const ctx = getPlaybackCtx();
+    const stream = new MediaStream([track]);
+    const source = ctx.createMediaStreamSource(stream);
+    const gain = ctx.createGain();
+    source.connect(gain);
+    gain.connect(ctx.destination);
 
-    audioElements.set(identity, audio);
+    gain.gain.value = pctToGain(getUserVolume(identity));
+
+    audioPipelines.set(identity, { gain, source });
 }
 
 function detachAudioTrack(identity: string) {
-    const audio = audioElements.get(identity);
-    if (audio) {
-        audio.pause();
-        audio.srcObject = null;
-        audio.remove();
-        audioElements.delete(identity);
+    const pipe = audioPipelines.get(identity);
+    if (pipe) {
+        pipe.source.disconnect();
+        pipe.gain.disconnect();
+        audioPipelines.delete(identity);
     }
 }
 
 function detachAllAudio() {
-    for (const [id] of audioElements) {
+    for (const [id] of audioPipelines) {
         detachAudioTrack(id);
     }
 }
@@ -168,14 +247,58 @@ function bindRemoteAudioTrack(participant: RemoteParticipant) {
 export async function connectToVoice(token: string, wsUrl: string, initialMuted = false, initialDeafened = false) {
     if (room) await disconnect();
 
+    const micId = getDevicePref("audioinput");
+    const camId = getDevicePref("videoinput");
+
+    const nsSettings = getNoiseSuppressionSettings();
+    // Disable browser's built-in noise suppression when we handle it ourselves
+    const browserNS = nsSettings.mode === "off";
+
     room = new Room({
         dynacast: true,
         adaptiveStream: true,
         audioCaptureDefaults: {
             autoGainControl: true,
-            noiseSuppression: true,
+            noiseSuppression: browserNS,
             echoCancellation: true,
+            ...(micId && { deviceId: micId }),
         },
+        videoCaptureDefaults: {
+            ...(camId && { deviceId: camId }),
+        },
+    });
+
+    // ── LiveKit observability ─────────────────────────────────
+    room.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
+        logger.voice.warn("Room disconnected", reason);
+    });
+
+    room.on(RoomEvent.Reconnecting, () => {
+        logger.voice.info("Reconnecting to voice server...");
+        showToast("Reconnecting to voice...", "info");
+    });
+
+    room.on(RoomEvent.Reconnected, () => {
+        logger.voice.info("Reconnected to voice server");
+        showToast("Voice reconnected", "success");
+    });
+
+    room.on(RoomEvent.SignalReconnecting, () => {
+        logger.voice.info("Signal connection reconnecting...");
+    });
+
+    room.on(RoomEvent.MediaDevicesError, (error: Error) => {
+        logger.voice.error("Media device error", error);
+        showToast(`Microphone/camera error: ${error.message}`, "error");
+    });
+
+    room.on(RoomEvent.ConnectionQualityChanged, (quality: ConnectionQuality, participant) => {
+        if (participant.identity === room!.localParticipant.identity) {
+            if (quality === ConnectionQuality.Poor) {
+                logger.voice.warn("Connection quality degraded to Poor");
+            }
+            window.dispatchEvent(new CustomEvent("voice:quality:changed", { detail: { quality } }));
+        }
     });
 
     room.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
@@ -199,12 +322,28 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
         }
     });
 
-    room.on(RoomEvent.LocalTrackPublished, (pub) => {
-        if (pub.kind === "audio") {
-            const msTrack = pub.track?.mediaStreamTrack;
-            if (msTrack) {
-                startAnalysingTrack(room!.localParticipant.identity, msTrack);
+    room.on(RoomEvent.LocalTrackPublished, async (pub: LocalTrackPublication) => {
+        if (pub.kind !== "audio" || !pub.track) return;
+        const identity = room!.localParticipant.identity;
+
+        if (getNoiseSuppressionSettings().mode !== "off") {
+            try {
+                const processedTrack = await applyNoiseSuppressionToTrack(
+                    pub.track as unknown as LocalAudioTrackLike,
+                );
+                if (processedTrack) {
+                    startAnalysingTrack(identity, processedTrack);
+                    return;
+                }
+            } catch (err) {
+                logger.voice.warn("Failed to apply noise suppression", err);
             }
+        }
+
+        // Fallback: use raw track when mode is off or processor failed
+        const msTrack = pub.track?.mediaStreamTrack;
+        if (msTrack) {
+            startAnalysingTrack(identity, msTrack);
         }
     });
 
@@ -213,6 +352,25 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
             stopAnalysingTrack(room!.localParticipant.identity);
         }
     });
+
+    // Listen for runtime noise suppression mode changes
+    const onNsChanged = async () => {
+        if (!room) return;
+        const localAudioTrack = getLocalAudioTrack();
+        if (!localAudioTrack) return;
+        const identity = room.localParticipant.identity;
+        try {
+            const processedTrack = await applyNoiseSuppressionToTrack(
+                localAudioTrack as unknown as LocalAudioTrackLike,
+            );
+            const analyseTrack = processedTrack ?? localAudioTrack.mediaStreamTrack;
+            if (analyseTrack) startAnalysingTrack(identity, analyseTrack);
+        } catch (err) {
+            logger.voice.warn("Failed to apply noise suppression", err);
+        }
+    };
+    window.addEventListener("voice:noisesuppression:changed", onNsChanged);
+    nsChangeListener = onNsChanged;
 
     await room.connect(wsUrl, token);
     await room.localParticipant.setMicrophoneEnabled(!initialMuted);
@@ -224,16 +382,18 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
     await room.startAudio();
 
     room.remoteParticipants.forEach(bindRemoteAudioTrack);
-
-    const localAudioPub = room.localParticipant.audioTrackPublications.values().next().value;
-    if (localAudioPub?.track?.mediaStreamTrack) {
-        startAnalysingTrack(room.localParticipant.identity, localAudioPub.track.mediaStreamTrack);
-    }
+    // Local track speaking detection + noise suppression are handled
+    // by the LocalTrackPublished event handler above.
 }
 
 export async function disconnect() {
     stopAllAnalysers();
     detachAllAudio();
+    if (nsChangeListener) {
+        window.removeEventListener("voice:noisesuppression:changed", nsChangeListener);
+        nsChangeListener = null;
+    }
+    clearActiveProcessor();
     if (!room) return;
     await room.disconnect(true);
     room = null;
@@ -266,16 +426,46 @@ export async function toggleDeafen(): Promise<boolean> {
     return isDeafened;
 }
 
-export async function toggleCamera(): Promise<boolean> {
+export async function toggleCamera(deviceId?: string): Promise<boolean> {
     if (!room) return false;
     const enabled = !room.localParticipant.isCameraEnabled;
-    await room.localParticipant.setCameraEnabled(enabled);
+    await room.localParticipant.setCameraEnabled(enabled, deviceId ? { deviceId } : undefined);
     return enabled;
+}
+
+export async function switchCamera(deviceId: string): Promise<void> {
+    if (!room) return;
+    await room.localParticipant.setCameraEnabled(true, { deviceId });
+}
+
+export async function listVideoDevices(): Promise<MediaDeviceInfo[]> {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter(d => d.kind === "videoinput");
+}
+
+export async function listAudioInputDevices(): Promise<MediaDeviceInfo[]> {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter(d => d.kind === "audioinput");
+}
+
+export async function listAudioOutputDevices(): Promise<MediaDeviceInfo[]> {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter(d => d.kind === "audiooutput");
+}
+
+export async function switchMicrophone(deviceId: string): Promise<void> {
+    if (!room) return;
+    await room.localParticipant.setMicrophoneEnabled(true, { deviceId });
+}
+
+export async function switchActiveDevice(kind: MediaDeviceKind, deviceId: string): Promise<void> {
+    if (!room) return;
+    await room.switchActiveDevice(kind, deviceId);
 }
 
 export interface ScreenShareSettings {
     resolution: "720p" | "1080p" | "1440p" | "source";
-    frameRate: 15 | 30 | 60 | "source";
+    frameRate: 15 | 30 | 60;
     audio: boolean;
 }
 
@@ -289,34 +479,50 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
     if (!room) return false;
 
     const res = RESOLUTION_MAP[options.resolution];
-    const numericFps = options.frameRate === "source" ? undefined : options.frameRate;
+    const encodeFps = options.frameRate;
 
+    // "source" gives sender's native resolution, capped at 4K.
     let resolution: { width: number; height: number; frameRate?: number } | undefined;
     if (res) {
-        resolution = { ...res, ...(numericFps ? { frameRate: numericFps } : {}) };
+        resolution = { ...res, frameRate: encodeFps };
+    } else {
+        resolution = { width: 3840, height: 2160, frameRate: encodeFps };
     }
+
+    // Encoding: match FPS with appropriate bitrate (LiveKit presets)
+    const encodingBitrate = encodeFps >= 60 ? 7_000_000 : encodeFps >= 30 ? 5_000_000 : 2_500_000;
 
     try {
         await room.localParticipant.setScreenShareEnabled(true, {
             audio: options.audio,
-            ...(resolution ? { resolution } : {}),
+            resolution,
+        }, {
+            screenShareEncoding: {
+                maxFramerate: encodeFps,
+                maxBitrate: encodingBitrate,
+            },
+            // One simulcast layer for small-tile viewers (960x540 capped at 30fps)
+            screenShareSimulcastLayers: [
+                new VideoPreset(960, 540, 1_500_000, Math.min(encodeFps, 30)),
+            ],
         });
     } catch (e) {
-        console.warn("[Voice] Screen share failed, retrying without constraints:", e);
+        logger.voice.warn("Screen share failed, retrying without constraints", e);
         try {
             // Fallback: no constraints — maximum browser compatibility
             await room.localParticipant.setScreenShareEnabled(true, {
                 audio: options.audio,
             });
         } catch (e2) {
-            console.warn("[Voice] Screen share failed entirely:", e2);
+            logger.voice.warn("Screen share failed entirely", e2);
+            showToast("Screen share failed", "error");
             return false;
         }
     }
 
     // Some browsers reject contentHint in constraints but accept it post-capture
     try {
-        const hint = numericFps === undefined || numericFps >= 30 ? "motion" : "detail";
+        const hint = encodeFps >= 30 ? "motion" : "detail";
         room.localParticipant.videoTrackPublications.forEach(pub => {
             if (pub.source === Track.Source.ScreenShare && pub.track?.mediaStreamTrack) {
                 pub.track.mediaStreamTrack.contentHint = hint;

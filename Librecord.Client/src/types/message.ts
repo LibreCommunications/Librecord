@@ -1,14 +1,21 @@
 import type { UserSummary } from "./user";
 
+export interface ReplyInfo {
+    messageId: string;
+    content: string;
+    author?: UserSummary | null;
+}
+
 export interface Message {
     id: string;
     channelId: string;
-    content: string; 
+    content: string;
     createdAt: string;
     editedAt?: string | null;
 
     author: UserSummary;
-    
+    replyTo?: ReplyInfo | null;
+
     attachments: MessageAttachment[];
     reactions: MessageReaction[];
     edits: MessageEdit[];
@@ -16,15 +23,16 @@ export interface Message {
 
 export interface TransportMessage {
     id: string;                 // real messageId (server)
-    channelId: string;         
+    channelId: string;
 
     clientMessageId?: string;   // echoed back for optimistic reconciliation
 
-    content: string;            
+    content: string;
     createdAt: string;
     editedAt?: string | null;
 
     author: UserSummary;
+    replyTo?: ReplyInfo | null;
 
     attachments: MessageAttachment[];
     reactions: MessageReaction[];
@@ -41,6 +49,8 @@ export interface MessageAttachment {
     contentType: string;
     size: number;
     isSpoiler: boolean;
+    width?: number | null;
+    height?: number | null;
 }
 
 export interface MessageReaction {

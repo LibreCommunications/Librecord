@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { CloseIcon } from "./Icons";
+import { STORAGE } from "../../lib/storageKeys";
 
 declare const __BUILD_ID__: string | undefined;
 
@@ -32,7 +34,7 @@ export function UpdateBanner() {
 
     function handleRefresh() {
         // Save current page so it can be restored after reload
-        sessionStorage.setItem("librecord:returnUrl", window.location.pathname);
+        sessionStorage.setItem(STORAGE.returnUrl, window.location.pathname);
         window.location.reload();
     }
 
@@ -49,10 +51,7 @@ export function UpdateBanner() {
                 onClick={() => setDismissed(true)}
                 className="text-white/60 hover:text-white ml-1"
             >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+                <CloseIcon size={14} />
             </button>
         </div>
     );

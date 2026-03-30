@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import type { MessageReaction } from "../../types/message";
 
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "🎉", "👀"];
@@ -11,7 +11,7 @@ interface Props {
     onRemove: (messageId: string, emoji: string) => void;
 }
 
-export function ReactionBar({ reactions, messageId, currentUserId, onAdd, onRemove }: Props) {
+export const ReactionBar = memo(function ReactionBar({ reactions, messageId, currentUserId, onAdd, onRemove }: Props) {
     const [showPicker, setShowPicker] = useState(false);
 
     const grouped = new Map<string, { count: number; userReacted: boolean }>();
@@ -84,4 +84,4 @@ export function ReactionBar({ reactions, messageId, currentUserId, onAdd, onRemo
             </div>
         </div>
     );
-}
+});

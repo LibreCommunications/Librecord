@@ -18,4 +18,6 @@ public sealed class DmRealtimeMessageCreatedTransport
     public IReadOnlyList<MessageEditDto> Edits { get; init; } = [];
 
     public string? ClientMessageId { get; init; }
+
+    public ReplySnapshot? ReplyTo { get; init; }
 }

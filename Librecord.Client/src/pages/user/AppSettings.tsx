@@ -1,12 +1,17 @@
 import { useState } from "react";
+import { STORAGE } from "../../lib/storageKeys";
 
 export default function AppSettings() {
     const [desktopNotifs, setDesktopNotifs] = useState(() => {
-        return localStorage.getItem("lr:desktop-notifs") !== "false";
+        return localStorage.getItem(STORAGE.desktopNotifs) !== "false";
     });
     const [notifSounds, setNotifSounds] = useState(() => {
-        return localStorage.getItem("lr:notif-sounds") !== "false";
+        return localStorage.getItem(STORAGE.notifSounds) !== "false";
     });
+    const [devMode, setDevMode] = useState(() => {
+        return localStorage.getItem(STORAGE.devMode) === "true";
+    });
+
     function toggle(key: string, value: boolean, setter: (v: boolean) => void) {
         localStorage.setItem(key, String(value));
         setter(value);
@@ -18,25 +23,35 @@ export default function AppSettings() {
 
             {/* Notifications */}
             <section>
-                <h2 className="section-label mb-4">
-                    Notifications
-                </h2>
+                <h2 className="section-label mb-4">Notifications</h2>
                 <div className="space-y-3">
                     <ToggleRow
                         label="Desktop Notifications"
                         description="Show desktop notifications for new messages when the app is in the background."
                         checked={desktopNotifs}
-                        onChange={v => toggle("lr:desktop-notifs", v, setDesktopNotifs)}
+                        onChange={v => toggle(STORAGE.desktopNotifs, v, setDesktopNotifs)}
                     />
                     <ToggleRow
                         label="Notification Sounds"
                         description="Play a sound when you receive a new message."
                         checked={notifSounds}
-                        onChange={v => toggle("lr:notif-sounds", v, setNotifSounds)}
+                        onChange={v => toggle(STORAGE.notifSounds, v, setNotifSounds)}
                     />
                 </div>
             </section>
 
+            {/* Developer */}
+            <section>
+                <h2 className="section-label mb-4">Developer</h2>
+                <div className="space-y-3">
+                    <ToggleRow
+                        label="Developer Mode"
+                        description="Show connection stats overlay on voice channels: ping, resolution, FPS, codec."
+                        checked={devMode}
+                        onChange={v => toggle(STORAGE.devMode, v, setDevMode)}
+                    />
+                </div>
+            </section>
         </div>
     );
 }

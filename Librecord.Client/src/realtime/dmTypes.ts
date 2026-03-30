@@ -2,6 +2,7 @@ import type {
     MessageAttachment,
     MessageReaction,
     MessageEdit,
+    ReplyInfo,
 } from "../types/message";
 
 export interface DmRealtimeAuthor {
@@ -20,6 +21,7 @@ export interface DmRealtimeMessageTransport {
     createdAt: string;
 
     author: DmRealtimeAuthor;
+    replyTo?: ReplyInfo | null;
 
     attachments: MessageAttachment[];
     reactions: MessageReaction[];

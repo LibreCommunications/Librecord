@@ -1,32 +1,52 @@
+import { Suspense, useState, useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import GlobalSidebar from "../components/layout/GlobalSidebar";
 import ChannelSidebar from "../components/layout/ChannelSidebar";
 import DmSidebar from "../components/layout/DmSidebar";
 import { VoiceControls } from "../components/voice/VoiceControls";
+import { DevOverlay } from "../components/voice/DevOverlay";
+import { FloatingScreenShare } from "../components/voice/FloatingScreenShare";
+import { UserProfilePopup } from "../components/user/UserProfilePopup";
 import { ConnectionBanner } from "../components/ui/ConnectionBanner";
 import { ErrorBoundary } from "../components/ui/ErrorBoundary";
+import { Spinner } from "../components/ui/Spinner";
 
 import { RealtimeRoot } from "../realtime/RealtimeRoot";
+import { onCustomEvent } from "../lib/typedEvent";
 
 export default function MainPage() {
     const location = useLocation();
+    const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
     const isDm = location.pathname.startsWith("/app/dm");
     const isGuild = location.pathname.startsWith("/app/guild/");
     const guildId = isGuild ? location.pathname.split("/")[3] : null;
+
+    // Global event for opening profile popups from anywhere
+    useEffect(() => {
+        return onCustomEvent<{ userId: string }>("user:profile:open", (detail) => {
+            setProfileUserId(detail.userId);
+        });
+    }, []);
 
     return (
         <div className="flex h-screen bg-[#2f3136] text-gray-200 overflow-hidden">
 
             <RealtimeRoot />
             <ConnectionBanner />
+            <DevOverlay />
+            <FloatingScreenShare />
 
-            <GlobalSidebar />
+            <ErrorBoundary variant="section" label="GlobalSidebar">
+                <GlobalSidebar />
+            </ErrorBoundary>
 
             {isDm && (
                 <div className="flex flex-col h-full bg-[#2a2c31]">
                     <div className="flex-1 min-h-0 overflow-auto">
-                        <DmSidebar />
+                        <ErrorBoundary variant="section" label="DmSidebar">
+                            <DmSidebar />
+                        </ErrorBoundary>
                     </div>
                     <VoiceControls />
                 </div>
@@ -35,17 +55,28 @@ export default function MainPage() {
             {isGuild && guildId && (
                 <div className="flex flex-col h-full bg-[#2a2c31]">
                     <div className="flex-1 min-h-0 overflow-auto">
-                        <ChannelSidebar guildId={guildId} />
+                        <ErrorBoundary variant="section" label="ChannelSidebar">
+                            <ChannelSidebar guildId={guildId} />
+                        </ErrorBoundary>
                     </div>
                     <VoiceControls />
                 </div>
             )}
 
             <div className="flex flex-1 min-w-0 min-h-0 overflow-hidden">
-                <ErrorBoundary key={location.pathname}>
-                    <Outlet />
-                </ErrorBoundary>
+                <Suspense fallback={<div className="flex-1 flex items-center justify-center"><Spinner className="text-[#949ba4]" /></div>}>
+                    <ErrorBoundary key={location.pathname} label="Content">
+                        <Outlet />
+                    </ErrorBoundary>
+                </Suspense>
             </div>
+
+            {profileUserId && (
+                <UserProfilePopup
+                    userId={profileUserId}
+                    onClose={() => setProfileUserId(null)}
+                />
+            )}
         </div>
     );
 }

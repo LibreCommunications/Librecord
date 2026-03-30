@@ -2,9 +2,11 @@ import { memo, useRef, useState } from "react";
 import { MessageMenu } from "./MessageMenu";
 import { ReactionBar } from "../messages/ReactionBar";
 import { ImageLightbox } from "../ui/ImageLightbox";
+import { UserHoverCard } from "../user/UserHoverCard";
 import { renderMarkdown } from "../../utils/markdown";
 import type { MessageItemProps } from "./MessageItemProps";
 import { API_URL } from "../../api/client";
+import { EditIcon, TrashIcon, ReplyIcon, MoreIcon, FileIcon } from "../../components/ui/Icons";
 
 function resolveAttachmentUrl(url: string): string {
     if (url.startsWith("http://") || url.startsWith("https://")) return url;
@@ -34,8 +36,11 @@ export const MessageItem = memo(function MessageItem({
                                 menuOpen,
                                 currentUserId,
                                 isPinned,
+                                canManageMessages,
                                 onToggleMenu,
                                 onStartEdit,
+                                onReply,
+                                onScrollToReply,
                                 onCancelEdit,
                                 onDelete,
                                 onPin,
@@ -49,19 +54,47 @@ export const MessageItem = memo(function MessageItem({
     const moreButtonRef = useRef<HTMLButtonElement>(null);
 
     return (
-        <div className="flex gap-4 px-4 py-1.5 group relative hover:bg-[#2e3035] transition-colors" data-testid={`message-${msg.id}`}>
+        <div className="flex flex-col px-4 py-1.5 group relative hover:bg-[#2e3035] transition-colors" data-testid={`message-${msg.id}`}>
+            {msg.replyTo && (
+                <button
+                    type="button"
+                    onClick={() => onScrollToReply?.(msg.replyTo!.messageId)}
+                    className="flex items-center gap-1.5 pl-[30px] mb-0.5 text-xs text-[#949ba4] hover:text-[#dbdee1] cursor-pointer"
+                >
+                    <span className="w-8 h-[13px] border-l-2 border-t-2 border-[#4e5058] rounded-tl-md shrink-0" />
+                    <img
+                        src={getAvatarUrl(msg.replyTo.author?.avatarUrl)}
+                        className="w-4 h-4 rounded-full object-cover shrink-0"
+                        alt=""
+                    />
+                    <span className="font-semibold text-[#c4c9ce]">
+                        {msg.replyTo.author?.displayName ?? "Unknown"}
+                    </span>
+                    {msg.replyTo.content?.trim()
+                        ? <span className="truncate max-w-[400px]">{msg.replyTo.content.split("\n")[0]}</span>
+                        : <span className="italic text-[#949ba4]">📷 Click to see attachment</span>
+                    }
+                </button>
+            )}
+            <div className="flex gap-4">
             <img
                 src={getAvatarUrl(msg.author.avatarUrl)}
                 loading="lazy"
+                onClick={() => window.dispatchEvent(new CustomEvent("user:profile:open", { detail: { userId: msg.author.id } }))}
                 className="w-10 h-10 rounded-full object-cover mt-0.5 cursor-pointer hover:opacity-80 transition-opacity"
                 alt=""
             />
 
             <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2">
-                    <span className="font-medium text-[#f2f3f5] hover:underline cursor-pointer">
-                        {msg.author.displayName}
-                    </span>
+                    <UserHoverCard userId={msg.author.id}>
+                        <span
+                            className="font-medium text-[#f2f3f5] hover:underline cursor-pointer"
+                            onClick={() => window.dispatchEvent(new CustomEvent("user:profile:open", { detail: { userId: msg.author.id } }))}
+                        >
+                            {msg.author.displayName}
+                        </span>
+                    </UserHoverCard>
                     <span className="text-xs text-[#949ba4]">
                         {formatTimestamp(msg.createdAt)}
                     </span>
@@ -80,6 +113,7 @@ export const MessageItem = memo(function MessageItem({
                         <textarea
                             value={editContent}
                             autoFocus
+                            aria-label="Edit message"
                             onChange={e => setEditContent(e.target.value)}
                             onKeyDown={e => {
                                 if (e.key === "Enter" && !e.shiftKey) {
@@ -118,14 +152,23 @@ export const MessageItem = memo(function MessageItem({
                             const src = resolveAttachmentUrl(att.url);
 
                             if (att.contentType.startsWith("image/")) {
+                                // Constrain to max 448px wide, 320px tall, preserving aspect ratio
+                                const maxW = 448, maxH = 320;
+                                let style: React.CSSProperties | undefined;
+                                if (att.width && att.height) {
+                                    const scale = Math.min(maxW / att.width, maxH / att.height, 1);
+                                    style = { width: att.width * scale, height: att.height * scale };
+                                } else {
+                                    style = { maxWidth: maxW, height: maxH };
+                                }
                                 return (
                                     <img
                                         key={att.id}
                                         src={src}
                                         alt={att.fileName}
-                                        loading="lazy"
                                         onClick={() => setLightboxSrc({ src, alt: att.fileName })}
-                                        className="max-w-md max-h-80 rounded-lg object-contain border border-[#1e1f22] cursor-zoom-in hover:brightness-110 transition"
+                                        style={style}
+                                        className="rounded-lg object-cover cursor-zoom-in hover:brightness-110 transition"
                                     />
                                 );
                             }
@@ -137,7 +180,8 @@ export const MessageItem = memo(function MessageItem({
                                         src={src}
                                         controls
                                         preload="metadata"
-                                        className="max-w-md max-h-80 rounded-lg"
+                                        className="max-w-md rounded-lg"
+                                        style={{ maxHeight: 320 }}
                                     />
                                 );
                             }
@@ -159,10 +203,7 @@ export const MessageItem = memo(function MessageItem({
                                     rel="noopener noreferrer"
                                     className="flex items-center gap-3 bg-[#2b2d31] border border-[#1e1f22] rounded-lg px-4 py-3 hover:bg-[#35373c] max-w-md transition-colors"
                                 >
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#949ba4] shrink-0">
-                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                        <polyline points="14 2 14 8 20 8" />
-                                    </svg>
+                                    <FileIcon size={24} className="text-[#949ba4] shrink-0" />
                                     <div className="min-w-0">
                                         <div className="text-sm text-[#00a8fc] truncate hover:underline">{att.fileName}</div>
                                         <div className="text-xs text-[#949ba4]">{(att.size / 1024).toFixed(1)} KB</div>
@@ -183,6 +224,8 @@ export const MessageItem = memo(function MessageItem({
                 />
             </div>
 
+            </div>{/* end flex gap-4 */}
+
             {/* Action buttons - visible on hover */}
             <div className={`absolute -top-3 right-4 transition-opacity ${menuOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                 <div className="relative">
@@ -192,36 +235,41 @@ export const MessageItem = memo(function MessageItem({
                                 onClick={() => onStartEdit(msg.id)}
                                 className="px-2 py-1 text-[#b5bac1] hover:text-white hover:bg-[#35373c] transition-colors rounded-l"
                                 title="Edit"
+                                aria-label="Edit message"
+                                data-testid="edit-message-btn"
                             >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                </svg>
+                                <EditIcon size={16} />
                             </button>
                         )}
-                        {isAuthor && (
+                        {(isAuthor || canManageMessages) && (
                             <button
                                 onClick={() => onDelete(msg.id)}
                                 className="px-2 py-1 text-[#b5bac1] hover:text-[#f23f43] hover:bg-[#35373c] transition-colors"
                                 title="Delete"
+                                aria-label="Delete message"
+                                data-testid="delete-message-btn"
                             >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="3 6 5 6 21 6" />
-                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                </svg>
+                                <TrashIcon size={16} />
                             </button>
                         )}
                         <button
+                            onClick={() => onReply(msg.id)}
+                            className="px-2 py-1 text-[#b5bac1] hover:text-white hover:bg-[#35373c] transition-colors"
+                            title="Reply"
+                            aria-label="Reply to message"
+                            data-testid="reply-message-btn"
+                        >
+                            <ReplyIcon size={16} />
+                        </button>
+                        <button
                             ref={moreButtonRef}
                             onClick={() => onToggleMenu(msg.id)}
-                            className={`px-2 py-1 text-[#b5bac1] hover:text-white hover:bg-[#35373c] transition-colors ${isAuthor ? "" : "rounded-l"} rounded-r`}
+                            className="px-2 py-1 text-[#b5bac1] hover:text-white hover:bg-[#35373c] transition-colors rounded-r"
                             title="More"
+                            aria-label="More actions"
+                            data-testid="more-actions-btn"
                         >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                <circle cx="12" cy="5" r="2" />
-                                <circle cx="12" cy="12" r="2" />
-                                <circle cx="12" cy="19" r="2" />
-                            </svg>
+                            <MoreIcon size={16} />
                         </button>
                     </div>
                     {menuOpen && (

@@ -1,5 +1,7 @@
 using Librecord.Api.Models.UserProfile;
+using Librecord.Application.Friendships;
 using Librecord.Application.Interfaces;
+using Librecord.Domain.Social;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,10 +12,80 @@ namespace Librecord.Api.Controllers;
 public class UserProfileController : AuthenticatedController
 {
     private readonly IUserService _users;
+    private readonly IFriendshipRepository _friendships;
+    private readonly IFriendshipService _friendService;
 
-    public UserProfileController(IUserService users)
+    public UserProfileController(IUserService users, IFriendshipRepository friendships, IFriendshipService friendService)
     {
         _users = users;
+        _friendships = friendships;
+        _friendService = friendService;
+    }
+
+    [Authorize]
+    [HttpGet("{userId:guid}")]
+    public async Task<IActionResult> GetProfile(Guid userId)
+    {
+        var user = await _users.GetByIdAsync(userId);
+        if (user == null) return NotFound();
+
+        var isFriend = await _friendships.UsersAreConfirmedFriendsAsync(UserId, userId);
+
+        // Mutual friends — only count if their friends are visible or they're a friend
+        var canSeeFriends = user.FriendsVisible || isFriend || user.Id == UserId;
+        var mutualCount = 0;
+        if (canSeeFriends && user.Id != UserId)
+        {
+            var myFriends = (await _friendService.GetFriendsAsync(UserId)).Select(f => f.UserId).ToHashSet();
+            var theirFriends = (await _friendService.GetFriendsAsync(userId)).Select(f => f.UserId).ToHashSet();
+            mutualCount = myFriends.Intersect(theirFriends).Count();
+        }
+
+        return Ok(new
+        {
+            id = user.Id,
+            username = user.UserName,
+            displayName = user.DisplayName,
+            avatarUrl = user.AvatarUrl,
+            bio = user.Bio,
+            bannerUrl = user.BannerUrl,
+            createdAt = user.CreatedAt,
+            isFriend,
+            isSelf = user.Id == UserId,
+            mutualFriendCount = mutualCount,
+            friendsVisible = canSeeFriends,
+            friendsVisibleSetting = user.Id == UserId ? user.FriendsVisible : (bool?)null,
+        });
+    }
+
+    [Authorize]
+    [HttpGet("{userId:guid}/friends")]
+    public async Task<IActionResult> GetUserFriends(Guid userId)
+    {
+        var user = await _users.GetByIdAsync(userId);
+        if (user == null) return NotFound();
+
+        // Respect privacy: only show friends if visible, or viewer is a friend, or it's self
+        var isFriend = await _friendships.UsersAreConfirmedFriendsAsync(UserId, userId);
+        if (!user.FriendsVisible && !isFriend && user.Id != UserId)
+            return Ok(Array.Empty<object>());
+
+        var friends = await _friendService.GetFriendsAsync(userId);
+        return Ok(friends.Select(f => new
+        {
+            id = f.UserId,
+            username = f.Username,
+            displayName = f.DisplayName,
+            avatarUrl = f.AvatarUrl,
+        }));
+    }
+
+    [Authorize]
+    [HttpPut("friends-visible")]
+    public async Task<IActionResult> UpdateFriendsVisible([FromBody] UpdateFriendsVisibleRequest request)
+    {
+        var ok = await _users.UpdateFriendsVisibleAsync(UserId, request.Visible);
+        return ok ? Ok() : Unauthorized();
     }
 
     [Authorize]
@@ -45,6 +117,17 @@ public class UserProfileController : AuthenticatedController
     }
 
     [Authorize]
+    [HttpPut("bio")]
+    public async Task<IActionResult> UpdateBio([FromBody] UpdateBioRequest request)
+    {
+        if (request.Bio != null && request.Bio.Length > 500)
+            return BadRequest("Bio must be 500 characters or less.");
+
+        var ok = await _users.UpdateBioAsync(UserId, request.Bio);
+        return ok ? Ok() : Unauthorized();
+    }
+
+    [Authorize]
     [HttpPost("avatar")]
     public async Task<IActionResult> UploadAvatar(IFormFile file)
     {
@@ -67,4 +150,38 @@ public class UserProfileController : AuthenticatedController
 
         return Ok(new { avatarUrl });
     }
+
+    [Authorize]
+    [HttpPost("banner")]
+    public async Task<IActionResult> UploadBanner(IFormFile file)
+    {
+        if (file.Length == 0)
+            return BadRequest("Invalid file.");
+
+        var allowedExtensions = new[] { ".png", ".jpg", ".jpeg", ".webp" };
+        var ext = Path.GetExtension(file.FileName).ToLower();
+
+        if (!allowedExtensions.Contains(ext))
+            return BadRequest("Unsupported file type.");
+
+        if (file.Length > Librecord.Application.Limits.MaxAvatarSize)
+            return BadRequest("File too large.");
+
+        await using var stream = file.OpenReadStream();
+        var contentType = FileSignature.Detect(stream, file.ContentType);
+        var bannerUrl = await _users.UpdateBannerAsync(UserId, stream, file.FileName, contentType);
+        if (bannerUrl == null) return Unauthorized();
+
+        return Ok(new { bannerUrl });
+    }
+}
+
+public class UpdateBioRequest
+{
+    public string? Bio { get; set; }
+}
+
+public class UpdateFriendsVisibleRequest
+{
+    public bool Visible { get; set; }
 }

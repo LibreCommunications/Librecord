@@ -23,6 +23,8 @@ public sealed class MessageDto
     public required UserSummaryDto Author { get; init; }
     public required MessageContextDto Context { get; init; }
 
+    public ReplyInfoDto? ReplyTo { get; init; }
+
     public IReadOnlyList<MessageAttachmentDto> Attachments { get; init; } = [];
     public IReadOnlyList<MessageReactionDto> Reactions { get; init; } = [];
     public IReadOnlyList<MessageEditDto> Edits { get; init; } = [];
@@ -39,6 +41,19 @@ public sealed class MessageDto
 
             Author = UserSummaryDto.From(message.User),
             Context = MessageContextDto.From(message),
+
+            ReplyTo = message.ReplyToMessage != null
+                ? new ReplyInfoDto
+                {
+                    MessageId = message.ReplyToMessage.Id,
+                    Content = message.ReplyToMessage.ContentText ?? "",
+                    Author = message.ReplyToMessage.User != null
+                        ? UserSummaryDto.From(message.ReplyToMessage.User)
+                        : null,
+                }
+                : message.ReplyToMessageId.HasValue
+                    ? new ReplyInfoDto { MessageId = message.ReplyToMessageId.Value, Content = "[deleted]" }
+                    : null,
 
             Attachments = message.Attachments
                 .Select(MessageAttachmentDto.From)

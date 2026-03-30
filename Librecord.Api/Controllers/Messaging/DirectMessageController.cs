@@ -48,7 +48,8 @@ public sealed class DirectMessageController : AuthenticatedController
             channelId,
             UserId,
             dto.Content,
-            dto.ClientMessageId
+            dto.ClientMessageId,
+            replyToMessageId: dto.ReplyToMessageId
         );
 
         return Ok(MessageDto.From(message, dto.ClientMessageId));

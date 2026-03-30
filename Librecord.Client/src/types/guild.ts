@@ -2,6 +2,7 @@ export interface GuildSummary {
     id: string;
     name: string;
     iconUrl: string | null;
+    ownerId?: string;
 }
 
 export interface Guild {
@@ -34,6 +35,7 @@ export interface GuildPermissions {
     manageGuild: boolean;
     manageChannels: boolean;
     manageRoles: boolean;
+    manageMessages: boolean;
     kickMembers: boolean;
     banMembers: boolean;
     inviteMembers: boolean;

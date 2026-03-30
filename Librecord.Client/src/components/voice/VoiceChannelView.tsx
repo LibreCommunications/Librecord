@@ -5,13 +5,17 @@ import { useAuth } from "../../hooks/useAuth";
 import { voice } from "../../api/client";
 import { ParticipantTile } from "./ParticipantTile";
 import { ScreenShareTile } from "./ScreenShareTile";
-import { SpeakerIcon } from "./VoiceIcons";
+import { SpeakerIcon, MicOffIcon, HeadphonesOffIcon, ScreenShareIcon } from "./VoiceIcons";
+import { FullscreenIcon, ExitFullscreenIcon } from "../ui/Icons";
 import type { VoiceParticipant } from "../../voice/voiceStore";
 
 interface Props {
     channelId: string;
     channelName?: string;
 }
+
+// Persists across unmount/remount so "watching" status survives navigation
+let _watchingStreams = new Set<string>();
 
 function PreviewCard({
     participant,
@@ -46,31 +50,32 @@ function PreviewCard({
             <div className="absolute bottom-2 left-2 flex items-center gap-1">
                 {participant.isMuted && (
                     <span className="p-1 rounded bg-black/40 text-red-400">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <line x1="1" y1="1" x2="23" y2="23" />
-                            <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
-                            <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2c0 .76-.12 1.5-.34 2.18" />
-                        </svg>
+                        <MicOffIcon size={12} />
                     </span>
                 )}
                 {participant.isDeafened && (
                     <span className="p-1 rounded bg-black/40 text-red-400">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
-                            <line x1="1" y1="1" x2="23" y2="23" />
-                        </svg>
+                        <HeadphonesOffIcon size={12} />
                     </span>
                 )}
                 {participant.isScreenSharing && (
                     <span className="p-1 rounded bg-black/40 text-[#5865f2]">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                            <line x1="8" y1="21" x2="16" y2="21" />
-                            <line x1="12" y1="17" x2="12" y2="21" />
-                        </svg>
+                        <ScreenShareIcon size={12} />
                     </span>
                 )}
             </div>
+        </div>
+    );
+}
+
+function FocusOverlay({ onClick, label }: { onClick: () => void; label: string }) {
+    return (
+        <div
+            className="absolute top-2 left-2 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-sm text-white text-xs font-medium cursor-pointer opacity-0 group-hover/tile:opacity-100 transition-opacity z-10 flex items-center gap-1"
+            onClick={e => { e.stopPropagation(); onClick(); }}
+        >
+            {label === "Focus" ? <FullscreenIcon size={12} /> : <ExitFullscreenIcon size={12} />}
+            {label}
         </div>
     );
 }
@@ -90,13 +95,16 @@ export function VoiceChannelView({ channelId }: Props) {
     const [speakingMap, setSpeakingMap] = useState<Record<string, boolean>>({});
     const [previewParticipants, setPreviewParticipants] = useState<VoiceParticipant[]>([]);
 
-    // Persists across screen share stop/restart so viewers don't need to re-click
-    const [watchingStreams, setWatchingStreams] = useState<Set<string>>(new Set());
+    // Module-level so it survives unmount/remount when navigating away and back
+    // { type: "screen" | "camera", userId } or null
+    const [focusedTile, setFocusedTile] = useState<{ type: "screen" | "camera"; userId: string } | null>(null);
+    const [watchingStreams, setWatchingStreams] = useState<Set<string>>(() => _watchingStreams);
     const toggleWatch = useCallback((userId: string, watching: boolean) => {
         setWatchingStreams(prev => {
             const next = new Set(prev);
             if (watching) next.add(userId);
             else next.delete(userId);
+            _watchingStreams = next;
             return next;
         });
     }, []);
@@ -170,61 +178,130 @@ export function VoiceChannelView({ channelId }: Props) {
         );
     }
 
+    // ── Build tile list ────────────────────────────────────────
+    // Each tile is either a screen share or a participant card
+    type Tile = { key: string; type: "screen"; participant: VoiceParticipant }
+              | { key: string; type: "camera"; participant: VoiceParticipant };
+
+    const tiles: Tile[] = [];
     if (hasScreenShare) {
+        for (const p of screenSharers) tiles.push({ key: `screen-${p.userId}`, type: "screen", participant: p });
+    }
+    for (const p of participants) tiles.push({ key: `user-${p.userId}`, type: "camera", participant: p });
+
+    // ── Focused mode ────────────────────────────────────────
+    const focusedP = focusedTile
+        ? tiles.find(t => t.type === focusedTile.type && t.participant.userId === focusedTile.userId)
+        : null;
+
+    if (focusedP) {
+        const remaining = tiles.filter(t => t !== focusedP);
+
         return (
-            <div className="flex-1 flex bg-[#313338] overflow-hidden">
-                <div className="flex-1 flex flex-col gap-2 p-3 min-w-0 overflow-auto">
-                    {screenSharers.map(p => {
-                        const isSelf = p.userId === user?.userId;
-                        return (
+            <div className="flex-1 flex flex-col bg-[#313338] overflow-hidden">
+                {/* Focused tile — top */}
+                <div className="p-3 pb-0 relative group/focused" style={{ flex: 2 }}>
+                    <div className="h-full">
+                        {focusedP.type === "screen" ? (
                             <ScreenShareTile
-                                key={`screen-${p.userId}`}
-                                participant={p}
-                                isWatching={isSelf || watchingStreams.has(p.userId)}
-                                onToggleWatch={(watching) => toggleWatch(p.userId, watching)}
-                                isSelf={isSelf}
+                                participant={focusedP.participant}
+                                isWatching={focusedP.participant.userId === user?.userId || watchingStreams.has(focusedP.participant.userId)}
+                                onToggleWatch={(w) => toggleWatch(focusedP.participant.userId, w)}
+                                isSelf={focusedP.participant.userId === user?.userId}
+                                fill
                             />
-                        );
-                    })}
+                        ) : (
+                            <ParticipantTile
+                                participant={focusedP.participant}
+                                isSpeaking={speakingMap[focusedP.participant.userId] ?? false}
+                                getAvatarUrl={getAvatarUrl}
+                                isSelf={focusedP.participant.userId === user?.userId}
+                                fill
+                            />
+                        )}
+                    </div>
+                    {/* Minimize overlay */}
+                    <div className="absolute inset-3 bottom-0 rounded-xl pointer-events-none flex items-start justify-center">
+                        <div className="mt-2 px-3 py-1 rounded-full bg-black/50 text-white text-xs font-medium flex items-center gap-1.5 opacity-0 group-hover/focused:opacity-100 transition-opacity pointer-events-auto cursor-pointer" onClick={() => setFocusedTile(null)}>
+                            <ExitFullscreenIcon size={12} />
+                            Minimize
+                        </div>
+                    </div>
                 </div>
 
-                <div className="w-56 shrink-0 bg-[#2b2d31] border-l border-black/20 overflow-y-auto dark-scrollbar p-2 space-y-2">
-                    {participants.map(p => (
-                        <ParticipantTile
-                            key={p.userId}
-                            participant={p}
-                            isSpeaking={speakingMap[p.userId] ?? false}
-                            getAvatarUrl={getAvatarUrl}
-                            compact
-                        />
-                    ))}
+                {/* Remaining — bottom row */}
+                <div className="p-3 pt-1.5 overflow-hidden" style={{ flex: 1 }}>
+                    <div className="h-full flex gap-2">
+                        {remaining.map(t => {
+                            const isUnwatchedScreen = t.type === "screen" && t.participant.userId !== user?.userId && !watchingStreams.has(t.participant.userId);
+                            return (
+                                <div
+                                    key={t.key}
+                                    className={`relative group/tile overflow-hidden rounded-lg flex-1 min-w-0 ${isUnwatchedScreen ? "cursor-pointer" : ""}`}
+                                    onClick={isUnwatchedScreen ? () => {
+                                        toggleWatch(t.participant.userId, true);
+                                        setFocusedTile({ type: "screen", userId: t.participant.userId });
+                                    } : undefined}
+                                >
+                                    {t.type === "screen" ? (
+                                        <ScreenShareTile
+                                            participant={t.participant}
+                                            isWatching={t.participant.userId === user?.userId || watchingStreams.has(t.participant.userId)}
+                                            onToggleWatch={(w) => toggleWatch(t.participant.userId, w)}
+                                            isSelf={t.participant.userId === user?.userId}
+                                            fill
+                                        />
+                                    ) : (
+                                        <ParticipantTile
+                                            participant={t.participant}
+                                            isSpeaking={speakingMap[t.participant.userId] ?? false}
+                                            getAvatarUrl={getAvatarUrl}
+                                            isSelf={t.participant.userId === user?.userId}
+                                            fill
+                                        />
+                                    )}
+                                    {!isUnwatchedScreen && (
+                                        <FocusOverlay label="Focus" onClick={() => setFocusedTile({ type: t.type, userId: t.participant.userId })} />
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
         );
     }
 
+    // ── Normal grid — all tiles equal ───────────────────────
     return (
-        <div className="flex-1 flex flex-col bg-[#313338] overflow-hidden">
-            <div className="flex-1 p-6 overflow-auto flex items-center justify-center">
-                <div className={`grid ${getGridClass(participants.length)} gap-3 w-full mx-auto`}>
-                    {participants.map(p => {
-                        if (isInThisChannel) {
-                            return (
-                                <ParticipantTile
-                                    key={p.userId}
-                                    participant={p}
-                                    isSpeaking={speakingMap[p.userId] ?? false}
-                                    getAvatarUrl={getAvatarUrl}
-                                />
-                            );
-                        }
-
+        <div className="flex-1 flex flex-col bg-[#313338] overflow-hidden relative">
+            <div className="flex-1 p-3 overflow-auto flex items-center justify-center">
+                <div className={`grid ${getGridClass(tiles.length)} gap-3 w-full mx-auto`}>
+                    {tiles.map(t => {
+                        const isUnwatchedScreen = t.type === "screen" && t.participant.userId !== user?.userId && !watchingStreams.has(t.participant.userId);
                         return (
-                            <PreviewCard
-                                key={p.userId}
-                                participant={p}
-                                getAvatarUrl={getAvatarUrl}
-                            />
+                            <div key={t.key} className="relative group/tile">
+                                {t.type === "screen" ? (
+                                    <ScreenShareTile
+                                        participant={t.participant}
+                                        isWatching={t.participant.userId === user?.userId || watchingStreams.has(t.participant.userId)}
+                                        onToggleWatch={(w) => toggleWatch(t.participant.userId, w)}
+                                        isSelf={t.participant.userId === user?.userId}
+                                    />
+                                ) : isInThisChannel ? (
+                                    <ParticipantTile
+                                        participant={t.participant}
+                                        isSpeaking={speakingMap[t.participant.userId] ?? false}
+                                        getAvatarUrl={getAvatarUrl}
+                                        isSelf={t.participant.userId === user?.userId}
+                                    />
+                                ) : (
+                                    <PreviewCard participant={t.participant} getAvatarUrl={getAvatarUrl} />
+                                )}
+                                {isInThisChannel && !isUnwatchedScreen && (
+                                    <FocusOverlay label="Focus" onClick={() => setFocusedTile({ type: t.type, userId: t.participant.userId })} />
+                                )}
+                            </div>
                         );
                     })}
                 </div>

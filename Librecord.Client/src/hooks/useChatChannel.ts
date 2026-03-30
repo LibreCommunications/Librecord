@@ -5,6 +5,8 @@ import { useReadState } from "./useReadState";
 import { useTypingIndicator } from "./useTypingIndicator";
 import { usePins } from "./usePins";
 import { useToast } from "./useToast";
+import { logger } from "../lib/logger";
+import { onCustomEvent, onEvent } from "../lib/typedEvent";
 import type { Message } from "../types/message";
 import type { UploadResult } from "./useAttachmentUpload";
 
@@ -17,8 +19,8 @@ export interface ChatChannelConfig {
     channelId: string | undefined;
 
     getMessages: (channelId: string, limit?: number, before?: string) => Promise<Message[]>;
-    sendTextMessage: (channelId: string, content: string, clientMessageId: string) => Promise<void>;
-    sendWithAttachments: (channelId: string, content: string, clientMessageId: string, files: File[]) => Promise<UploadResult>;
+    sendTextMessage: (channelId: string, content: string, clientMessageId: string, replyToMessageId?: string) => Promise<void>;
+    sendWithAttachments: (channelId: string, content: string, clientMessageId: string, files: File[], replyToMessageId?: string) => Promise<UploadResult>;
     editMessage: (messageId: string, dto: { content: string }) => Promise<{ content: string; editedAt?: string | null }>;
     deleteMessage: (messageId: string) => Promise<void>;
     events: {
@@ -48,6 +50,7 @@ export function useChatChannel(config: ChatChannelConfig) {
     const [sending, setSending] = useState(false);
     const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [replyingTo, setReplyingTo] = useState<Message | null>(null);
     const [showPins, setShowPins] = useState(false);
     const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
     const [hasMore, setHasMore] = useState(true);
@@ -109,16 +112,32 @@ export function useChatChannel(config: ChatChannelConfig) {
         return next;
     }, []);
 
+    // Refetch recent messages after reconnect to catch anything missed during the gap
     useEffect(() => {
         if (!channelId) return;
-        const handler = (event: CustomEvent<{ message: Message; clientMessageId?: string }>) => {
-            const { message, clientMessageId } = event.detail;
+        return onEvent("realtime:reconnected", () => {
+            config.getMessages(channelId).then(msgs => {
+                const reversed = msgs.slice().reverse();
+                setMessages(prev => {
+                    const existingIds = new Set(prev.map(m => m.id));
+                    const newMsgs = reversed.filter(m => !existingIds.has(m.id));
+                    if (newMsgs.length === 0) return prev;
+                    return [...prev, ...newMsgs];
+                });
+                if (reversed.length > 0) markAsRead(channelId, reversed[reversed.length - 1].id);
+            }).catch(() => { /* silent — will show on next user action */ });
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [channelId]);
+
+    useEffect(() => {
+        if (!channelId) return;
+        return onCustomEvent<{ message: Message; clientMessageId?: string }>(events.messageNew, (detail) => {
+            const { message, clientMessageId } = detail;
             if (message.channelId !== channelId) return;
             setMessages(prev => applyNewMessage(prev, message, clientMessageId));
             if (document.hasFocus()) markAsRead(channelId, message.id);
-        };
-        window.addEventListener(events.messageNew, handler as EventListener);
-        return () => window.removeEventListener(events.messageNew, handler as EventListener);
+        });
     }, [channelId, events.messageNew, markAsRead, applyNewMessage]);
 
     useEffect(() => {
@@ -135,69 +154,58 @@ export function useChatChannel(config: ChatChannelConfig) {
 
     useEffect(() => {
         if (!channelId) return;
-        const handler = (event: CustomEvent<{ channelId: string; messageId: string; content: string; editedAt?: string }>) => {
-            const d = event.detail;
+        return onCustomEvent<{ channelId: string; messageId: string; content: string; editedAt?: string }>(events.messageEdited, (d) => {
             if (d.channelId !== channelId) return;
             setMessages(prev => prev.map(m => m.id === d.messageId ? { ...m, content: d.content, editedAt: d.editedAt } : m));
-        };
-        window.addEventListener(events.messageEdited, handler as EventListener);
-        return () => window.removeEventListener(events.messageEdited, handler as EventListener);
+        });
     }, [channelId, events.messageEdited]);
 
     useEffect(() => {
         if (!channelId) return;
-        const handler = (event: CustomEvent<{ channelId: string; messageId: string }>) => {
-            if (event.detail.channelId !== channelId) return;
-            setMessages(prev => prev.filter(m => m.id !== event.detail.messageId));
-        };
-        window.addEventListener(events.messageDeleted, handler as EventListener);
-        return () => window.removeEventListener(events.messageDeleted, handler as EventListener);
+        return onCustomEvent<{ channelId: string; messageId: string }>(events.messageDeleted, (detail) => {
+            if (detail.channelId !== channelId) return;
+            setMessages(prev => prev.filter(m => m.id !== detail.messageId));
+        });
     }, [channelId, events.messageDeleted]);
 
     useEffect(() => {
         if (!channelId) return;
-        const onPinned = (event: CustomEvent<{ channelId: string; messageId: string }>) => {
-            if (event.detail.channelId !== channelId) return;
-            setPinnedIds(prev => new Set(prev).add(event.detail.messageId));
-        };
-        const onUnpinned = (event: CustomEvent<{ channelId: string; messageId: string }>) => {
-            if (event.detail.channelId !== channelId) return;
-            setPinnedIds(prev => { const next = new Set(prev); next.delete(event.detail.messageId); return next; });
-        };
-        window.addEventListener("channel:message:pinned", onPinned as EventListener);
-        window.addEventListener("channel:message:unpinned", onUnpinned as EventListener);
-        return () => {
-            window.removeEventListener("channel:message:pinned", onPinned as EventListener);
-            window.removeEventListener("channel:message:unpinned", onUnpinned as EventListener);
-        };
+        const cleanups = [
+            onCustomEvent<{ channelId: string; messageId: string }>("channel:message:pinned", (detail) => {
+                if (detail.channelId !== channelId) return;
+                setPinnedIds(prev => new Set(prev).add(detail.messageId));
+            }),
+            onCustomEvent<{ channelId: string; messageId: string }>("channel:message:unpinned", (detail) => {
+                if (detail.channelId !== channelId) return;
+                setPinnedIds(prev => { const next = new Set(prev); next.delete(detail.messageId); return next; });
+            }),
+        ];
+        return () => cleanups.forEach(fn => fn());
     }, [channelId]);
 
     useEffect(() => {
         if (!channelId) return;
-        const onAdded = (event: CustomEvent<{ channelId: string; messageId: string; userId: string; emoji: string }>) => {
-            const { channelId: ch, messageId, userId: reactUserId, emoji } = event.detail;
-            if (ch !== channelId || reactUserId === user?.userId) return;
-            setMessages(prev => prev.map(m => {
-                if (m.id !== messageId) return m;
-                if (m.reactions.some(r => r.userId === reactUserId && r.emoji === emoji)) return m;
-                return { ...m, reactions: [...m.reactions, { userId: reactUserId, emoji, createdAt: new Date().toISOString() }] };
-            }));
-        };
-        const onRemoved = (event: CustomEvent<{ channelId: string; messageId: string; userId: string; emoji: string }>) => {
-            const { channelId: ch, messageId, userId: reactUserId, emoji } = event.detail;
-            if (ch !== channelId || reactUserId === user?.userId) return;
-            setMessages(prev => prev.map(m =>
-                m.id === messageId
-                    ? { ...m, reactions: m.reactions.filter(r => !(r.userId === reactUserId && r.emoji === emoji)) }
-                    : m
-            ));
-        };
-        window.addEventListener("channel:reaction:added", onAdded as EventListener);
-        window.addEventListener("channel:reaction:removed", onRemoved as EventListener);
-        return () => {
-            window.removeEventListener("channel:reaction:added", onAdded as EventListener);
-            window.removeEventListener("channel:reaction:removed", onRemoved as EventListener);
-        };
+        const cleanups = [
+            onCustomEvent<{ channelId: string; messageId: string; userId: string; emoji: string }>("channel:reaction:added", (detail) => {
+                const { channelId: ch, messageId, userId: reactUserId, emoji } = detail;
+                if (ch !== channelId || reactUserId === user?.userId) return;
+                setMessages(prev => prev.map(m => {
+                    if (m.id !== messageId) return m;
+                    if (m.reactions.some(r => r.userId === reactUserId && r.emoji === emoji)) return m;
+                    return { ...m, reactions: [...m.reactions, { userId: reactUserId, emoji, createdAt: new Date().toISOString() }] };
+                }));
+            }),
+            onCustomEvent<{ channelId: string; messageId: string; userId: string; emoji: string }>("channel:reaction:removed", (detail) => {
+                const { channelId: ch, messageId, userId: reactUserId, emoji } = detail;
+                if (ch !== channelId || reactUserId === user?.userId) return;
+                setMessages(prev => prev.map(m =>
+                    m.id === messageId
+                        ? { ...m, reactions: m.reactions.filter(r => !(r.userId === reactUserId && r.emoji === emoji)) }
+                        : m
+                ));
+            }),
+        ];
+        return () => cleanups.forEach(fn => fn());
     }, [channelId, user?.userId]);
 
     useEffect(() => {
@@ -219,7 +227,7 @@ export function useChatChannel(config: ChatChannelConfig) {
             })
             .catch((err) => {
                 if (err?.name !== 'AbortError') {
-                    console.error(`[useChatChannel] load ERROR for ${channelId}:`, err);
+                    logger.realtime.warn(`Failed to load messages for ${channelId}`, err);
                     setError("Failed to load messages");
                 }
             })
@@ -239,9 +247,11 @@ export function useChatChannel(config: ChatChannelConfig) {
         const clientMessageId = createClientMessageId();
         const text = content.trim();
         const filesToSend = [...pendingFiles];
+        const replyMsg = replyingTo;
 
         setContent("");
         setPendingFiles([]);
+        setReplyingTo(null);
         setSending(true);
         shouldAutoScrollRef.current = true;
 
@@ -258,6 +268,11 @@ export function useChatChannel(config: ChatChannelConfig) {
                 displayName: user.displayName,
                 avatarUrl: user.avatarUrl ?? null,
             },
+            replyTo: replyMsg ? {
+                messageId: replyMsg.id,
+                content: replyMsg.content,
+                author: replyMsg.author,
+            } : null,
             attachments: [],
             reactions: [],
             edits: [],
@@ -267,7 +282,7 @@ export function useChatChannel(config: ChatChannelConfig) {
 
         try {
             if (filesToSend.length > 0) {
-                const result = await config.sendWithAttachments(channelId, text, clientMessageId, filesToSend);
+                const result = await config.sendWithAttachments(channelId, text, clientMessageId, filesToSend, replyMsg?.id);
                 if (result.ok) {
                     setMessages(prev => prev.map(m =>
                         m.clientMessageId === clientMessageId ? { ...result.message, clientMessageId } : m
@@ -281,7 +296,7 @@ export function useChatChannel(config: ChatChannelConfig) {
                         : "Failed to send file. The upload may have timed out.", "error");
                 }
             } else {
-                await config.sendTextMessage(channelId, text, clientMessageId);
+                await config.sendTextMessage(channelId, text, clientMessageId, replyMsg?.id);
             }
         } catch {
             setMessages(prev => prev.filter(m => m.clientMessageId !== clientMessageId));
@@ -399,6 +414,7 @@ export function useChatChannel(config: ChatChannelConfig) {
         sending,
         menuOpenId, setMenuOpenId,
         editingId, setEditingId,
+        replyingTo, setReplyingTo,
         showPins, setShowPins,
         pinnedIds,
         hasMore,

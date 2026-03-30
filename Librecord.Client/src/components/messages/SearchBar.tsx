@@ -29,11 +29,13 @@ export function SearchBar({ channelId, guildId }: Props) {
                 onChange={e => setQuery(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && handleSearch()}
                 placeholder="Search messages..."
+                aria-label="Search messages"
+                data-testid="search-input"
                 className="w-48 px-3 py-1.5 rounded bg-[#1e1f22] text-sm text-white placeholder-gray-500"
             />
 
             {open && (
-                <div className="absolute top-full right-0 mt-1 w-96 max-h-80 overflow-y-auto bg-[#1e1f22] rounded-lg shadow-xl z-50">
+                <div role="listbox" data-testid="search-results" className="absolute top-full right-0 mt-1 w-96 max-h-80 overflow-y-auto bg-[#1e1f22] rounded-lg shadow-xl z-50">
                     <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700">
                         <span className="text-xs text-gray-400">
                             {loading ? "Searching..." : `${results.length} results`}
@@ -47,7 +49,7 @@ export function SearchBar({ channelId, guildId }: Props) {
                     </div>
 
                     {results.map(r => (
-                        <div key={r.id} className="px-3 py-2 hover:bg-white/5 border-b border-gray-800">
+                        <div key={r.id} role="option" data-testid={`search-result-${r.id}`} className="px-3 py-2 hover:bg-white/5 border-b border-gray-800">
                             <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
                                 <span className="font-medium text-gray-300">{r.author.displayName}</span>
                                 <span>{new Date(r.createdAt).toLocaleDateString()}</span>

@@ -1,5 +1,7 @@
 using Librecord.Domain.Guilds;
+using Librecord.Domain.Messaging.Common;
 using Librecord.Domain.Storage;
+using Microsoft.Extensions.Logging;
 
 namespace Librecord.Application.Guilds;
 
@@ -7,11 +9,19 @@ public class GuildSettingsService : IGuildSettingsService
 {
     private readonly IGuildRepository _guilds;
     private readonly IAttachmentStorageService _storage;
+    private readonly IAttachmentRepository _attachments;
+    private readonly ILogger<GuildSettingsService> _logger;
 
-    public GuildSettingsService(IGuildRepository guilds, IAttachmentStorageService storage)
+    public GuildSettingsService(
+        IGuildRepository guilds,
+        IAttachmentStorageService storage,
+        IAttachmentRepository attachments,
+        ILogger<GuildSettingsService> logger)
     {
         _guilds = guilds;
         _storage = storage;
+        _attachments = attachments;
+        _logger = logger;
     }
 
     public async Task<Guild?> UpdateGuildAsync(Guid guildId, string? name)
@@ -49,8 +59,32 @@ public class GuildSettingsService : IGuildSettingsService
 
         var channelIds = await _guilds.GetChannelIdsAsync(guildId);
 
+        // Collect attachment URLs before cascade delete
+        var attachmentUrls = await _attachments.GetUrlsByGuildAsync(guildId);
+
+        // Also collect guild icon URL
+        var iconUrl = guild.IconUrl;
+
         await _guilds.RemoveGuildAsync(guild);
         await _guilds.SaveChangesAsync();
+
+        // Best-effort storage cleanup
+        foreach (var url in attachmentUrls)
+        {
+            try { await _storage.DeleteAsync(url); }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete attachment {Url} during guild cleanup", url);
+            }
+        }
+        if (iconUrl != null)
+        {
+            try { await _storage.DeleteAsync(iconUrl); }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete guild icon {Url} during guild cleanup", iconUrl);
+            }
+        }
 
         return (true, channelIds);
     }

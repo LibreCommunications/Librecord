@@ -10,6 +10,8 @@ export interface VoiceParticipant {
     joinedAt: string;
 }
 
+import { STORAGE } from "../lib/storageKeys";
+
 export interface VoiceState {
     channelId: string | null;
     guildId: string | null;
@@ -21,13 +23,28 @@ export interface VoiceState {
     isConnected: boolean;
 }
 
-const STORAGE_KEY = "librecord:voiceSession";
+
+interface VoicePrefs {
+    isMuted: boolean;
+    isDeafened: boolean;
+}
+
+export function getVoicePrefs(): VoicePrefs {
+    try {
+        const raw = localStorage.getItem(STORAGE.voicePrefs);
+        if (raw) return JSON.parse(raw);
+    } catch { /* ignore */ }
+    return { isMuted: false, isDeafened: false };
+}
+
+export function setVoicePrefs(prefs: Partial<VoicePrefs>) {
+    const current = getVoicePrefs();
+    localStorage.setItem(STORAGE.voicePrefs, JSON.stringify({ ...current, ...prefs }));
+}
 
 interface PersistedVoiceSession {
     channelId: string;
     guildId: string;
-    isMuted: boolean;
-    isDeafened: boolean;
 }
 
 const INITIAL_STATE: VoiceState = {
@@ -52,12 +69,10 @@ function persist() {
         const session: PersistedVoiceSession = {
             channelId: state.channelId,
             guildId: state.guildId,
-            isMuted: state.isMuted,
-            isDeafened: state.isDeafened,
         };
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+        sessionStorage.setItem(STORAGE.voiceSession, JSON.stringify(session));
     } else {
-        sessionStorage.removeItem(STORAGE_KEY);
+        sessionStorage.removeItem(STORAGE.voiceSession);
     }
 }
 
@@ -73,7 +88,7 @@ export function getVoiceState(): VoiceState {
 
 export function getPersistedVoiceSession(): PersistedVoiceSession | null {
     try {
-        const raw = sessionStorage.getItem(STORAGE_KEY);
+        const raw = sessionStorage.getItem(STORAGE.voiceSession);
         if (!raw) return null;
         return JSON.parse(raw);
     } catch {
@@ -82,7 +97,7 @@ export function getPersistedVoiceSession(): PersistedVoiceSession | null {
 }
 
 export function clearPersistedVoiceSession() {
-    sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(STORAGE.voiceSession);
 }
 
 export function setVoiceState(patch: Partial<VoiceState>) {

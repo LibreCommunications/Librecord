@@ -9,4 +9,6 @@ public sealed class SendMessageRequest
 
     [Required, MaxLength(64)]
     public string ClientMessageId { get; init; } = null!;
+
+    public Guid? ReplyToMessageId { get; init; }
 }

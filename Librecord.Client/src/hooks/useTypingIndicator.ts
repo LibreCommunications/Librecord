@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { appConnection } from "../realtime/connection";
+import { logger } from "../lib/logger";
+import { onCustomEvent } from "../lib/typedEvent";
 
 const TYPING_THROTTLE_MS = 3000;
 const TYPING_EXPIRE_MS = 5000;
@@ -27,41 +29,33 @@ export function useTypingIndicator(
     useEffect(() => {
         if (!channelId) return;
 
-        const onTyping = (e: CustomEvent<{ channelId: string; userId: string; username: string; displayName?: string }>) => {
-            const { channelId: evtChannel, userId, username, displayName } = e.detail;
-            if (evtChannel !== channelId) return;
-            if (userId === currentUserId) return;
-
-            setTypingUsers(prev => {
-                const now = Date.now();
-                const filtered = prev.filter(t => t.expiresAt > now && t.userId !== userId);
-                return [...filtered, { channelId, userId, username, displayName: displayName ?? username, expiresAt: now + TYPING_EXPIRE_MS }];
-            });
-        };
-
-        const onStopTyping = (e: CustomEvent<{ channelId: string; userId: string }>) => {
-            const { channelId: evtChannel, userId } = e.detail;
-            if (evtChannel !== channelId) return;
-
-            setTypingUsers(prev => prev.filter(t => t.userId !== userId));
-        };
-
         const messageEvent = hub === "dm" ? "dm:message:new" : "guild:message:new";
-        const onMessage = (e: CustomEvent<{ message: { channelId: string; author: { id: string } } }>) => {
-            const { message } = e.detail;
-            if (message.channelId !== channelId) return;
+        const cleanups = [
+            onCustomEvent<{ channelId: string; userId: string; username: string; displayName?: string }>(typingEvent, (detail) => {
+                const { channelId: evtChannel, userId, username, displayName } = detail;
+                if (evtChannel !== channelId) return;
+                if (userId === currentUserId) return;
 
-            setTypingUsers(prev => prev.filter(t => t.userId !== message.author.id));
-        };
+                setTypingUsers(prev => {
+                    const now = Date.now();
+                    const filtered = prev.filter(t => t.expiresAt > now && t.userId !== userId);
+                    return [...filtered, { channelId, userId, username, displayName: displayName ?? username, expiresAt: now + TYPING_EXPIRE_MS }];
+                });
+            }),
+            onCustomEvent<{ channelId: string; userId: string }>(stopTypingEvent, (detail) => {
+                const { channelId: evtChannel, userId } = detail;
+                if (evtChannel !== channelId) return;
 
-        window.addEventListener(typingEvent, onTyping as EventListener);
-        window.addEventListener(stopTypingEvent, onStopTyping as EventListener);
-        window.addEventListener(messageEvent, onMessage as EventListener);
-        return () => {
-            window.removeEventListener(typingEvent, onTyping as EventListener);
-            window.removeEventListener(stopTypingEvent, onStopTyping as EventListener);
-            window.removeEventListener(messageEvent, onMessage as EventListener);
-        };
+                setTypingUsers(prev => prev.filter(t => t.userId !== userId));
+            }),
+            onCustomEvent<{ message: { channelId: string; author: { id: string } } }>(messageEvent, (detail) => {
+                const { message } = detail;
+                if (message.channelId !== channelId) return;
+
+                setTypingUsers(prev => prev.filter(t => t.userId !== message.author.id));
+            }),
+        ];
+        return () => cleanups.forEach(fn => fn());
     }, [channelId, currentUserId, typingEvent, stopTypingEvent, hub]);
 
     useEffect(() => {
@@ -80,7 +74,7 @@ export function useTypingIndicator(
             if (isTypingRef.current && channelId) {
                 isTypingRef.current = false;
                 const method = hub === "dm" ? "DmStopTyping" : "GuildStopTyping";
-                appConnection.invoke(method, channelId).catch(() => {});
+                appConnection.invoke(method, channelId).catch(e => logger.typing.warn("Failed to send stop typing on cleanup", e));
             }
         };
     }, [channelId, hub]);
@@ -95,7 +89,7 @@ export function useTypingIndicator(
         lastSentRef.current = now;
 
         const method = hub === "dm" ? "DmStartTyping" : "GuildStartTyping";
-        appConnection.invoke(method, channelId).catch((e) => console.warn("[Typing] SignalR invoke failed:", e));
+        appConnection.invoke(method, channelId).catch(e => logger.typing.warn("SignalR invoke failed", e));
     }, [channelId, hub]);
 
     const stopTyping = useCallback(() => {
@@ -105,7 +99,7 @@ export function useTypingIndicator(
         lastSentRef.current = 0;
 
         const method = hub === "dm" ? "DmStopTyping" : "GuildStopTyping";
-        appConnection.invoke(method, channelId).catch((e) => console.warn("[Typing] SignalR invoke failed:", e));
+        appConnection.invoke(method, channelId).catch(e => logger.typing.warn("SignalR invoke failed", e));
     }, [channelId, hub]);
 
     const typingNames = typingUsers

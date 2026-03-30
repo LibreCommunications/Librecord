@@ -13,13 +13,14 @@ export function useAttachmentUpload() {
         channelId: string,
         content: string,
         clientMessageId: string,
-        files: File[]
+        files: File[],
+        replyToMessageId?: string,
     ): Promise<UploadResult> => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
 
         try {
-            const message = await uploads.guildMessage(channelId, content, clientMessageId, files, controller.signal);
+            const message = await uploads.guildMessage(channelId, content, clientMessageId, files, controller.signal, replyToMessageId);
             return { ok: true, message };
         } catch (err) {
             if (err instanceof ApiError) return { ok: false, status: err.status };
@@ -33,13 +34,14 @@ export function useAttachmentUpload() {
         channelId: string,
         content: string,
         clientMessageId: string,
-        files: File[]
+        files: File[],
+        replyToMessageId?: string,
     ): Promise<UploadResult> => {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
 
         try {
-            const message = await uploads.dmMessage(channelId, content, clientMessageId, files, controller.signal);
+            const message = await uploads.dmMessage(channelId, content, clientMessageId, files, controller.signal, replyToMessageId);
             return { ok: true, message };
         } catch (err) {
             if (err instanceof ApiError) return { ok: false, status: err.status };

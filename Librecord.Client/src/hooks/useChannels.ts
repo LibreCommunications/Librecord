@@ -9,11 +9,13 @@ export interface CreateChannelDto {
     type: number;
     position: number;
     topic?: string | null;
+    parentId?: string | null;
 }
 
 export interface UpdateChannelDto {
     name?: string;
     topic?: string | null;
+    parentId?: string | null;
 }
 
 export function useChannels() {

@@ -1,7 +1,12 @@
 import { Component, type ReactNode } from "react";
+import { logger } from "../../lib/logger";
 
 interface Props {
     children: ReactNode;
+    /** "page" shows full-screen error. "section" shows inline error in the affected panel. */
+    variant?: "page" | "section";
+    /** Label for logging (e.g. "ChannelSidebar", "Outlet") */
+    label?: string;
 }
 
 interface State {
@@ -19,8 +24,35 @@ export class ErrorBoundary extends Component<Props, State> {
         return { hasError: true, error };
     }
 
+    componentDidCatch(error: Error, info: React.ErrorInfo) {
+        logger.ui.error(`ErrorBoundary [${this.props.label ?? "unknown"}] caught`, error, info.componentStack);
+    }
+
+    private handleRetry = () => {
+        this.setState({ hasError: false, error: null });
+    };
+
     render() {
         if (!this.state.hasError) return this.props.children;
+
+        if (this.props.variant === "section") {
+            return (
+                <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+                    <p className="text-sm text-[#949ba4] mb-3">Something went wrong</p>
+                    {this.state.error && (
+                        <pre className="text-[10px] text-[#72767d] bg-[#1e1f22] rounded p-2 mb-3 max-w-full overflow-auto max-h-20">
+                            {this.state.error.message}
+                        </pre>
+                    )}
+                    <button
+                        onClick={this.handleRetry}
+                        className="px-3 py-1.5 bg-[#5865F2] text-white text-xs rounded font-medium hover:bg-[#4752c4]"
+                    >
+                        Retry
+                    </button>
+                </div>
+            );
+        }
 
         return (
             <div className="flex flex-col items-center justify-center h-screen bg-[#313338] text-gray-200">

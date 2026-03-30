@@ -22,6 +22,15 @@ export function useGuildSettings() {
         }
     }, []);
 
+    const leaveGuild = useCallback(async (guildId: string): Promise<boolean> => {
+        try {
+            await guildModeration.leave(guildId);
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
+
     const kickMember = useCallback(async (guildId: string, userId: string): Promise<boolean> => {
         try {
             await guildModeration.kick(guildId, userId);
@@ -54,5 +63,5 @@ export function useGuildSettings() {
         [],
     );
 
-    return { updateGuild, deleteGuild, kickMember, banMember, unbanMember, getBans };
+    return { updateGuild, deleteGuild, leaveGuild, kickMember, banMember, unbanMember, getBans };
 }

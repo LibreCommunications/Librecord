@@ -10,8 +10,10 @@ import { useReadState } from "../../hooks/useReadState";
 import { UnreadBadge } from "../ui/UnreadBadge";
 import { StatusDot } from "../user/StatusDot";
 import { presence } from "../../api/client";
+import { onCustomEvent, onEvent } from "../../lib/typedEvent";
 import type { AppEventMap } from "../../realtime/events";
 import { CreateGroupModal } from "../dm/CreateGroupModal";
+import { CloseIcon, PersonsIcon } from "../ui/Icons";
 
 export default function DmSidebar() {
     const { dmId } = useParams();
@@ -58,21 +60,18 @@ export default function DmSidebar() {
 
     useEffect(() => {
         const refresh = () => { loadDms(); };
-        window.addEventListener("friend:removed", refresh as EventListener);
-        window.addEventListener("dm:channel:created", refresh as EventListener);
-        window.addEventListener("dm:member:added", refresh as EventListener);
-        window.addEventListener("realtime:reconnected", refresh);
-        return () => {
-            window.removeEventListener("friend:removed", refresh as EventListener);
-            window.removeEventListener("dm:channel:created", refresh as EventListener);
-            window.removeEventListener("dm:member:added", refresh as EventListener);
-            window.removeEventListener("realtime:reconnected", refresh);
-        };
+        const cleanups = [
+            onEvent("friend:removed", refresh),
+            onEvent("dm:channel:created", refresh),
+            onEvent("dm:member:added", refresh),
+            onEvent("realtime:reconnected", refresh),
+        ];
+        return () => cleanups.forEach(fn => fn());
     }, [loadDms]);
 
     useEffect(() => {
-        const onMemberLeft = (e: CustomEvent<AppEventMap["dm:member:left"]>) => {
-            const { channelId, userId } = e.detail;
+        return onCustomEvent<AppEventMap["dm:member:left"]>("dm:member:left", (detail) => {
+            const { channelId, userId } = detail;
             if (userId === user?.userId) {
                 setDms(prev => prev.filter(d => d.id !== channelId));
                 if (dmId === channelId) navigate("/app/dm");
@@ -83,36 +82,29 @@ export default function DmSidebar() {
                         : d
                 ));
             }
-        };
-        window.addEventListener("dm:member:left", onMemberLeft as EventListener);
-        return () => window.removeEventListener("dm:member:left", onMemberLeft as EventListener);
+        });
     }, [dmId, user?.userId, navigate]);
 
     useEffect(() => {
-        const onDeleted = (e: CustomEvent<AppEventMap["dm:channel:deleted"]>) => {
-            const { channelId } = e.detail;
+        return onCustomEvent<AppEventMap["dm:channel:deleted"]>("dm:channel:deleted", (detail) => {
+            const { channelId } = detail;
             setDms(prev => prev.filter(d => d.id !== channelId));
             if (dmId === channelId) navigate("/app/dm");
-        };
-        window.addEventListener("dm:channel:deleted", onDeleted as EventListener);
-        return () => window.removeEventListener("dm:channel:deleted", onDeleted as EventListener);
+        });
     }, [dmId, navigate]);
 
     useEffect(() => {
-        const onPresence = (e: CustomEvent<AppEventMap["dm:user:presence"]>) => {
+        return onCustomEvent<AppEventMap["dm:user:presence"]>("dm:user:presence", (detail) => {
             setPresenceMap(prev => ({
                 ...prev,
-                [e.detail.userId]: e.detail.status,
+                [detail.userId]: detail.status,
             }));
-        };
-
-        window.addEventListener("dm:user:presence", onPresence as EventListener);
-        return () => window.removeEventListener("dm:user:presence", onPresence as EventListener);
+        });
     }, []);
 
     useEffect(() => {
-        const onPing = (e: CustomEvent<AppEventMap["dm:message:ping"]>) => {
-            const { channelId: pingChannel, authorId } = e.detail;
+        return onCustomEvent<AppEventMap["dm:message:ping"]>("dm:message:ping", (detail) => {
+            const { channelId: pingChannel, authorId } = detail;
             if (pingChannel === dmId) return;
             if (authorId === user?.userId) return;
 
@@ -128,10 +120,7 @@ export default function DmSidebar() {
                 ...prev,
                 [pingChannel]: (prev[pingChannel] ?? 0) + 1,
             }));
-        };
-
-        window.addEventListener("dm:message:ping", onPing as EventListener);
-        return () => window.removeEventListener("dm:message:ping", onPing as EventListener);
+        });
     }, [dmId, user?.userId, loadDms]);
 
     const [prevActiveDmId, setPrevActiveDmId] = useState(dmId);
@@ -146,15 +135,17 @@ export default function DmSidebar() {
 
     return (
         <>
-        <aside className="w-60 bg-[#2b2d31] p-2 border-r border-black/20 flex-1">
+        <aside aria-label="Direct messages" data-testid="dm-sidebar" role="navigation" className="w-60 shrink-0 bg-[#2b2d31] p-2 border-r border-black/20 flex-1">
             <div className="flex items-center justify-between px-2 mb-2">
-                <h2 className="text-[#949ba4] uppercase text-[11px] font-bold tracking-wide">
+                <h2 className="text-[#949ba4] uppercase text-xs font-bold tracking-wide">
                     Direct Messages
                 </h2>
                 <button
                     onClick={() => setShowCreateGroup(true)}
                     className="text-[#949ba4] hover:text-[#dbdee1] text-base leading-none"
                     title="Create Group DM"
+                    aria-label="Create Group DM"
+                    data-testid="create-group-dm-btn"
                 >
                     +
                 </button>
@@ -168,17 +159,12 @@ export default function DmSidebar() {
                         ${isFriendsPage ? "bg-[#404249] text-white" : "text-[#949ba4] hover:text-[#dbdee1]"}
                     `}
                 >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                        <circle cx="9" cy="7" r="4" />
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
+                    <PersonsIcon size={20} className="shrink-0" />
                     Friends
                 </div>
             </Link>
 
-            <div className="space-y-0.5 mt-1">
+            <div className="space-y-0.5 mt-1" role="list" aria-label="Conversations">
                 {dms.map(dm => {
                     const others = dm.members.filter(m => m.id !== user?.userId);
                     const name = dm.isGroup
@@ -191,7 +177,7 @@ export default function DmSidebar() {
                     const otherStatus = showAvatar ? (presenceMap[others[0].id] ?? "offline") : undefined;
 
                     return (
-                        <div key={dm.id} className="group relative" data-testid={`dm-sidebar-entry-${dm.id}`}>
+                        <div key={dm.id} className="group relative" data-testid={`dm-item-${dm.id}`}>
                             <Link to={`/app/dm/${dm.id}`}>
                                 <div
                                     className={`
@@ -229,11 +215,9 @@ export default function DmSidebar() {
                                 }}
                                 className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-[#949ba4] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
                                 title="Leave group"
+                                aria-label="Leave group"
                             >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <line x1="18" y1="6" x2="6" y2="18" />
-                                    <line x1="6" y1="6" x2="18" y2="18" />
-                                </svg>
+                                <CloseIcon size={14} />
                             </button>}
                             {!dm.isGroup && dm.isFriend === false && <button
                                 onClick={(e) => {
@@ -243,11 +227,9 @@ export default function DmSidebar() {
                                 }}
                                 className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-[#949ba4] hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
                                 title="Delete conversation"
+                                aria-label="Delete conversation"
                             >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <line x1="18" y1="6" x2="6" y2="18" />
-                                    <line x1="6" y1="6" x2="18" y2="18" />
-                                </svg>
+                                <CloseIcon size={14} />
                             </button>}
                         </div>
                     );
@@ -260,7 +242,7 @@ export default function DmSidebar() {
             const isLast = leaveDm && leaveDm.members.length <= 1;
             return (
             <div className="modal-overlay" onClick={() => setLeaveConfirmId(null)}>
-                <div className="bg-[#313338] rounded-lg w-[400px] p-5" onClick={e => e.stopPropagation()}>
+                <div role="dialog" aria-modal="true" aria-label="Leave Group" className="bg-[#313338] rounded-lg w-full max-w-md mx-4 p-5" onClick={e => e.stopPropagation()}>
                     <h3 className="text-white text-lg font-semibold mb-2">Leave Group</h3>
                     <p className="text-[#949ba4] text-sm mb-5">
                         {isLast
@@ -291,7 +273,7 @@ export default function DmSidebar() {
 
         {deleteConfirmId && (
             <div className="modal-overlay" onClick={() => setDeleteConfirmId(null)}>
-                <div className="bg-[#313338] rounded-lg w-[400px] p-5" onClick={e => e.stopPropagation()}>
+                <div role="dialog" aria-modal="true" aria-label="Delete Conversation" className="bg-[#313338] rounded-lg w-full max-w-md mx-4 p-5" onClick={e => e.stopPropagation()}>
                     <h3 className="text-white text-lg font-semibold mb-2">Delete Conversation</h3>
                     <p className="text-[#949ba4] text-sm mb-5">
                         Are you sure you want to delete this conversation? All messages and attachments will be permanently removed for both users.

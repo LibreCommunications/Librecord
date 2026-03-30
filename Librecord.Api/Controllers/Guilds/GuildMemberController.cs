@@ -1,5 +1,6 @@
 using Librecord.Application.Guilds;
 using Librecord.Application.Permissions;
+using Librecord.Application.Realtime.Guild;
 using Librecord.Domain.Permissions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,15 +15,18 @@ public class GuildMemberController : AuthenticatedController
     private readonly IGuildService _guilds;
     private readonly IGuildMemberService _members;
     private readonly IPermissionService _permissions;
+    private readonly IGuildRealtimeNotifier _notifier;
 
     public GuildMemberController(
         IGuildService guilds,
         IGuildMemberService members,
-        IPermissionService permissions)
+        IPermissionService permissions,
+        IGuildRealtimeNotifier notifier)
     {
         _guilds = guilds;
         _members = members;
         _permissions = permissions;
+        _notifier = notifier;
     }
 
     [HttpGet("members")]
@@ -56,16 +60,34 @@ public class GuildMemberController : AuthenticatedController
 
         var guild = await _guilds.GetGuildAsync(guildId);
 
+        var isOwner = guild?.OwnerId == UserId;
+        var manageGuild = granted.Contains(GuildPermission.ManageGuild);
+
         return Ok(new
         {
-            isOwner = guild?.OwnerId == UserId,
-            manageGuild = granted.Contains(GuildPermission.ManageGuild),
+            isOwner,
+            manageGuild,
             manageChannels = granted.Contains(GuildPermission.ManageChannels),
             manageRoles = granted.Contains(GuildPermission.ManageRoles),
+            manageMessages = isOwner || manageGuild,
             kickMembers = granted.Contains(GuildPermission.KickMembers),
             banMembers = granted.Contains(GuildPermission.BanMembers),
             inviteMembers = granted.Contains(GuildPermission.InviteMembers),
         });
+    }
+
+    [HttpPost("leave")]
+    public async Task<IActionResult> Leave(Guid guildId)
+    {
+        var guild = await _guilds.GetGuildAsync(guildId);
+        if (guild == null) return NotFound();
+        if (guild.OwnerId == UserId)
+            return BadRequest("The guild owner cannot leave. Transfer ownership or delete the guild.");
+
+        var left = await _members.KickMemberAsync(guildId, UserId);
+        if (!left) return NotFound("You are not a member of this guild.");
+        await BroadcastMemberRemoved(guildId, UserId, "leave");
+        return Ok();
     }
 
     [HttpPost("kick/{userId:guid}")]
@@ -78,7 +100,9 @@ public class GuildMemberController : AuthenticatedController
             return BadRequest("Cannot kick yourself.");
 
         var kicked = await _members.KickMemberAsync(guildId, userId);
-        return kicked ? Ok() : NotFound("Member not found.");
+        if (!kicked) return NotFound("Member not found.");
+        await BroadcastMemberRemoved(guildId, userId, "kick");
+        return Ok();
     }
 
     [HttpPost("bans/{userId:guid}")]
@@ -91,7 +115,22 @@ public class GuildMemberController : AuthenticatedController
             return BadRequest("Cannot ban yourself.");
 
         await _members.BanMemberAsync(guildId, userId, UserId, request?.Reason);
+        await BroadcastMemberRemoved(guildId, userId, "ban", request?.Reason);
         return Ok();
+    }
+
+    private async Task BroadcastMemberRemoved(Guid guildId, Guid userId, string action, string? reason = null)
+    {
+        var guild = await _guilds.GetGuildAsync(guildId);
+        var channelIds = guild?.Channels.Select(c => c.Id).ToList() ?? [];
+        await _notifier.NotifyMemberRemovedAsync(new GuildMemberRemoved
+        {
+            GuildId = guildId,
+            UserId = userId,
+            Action = action,
+            Reason = reason,
+            ChannelIds = channelIds,
+        });
     }
 
     [HttpDelete("bans/{userId:guid}")]

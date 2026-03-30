@@ -33,7 +33,7 @@ export default function RegisterPage() {
 
     return (
         <div className="h-screen w-full flex items-center justify-center bg-[#5865F2]">
-            <div className="w-[480px] bg-[#313338] p-8 rounded-2xl shadow-2xl animate-[scaleIn_0.2s_ease-out]">
+            <div className="w-[480px] bg-[#313338] p-8 rounded-2xl shadow-2xl animate-[scaleIn_0.2s_ease-out]" data-testid="register-form">
                 <h1 className="text-2xl font-bold text-white mb-1 text-center">
                     Create an account
                 </h1>
@@ -57,6 +57,7 @@ export default function RegisterPage() {
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
+                        data-testid="register-email"
                         className="input-field mt-2"
                     />
                 </label>
@@ -73,6 +74,7 @@ export default function RegisterPage() {
                         maxLength={32}
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
+                        data-testid="register-username"
                         className="input-field mt-2"
                     />
                 </label>
@@ -85,6 +87,7 @@ export default function RegisterPage() {
                         type="text"
                         value={displayName}
                         onChange={(e) => setDisplayName(e.target.value)}
+                        data-testid="register-display-name"
                         className="input-field mt-2"
                     />
                 </label>
@@ -101,6 +104,7 @@ export default function RegisterPage() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && handleRegister()}
+                        data-testid="register-password"
                         className="input-field mt-2"
                     />
                 </label>
@@ -108,7 +112,8 @@ export default function RegisterPage() {
                 <button
                     onClick={handleRegister}
                     disabled={loading}
-                    className="w-full py-2.5 rounded-[4px] font-semibold text-white bg-[#5865F2] hover:bg-[#4752C4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                    data-testid="register-submit"
+                    className="w-full py-2.5 rounded-[4px] font-semibold text-white bg-[#5865F2] hover:bg-[#4752c4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                 >
                     {loading && <Spinner size="sm" />}
                     {loading ? "Creating account..." : "Continue"}

@@ -81,7 +81,8 @@ public sealed class GuildChannelMessagesController(
             channelId,
             UserId,
             dto.Content.Trim(),
-            dto.ClientMessageId);
+            dto.ClientMessageId,
+            replyToMessageId: dto.ReplyToMessageId);
 
         return Ok(MessageDto.From(message));
     }
@@ -127,6 +128,15 @@ public sealed class GuildChannelMessagesController(
             var message = await guildChannelMessages.GetMessageAsync(messageId);
             if (message?.GuildContext?.ChannelId != channelId)
                 return NotFound();
+
+            // Author can always delete their own messages.
+            // Others need ManageMessages permission.
+            if (message.UserId != UserId)
+            {
+                var perm = await permissions.HasChannelPermissionAsync(
+                    UserId, channelId, ChannelPermission.ManageMessages);
+                if (!perm.Allowed) return Forbid();
+            }
 
             await guildChannelMessages.DeleteMessageAsync(messageId);
             return Ok();

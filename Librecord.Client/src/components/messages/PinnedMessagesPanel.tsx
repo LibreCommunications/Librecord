@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePins, type PinnedMessage } from "../../hooks/usePins";
+import { onCustomEvent } from "../../lib/typedEvent";
 
 interface Props {
     channelId: string;
@@ -32,17 +33,16 @@ export function PinnedMessagesPanel({ channelId, onClose }: Props) {
     }, [getPins, channelId]);
 
     useEffect(() => {
-        const onPinChanged = (e: CustomEvent<{ channelId: string; messageId: string }>) => {
-            if (e.detail.channelId !== channelId) return;
+        const handler = (detail: { channelId: string; messageId: string }) => {
+            if (detail.channelId !== channelId) return;
             loadPins();
         };
 
-        window.addEventListener("channel:message:pinned", onPinChanged as EventListener);
-        window.addEventListener("channel:message:unpinned", onPinChanged as EventListener);
-        return () => {
-            window.removeEventListener("channel:message:pinned", onPinChanged as EventListener);
-            window.removeEventListener("channel:message:unpinned", onPinChanged as EventListener);
-        };
+        const cleanups = [
+            onCustomEvent<{ channelId: string; messageId: string }>("channel:message:pinned", handler),
+            onCustomEvent<{ channelId: string; messageId: string }>("channel:message:unpinned", handler),
+        ];
+        return () => cleanups.forEach(fn => fn());
     }, [channelId, loadPins]);
 
     async function handleUnpin(messageId: string) {
@@ -52,7 +52,7 @@ export function PinnedMessagesPanel({ channelId, onClose }: Props) {
     }
 
     return (
-        <div className="w-80 bg-[#2b2d31] border-l border-black/20 flex flex-col">
+        <div className="w-72 shrink-0 bg-[#2b2d31] border-l border-black/20 flex flex-col">
             <div className="h-12 flex items-center justify-between px-4 border-b border-black/20">
                 <span className="font-semibold text-sm">Pinned Messages</span>
                 <button onClick={onClose} className="text-gray-400 hover:text-white text-lg">x</button>

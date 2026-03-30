@@ -120,6 +120,7 @@ public class ChannelController : AuthenticatedController
             Type = (GuildChannelType)dto.Type,
             Position = dto.Position,
             Topic = dto.Topic,
+            ParentId = dto.ParentId,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -139,7 +140,8 @@ public class ChannelController : AuthenticatedController
                     guildId,
                     name = channel.Name,
                     type = (int)channel.Type,
-                    position = channel.Position
+                    position = channel.Position,
+                    parentId = channel.ParentId
                 });
         }
 
@@ -169,9 +171,24 @@ public class ChannelController : AuthenticatedController
         if (!string.IsNullOrWhiteSpace(dto.Name))
             channel.Name = dto.Name.Trim();
 
-        channel.Topic = dto.Topic;
+        // Only update topic when name is also provided (edit modal sends both)
+        // Drag-move only sends parentId, so topic stays untouched
+        if (dto.Name != null)
+            channel.Topic = dto.Topic;
+
+        channel.ParentId = dto.ParentId;
 
         await _channels.UpdateChannelAsync(channel);
+
+        // Broadcast to all guild members
+        var guildChannels = await _channels.GetGuildChannelsAsync(channel.GuildId);
+        foreach (var ch in guildChannels)
+        {
+            await _hub.Clients.Group(AppHub.GuildGroup(ch.Id)).SendAsync(
+                "guild:channel:updated",
+                new { channelId = channel.Id, guildId = channel.GuildId, name = channel.Name, topic = channel.Topic, parentId = channel.ParentId });
+        }
+
         return Ok(channel);
     }
 
@@ -193,7 +210,20 @@ public class ChannelController : AuthenticatedController
                 new { error = access.Error }
             );
 
+        var guildId = channel.GuildId;
+        var guildChannels = await _channels.GetGuildChannelsAsync(guildId);
+
         await _channels.DeleteChannelAsync(channelId);
+
+        // Broadcast to all guild members via remaining channels
+        foreach (var ch in guildChannels)
+        {
+            if (ch.Id == channelId) continue;
+            await _hub.Clients.Group(AppHub.GuildGroup(ch.Id)).SendAsync(
+                "guild:channel:deleted",
+                new { channelId, guildId });
+        }
+
         return Ok();
     }
 }

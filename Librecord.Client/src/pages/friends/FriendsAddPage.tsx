@@ -93,7 +93,7 @@ export default function FriendsAddPage() {
                 <button
                     onClick={handleAddFriend}
                     disabled={loading || !username.trim()}
-                    className="h-11 px-5 rounded-[4px] bg-[#5865F2] hover:bg-[#4752C4] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors flex items-center gap-2"
+                    className="h-11 px-5 rounded-[4px] bg-[#5865F2] hover:bg-[#4752c4] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors flex items-center gap-2"
                 >
                     {loading && <Spinner size="sm" />}
                     Send Friend Request

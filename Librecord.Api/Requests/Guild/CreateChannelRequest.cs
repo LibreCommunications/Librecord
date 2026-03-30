@@ -12,4 +12,6 @@ public class CreateChannelRequest
 
     [MaxLength(1024)]
     public string? Topic { get; set; }
+
+    public Guid? ParentId { get; set; }
 }

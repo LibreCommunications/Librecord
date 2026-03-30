@@ -14,5 +14,7 @@ public sealed class GuildRealtimeMessageCreatedTransport
 
     public string? ClientMessageId { get; init; }
 
+    public ReplySnapshot? ReplyTo { get; init; }
+
     public IReadOnlyList<MessageAttachmentSnapshot> Attachments { get; init; } = [];
 }

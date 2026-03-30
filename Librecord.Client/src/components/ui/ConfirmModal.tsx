@@ -36,7 +36,7 @@ export function ConfirmModal({
     const confirmClass =
         confirmVariant === "danger"
             ? "bg-[#da373c] hover:bg-[#a12828]"
-            : "bg-[#5865F2] hover:bg-[#4752C4]";
+            : "bg-[#5865F2] hover:bg-[#4752c4]";
 
     return (
         <div
@@ -44,8 +44,12 @@ export function ConfirmModal({
             onClick={onCancel}
         >
             <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={title}
+                data-testid="confirm-modal"
                 onClick={e => e.stopPropagation()}
-                className="w-[440px] modal-card-animated"
+                className="w-full max-w-md mx-4 modal-card-animated"
             >
                 <div className="p-4">
                     <h2 className="text-xl font-semibold text-white mb-2">{title}</h2>
@@ -56,6 +60,7 @@ export function ConfirmModal({
                     <button
                         onClick={onCancel}
                         disabled={loading}
+                        data-testid="cancel-btn"
                         className="px-4 py-2 text-sm text-white hover:underline"
                     >
                         Cancel

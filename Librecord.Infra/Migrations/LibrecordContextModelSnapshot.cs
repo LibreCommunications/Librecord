@@ -345,6 +345,14 @@ namespace Librecord.Infra.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
+                    b.Property<string>("BannerUrl")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("Bio")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("text");
@@ -362,6 +370,9 @@ namespace Librecord.Infra.Migrations
                         .HasColumnType("character varying(256)");
 
                     b.Property<bool>("EmailConfirmed")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("FriendsVisible")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("LockoutEnabled")
@@ -514,12 +525,17 @@ namespace Librecord.Infra.Migrations
                     b.Property<DateTime?>("EditedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("ReplyToMessageId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedAt");
+
+                    b.HasIndex("ReplyToMessageId");
 
                     b.HasIndex("UserId");
 
@@ -1289,11 +1305,18 @@ namespace Librecord.Infra.Migrations
 
             modelBuilder.Entity("Librecord.Domain.Messaging.Common.Message", b =>
                 {
+                    b.HasOne("Librecord.Domain.Messaging.Common.Message", "ReplyToMessage")
+                        .WithMany()
+                        .HasForeignKey("ReplyToMessageId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Librecord.Domain.Identity.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("ReplyToMessage");
 
                     b.Navigation("User");
                 });

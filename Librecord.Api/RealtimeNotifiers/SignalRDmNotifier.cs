@@ -54,7 +54,8 @@ public sealed class SignalRDmRealtimeNotifier : IDmRealtimeNotifier
                                 .Select(MessageEditDto.From)
                                 .ToList(),
 
-                            ClientMessageId = created.ClientMessageId
+                            ClientMessageId = created.ClientMessageId,
+                            ReplyTo = created.ReplyTo
                         })
                 ),
 

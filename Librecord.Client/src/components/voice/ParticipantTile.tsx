@@ -3,6 +3,7 @@ import { Track } from "livekit-client";
 import { useTrackBySource } from "../../voice/useTrackBySource";
 import type { VoiceParticipant } from "../../voice/voiceStore";
 import { MicOffIcon, HeadphonesOffIcon, CameraIcon, ScreenShareIcon } from "./VoiceIcons";
+import { VolumePopup } from "./VolumePopup";
 
 interface Props {
     participant: VoiceParticipant;
@@ -10,9 +11,13 @@ interface Props {
     getAvatarUrl: (avatarUrl: string | null) => string;
     /** Compact mode for the screen-share sidebar strip */
     compact?: boolean;
+    /** Whether this is the local user */
+    isSelf?: boolean;
+    /** Fill parent instead of using aspect-video (for constrained containers) */
+    fill?: boolean;
 }
 
-export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact }: Props) {
+export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact, isSelf, fill }: Props) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [imgError, setImgError] = useState(false);
 
@@ -39,17 +44,28 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
     const avatarSrc = getAvatarUrl(participant.avatarUrl);
     const avatarSize = compact ? 36 : 72;
 
+    const openProfile = () => window.dispatchEvent(new CustomEvent("user:profile:open", { detail: { userId: participant.userId } }));
+    const [volumePopup, setVolumePopup] = useState<{ x: number; y: number } | null>(null);
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+        if (isSelf) return;
+        e.preventDefault();
+        setVolumePopup({ x: e.clientX, y: e.clientY });
+    };
+
     if (compact) {
-        return (
+        return (<>
             <div
+                onClick={openProfile}
+                onContextMenu={handleContextMenu}
                 className={`
-                    relative rounded-lg overflow-hidden
+                    relative rounded-lg overflow-hidden cursor-pointer
                     bg-[#232428] transition-shadow duration-200
                     ${isSpeaking ? "shadow-[0_0_0_2px_#23a55a]" : "shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"}
                 `}
             >
                 {showVideo ? (
-                    <div className="aspect-video relative">
+                    <div className={`aspect-video ${fill ? "max-h-full min-h-16" : ""} relative`}>
                         <video
                             ref={videoRef}
                             autoPlay
@@ -108,14 +124,19 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
                     </div>
                 )}
             </div>
-        );
+            {volumePopup && (
+                <VolumePopup userId={participant.userId} displayName={participant.displayName} x={volumePopup.x} y={volumePopup.y} onClose={() => setVolumePopup(null)} />
+            )}
+        </>);
     }
 
-    return (
+    return (<>
         <div
+            onClick={openProfile}
+            onContextMenu={handleContextMenu}
             className={`
-                relative rounded-xl overflow-hidden
-                flex items-center justify-center aspect-video
+                relative rounded-xl overflow-hidden cursor-pointer
+                flex items-center justify-center aspect-video ${fill ? "max-h-full min-h-16" : ""}
                 bg-[#2b2d31] transition-shadow duration-200
                 ${isSpeaking ? "shadow-[0_0_0_3px_#23a55a,0_0_12px_rgba(35,165,90,0.3)]" : "shadow-[0_0_0_1px_rgba(255,255,255,0.04)]"}
             `}
@@ -129,15 +150,15 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
             />
 
             {!showVideo && (
-                <div className="flex flex-col items-center gap-3">
+                <div className="flex flex-col items-center gap-2 overflow-hidden p-2">
                     {imgError ? (
                         <div className={`
-                            w-[72px] h-[72px] rounded-full bg-[#5865f2]
-                            flex items-center justify-center text-2xl text-white font-semibold
+                            w-1/4 max-w-[72px] min-w-[32px] aspect-square rounded-full bg-[#5865f2]
+                            flex items-center justify-center text-white font-semibold shrink-0
                             transition-shadow duration-200
                             ${isSpeaking ? "shadow-[0_0_0_3px_#2b2d31,0_0_0_5px_#23a55a]" : ""}
                         `}>
-                            {participant.displayName[0]?.toUpperCase()}
+                            <span className="text-[clamp(0.75rem,3cqw,1.5rem)]">{participant.displayName[0]?.toUpperCase()}</span>
                         </div>
                     ) : (
                         <img
@@ -145,13 +166,13 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
                             alt={participant.displayName}
                             onError={() => setImgError(true)}
                             className={`
-                                w-[72px] h-[72px] rounded-full object-cover
+                                w-1/4 max-w-[72px] min-w-[32px] aspect-square rounded-full object-cover shrink-0
                                 transition-shadow duration-200
                                 ${isSpeaking ? "shadow-[0_0_0_3px_#2b2d31,0_0_0_5px_#23a55a]" : ""}
                             `}
                         />
                     )}
-                    <span className="text-sm text-[#b5bac1] font-medium truncate max-w-[80%]">
+                    <span className="text-sm text-[#b5bac1] font-medium truncate max-w-full">
                         {participant.displayName}
                     </span>
                 </div>
@@ -188,5 +209,8 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
                 )}
             </div>
         </div>
-    );
+        {volumePopup && (
+            <VolumePopup userId={participant.userId} displayName={participant.displayName} x={volumePopup.x} y={volumePopup.y} onClose={() => setVolumePopup(null)} />
+        )}
+    </>);
 }

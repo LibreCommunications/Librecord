@@ -134,6 +134,39 @@ export interface AppEventMap {
         name: string;
         type: number;
         position: number;
+        parentId?: string | null;
+    };
+
+    "guild:member:roles": {
+        guildId: string;
+        userId: string;
+        roles: { id: string; name: string }[];
+    };
+
+    "guild:member:removed": {
+        guildId: string;
+        userId: string;
+        action: "kick" | "ban" | "leave";
+        reason?: string | null;
+    };
+
+    "guild:channel:updated": {
+        channelId: string;
+        guildId: string;
+        name: string;
+        topic?: string | null;
+        parentId?: string | null;
+    };
+
+    "guild:channel:deleted": {
+        channelId: string;
+        guildId: string;
+    };
+
+    "guild:updated": {
+        guildId: string;
+        name?: string;
+        iconUrl?: string | null;
     };
 
     "guild:deleted": {

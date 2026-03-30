@@ -10,6 +10,9 @@ public class User : IdentityUser<Guid>
     public required string DisplayName { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string? AvatarUrl { get; set; }
+    public string? Bio { get; set; }
+    public string? BannerUrl { get; set; }
+    public bool FriendsVisible { get; set; } = true;
 
     public List<GuildMember> GuildMemberships { get; set; } = [];
     public List<GuildChannelMember> ChannelMemberships { get; set; } = [];

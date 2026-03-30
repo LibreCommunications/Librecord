@@ -1,5 +1,6 @@
 using Librecord.Domain.Messaging.Common;
 using Librecord.Domain.Storage;
+using SixLabors.ImageSharp;
 
 namespace Librecord.Application.Messaging;
 
@@ -26,6 +27,19 @@ public class AttachmentService : IAttachmentService
             var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
             var objectName = $"attachments/{messageId}/{Guid.NewGuid()}{ext}";
 
+            // Extract image dimensions before upload (IdentifyAsync only reads headers)
+            int? width = null, height = null;
+            if (file.ContentType.StartsWith("image/"))
+            {
+                try
+                {
+                    var info = await Image.IdentifyAsync(file.Stream);
+                    if (info != null) { width = info.Width; height = info.Height; }
+                    file.Stream.Position = 0;
+                }
+                catch { if (file.Stream.CanSeek) file.Stream.Position = 0; }
+            }
+
             await _storage.UploadAsync(objectName, file.Stream, file.ContentType);
 
             var attachment = new MessageAttachment
@@ -37,6 +51,8 @@ public class AttachmentService : IAttachmentService
                 Size = file.Size,
                 ContentType = file.ContentType,
                 FileExtension = ext,
+                Width = width,
+                Height = height,
                 CreatedAt = DateTime.UtcNow
             };
 

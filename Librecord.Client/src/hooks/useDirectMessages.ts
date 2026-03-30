@@ -10,8 +10,8 @@ export function useDirectMessages() {
     );
 
     const sendMessage = useCallback(
-        (channelId: string, content: string, clientMessageId: string): Promise<void> =>
-            dmMessages.send(channelId, content, clientMessageId),
+        (channelId: string, content: string, clientMessageId: string, replyToMessageId?: string): Promise<void> =>
+            dmMessages.send(channelId, content, clientMessageId, replyToMessageId),
         [],
     );
 

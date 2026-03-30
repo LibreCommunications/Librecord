@@ -41,6 +41,7 @@ public sealed class SignalRGuildRealtimeNotifier : IGuildRealtimeNotifier
                             CreatedAt = created.CreatedAt,
                             Author = created.Author,
                             ClientMessageId = created.ClientMessageId,
+                            ReplyTo = created.ReplyTo,
                             Attachments = created.Attachments
                         })
                 ),
@@ -67,6 +68,33 @@ public sealed class SignalRGuildRealtimeNotifier : IGuildRealtimeNotifier
 
             _ => Task.CompletedTask
         };
+    }
+
+    public Task NotifyMemberRemovedAsync(GuildMemberRemoved evt)
+    {
+        var tasks = evt.ChannelIds.Select(channelId =>
+            _hub.Clients.Group(AppHub.GuildGroup(channelId))
+                .SendAsync("guild:member:removed", new
+                {
+                    guildId = evt.GuildId,
+                    userId = evt.UserId,
+                    action = evt.Action,
+                    reason = evt.Reason,
+                }));
+        return Task.WhenAll(tasks);
+    }
+
+    public Task NotifyGuildUpdatedAsync(GuildUpdated evt)
+    {
+        var tasks = evt.ChannelIds.Select(channelId =>
+            _hub.Clients.Group(AppHub.GuildGroup(channelId))
+                .SendAsync("guild:updated", new
+                {
+                    guildId = evt.GuildId,
+                    name = evt.Name,
+                    iconUrl = evt.IconUrl,
+                }));
+        return Task.WhenAll(tasks);
     }
 
     public Task NotifyGuildDeletedAsync(GuildDeleted evt)

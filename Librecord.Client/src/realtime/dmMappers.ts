@@ -16,6 +16,7 @@ export function mapDmRealtimeToMessage(
         editedAt: null,
 
         author: msg.author,
+        replyTo: msg.replyTo ?? null,
 
         attachments: msg.attachments ?? [],
         reactions: msg.reactions ?? [],

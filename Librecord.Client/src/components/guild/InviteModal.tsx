@@ -38,7 +38,7 @@ export function InviteModal({ guildId, onClose }: Props) {
 
     return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 animate-[fadeIn_0.15s_ease-out]" onClick={onClose}>
-            <div className="bg-[#313338] rounded-lg p-6 w-[440px] shadow-xl animate-[scaleIn_0.15s_ease-out]" onClick={e => e.stopPropagation()}>
+            <div role="dialog" aria-modal="true" aria-label="Invite People" data-testid="invite-modal" className="bg-[#313338] rounded-lg p-6 w-full max-w-md mx-4 shadow-xl animate-[scaleIn_0.15s_ease-out]" onClick={e => e.stopPropagation()}>
                 <h2 className="text-xl font-bold text-white mb-4">
                     Invite People
                 </h2>
@@ -60,10 +60,13 @@ export function InviteModal({ guildId, onClose }: Props) {
                             <input
                                 readOnly
                                 value={inviteCode}
+                                aria-label="Invite code"
+                                data-testid="invite-code"
                                 className="flex-1 px-3 py-2 rounded bg-[#1e1f22] text-white font-mono text-lg"
                             />
                             <button
                                 onClick={handleCopy}
+                                data-testid="copy-invite-btn"
                                 className="px-4 py-2 rounded bg-[#5865F2] text-white font-medium hover:bg-[#4752c4]"
                             >
                                 {copied ? "Copied!" : "Copy"}
