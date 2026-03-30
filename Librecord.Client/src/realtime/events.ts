@@ -225,4 +225,18 @@ export interface AppEventMap {
         userId: string;
         emoji: string;
     };
+
+    "guild:thread:message:new": {
+        channelId: string;
+        threadId: string;
+        messageId: string;
+        content: string;
+        createdAt: string;
+        author: {
+            id: string;
+            username: string;
+            displayName: string;
+            avatarUrl: string | null;
+        };
+    };
 }

@@ -24,6 +24,8 @@ export function MessageList({
     pinnedMessageIds,
     canManageMessages,
     onReply,
+    onStartThread,
+    onOpenThread,
     onAddReaction,
     onRemoveReaction,
     getAvatarUrl,
@@ -175,6 +177,8 @@ export function MessageList({
                         onCancelEdit={handleCancelEdit}
                         onDelete={handleDelete}
                         onPin={onPinMessage}
+                        onStartThread={onStartThread}
+                        onOpenThread={onOpenThread}
                         isPinned={pinnedMessageIds?.has(msg.id)}
                         onAddReaction={onAddReaction}
                         onRemoveReaction={onRemoveReaction}
@@ -188,7 +192,7 @@ export function MessageList({
             firstItemIndex, messages, currentUserId, dateSepIndices,
             editingId, menuOpenId, pinnedMessageIds, canManageMessages,
             handleToggleMenu, handleStartEdit, handleCancelEdit, handleDelete,
-            handleScrollToReply, onPinMessage, onReply,
+            handleScrollToReply, onPinMessage, onStartThread, onOpenThread, onReply,
             onAddReaction, onRemoveReaction, editMessage, getAvatarUrl,
         ],
     );

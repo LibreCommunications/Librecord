@@ -52,6 +52,16 @@ public sealed class GuildUpdated
     public IReadOnlyList<Guid> ChannelIds { get; init; } = [];
 }
 
+public sealed class ThreadMessageCreated
+{
+    public Guid ChannelId { get; init; }
+    public Guid ThreadId { get; init; }
+    public Guid MessageId { get; init; }
+    public string Content { get; init; } = null!;
+    public DateTime CreatedAt { get; init; }
+    public GuildAuthorSnapshot Author { get; init; } = null!;
+}
+
 // Uses ChannelId to target broadcast groups
 public sealed class GuildDeleted
 {

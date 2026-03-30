@@ -106,4 +106,24 @@ public sealed class SignalRGuildRealtimeNotifier : IGuildRealtimeNotifier
 
         return Task.WhenAll(tasks);
     }
+
+    public Task NotifyThreadMessageCreatedAsync(ThreadMessageCreated evt)
+    {
+        var group = AppHub.GuildGroup(evt.ChannelId);
+        return _hub.Clients.Group(group).SendAsync("guild:thread:message:new", new
+        {
+            channelId = evt.ChannelId,
+            threadId = evt.ThreadId,
+            messageId = evt.MessageId,
+            content = evt.Content,
+            createdAt = evt.CreatedAt,
+            author = new
+            {
+                id = evt.Author.Id,
+                username = evt.Author.Username,
+                displayName = evt.Author.DisplayName,
+                avatarUrl = evt.Author.AvatarUrl,
+            }
+        });
+    }
 }

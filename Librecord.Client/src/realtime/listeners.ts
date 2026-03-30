@@ -66,6 +66,7 @@ export function registerListeners() {
     appConnection.off("channel:message:unpinned");
     appConnection.off("channel:reaction:added");
     appConnection.off("channel:reaction:removed");
+    appConnection.off("guild:thread:message:new");
 
     appConnection.on(
         "dm:message:ping",
@@ -376,6 +377,13 @@ export function registerListeners() {
         "channel:reaction:removed",
         (payload: AppEventMap["channel:reaction:removed"]) => {
             dispatchAppEvent("channel:reaction:removed", payload);
+        }
+    );
+
+    appConnection.on(
+        "guild:thread:message:new",
+        (payload: AppEventMap["guild:thread:message:new"]) => {
+            dispatchAppEvent("guild:thread:message:new", payload);
         }
     );
 }

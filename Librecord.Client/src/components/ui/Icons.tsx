@@ -60,6 +60,10 @@ export function ReplyIcon({ size, className }: IconProps) {
     return <Icon size={size} className={className}><polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" /></Icon>;
 }
 
+export function ThreadIcon({ size, className }: IconProps) {
+    return <Icon size={size} className={className}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><line x1="10" y1="9" x2="8" y2="9" /></Icon>;
+}
+
 export function MoreIcon({ size, className }: IconProps) {
     return <Icon size={size} className={className} fill><circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" /></Icon>;
 }

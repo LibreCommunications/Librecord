@@ -19,6 +19,10 @@ export interface Message {
     attachments: MessageAttachment[];
     reactions: MessageReaction[];
     edits: MessageEdit[];
+
+    threadId?: string | null;
+    threadName?: string | null;
+    threadMessageCount?: number;
 }
 
 export interface TransportMessage {

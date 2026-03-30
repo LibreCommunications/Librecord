@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { EmojiIcon, PinIcon } from "../../components/ui/Icons";
+import { EmojiIcon, PinIcon, ThreadIcon } from "../../components/ui/Icons";
 
 const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "🎉", "👀"];
 
@@ -8,12 +8,14 @@ export function MessageMenu({
                                 anchorRef,
                                 onAddReaction,
                                 onPin,
+                                onStartThread,
                                 onClose,
                                 isPinned = false,
                             }: {
     anchorRef: React.RefObject<HTMLElement | null>;
     onAddReaction?: (emoji: string) => void;
     onPin?: () => void;
+    onStartThread?: () => void;
     onClose: () => void;
     isPinned?: boolean;
 }) {
@@ -101,6 +103,17 @@ export function MessageMenu({
                     >
                         <PinIcon size={18} />
                         {isPinned ? "Unpin Message" : "Pin Message"}
+                    </button>
+                )}
+                {onStartThread && (
+                    <button
+                        role="menuitem"
+                        onClick={onStartThread}
+                        data-testid="start-thread-btn"
+                        className="w-full text-left px-3 py-2 text-sm text-[#dbdee1] hover:bg-[#4752c4] hover:text-white flex items-center gap-2.5 rounded-[3px] mx-1 transition-colors"
+                    >
+                        <ThreadIcon size={18} />
+                        Start Thread
                     </button>
                 )}
             </div>

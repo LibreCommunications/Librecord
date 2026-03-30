@@ -14,11 +14,13 @@ interface ChatViewProps {
     getAvatarUrl: (avatarUrl?: string | null) => string;
     inputPlaceholder: string;
     canManageMessages?: boolean;
+    onStartThread?: (messageId: string) => void;
+    onOpenThread?: (messageId: string) => void;
 }
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
-export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, canManageMessages }: ChatViewProps) {
+export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, canManageMessages, onStartThread, onOpenThread }: ChatViewProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const { toast } = useToast();
     const [dragging, setDragging] = useState(false);
@@ -79,6 +81,8 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, 
                 onPinMessage={chat.handlePin}
                 pinnedMessageIds={chat.pinnedIds}
                 canManageMessages={canManageMessages}
+                onStartThread={onStartThread}
+                onOpenThread={onOpenThread}
                 onReply={(msgId) => {
                     const msg = chat.messages.find(m => m.id === msgId);
                     if (msg) chat.setReplyingTo(msg);

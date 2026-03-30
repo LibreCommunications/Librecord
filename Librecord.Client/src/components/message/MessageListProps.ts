@@ -24,6 +24,8 @@ export interface MessageListProps {
 
     onPinMessage?: (messageId: string) => void;
     pinnedMessageIds?: Set<string>;
+    onStartThread?: (messageId: string) => void;
+    onOpenThread?: (messageId: string) => void;
 
     canManageMessages?: boolean;
     onReply: (messageId: string) => void;

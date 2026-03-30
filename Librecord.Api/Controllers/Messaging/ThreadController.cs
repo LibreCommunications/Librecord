@@ -1,4 +1,5 @@
 using Librecord.Application.Messaging;
+using Librecord.Application.Realtime.Guild;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,10 +11,12 @@ namespace Librecord.Api.Controllers.Messaging;
 public class ThreadController : AuthenticatedController
 {
     private readonly IThreadService _threads;
+    private readonly IGuildRealtimeNotifier _notifier;
 
-    public ThreadController(IThreadService threads)
+    public ThreadController(IThreadService threads, IGuildRealtimeNotifier notifier)
     {
         _threads = threads;
+        _notifier = notifier;
     }
 
     [HttpPost]
@@ -99,6 +102,22 @@ public class ThreadController : AuthenticatedController
 
         var result = await _threads.PostMessageAsync(threadId, channelId, UserId, request.Content);
         if (result == null) return NotFound();
+
+        await _notifier.NotifyThreadMessageCreatedAsync(new ThreadMessageCreated
+        {
+            ChannelId = channelId,
+            ThreadId = threadId,
+            MessageId = result.MessageId,
+            Content = result.Content,
+            CreatedAt = result.CreatedAt,
+            Author = new GuildAuthorSnapshot
+            {
+                Id = result.Author.Id,
+                Username = result.Author.Username,
+                DisplayName = result.Author.DisplayName,
+                AvatarUrl = result.Author.AvatarUrl,
+            }
+        });
 
         return Ok(new
         {
