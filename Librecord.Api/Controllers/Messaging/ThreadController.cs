@@ -113,7 +113,7 @@ public class ThreadController : AuthenticatedController
             Author = new GuildAuthorSnapshot
             {
                 Id = result.Author.Id,
-                Username = result.Author.Username,
+                Username = result.Author.Username ?? "",
                 DisplayName = result.Author.DisplayName,
                 AvatarUrl = result.Author.AvatarUrl,
             }

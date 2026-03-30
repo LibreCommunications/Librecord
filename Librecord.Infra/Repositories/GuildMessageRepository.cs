@@ -71,7 +71,7 @@ public sealed class GuildMessageRepository : IGuildMessageRepository
 
     public async Task AddMessageAsync(Message message, Guid channelId)
     {
-        var encrypted = _encryption.Encrypt(message.ContentText);
+        var encrypted = _encryption.Encrypt(message.ContentText ?? "");
 
         message.Content = encrypted.Ciphertext;
 

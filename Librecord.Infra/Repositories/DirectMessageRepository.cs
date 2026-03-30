@@ -68,7 +68,7 @@ public sealed class DirectMessageRepository : IDirectMessageRepository
 
     public async Task AddMessageAsync(Message message, Guid channelId)
     {
-        var encrypted = _encryption.Encrypt(message.ContentText);
+        var encrypted = _encryption.Encrypt(message.ContentText ?? "");
 
         message.Content = encrypted.Ciphertext;
 
@@ -87,7 +87,7 @@ public sealed class DirectMessageRepository : IDirectMessageRepository
     {
         if (message.ContentText != null)
         {
-            var encrypted = _encryption.Encrypt(message.ContentText);
+            var encrypted = _encryption.Encrypt(message.ContentText ?? "");
 
             message.Content = encrypted.Ciphertext;
             message.EditedAt = DateTime.UtcNow;
