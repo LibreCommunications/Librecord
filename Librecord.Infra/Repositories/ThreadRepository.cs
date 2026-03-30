@@ -1,4 +1,5 @@
 using Librecord.Domain.Messaging.Common;
+using Librecord.Domain.Security;
 using Librecord.Infra.Database;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,8 +8,13 @@ namespace Librecord.Infra.Repositories;
 public class ThreadRepository : IThreadRepository
 {
     private readonly LibrecordContext _db;
+    private readonly IMessageEncryptionService _encryption;
 
-    public ThreadRepository(LibrecordContext db) => _db = db;
+    public ThreadRepository(LibrecordContext db, IMessageEncryptionService encryption)
+    {
+        _db = db;
+        _encryption = encryption;
+    }
 
     public Task<MessageThread?> GetThreadAsync(Guid threadId)
         => _db.Set<MessageThread>().FindAsync(threadId).AsTask();
@@ -31,7 +37,20 @@ public class ThreadRepository : IThreadRepository
         if (beforeDate.HasValue)
             query = query.Where(tm => tm.Message.CreatedAt < beforeDate.Value);
 
-        return await query.Take(limit).ToListAsync();
+        var results = await query.Take(limit).ToListAsync();
+
+        foreach (var tm in results)
+        {
+            if (tm.EncryptionSalt.Length > 0)
+            {
+                tm.Message.ContentText = _encryption.Decrypt(
+                    tm.Message.Content,
+                    tm.EncryptionSalt,
+                    tm.EncryptionAlgorithm);
+            }
+        }
+
+        return results;
     }
 
     public Task AddThreadAsync(MessageThread thread)
