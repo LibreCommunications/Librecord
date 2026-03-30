@@ -3,7 +3,9 @@ import { Track } from "livekit-client";
 import { useTrackBySource } from "../../voice/useTrackBySource";
 import type { VoiceParticipant } from "../../voice/voiceStore";
 import { MicOffIcon, HeadphonesOffIcon, CameraIcon, ScreenShareIcon } from "./VoiceIcons";
+import { FullscreenIcon, ExitFullscreenIcon } from "../ui/Icons";
 import { VolumePopup } from "./VolumePopup";
+import { useFullscreen } from "./useFullscreen";
 
 interface Props {
     participant: VoiceParticipant;
@@ -19,6 +21,7 @@ interface Props {
 
 export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact, isSelf, fill }: Props) {
     const videoRef = useRef<HTMLVideoElement>(null);
+    const { containerRef, isFullscreen, toggleFullscreen } = useFullscreen();
     const [imgError, setImgError] = useState(false);
 
     const showVideo = participant.isCameraOn;
@@ -132,13 +135,16 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
 
     return (<>
         <div
+            ref={containerRef}
             onClick={openProfile}
+            onDoubleClick={e => { e.stopPropagation(); toggleFullscreen(); }}
             onContextMenu={handleContextMenu}
             className={`
-                relative rounded-xl cursor-pointer
-                flex items-center justify-center aspect-video ${fill ? "max-h-full min-h-16" : ""}
+                relative rounded-xl cursor-pointer group/tile
+                flex items-center justify-center ${isFullscreen ? "" : `aspect-video ${fill ? "max-h-full min-h-16" : ""}`}
                 bg-[#2b2d31] transition-all duration-200
                 ${isSpeaking ? "ring-[3px] ring-[#23a55a]" : "ring-1 ring-white/[0.04]"}
+                ${isFullscreen ? "!rounded-none" : ""}
             `}
         >
             <div className="absolute inset-0 rounded-xl overflow-hidden">
@@ -209,6 +215,13 @@ export function ParticipantTile({ participant, isSpeaking, getAvatarUrl, compact
                         <ScreenShareIcon size={12} />
                     </span>
                 )}
+                <button
+                    onClick={e => { e.stopPropagation(); toggleFullscreen(); }}
+                    title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                    className="p-1 rounded bg-black/50 backdrop-blur-sm text-white/60 hover:text-white opacity-0 group-hover/tile:opacity-100 transition-opacity"
+                >
+                    {isFullscreen ? <ExitFullscreenIcon size={12} /> : <FullscreenIcon size={12} />}
+                </button>
             </div>
         </div>
         {volumePopup && (

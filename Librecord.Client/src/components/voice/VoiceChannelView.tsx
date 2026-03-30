@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useVoice } from "../../hooks/useVoice";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { useAuth } from "../../hooks/useAuth";
@@ -22,7 +22,27 @@ export function VoiceChannelView({ channelId }: Props) {
     const [speakingMap, setSpeakingMap] = useState<Record<string, boolean>>({});
     const [previewParticipants, setPreviewParticipants] = useState<VoiceParticipant[]>([]);
 
-    const [focusedStreamId, setFocusedStreamId] = useState<string | null>(null);
+    // One tile maximized at a time (null = default grid view)
+    const [maximizedId, setMaximizedId] = useState<string | null>(null);
+    const [sidebarWidth, setSidebarWidth] = useState(224); // w-56 = 224px
+    const resizing = useRef(false);
+
+    const onResizeStart = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        resizing.current = true;
+        const onMove = (ev: MouseEvent) => {
+            if (!resizing.current) return;
+            const fromRight = window.innerWidth - ev.clientX;
+            setSidebarWidth(Math.max(160, Math.min(480, fromRight)));
+        };
+        const onUp = () => {
+            resizing.current = false;
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+        };
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onUp);
+    }, []);
     const [watchingStreams, setWatchingStreams] = useState<Set<string>>(() => _watchingStreams);
     const toggleWatch = useCallback((userId: string, watching: boolean) => {
         setWatchingStreams(() => {
@@ -87,119 +107,128 @@ export function VoiceChannelView({ channelId }: Props) {
         );
     }
 
-    // Reset focused stream if that user stopped sharing
-    if (focusedStreamId && !screenSharers.some(p => p.userId === focusedStreamId)) {
-        setFocusedStreamId(null);
-    }
+    // ── Build all tiles ────────────────────────────────────────
+    type Tile = { id: string; type: "screen" | "camera"; participant: VoiceParticipant };
+    const allTiles: Tile[] = [];
+    for (const p of screenSharers) allTiles.push({ id: `screen:${p.userId}`, type: "screen", participant: p });
+    for (const p of participants) allTiles.push({ id: `camera:${p.userId}`, type: "camera", participant: p });
 
-    // ── Screen share active ─────────────────────────────────
-    if (screenSharers.length > 0) {
-        const focused = focusedStreamId ? screenSharers.find(p => p.userId === focusedStreamId) : null;
-        const mainStreams = focused ? [focused] : screenSharers;
-        const sidebarStreams = focused ? screenSharers.filter(p => p.userId !== focusedStreamId) : [];
+    // Reset if maximized tile no longer exists
+    const maximizedTile = maximizedId ? allTiles.find(t => t.id === maximizedId) : null;
+    if (maximizedId && !maximizedTile) setMaximizedId(null);
+
+    // ── Maximized view: one tile in main area, rest in sidebar ──
+    if (maximizedTile) {
+        const sidebarTiles = allTiles.filter(t => t.id !== maximizedId);
 
         return (
             <div className="flex-1 flex bg-[#313338] overflow-hidden">
-                {/* Main area: focused stream or all streams stacked */}
-                <div className="flex-1 flex flex-col gap-2 p-3 min-w-0">
-                    {mainStreams.map(p => {
-                        const isSelf = p.userId === user?.userId;
-                        return (
-                            <div key={`screen-${p.userId}`} className="relative group/stream flex-1 min-h-0">
-                                <ScreenShareTile
-                                    participant={p}
-                                    isWatching={isSelf || watchingStreams.has(p.userId)}
-                                    onToggleWatch={(watching) => toggleWatch(p.userId, watching)}
-                                    isSelf={isSelf}
-                                />
-                                {/* Focus/unfocus button */}
-                                {!focused && screenSharers.length > 1 && (
-                                    <button
-                                        onClick={() => setFocusedStreamId(p.userId)}
-                                        className="absolute top-2 left-2 px-2 py-1 rounded bg-black/60 text-white text-xs font-medium opacity-0 group-hover/stream:opacity-100 transition-opacity z-10"
-                                    >
-                                        Maximize
-                                    </button>
-                                )}
-                                {focused && (
-                                    <button
-                                        onClick={() => setFocusedStreamId(null)}
-                                        className="absolute top-2 left-2 px-2 py-1 rounded bg-black/60 text-white text-xs font-medium opacity-0 group-hover/stream:opacity-100 transition-opacity z-10"
-                                    >
-                                        Minimize
-                                    </button>
-                                )}
-                            </div>
-                        );
-                    })}
+                <div className="flex-1 flex flex-col p-3 min-w-0">
+                    <div className="relative group/stream flex-1 min-h-0">
+                        {maximizedTile.type === "screen" ? (
+                            <ScreenShareTile
+                                participant={maximizedTile.participant}
+                                isWatching={maximizedTile.participant.userId === user?.userId || watchingStreams.has(maximizedTile.participant.userId)}
+                                onToggleWatch={(w) => toggleWatch(maximizedTile.participant.userId, w)}
+                                isSelf={maximizedTile.participant.userId === user?.userId}
+                            />
+                        ) : (
+                            <ParticipantTile
+                                participant={maximizedTile.participant}
+                                isSpeaking={speakingMap[maximizedTile.participant.userId] ?? false}
+                                getAvatarUrl={getAvatarUrl}
+                                isSelf={maximizedTile.participant.userId === user?.userId}
+                            />
+                        )}
+                        <button
+                            onClick={e => { e.stopPropagation(); setMaximizedId(null); }}
+                            className="absolute top-2 left-2 px-2 py-1 rounded bg-black/60 text-white text-xs font-medium opacity-0 group-hover/stream:opacity-100 transition-opacity z-20"
+                        >
+                            Minimize
+                        </button>
+                    </div>
                 </div>
 
-                {/* Right sidebar: other streams (if focused) + all participants */}
-                <div className="w-56 shrink-0 bg-[#2b2d31] border-l border-black/20 overflow-y-auto dark-scrollbar p-2 space-y-2">
-                    {sidebarStreams.map(p => {
-                        const isSelf = p.userId === user?.userId;
-                        return (
-                            <div
-                                key={`side-screen-${p.userId}`}
-                                className="cursor-pointer rounded-lg overflow-hidden"
-                                onClick={() => setFocusedStreamId(p.userId)}
+                {sidebarTiles.length > 0 && (<>
+                    {/* Drag handle */}
+                    <div
+                        className="w-1 shrink-0 cursor-col-resize hover:bg-[#5865F2]/30 active:bg-[#5865F2]/50 transition-colors"
+                        onMouseDown={onResizeStart}
+                    />
+                    <div className="shrink-0 bg-[#2b2d31] overflow-y-auto dark-scrollbar p-2 space-y-2" style={{ width: sidebarWidth }}>
+                        {sidebarTiles.map(t => (
+                            <div key={t.id} className="relative group/stream cursor-pointer rounded-lg overflow-hidden"
+                                onClick={() => setMaximizedId(t.id)}
                             >
-                                <ScreenShareTile
-                                    participant={p}
-                                    isWatching={isSelf || watchingStreams.has(p.userId)}
-                                    onToggleWatch={(watching) => toggleWatch(p.userId, watching)}
-                                    isSelf={isSelf}
-                                />
+                                {t.type === "screen" ? (
+                                    <ScreenShareTile
+                                        participant={t.participant}
+                                        isWatching={t.participant.userId === user?.userId || watchingStreams.has(t.participant.userId)}
+                                        onToggleWatch={(w) => toggleWatch(t.participant.userId, w)}
+                                        isSelf={t.participant.userId === user?.userId}
+                                    />
+                                ) : (
+                                    <ParticipantTile
+                                        participant={t.participant}
+                                        isSpeaking={speakingMap[t.participant.userId] ?? false}
+                                        getAvatarUrl={getAvatarUrl}
+                                        isSelf={t.participant.userId === user?.userId}
+                                        compact
+                                    />
+                                )}
+                                <button
+                                    onClick={e => { e.stopPropagation(); setMaximizedId(t.id); }}
+                                    className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[10px] font-medium opacity-0 group-hover/stream:opacity-100 transition-opacity z-10"
+                                >
+                                    Maximize
+                                </button>
                             </div>
-                        );
-                    })}
-                    {participants.map(p => (
-                        <ParticipantTile
-                            key={p.userId}
-                            participant={p}
-                            isSpeaking={speakingMap[p.userId] ?? false}
-                            getAvatarUrl={getAvatarUrl}
-                            isSelf={p.userId === user?.userId}
-                            compact
-                        />
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                </>)}
             </div>
         );
     }
 
-    // ── No screen shares: centered grid of participant tiles ─
-    const count = participants.length;
-    const cols = count <= 1 ? 1 : count <= 4 ? 2 : count <= 9 ? 3 : 4;
+    // ── Default: grid of all tiles (screens + participants) ─────
+    const cols = allTiles.length <= 1 ? 1 : allTiles.length <= 4 ? 2 : allTiles.length <= 9 ? 3 : 4;
 
     return (
         <div className="flex-1 flex flex-col bg-[#313338] overflow-hidden">
-            <div className="flex-1 p-6 flex items-center justify-center">
+            <div className="flex-1 p-3 flex items-center justify-center">
                 <div
-                    className="grid gap-3 w-full max-w-5xl mx-auto"
+                    className="grid gap-3 w-full mx-auto"
                     style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
                 >
-                    {participants.map(p => {
-                        if (isInThisChannel) {
-                            return (
-                                <ParticipantTile
-                                    key={p.userId}
-                                    participant={p}
-                                    isSpeaking={speakingMap[p.userId] ?? false}
-                                    getAvatarUrl={getAvatarUrl}
-                                    isSelf={p.userId === user?.userId}
+                    {allTiles.map(t => (
+                        <div key={t.id} className="relative group/stream">
+                            {t.type === "screen" ? (
+                                <ScreenShareTile
+                                    participant={t.participant}
+                                    isWatching={t.participant.userId === user?.userId || watchingStreams.has(t.participant.userId)}
+                                    onToggleWatch={(w) => toggleWatch(t.participant.userId, w)}
+                                    isSelf={t.participant.userId === user?.userId}
                                 />
-                            );
-                        }
-
-                        return (
-                            <PreviewCard
-                                key={p.userId}
-                                participant={p}
-                                getAvatarUrl={getAvatarUrl}
-                            />
-                        );
-                    })}
+                            ) : isInThisChannel ? (
+                                <ParticipantTile
+                                    participant={t.participant}
+                                    isSpeaking={speakingMap[t.participant.userId] ?? false}
+                                    getAvatarUrl={getAvatarUrl}
+                                    isSelf={t.participant.userId === user?.userId}
+                                />
+                            ) : (
+                                <PreviewCard participant={t.participant} getAvatarUrl={getAvatarUrl} />
+                            )}
+                            {isInThisChannel && (
+                                <button
+                                    onClick={e => { e.stopPropagation(); setMaximizedId(t.id); }}
+                                    className="absolute top-2 left-2 px-2 py-1 rounded bg-black/60 text-white text-xs font-medium opacity-0 group-hover/stream:opacity-100 transition-opacity z-20"
+                                >
+                                    Maximize
+                                </button>
+                            )}
+                        </div>
+                    ))}
                 </div>
             </div>
         </div>

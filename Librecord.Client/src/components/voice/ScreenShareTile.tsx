@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Track } from "livekit-client";
 import { useTrackBySource } from "../../voice/useTrackBySource";
 import { getRoom } from "../../voice/livekitClient";
@@ -7,6 +7,7 @@ import { ScreenShareIcon } from "./VoiceIcons";
 import { PlayIcon, ExitFullscreenIcon, FullscreenIcon } from "../ui/Icons";
 import { DevOverlay } from "./DevOverlay";
 import { VolumePopup } from "./VolumePopup";
+import { useFullscreen } from "./useFullscreen";
 
 interface Props {
     participant: VoiceParticipant;
@@ -22,15 +23,14 @@ interface Props {
 
 export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf, fill }: Props) {
     const videoRef = useRef<HTMLVideoElement>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [isFullscreen, setIsFullscreen] = useState(false);
+    const { containerRef, isFullscreen, toggleFullscreen } = useFullscreen();
     const [volumePopup, setVolumePopup] = useState<{ x: number; y: number } | null>(null);
 
     const track = useTrackBySource(participant.userId, Track.Source.ScreenShare);
 
     // Subscribe/unsubscribe to save bandwidth when not watching
     useEffect(() => {
-        if (isSelf) return; // don't unsubscribe from own stream
+        if (isSelf) return;
         const room = getRoom();
         if (!room) return;
         const remote = room.remoteParticipants.get(participant.userId);
@@ -42,44 +42,15 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
         }
     }, [isWatching, participant.userId, isSelf]);
 
-    // attach() / detach() following @livekit/components-react pattern.
     useEffect(() => {
         const el = videoRef.current;
         if (!el) return;
-
-        if (!isWatching || !track) {
-            track?.detach(el);
-            return;
-        }
-
+        if (!isWatching || !track) { track?.detach(el); return; }
         track.attach(el);
-
-        return () => {
-            track.detach(el);
-        };
+        return () => { track.detach(el); };
     }, [track, isWatching]);
 
-    const trackStatus: "loading" | "active" =
-        isWatching && track ? "active" : "loading";
-
-    // Track fullscreen state changes (user may exit via Escape)
-    useEffect(() => {
-        function onFullscreenChange() {
-            setIsFullscreen(!!document.fullscreenElement);
-        }
-        document.addEventListener("fullscreenchange", onFullscreenChange);
-        return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
-    }, []);
-
-    const toggleFullscreen = useCallback(() => {
-        if (!containerRef.current) return;
-
-        if (document.fullscreenElement) {
-            document.exitFullscreen();
-        } else {
-            containerRef.current.requestFullscreen();
-        }
-    }, []);
+    const trackStatus: "loading" | "active" = isWatching && track ? "active" : "loading";
 
     const handleContextMenu = (e: React.MouseEvent) => {
         if (isSelf) return;
@@ -102,7 +73,7 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
                         {participant.displayName}&apos;s screen
                     </p>
                     <button
-                        onClick={() => onToggleWatch(true)}
+                        onClick={e => { e.stopPropagation(); onToggleWatch(true); }}
                         className="px-4 py-1.5 rounded-lg text-sm font-medium text-white bg-[#5865F2] hover:bg-[#4752c4] transition-colors flex items-center gap-2 shrink-0"
                     >
                         <PlayIcon size={14} />
@@ -154,7 +125,7 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
 
             {trackStatus === "active" && !isSelf && (
                 <button
-                    onClick={() => onToggleWatch(false)}
+                    onClick={e => { e.stopPropagation(); onToggleWatch(false); }}
                     className="absolute top-2 right-2 p-1.5 rounded-md bg-black/60 backdrop-blur-sm text-[#f23f43] hover:text-white hover:bg-[#da373c] text-sm font-bold leading-none z-10 transition-colors"
                     title="Stop watching"
                 >
@@ -165,7 +136,7 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
             {trackStatus === "active" && (
                 <div className="absolute bottom-2 right-2 flex items-center gap-1.5 opacity-0 group-hover/screen:opacity-100 transition-opacity">
                     <button
-                        onClick={toggleFullscreen}
+                        onClick={e => { e.stopPropagation(); toggleFullscreen(); }}
                         title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
                         className="p-1.5 rounded-md bg-black/60 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/80"
                     >
