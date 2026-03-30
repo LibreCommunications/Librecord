@@ -44,6 +44,7 @@ export default function GuildChannelPage() {
     const [showInvite, setShowInvite] = useState(false);
     const [showMembers, setShowMembers] = useState(true);
     const [activeThread, setActiveThread] = useState<{ id: string; name: string } | null>(null);
+    const [threadMap, setThreadMap] = useState<Map<string, { threadId: string; threadName: string; messageCount: number }>>(new Map());
     const [threadPromptMsgId, setThreadPromptMsgId] = useState<string | null>(null);
     const [threadNameInput, setThreadNameInput] = useState("");
 
@@ -97,8 +98,6 @@ export default function GuildChannelPage() {
     const chat = useChatChannel(config);
 
     // Load thread metadata for messages in this channel
-    const [threadMap, setThreadMap] = useState<Map<string, { threadId: string; threadName: string; messageCount: number }>>(new Map());
-
     useEffect(() => {
         if (!channelId) return;
         let stale = false;
