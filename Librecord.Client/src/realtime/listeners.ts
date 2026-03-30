@@ -52,6 +52,7 @@ export function registerListeners() {
     appConnection.off("guild:user:stop-typing");
     appConnection.off("guild:user:presence");
     appConnection.off("guild:channel:created");
+    appConnection.off("guild:member:added");
     appConnection.off("guild:member:roles");
     appConnection.off("guild:member:removed");
     appConnection.off("guild:channel:updated");
@@ -260,6 +261,13 @@ export function registerListeners() {
                 logger.realtime.warn("Failed to join new channel group", err);
             });
             dispatchAppEvent("guild:channel:created", payload);
+        }
+    );
+
+    appConnection.on(
+        "guild:member:added",
+        (payload: AppEventMap["guild:member:added"]) => {
+            dispatchAppEvent("guild:member:added", payload);
         }
     );
 

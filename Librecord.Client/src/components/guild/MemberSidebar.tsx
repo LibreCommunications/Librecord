@@ -41,6 +41,21 @@ export function MemberSidebar({ guildId }: Props) {
             onCustomEvent<AppEventMap["guild:user:presence"]>("guild:user:presence", (detail) => {
                 setPresenceMap(prev => ({ ...prev, [detail.userId]: detail.status }));
             }),
+            onCustomEvent<AppEventMap["guild:member:added"]>("guild:member:added", (detail) => {
+                if (detail.guildId !== guildId) return;
+                setMembers(prev => {
+                    if (prev.some(m => m.userId === detail.userId)) return prev;
+                    return [...prev, {
+                        userId: detail.userId,
+                        username: detail.username,
+                        displayName: detail.displayName,
+                        avatarUrl: detail.avatarUrl,
+                        joinedAt: detail.joinedAt,
+                        roles: [],
+                    }];
+                });
+                setPresenceMap(prev => ({ ...prev, [detail.userId]: "online" }));
+            }),
             onCustomEvent<AppEventMap["guild:member:removed"]>("guild:member:removed", (detail) => {
                 if (detail.guildId !== guildId) return;
                 setMembers(prev => prev.filter(m => m.userId !== detail.userId));

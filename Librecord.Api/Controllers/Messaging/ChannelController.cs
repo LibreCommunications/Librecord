@@ -157,10 +157,10 @@ public class ChannelController : AuthenticatedController
         if (channel == null)
             return NotFound();
 
-        var access = await _permissions.HasChannelPermissionAsync(
+        var access = await _permissions.HasGuildPermissionAsync(
             UserId,
-            channelId,
-            ChannelPermission.ManageChannels);
+            channel.GuildId,
+            GuildPermission.ManageChannels);
 
         if (!access.Allowed)
             return StatusCode(
@@ -199,10 +199,10 @@ public class ChannelController : AuthenticatedController
         if (channel == null)
             return NotFound();
 
-        var access = await _permissions.HasChannelPermissionAsync(
+        var access = await _permissions.HasGuildPermissionAsync(
             UserId,
-            channelId,
-            ChannelPermission.ManageChannels);
+            channel.GuildId,
+            GuildPermission.ManageChannels);
 
         if (!access.Allowed)
             return StatusCode(

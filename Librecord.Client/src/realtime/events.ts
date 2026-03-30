@@ -143,6 +143,15 @@ export interface AppEventMap {
         roles: { id: string; name: string }[];
     };
 
+    "guild:member:added": {
+        guildId: string;
+        userId: string;
+        username: string;
+        displayName: string;
+        avatarUrl: string | null;
+        joinedAt: string;
+    };
+
     "guild:member:removed": {
         guildId: string;
         userId: string;

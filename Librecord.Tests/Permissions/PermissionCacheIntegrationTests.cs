@@ -216,6 +216,5 @@ public class PermissionCacheIntegrationTests : IDisposable
         { ChannelPermission.SendAttachments, "SendAttachments", PermissionIds.ChannelSendAttachments },
         { ChannelPermission.AddReactions, "AddReactions", PermissionIds.ChannelAddReactions },
         { ChannelPermission.ManageMessages, "ManageMessages", PermissionIds.ChannelManageMessages },
-        { ChannelPermission.ManageChannels, "ManageChannels", PermissionIds.ChannelManageChannels },
     };
 }

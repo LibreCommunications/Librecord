@@ -13,7 +13,6 @@ const CHANNEL_PERMISSIONS = [
     { id: "22222222-2222-2222-2222-222222222204", name: "Send Attachments" },
     { id: "22222222-2222-2222-2222-222222222205", name: "Add Reactions" },
     { id: "22222222-2222-2222-2222-222222222206", name: "Manage Messages" },
-    { id: "22222222-2222-2222-2222-222222222207", name: "Manage Channels" },
 ];
 
 type TriState = true | false | null;

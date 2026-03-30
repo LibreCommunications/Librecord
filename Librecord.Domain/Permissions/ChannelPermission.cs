@@ -20,9 +20,6 @@ public abstract class ChannelPermission : PermissionCapability
     public static readonly ChannelPermission ManageMessages =
         new Impl("ManageMessages");
 
-    public static readonly ChannelPermission ManageChannels =
-        new Impl("ManageChannels");
-
     protected ChannelPermission(string key) : base(key)
     {
     }

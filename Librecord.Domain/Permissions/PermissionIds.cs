@@ -43,7 +43,4 @@ public static class PermissionIds
 
     public static readonly Guid ChannelManageMessages =
         Guid.Parse("22222222-2222-2222-2222-222222222206");
-
-    public static readonly Guid ChannelManageChannels =
-        Guid.Parse("22222222-2222-2222-2222-222222222207");
 }

@@ -348,6 +348,5 @@ public class PermissionServiceTests
         { ChannelPermission.SendAttachments, "SendAttachments" },
         { ChannelPermission.AddReactions, "AddReactions" },
         { ChannelPermission.ManageMessages, "ManageMessages" },
-        { ChannelPermission.ManageChannels, "ManageChannels" },
     };
 }
