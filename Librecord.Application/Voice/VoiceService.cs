@@ -45,7 +45,8 @@ public class VoiceService : IVoiceService
     {
         var canAccess = await _guilds.CanAccessChannelAsync(channelId, userId);
         if (!canAccess)
-            throw new InvalidOperationException("You do not have access to this channel.");
+            throw new InvalidOperationException(
+                $"You do not have access to this channel. UserId={userId}, ChannelId={channelId}");
 
         var channel = await _guilds.GetChannelAsync(channelId);
         if (channel is null)

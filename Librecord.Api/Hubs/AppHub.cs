@@ -338,14 +338,14 @@ public class AppHub : Hub
     /// Re-registers voice state after a SignalR reconnect.
     public async Task<VoiceJoinResult?> RejoinVoiceChannel(Guid channelId, VoiceStateUpdateDto currentState)
     {
-        _logger.LogInformation(
-            "[APP HUB] RejoinVoiceChannel | UserId={UserId} | ChannelId={ChannelId}",
-            UserId, channelId);
-
         var existing = await _voice.GetVoiceStateAsync(UserId);
         var isDmCall = existing is not null
             ? existing.GuildId == Guid.Empty
             : await _channels.IsMemberAsync(channelId, UserId);
+
+        _logger.LogInformation(
+            "[APP HUB] RejoinVoiceChannel | UserId={UserId} | ChannelId={ChannelId} | IsDmCall={IsDmCall} | ExistingState={HasExisting}",
+            UserId, channelId, isDmCall, existing is not null);
 
         var group = isDmCall ? DmGroup(channelId) : GuildGroup(channelId);
         await Groups.AddToGroupAsync(Context.ConnectionId, group);
