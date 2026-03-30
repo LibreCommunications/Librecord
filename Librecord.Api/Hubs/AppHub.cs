@@ -3,6 +3,7 @@ using Librecord.Application.Guilds;
 using Librecord.Application.Messaging;
 using Librecord.Application.Users;
 using Librecord.Application.Voice;
+using Librecord.Domain.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
@@ -15,6 +16,7 @@ public class AppHub : Hub
     private readonly IGuildService _guilds;
     private readonly IPresenceService _presence;
     private readonly IVoiceService _voice;
+    private readonly IUserRepository _users;
     private readonly IConnectionTracker _connections;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly ILogger<AppHub> _logger;
@@ -24,6 +26,7 @@ public class AppHub : Hub
         IGuildService guilds,
         IPresenceService presence,
         IVoiceService voice,
+        IUserRepository users,
         IConnectionTracker connections,
         IHostApplicationLifetime lifetime,
         ILogger<AppHub> logger)
@@ -32,6 +35,7 @@ public class AppHub : Hub
         _guilds = guilds;
         _presence = presence;
         _voice = voice;
+        _users = users;
         _connections = connections;
         _lifetime = lifetime;
         _logger = logger;
@@ -281,28 +285,82 @@ public class AppHub : Hub
         await _voice.UpdateVoiceStateAsync(UserId, update);
     }
 
-    /// Re-registers voice state after a SignalR reconnect. If the user's
-    /// voice state row still exists in the DB (survived the restart), this
-    /// re-broadcasts their presence so other clients see them. If it was
-    /// lost, re-creates it.
+    public async Task<VoiceJoinResult> StartDmCall(Guid dmChannelId)
+    {
+        _logger.LogInformation(
+            "[APP HUB] StartDmCall | UserId={UserId} | DmChannelId={DmChannelId}",
+            UserId, dmChannelId);
+
+        if (!await _channels.IsMemberAsync(dmChannelId, UserId))
+            throw new HubException("Not a member of this DM channel.");
+
+        // Caller joins immediately (Discord behavior: sit in call even if nobody picks up)
+        var result = await _voice.JoinDmVoiceCallAsync(dmChannelId, UserId);
+
+        // Ring other members
+        var user = await _users.GetByIdAsync(UserId);
+        await Clients.OthersInGroup(DmGroup(dmChannelId)).SendAsync("dm:call:incoming", new
+        {
+            channelId = dmChannelId,
+            callerId = UserId,
+            callerDisplayName = user?.DisplayName ?? user?.UserName ?? "Unknown",
+            callerAvatarUrl = user?.AvatarUrl,
+        });
+
+        return result;
+    }
+
+    public async Task<VoiceJoinResult> AcceptDmCall(Guid dmChannelId)
+    {
+        _logger.LogInformation(
+            "[APP HUB] AcceptDmCall | UserId={UserId} | DmChannelId={DmChannelId}",
+            UserId, dmChannelId);
+
+        if (!await _channels.IsMemberAsync(dmChannelId, UserId))
+            throw new HubException("Not a member of this DM channel.");
+
+        return await _voice.JoinDmVoiceCallAsync(dmChannelId, UserId);
+    }
+
+    public async Task DeclineDmCall(Guid dmChannelId)
+    {
+        _logger.LogInformation(
+            "[APP HUB] DeclineDmCall | UserId={UserId} | DmChannelId={DmChannelId}",
+            UserId, dmChannelId);
+
+        await Clients.OthersInGroup(DmGroup(dmChannelId)).SendAsync("dm:call:declined", new
+        {
+            channelId = dmChannelId,
+            userId = UserId,
+        });
+    }
+
+    /// Re-registers voice state after a SignalR reconnect.
     public async Task<VoiceJoinResult?> RejoinVoiceChannel(Guid channelId, VoiceStateUpdateDto currentState)
     {
         _logger.LogInformation(
             "[APP HUB] RejoinVoiceChannel | UserId={UserId} | ChannelId={ChannelId}",
             UserId, channelId);
 
-        await Groups.AddToGroupAsync(Context.ConnectionId, GuildGroup(channelId));
-
         var existing = await _voice.GetVoiceStateAsync(UserId);
+
+        // Route to correct group based on guild vs DM call
+        var group = existing?.GuildId == Guid.Empty
+            ? DmGroup(channelId)
+            : GuildGroup(channelId);
+        await Groups.AddToGroupAsync(Context.ConnectionId, group);
+
         if (existing is not null && existing.ChannelId == channelId)
         {
-            // Row survived — just update flags and re-broadcast
             await _voice.UpdateVoiceStateAsync(UserId, currentState);
             return null;
         }
 
-        // Row was lost (e.g. ungraceful crash) — full rejoin
-        return await _voice.JoinVoiceChannelAsync(channelId, UserId);
+        // Row was lost — full rejoin (guild only, DM calls don't auto-rejoin)
+        if (existing?.GuildId != Guid.Empty)
+            return await _voice.JoinVoiceChannelAsync(channelId, UserId);
+
+        return await _voice.JoinDmVoiceCallAsync(channelId, UserId);
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)

@@ -1,4 +1,5 @@
 using Librecord.Application.Guilds;
+using Librecord.Application.Messaging;
 using Librecord.Application.Realtime.Voice;
 using Librecord.Domain;
 using Librecord.Domain.Guilds;
@@ -13,6 +14,7 @@ public class VoiceService : IVoiceService
 {
     private readonly IVoiceStateRepository _voiceStates;
     private readonly IGuildService _guilds;
+    private readonly IDirectMessageChannelService _dmChannels;
     private readonly IUserRepository _users;
     private readonly ILiveKitTokenService _tokenService;
     private readonly IVoiceRealtimeNotifier _notifier;
@@ -22,6 +24,7 @@ public class VoiceService : IVoiceService
     public VoiceService(
         IVoiceStateRepository voiceStates,
         IGuildService guilds,
+        IDirectMessageChannelService dmChannels,
         IUserRepository users,
         ILiveKitTokenService tokenService,
         IVoiceRealtimeNotifier notifier,
@@ -30,6 +33,7 @@ public class VoiceService : IVoiceService
     {
         _voiceStates = voiceStates;
         _guilds = guilds;
+        _dmChannels = dmChannels;
         _users = users;
         _tokenService = tokenService;
         _notifier = notifier;
@@ -106,6 +110,74 @@ public class VoiceService : IVoiceService
         });
 
         var participants = await GetChannelParticipantsAsync(channelId);
+
+        return new VoiceJoinResult
+        {
+            Token = token,
+            WsUrl = _liveKitOptions.Host,
+            Participants = participants
+        };
+    }
+
+    public async Task<VoiceJoinResult> JoinDmVoiceCallAsync(Guid dmChannelId, Guid userId)
+    {
+        if (!await _dmChannels.IsMemberAsync(dmChannelId, userId))
+            throw new InvalidOperationException("You are not a member of this DM channel.");
+
+        var user = await _users.GetByIdAsync(userId);
+        if (user is null)
+            throw new InvalidOperationException("User not found.");
+
+        var existing = await _voiceStates.GetByUserIdAsync(userId);
+        Guid? previousChannelId = null;
+        Guid? previousGuildId = null;
+
+        if (existing is not null)
+        {
+            previousChannelId = existing.ChannelId;
+            previousGuildId = existing.GuildId;
+            await _voiceStates.RemoveAsync(userId);
+            await _voiceStates.SaveChangesAsync();
+        }
+
+        var voiceState = new VoiceState
+        {
+            UserId = userId,
+            ChannelId = dmChannelId,
+            GuildId = Guid.Empty
+        };
+
+        await _voiceStates.AddAsync(voiceState);
+        await _voiceStates.SaveChangesAsync();
+
+        if (previousChannelId.HasValue)
+        {
+            await _notifier.NotifyAsync(new VoiceUserLeft
+            {
+                ChannelId = previousChannelId.Value,
+                GuildId = previousGuildId!.Value,
+                UserId = userId
+            });
+        }
+
+        var displayName = user.DisplayName ?? user.UserName!;
+        var token = _tokenService.GenerateToken(userId, displayName, dmChannelId);
+
+        await _notifier.NotifyAsync(new VoiceUserJoined
+        {
+            ChannelId = dmChannelId,
+            GuildId = Guid.Empty,
+            UserId = userId,
+            Username = user.UserName!,
+            DisplayName = displayName,
+            AvatarUrl = user.AvatarUrl,
+            IsMuted = voiceState.IsMuted,
+            IsDeafened = voiceState.IsDeafened,
+            IsCameraOn = voiceState.IsCameraOn,
+            IsScreenSharing = voiceState.IsScreenSharing
+        });
+
+        var participants = await GetChannelParticipantsAsync(dmChannelId);
 
         return new VoiceJoinResult
         {

@@ -67,6 +67,8 @@ export function registerListeners() {
     appConnection.off("channel:message:unpinned");
     appConnection.off("channel:reaction:added");
     appConnection.off("channel:reaction:removed");
+    appConnection.off("dm:call:incoming");
+    appConnection.off("dm:call:declined");
     appConnection.off("guild:thread:message:new");
 
     appConnection.on(
@@ -385,6 +387,20 @@ export function registerListeners() {
         "channel:reaction:removed",
         (payload: AppEventMap["channel:reaction:removed"]) => {
             dispatchAppEvent("channel:reaction:removed", payload);
+        }
+    );
+
+    appConnection.on(
+        "dm:call:incoming",
+        (payload: AppEventMap["dm:call:incoming"]) => {
+            dispatchAppEvent("dm:call:incoming", payload);
+        }
+    );
+
+    appConnection.on(
+        "dm:call:declined",
+        (payload: AppEventMap["dm:call:declined"]) => {
+            dispatchAppEvent("dm:call:declined", payload);
         }
     );
 

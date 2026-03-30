@@ -63,6 +63,70 @@ export function useVoice() {
         playJoinSound();
     }, []);
 
+    const startDmCall = useCallback(async (dmChannelId: string) => {
+        const result = await appConnection.invoke<{
+            token: string;
+            wsUrl: string;
+            participants: VoiceParticipant[];
+        }>("StartDmCall", dmChannelId);
+
+        const prefs = getVoicePrefs();
+
+        setVoiceState({
+            channelId: dmChannelId,
+            guildId: null,
+            participants: result.participants,
+            isConnected: true,
+            isMuted: prefs.isMuted,
+            isDeafened: prefs.isDeafened,
+            isCameraOn: false,
+            isScreenSharing: false,
+        });
+
+        await livekitClient.connectToVoice(result.token, result.wsUrl, prefs.isMuted, prefs.isDeafened);
+
+        if (prefs.isMuted || prefs.isDeafened) {
+            appConnection.invoke("UpdateVoiceState", {
+                isMuted: prefs.isMuted,
+                isDeafened: prefs.isDeafened,
+            }).catch(e => logger.voice.warn("Failed to sync initial voice state", e));
+        }
+
+        playJoinSound();
+    }, []);
+
+    const acceptDmCall = useCallback(async (dmChannelId: string) => {
+        const result = await appConnection.invoke<{
+            token: string;
+            wsUrl: string;
+            participants: VoiceParticipant[];
+        }>("AcceptDmCall", dmChannelId);
+
+        const prefs = getVoicePrefs();
+
+        setVoiceState({
+            channelId: dmChannelId,
+            guildId: null,
+            participants: result.participants,
+            isConnected: true,
+            isMuted: prefs.isMuted,
+            isDeafened: prefs.isDeafened,
+            isCameraOn: false,
+            isScreenSharing: false,
+        });
+
+        await livekitClient.connectToVoice(result.token, result.wsUrl, prefs.isMuted, prefs.isDeafened);
+
+        if (prefs.isMuted || prefs.isDeafened) {
+            appConnection.invoke("UpdateVoiceState", {
+                isMuted: prefs.isMuted,
+                isDeafened: prefs.isDeafened,
+            }).catch(e => logger.voice.warn("Failed to sync initial voice state", e));
+        }
+
+        playJoinSound();
+    }, []);
+
     const leaveVoice = useCallback(async () => {
         playLeaveSound();
         await livekitClient.disconnect();
@@ -139,6 +203,8 @@ export function useVoice() {
     return {
         voiceState,
         joinVoice,
+        startDmCall,
+        acceptDmCall,
         leaveVoice,
         toggleMute,
         toggleDeafen,

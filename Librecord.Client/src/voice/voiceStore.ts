@@ -44,7 +44,7 @@ export function setVoicePrefs(prefs: Partial<VoicePrefs>) {
 
 interface PersistedVoiceSession {
     channelId: string;
-    guildId: string;
+    guildId: string | null;
 }
 
 const INITIAL_STATE: VoiceState = {
@@ -65,7 +65,7 @@ function emit() {
 }
 
 function persist() {
-    if (state.isConnected && state.channelId && state.guildId) {
+    if (state.isConnected && state.channelId) {
         const session: PersistedVoiceSession = {
             channelId: state.channelId,
             guildId: state.guildId,

@@ -235,6 +235,18 @@ export interface AppEventMap {
         emoji: string;
     };
 
+    "dm:call:incoming": {
+        channelId: string;
+        callerId: string;
+        callerDisplayName: string;
+        callerAvatarUrl: string | null;
+    };
+
+    "dm:call:declined": {
+        channelId: string;
+        userId: string;
+    };
+
     "guild:thread:message:new": {
         channelId: string;
         threadId: string;

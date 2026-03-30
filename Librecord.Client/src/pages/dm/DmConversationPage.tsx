@@ -8,6 +8,9 @@ import { useAuth } from "../../hooks/useAuth";
 import { useAttachmentUpload } from "../../hooks/useAttachmentUpload";
 import { useChatChannel, type ChatChannelConfig } from "../../hooks/useChatChannel";
 import { Spinner } from "../../components/ui/Spinner";
+import { useVoice } from "../../hooks/useVoice";
+import { VoiceChannelView } from "../../components/voice/VoiceChannelView";
+import { VoiceChannelIcon } from "../../components/ui/Icons";
 
 import { AddParticipantModal } from "./AddParticipantModal";
 import { DmHeader } from "./DmHeader";
@@ -52,6 +55,10 @@ export default function DmConversationPage() {
     const [showProfile, setShowProfile] = useState(() => localStorage.getItem(STORAGE.showDmProfile) !== "false");
     const [isBlocked, setIsBlocked] = useState(false);
     const [confirmDmAction, setConfirmDmAction] = useState<"block" | "unfriend" | null>(null);
+    const { voiceState, startDmCall } = useVoice();
+    const inCall = voiceState.isConnected && voiceState.channelId === dmId && !voiceState.guildId;
+    const [showCallView, setShowCallView] = useState(inCall);
+    if (!inCall && showCallView) setShowCallView(false);
     const { removeFriend } = useFriends();
     const { blockUser, unblockUser, isBlocked: checkBlocked } = useBlocks();
     const { toast } = useToast();
@@ -165,6 +172,8 @@ export default function DmConversationPage() {
                                 setShowAddModal(true);
                             }}
                             onLeave={() => setShowLeaveConfirm(true)}
+                            onStartCall={dmId ? () => { startDmCall(dmId); setShowCallView(true); } : undefined}
+                            inCall={inCall}
                         />
                     </div>
                     {!channel?.isGroup && (
@@ -209,12 +218,29 @@ export default function DmConversationPage() {
                     </button>
                 </div>
 
-                <ChatView
-                    chat={chat}
-                    currentUserId={user?.userId}
-                    getAvatarUrl={getAvatarUrl}
-                    inputPlaceholder={`Message ${channelName ?? ""}`}
-                />
+                {inCall && (
+                    <button
+                        onClick={() => setShowCallView(v => !v)}
+                        className="flex items-center gap-2 w-full px-4 py-2 bg-[#248046] hover:bg-[#1a6334] text-white text-sm font-medium transition-colors shrink-0"
+                    >
+                        <VoiceChannelIcon size={16} />
+                        <span>{showCallView ? "Back to Messages" : "View Call"}</span>
+                    </button>
+                )}
+
+                {inCall && showCallView ? (
+                    <VoiceChannelView
+                        channelId={dmId!}
+                        channelName={channelName ?? "Call"}
+                    />
+                ) : (
+                    <ChatView
+                        chat={chat}
+                        currentUserId={user?.userId}
+                        getAvatarUrl={getAvatarUrl}
+                        inputPlaceholder={`Message ${channelName ?? ""}`}
+                    />
+                )}
 
                 {showAddModal && channel && (
                     <AddParticipantModal

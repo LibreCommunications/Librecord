@@ -60,6 +60,14 @@ export function ReplyIcon({ size, className }: IconProps) {
     return <Icon size={size} className={className}><polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" /></Icon>;
 }
 
+export function PhoneIcon({ size, className }: IconProps) {
+    return <Icon size={size} className={className}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" /></Icon>;
+}
+
+export function PhoneOffIcon({ size, className }: IconProps) {
+    return <Icon size={size} className={className}><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67" /><path d="M22.95 16.22A19.58 19.58 0 0 0 21.84 12a19.42 19.42 0 0 0-3.07-4.63" /><path d="M2 2l20 20" /><path d="M3.87 4.24A19.79 19.79 0 0 0 2.12 8.87 2 2 0 0 0 4.11 11h3a2 2 0 0 0 2-1.72c.127-.96.361-1.903.7-2.81a2 2 0 0 0-.45-2.11L8.09 3.09" /></Icon>;
+}
+
 export function ThreadIcon({ size, className }: IconProps) {
     return <Icon size={size} className={className}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><line x1="10" y1="9" x2="8" y2="9" /></Icon>;
 }

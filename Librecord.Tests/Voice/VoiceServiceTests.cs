@@ -1,4 +1,5 @@
 using Librecord.Application.Guilds;
+using Librecord.Application.Messaging;
 using Librecord.Application.Realtime.Voice;
 using Librecord.Application.Voice;
 using Librecord.Domain;
@@ -14,6 +15,7 @@ public class VoiceServiceTests
 {
     private readonly Mock<IVoiceStateRepository> _voiceStates = new();
     private readonly Mock<IGuildService> _guilds = new();
+    private readonly Mock<IDirectMessageChannelService> _dmChannels = new();
     private readonly Mock<IUserRepository> _users = new();
     private readonly Mock<ILiveKitTokenService> _tokenService = new();
     private readonly Mock<IVoiceRealtimeNotifier> _notifier = new();
@@ -36,6 +38,7 @@ public class VoiceServiceTests
     private VoiceService CreateService() => new(
         _voiceStates.Object,
         _guilds.Object,
+        _dmChannels.Object,
         _users.Object,
         _tokenService.Object,
         _notifier.Object,
