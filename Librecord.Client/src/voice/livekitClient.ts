@@ -258,6 +258,10 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
     room = new Room({
         dynacast: true,
         adaptiveStream: true,
+        // Disable single peer connection mode — causes a=inactive on subscriber
+        // audio lines in Chromium when joining after the publisher, resulting in
+        // no audio playback. Firefox handles it fine but Edge/Chrome does not.
+        singlePeerConnection: false,
         audioCaptureDefaults: {
             autoGainControl: true,
             noiseSuppression: browserNS,
