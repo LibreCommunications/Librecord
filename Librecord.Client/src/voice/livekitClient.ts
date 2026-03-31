@@ -173,6 +173,9 @@ interface AudioPipeline {
     source: MediaStreamAudioSourceNode;
 }
 const audioPipelines = new Map<string, AudioPipeline>();
+// Hidden <audio> elements per user — Chromium won't deliver remote WebRTC audio
+// to Web Audio API nodes unless an <audio> element is also consuming the stream.
+const audioElements = new Map<string, HTMLAudioElement>();
 
 // dB-linear volume curve (same approach as OBS / Discord / DAWs).
 // Slider maps linearly to decibels, then converted to gain.
@@ -217,6 +220,16 @@ function attachAudioTrack(identity: string, track: MediaStreamTrack) {
 
     gain.gain.value = pctToGain(getUserVolume(identity));
 
+    // Chromium won't deliver remote WebRTC audio data to MediaStreamAudioSourceNode
+    // unless an <audio> element is also consuming the stream. Attach a silent element
+    // to keep the pipeline active. volume=0 (not muted attr) still pulls data.
+    const el = document.createElement("audio");
+    el.srcObject = stream;
+    el.volume = 0;
+    el.autoplay = true;
+    el.play().catch(() => {});
+    audioElements.set(identity, el);
+
     audioPipelines.set(identity, { gain, source });
 }
 
@@ -226,6 +239,12 @@ function detachAudioTrack(identity: string) {
         pipe.source.disconnect();
         pipe.gain.disconnect();
         audioPipelines.delete(identity);
+    }
+    const el = audioElements.get(identity);
+    if (el) {
+        el.pause();
+        el.srcObject = null;
+        audioElements.delete(identity);
     }
 }
 
