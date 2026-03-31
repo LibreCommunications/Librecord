@@ -302,11 +302,19 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
         }
     });
 
+    room.on(RoomEvent.ParticipantConnected, (p: RemoteParticipant) => {
+        logger.voice.info("Participant connected", p.identity);
+        // Bind any tracks that are already subscribed at join time
+        bindRemoteAudioTrack(p);
+    });
+
     room.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
         stopAnalysingTrack(p.identity);
+        detachAudioTrack(p.identity);
     });
 
     room.on(RoomEvent.TrackSubscribed, (track, _pub: RemoteTrackPublication, p: RemoteParticipant) => {
+        logger.voice.info("Track subscribed", p.identity, track.kind, track.source);
         if (track.kind === "audio") {
             const msTrack = track.mediaStreamTrack;
             if (msTrack) {
@@ -380,9 +388,13 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
         isDeafened = true;
     }
 
-    await room.startAudio();
+    await room.startAudio().catch(e => logger.voice.warn("startAudio failed", e));
 
-    room.remoteParticipants.forEach(bindRemoteAudioTrack);
+    // Bind tracks for participants already in the room
+    room.remoteParticipants.forEach((p) => {
+        logger.voice.info("Binding existing participant", p.identity, "tracks:", p.audioTrackPublications.size);
+        bindRemoteAudioTrack(p);
+    });
     // Local track speaking detection + noise suppression are handled
     // by the LocalTrackPublished event handler above.
 }
