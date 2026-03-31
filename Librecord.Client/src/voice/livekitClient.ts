@@ -240,6 +240,7 @@ function bindRemoteAudioTrack(participant: RemoteParticipant) {
         const msTrack = pub.track?.mediaStreamTrack;
         if (msTrack) {
             startAnalysingTrack(participant.identity, msTrack);
+            attachAudioTrack(participant.identity, msTrack);
         }
     });
 }
