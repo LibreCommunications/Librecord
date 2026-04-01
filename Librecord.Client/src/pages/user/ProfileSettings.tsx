@@ -19,7 +19,6 @@ export default function ProfileSettings() {
     const [name, setName] = useState(user?.displayName ?? "");
     const [bio, setBio] = useState("");
     const [bannerUrl, setBannerUrl] = useState<string | null>(null);
-    const [friendsVisible, setFriendsVisible] = useState(true);
     const [saving, setSaving] = useState(false);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -33,7 +32,6 @@ export default function ProfileSettings() {
         userProfiles.get(user.userId).then(p => {
             setBio(p.bio ?? "");
             setBannerUrl(p.bannerUrl ?? null);
-            setFriendsVisible(p.friendsVisibleSetting ?? true);
             setOriginal({ name: user.displayName, bio: p.bio ?? "" });
         }).catch(e => logger.api.warn("Failed to load user profile", e));
     }, [user]);
@@ -235,25 +233,6 @@ export default function ProfileSettings() {
                         <label className="block text-xs font-bold text-[#b5bac1] uppercase mb-1">Email</label>
                         <div className="px-3 py-2 rounded bg-[#1e1f22] text-[#949ba4] text-sm">{user.email}</div>
                     </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                    <div>
-                        <div className="text-sm font-medium text-white">Show Friends on Profile</div>
-                        <div className="text-xs text-[#949ba4] mt-0.5">Allow others to see your friend list.</div>
-                    </div>
-                    <button
-                        onClick={async () => {
-                            const next = !friendsVisible;
-                            setFriendsVisible(next);
-                            await userProfiles.updateFriendsVisible(next);
-                        }}
-                        aria-label="Toggle friends visibility"
-                        data-testid="toggle-friends-visible"
-                        className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${friendsVisible ? "bg-[#248046]" : "bg-[#72767d]"}`}
-                    >
-                        <span className={`block w-[18px] h-[18px] rounded-full bg-white shadow-md transition-all duration-200 absolute top-[3px] ${friendsVisible ? "left-[23px]" : "left-[3px]"}`} />
-                    </button>
                 </div>
 
                 <div className="pt-2 border-t border-[#3f4147]">

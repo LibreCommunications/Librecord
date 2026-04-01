@@ -323,34 +323,10 @@ export default function DmConversationPage() {
                         </div>
 
                         {/* Mutual Friends */}
-                        {otherProfile.mutualFriendCount != null && otherProfile.mutualFriendCount > 0 && (
+                        {otherFriends.length > 0 && (
                             <div className="mt-3 bg-[#1e1f22] rounded-lg px-3 py-2">
                                 <p className="text-[10px] font-semibold text-[#b5bac1] uppercase mb-1.5">
-                                    Mutual Friends — {otherProfile.mutualFriendCount}
-                                </p>
-                                <div className="flex flex-wrap gap-1">
-                                    {otherFriends
-                                        .filter(f => f.id !== user?.userId)
-                                        .slice(0, 10)
-                                        .map(f => (
-                                            <div key={f.id} className="flex items-center gap-1.5 bg-[#2b2d31] rounded-full pl-0.5 pr-2 py-0.5">
-                                                <img
-                                                    src={getAvatarUrl(f.avatarUrl ?? null)}
-                                                    alt={f.displayName}
-                                                    className="w-4 h-4 rounded-full object-cover"
-                                                />
-                                                <span className="text-[10px] text-[#dbdee1] truncate max-w-[60px]">{f.displayName}</span>
-                                            </div>
-                                        ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Friend List */}
-                        {otherProfile.friendsVisible && otherFriends.length > 0 && (
-                            <div className="mt-3 bg-[#1e1f22] rounded-lg px-3 py-2">
-                                <p className="text-[10px] font-semibold text-[#b5bac1] uppercase mb-1.5">
-                                    Friends — {otherFriends.length}
+                                    Mutual Friends — {otherFriends.length}
                                 </p>
                                 <div className="space-y-1 max-h-40 overflow-y-auto dark-scrollbar">
                                     {otherFriends.map(f => (

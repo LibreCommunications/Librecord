@@ -87,7 +87,6 @@ export const userProfiles = {
         form.append("file", file);
         return request<{ bannerUrl: string }>("/users/banner", { method: "POST", body: form });
     },
-    updateFriendsVisible: (visible: boolean) => request<void>("/users/friends-visible", { method: "PUT", ...json({ visible }) }),
 };
 
 import type { GuildSummary, Guild, GuildChannel, GuildMember, GuildPermissions } from "../types/guild";

@@ -91,8 +91,8 @@ export function UserProfilePopup({ userId, onClose }: Props) {
                         )}
                     </div>
 
-                    {/* Friends list — only show if profile allows it */}
-                    {!profile.isSelf && profile.friendsVisible && profile.mutualFriendCount != null && profile.mutualFriendCount > 0 && (
+                    {/* Mutual friends — expandable */}
+                    {!profile.isSelf && profile.mutualFriendCount != null && profile.mutualFriendCount > 0 && (
                         <div className="mt-2">
                             <button
                                 onClick={async () => {
@@ -103,7 +103,7 @@ export function UserProfilePopup({ userId, onClose }: Props) {
                                 }}
                                 className="text-xs text-[#5865F2] hover:underline"
                             >
-                                {showFriends ? "Hide friends" : "Show friends"}
+                                {showFriends ? "Hide mutual friends" : `Show ${profile.mutualFriendCount} mutual friend${profile.mutualFriendCount > 1 ? "s" : ""}`}
                             </button>
                             {showFriends && friends && (
                                 <div className="mt-2 max-h-[120px] overflow-y-auto space-y-1">
