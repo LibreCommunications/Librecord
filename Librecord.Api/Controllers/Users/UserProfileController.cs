@@ -32,7 +32,7 @@ public class UserProfileController : AuthenticatedController
         var isFriend = await _friendships.UsersAreConfirmedFriendsAsync(UserId, userId);
 
         var mutualCount = 0;
-        if (user.Id != UserId)
+        if (user.Id != UserId && user.MutualFriendsVisible)
         {
             var myFriends = (await _friendService.GetFriendsAsync(UserId)).Select(f => f.UserId).ToHashSet();
             var theirFriends = (await _friendService.GetFriendsAsync(userId)).Select(f => f.UserId).ToHashSet();
@@ -51,6 +51,7 @@ public class UserProfileController : AuthenticatedController
             isFriend,
             isSelf = user.Id == UserId,
             mutualFriendCount = mutualCount,
+            mutualFriendsVisible = user.Id == UserId ? user.MutualFriendsVisible : (bool?)null,
         });
     }
 
@@ -61,8 +62,8 @@ public class UserProfileController : AuthenticatedController
         var user = await _users.GetByIdAsync(userId);
         if (user == null) return NotFound();
 
-        // Only return mutual friends (friends the viewer and target have in common)
-        if (user.Id == UserId)
+        // Only return mutual friends; respect the target's privacy setting
+        if (user.Id == UserId || !user.MutualFriendsVisible)
             return Ok(Array.Empty<object>());
 
         var myFriendIds = (await _friendService.GetFriendsAsync(UserId)).Select(f => f.UserId).ToHashSet();
@@ -76,6 +77,14 @@ public class UserProfileController : AuthenticatedController
             displayName = f.DisplayName,
             avatarUrl = f.AvatarUrl,
         }));
+    }
+
+    [Authorize]
+    [HttpPut("mutual-friends-visible")]
+    public async Task<IActionResult> UpdateMutualFriendsVisible([FromBody] UpdateMutualFriendsVisibleRequest request)
+    {
+        var ok = await _users.UpdateMutualFriendsVisibleAsync(UserId, request.Visible);
+        return ok ? Ok() : Unauthorized();
     }
 
     [Authorize]
@@ -169,5 +178,10 @@ public class UserProfileController : AuthenticatedController
 public class UpdateBioRequest
 {
     public string? Bio { get; set; }
+}
+
+public class UpdateMutualFriendsVisibleRequest
+{
+    public bool Visible { get; set; }
 }
 

@@ -110,4 +110,14 @@ public class UserService : IUserService
 
         return user.BannerUrl;
     }
+
+    public async Task<bool> UpdateMutualFriendsVisibleAsync(Guid userId, bool visible)
+    {
+        var user = await _users.GetByIdAsync(userId);
+        if (user == null) return false;
+        user.MutualFriendsVisible = visible;
+        await _users.UpdateAsync(user);
+        await _users.SaveChangesAsync();
+        return true;
+    }
 }
