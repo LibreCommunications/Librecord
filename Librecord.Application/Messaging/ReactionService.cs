@@ -44,4 +44,9 @@ public class ReactionService : IReactionService
     {
         return _reactions.GetMessageChannelIdAsync(messageId);
     }
+
+    public Task<Guid?> GetMessageGuildChannelIdAsync(Guid messageId)
+    {
+        return _reactions.GetMessageGuildChannelIdAsync(messageId);
+    }
 }

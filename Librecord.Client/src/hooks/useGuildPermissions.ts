@@ -15,13 +15,14 @@ const NONE: GuildPermissions = {
     inviteMembers: false,
 };
 
-export function useGuildPermissions(guildId: string | undefined) {
+export function useGuildPermissions(guildId: string | undefined, channelId?: string) {
     const [permissions, setPermissions] = useState<GuildPermissions>(NONE);
     const [loaded, setLoaded] = useState(false);
-    const [prevGuildId, setPrevGuildId] = useState(guildId);
+    const [prevKey, setPrevKey] = useState(`${guildId}:${channelId}`);
 
-    if (guildId !== prevGuildId) {
-        setPrevGuildId(guildId);
+    const key = `${guildId}:${channelId}`;
+    if (key !== prevKey) {
+        setPrevKey(key);
         setPermissions(NONE);
         setLoaded(false);
     }
@@ -30,14 +31,14 @@ export function useGuildPermissions(guildId: string | undefined) {
         if (!guildId) return;
         let stale = false;
 
-        guilds.myPermissions(guildId).then((result) => {
+        guilds.myPermissions(guildId, channelId).then((result) => {
             if (stale) return;
             if (result) setPermissions(result);
             setLoaded(true);
         });
 
         return () => { stale = true; };
-    }, [guildId]);
+    }, [guildId, channelId]);
 
     return { permissions, loaded };
 }

@@ -53,7 +53,7 @@ public class GuildMemberController : AuthenticatedController
     }
 
     [HttpGet("permissions/me")]
-    public async Task<IActionResult> MyPermissions(Guid guildId)
+    public async Task<IActionResult> MyPermissions(Guid guildId, [FromQuery] Guid? channelId = null)
     {
         var granted = await _permissions.GetGrantedGuildPermissionsAsync(UserId, guildId);
         if (granted == null) return Forbid();
@@ -63,16 +63,28 @@ public class GuildMemberController : AuthenticatedController
         var isOwner = guild?.OwnerId == UserId;
         var manageGuild = granted.Contains(GuildPermission.ManageGuild);
 
+        // Resolve channel-level permissions when a channel is specified
+        HashSet<PermissionCapability>? channelGranted = null;
+        if (channelId.HasValue)
+            channelGranted = await _permissions.GetGrantedChannelPermissionsAsync(UserId, channelId.Value);
+
         return Ok(new
         {
             isOwner,
             manageGuild,
             manageChannels = granted.Contains(GuildPermission.ManageChannels),
             manageRoles = granted.Contains(GuildPermission.ManageRoles),
-            manageMessages = isOwner || manageGuild,
+            manageMessages = isOwner || manageGuild
+                || (channelGranted?.Contains(ChannelPermission.ManageMessages) ?? false),
             kickMembers = granted.Contains(GuildPermission.KickMembers),
             banMembers = granted.Contains(GuildPermission.BanMembers),
             inviteMembers = granted.Contains(GuildPermission.InviteMembers),
+            // Channel-level permissions (only present when channelId is provided)
+            channelSendMessages = channelGranted?.Contains(ChannelPermission.SendMessages),
+            channelSendAttachments = channelGranted?.Contains(ChannelPermission.SendAttachments),
+            channelAddReactions = channelGranted?.Contains(ChannelPermission.AddReactions),
+            channelViewChannel = channelGranted?.Contains(ChannelPermission.ViewChannel),
+            channelReadMessages = channelGranted?.Contains(ChannelPermission.ReadMessages),
         });
     }
 

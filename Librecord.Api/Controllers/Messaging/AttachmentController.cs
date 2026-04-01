@@ -49,6 +49,13 @@ public class GuildMessageWithAttachmentController : AuthenticatedController
             UserId, channelId, ChannelPermission.SendMessages);
         if (!access.Allowed) return Forbid();
 
+        if (files is { Count: > 0 })
+        {
+            var attachAccess = await _permissions.HasChannelPermissionAsync(
+                UserId, channelId, ChannelPermission.SendAttachments);
+            if (!attachAccess.Allowed) return Forbid();
+        }
+
         Guid? replyId = Guid.TryParse(replyToMessageId, out var rid) ? rid : null;
 
         var message = await _messages.CreateMessageAsync(

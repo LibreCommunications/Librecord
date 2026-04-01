@@ -1,5 +1,7 @@
 using Librecord.Api.Hubs;
 using Librecord.Application.Messaging;
+using Librecord.Application.Permissions;
+using Librecord.Domain.Permissions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -12,19 +14,31 @@ namespace Librecord.Api.Controllers.Messaging;
 public class ReactionController : AuthenticatedController
 {
     private readonly IReactionService _reactions;
+    private readonly IPermissionService _permissions;
     private readonly IHubContext<AppHub> _hub;
 
     public ReactionController(
         IReactionService reactions,
+        IPermissionService permissions,
         IHubContext<AppHub> hub)
     {
         _reactions = reactions;
+        _permissions = permissions;
         _hub = hub;
     }
 
     [HttpPut("{emoji}")]
     public async Task<IActionResult> Add(Guid messageId, string emoji)
     {
+        // Check AddReactions permission for guild channel messages
+        var guildChannelId = await _reactions.GetMessageGuildChannelIdAsync(messageId);
+        if (guildChannelId.HasValue)
+        {
+            var perm = await _permissions.HasChannelPermissionAsync(
+                UserId, guildChannelId.Value, ChannelPermission.AddReactions);
+            if (!perm.Allowed) return Forbid();
+        }
+
         try
         {
             var reaction = await _reactions.AddReactionAsync(messageId, UserId, emoji);
@@ -54,6 +68,9 @@ public class ReactionController : AuthenticatedController
     [HttpDelete("{emoji}")]
     public async Task<IActionResult> Remove(Guid messageId, string emoji)
     {
+        // Removing your own reaction doesn't need a permission check —
+        // only removing others' reactions would, but this endpoint only
+        // removes the calling user's reaction.
         await _reactions.RemoveReactionAsync(messageId, UserId, emoji);
 
         var channelId = await _reactions.GetMessageChannelIdAsync(messageId);

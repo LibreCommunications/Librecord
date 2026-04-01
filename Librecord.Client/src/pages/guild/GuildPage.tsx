@@ -36,7 +36,7 @@ export default function GuildChannelPage() {
         deleteMessage: guildDeleteMessage,
     } = useGuildChannelMessages();
     const { sendGuildMessageWithAttachments } = useAttachmentUpload();
-    const { permissions } = useGuildPermissions(guildId);
+    const { permissions } = useGuildPermissions(guildId, channelId);
     const { createThread, getThreads } = useThreads();
     const [channelName, setChannelName] = useState<string | null>(null);
     const [channelTopic, setChannelTopic] = useState<string | null>(null);

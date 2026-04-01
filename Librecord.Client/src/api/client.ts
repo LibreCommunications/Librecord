@@ -102,7 +102,8 @@ export const guilds = {
     channels: (guildId: string) => request<GuildChannel[]>(`/guilds/${guildId}/channels`).catch(fallback("guilds.channels", [] as GuildChannel[])),
     getChannel: (channelId: string) => requestOptional<GuildChannel & { topic?: string }>(`/channels/${channelId}`),
     members: (guildId: string) => request<GuildMember[]>(`/guilds/${guildId}/members`).catch(fallback("guilds.members", [] as GuildMember[])),
-    myPermissions: (guildId: string) => requestOptional<GuildPermissions>(`/guilds/${guildId}/permissions/me`),
+    myPermissions: (guildId: string, channelId?: string) =>
+        requestOptional<GuildPermissions>(`/guilds/${guildId}/permissions/me${channelId ? `?channelId=${channelId}` : ""}`),
     uploadIcon: (guildId: string, file: File) => {
         const form = new FormData();
         form.append("file", file);
