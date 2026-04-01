@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
+import { compression } from "vite-plugin-compression2";
 import fs from "fs";
 import path from "path";
 
@@ -50,6 +51,7 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset()] }),
     tailwindcss(),
     versionPlugin(),
+    compression({ algorithms: ["br", "gzip"], exclude: [/\.(br|gz)$/] }),
   ],
   build: {
     rolldownOptions: {
