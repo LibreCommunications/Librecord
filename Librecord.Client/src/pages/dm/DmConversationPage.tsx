@@ -8,6 +8,10 @@ import { useAuth } from "../../hooks/useAuth";
 import { useAttachmentUpload } from "../../hooks/useAttachmentUpload";
 import { useChatChannel, type ChatChannelConfig } from "../../hooks/useChatChannel";
 import { Spinner } from "../../components/ui/Spinner";
+import { useVoice } from "../../hooks/useVoice";
+import { VoiceChannelView } from "../../components/voice/VoiceChannelView";
+import { OutgoingCallOverlay } from "../../components/voice/OutgoingCallOverlay";
+import { VoiceChannelIcon } from "../../components/ui/Icons";
 
 import { AddParticipantModal } from "./AddParticipantModal";
 import { DmHeader } from "./DmHeader";
@@ -52,6 +56,15 @@ export default function DmConversationPage() {
     const [showProfile, setShowProfile] = useState(() => localStorage.getItem(STORAGE.showDmProfile) !== "false");
     const [isBlocked, setIsBlocked] = useState(false);
     const [confirmDmAction, setConfirmDmAction] = useState<"block" | "unfriend" | null>(null);
+    const { voiceState, startDmCall } = useVoice();
+    const inCall = voiceState.isConnected && voiceState.channelId === dmId && !voiceState.guildId;
+    const [showCallView, setShowCallView] = useState(inCall);
+    const [prevInCall, setPrevInCall] = useState(inCall);
+    if (inCall !== prevInCall) {
+        setPrevInCall(inCall);
+        // Auto-show call view when a call starts, auto-hide when it ends
+        setShowCallView(inCall);
+    }
     const { removeFriend } = useFriends();
     const { blockUser, unblockUser, isBlocked: checkBlocked } = useBlocks();
     const { toast } = useToast();
@@ -165,6 +178,8 @@ export default function DmConversationPage() {
                                 setShowAddModal(true);
                             }}
                             onLeave={() => setShowLeaveConfirm(true)}
+                            onStartCall={!voiceState.isConnected && dmId ? () => { startDmCall(dmId); setShowCallView(true); } : undefined}
+                            inCall={voiceState.isConnected}
                         />
                     </div>
                     {!channel?.isGroup && (
@@ -209,12 +224,32 @@ export default function DmConversationPage() {
                     </button>
                 </div>
 
-                <ChatView
-                    chat={chat}
-                    currentUserId={user?.userId}
-                    getAvatarUrl={getAvatarUrl}
-                    inputPlaceholder={`Message ${channelName ?? ""}`}
-                />
+                {inCall && (
+                    <button
+                        onClick={() => setShowCallView(v => !v)}
+                        className="flex items-center gap-2 w-full px-4 py-2 bg-[#248046] hover:bg-[#1a6334] text-white text-sm font-medium transition-colors shrink-0"
+                    >
+                        <VoiceChannelIcon size={16} />
+                        <span>{showCallView ? "Back to Messages" : "View Call"}</span>
+                    </button>
+                )}
+
+                {inCall && showCallView ? (
+                    <div className="flex-1 relative min-h-0">
+                        <VoiceChannelView
+                            channelId={dmId!}
+                            channelName={channelName ?? "Call"}
+                        />
+                        <OutgoingCallOverlay channelName={channelName ?? "Call"} />
+                    </div>
+                ) : (
+                    <ChatView
+                        chat={chat}
+                        currentUserId={user?.userId}
+                        getAvatarUrl={getAvatarUrl}
+                        inputPlaceholder={`Message ${channelName ?? ""}`}
+                    />
+                )}
 
                 {showAddModal && channel && (
                     <AddParticipantModal
@@ -288,34 +323,10 @@ export default function DmConversationPage() {
                         </div>
 
                         {/* Mutual Friends */}
-                        {otherProfile.mutualFriendCount != null && otherProfile.mutualFriendCount > 0 && (
+                        {otherFriends.length > 0 && (
                             <div className="mt-3 bg-[#1e1f22] rounded-lg px-3 py-2">
                                 <p className="text-[10px] font-semibold text-[#b5bac1] uppercase mb-1.5">
-                                    Mutual Friends — {otherProfile.mutualFriendCount}
-                                </p>
-                                <div className="flex flex-wrap gap-1">
-                                    {otherFriends
-                                        .filter(f => f.id !== user?.userId)
-                                        .slice(0, 10)
-                                        .map(f => (
-                                            <div key={f.id} className="flex items-center gap-1.5 bg-[#2b2d31] rounded-full pl-0.5 pr-2 py-0.5">
-                                                <img
-                                                    src={getAvatarUrl(f.avatarUrl ?? null)}
-                                                    alt={f.displayName}
-                                                    className="w-4 h-4 rounded-full object-cover"
-                                                />
-                                                <span className="text-[10px] text-[#dbdee1] truncate max-w-[60px]">{f.displayName}</span>
-                                            </div>
-                                        ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Friend List */}
-                        {otherProfile.friendsVisible && otherFriends.length > 0 && (
-                            <div className="mt-3 bg-[#1e1f22] rounded-lg px-3 py-2">
-                                <p className="text-[10px] font-semibold text-[#b5bac1] uppercase mb-1.5">
-                                    Friends — {otherFriends.length}
+                                    Mutual Friends — {otherFriends.length}
                                 </p>
                                 <div className="space-y-1 max-h-40 overflow-y-auto dark-scrollbar">
                                     {otherFriends.map(f => (

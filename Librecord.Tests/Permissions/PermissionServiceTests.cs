@@ -13,11 +13,13 @@ public class PermissionServiceTests
     private PermissionService CreateService() =>
         new(_guilds.Object, _registry);
 
-    // ─── HELPERS ────────────────────────────────────────
+    // --- Shared constants ---
 
     private static readonly Guid GuildId = Guid.NewGuid();
     private static readonly Guid UserId = Guid.NewGuid();
     private static readonly Guid ChannelId = Guid.NewGuid();
+
+    // --- Helpers ---
 
     private GuildMember MakeMember(params (Guid roleId, List<Permission> perms)[] roles)
     {
@@ -34,17 +36,15 @@ public class PermissionServiceTests
             }).ToList()
         };
 
-        // Setup per-role queries (used by channel permission fallback)
+        var allPerms = roles.SelectMany(r => r.perms).Distinct().ToList();
+        _guilds.Setup(g => g.GetRolesPermissionsBatchAsync(It.IsAny<IEnumerable<Guid>>()))
+            .ReturnsAsync(allPerms);
+
         foreach (var (roleId, perms) in roles)
         {
             _guilds.Setup(g => g.GetRolePermissionsAsync(roleId))
                 .ReturnsAsync(perms);
         }
-
-        // Setup batch query (used by guild permission checks)
-        var allPerms = roles.SelectMany(r => r.perms).Distinct().ToList();
-        _guilds.Setup(g => g.GetRolesPermissionsBatchAsync(It.IsAny<IEnumerable<Guid>>()))
-            .ReturnsAsync(allPerms);
 
         return member;
     }
@@ -61,12 +61,41 @@ public class PermissionServiceTests
     private GuildChannel MakeChannel() =>
         new() { Id = ChannelId, GuildId = GuildId, Name = "test" };
 
+    private void SetupChannelWithMember(GuildMember member, List<GuildChannelPermissionOverride> overrides)
+    {
+        _guilds.Setup(g => g.GetChannelAsync(ChannelId)).ReturnsAsync(MakeChannel());
+        _guilds.Setup(g => g.GetGuildMemberAsync(GuildId, UserId)).ReturnsAsync(member);
+        _guilds.Setup(g => g.GetChannelOverridesAsync(ChannelId)).ReturnsAsync(overrides);
+    }
+
+    private static GuildChannelPermissionOverride UserOverride(string permName, bool allow) =>
+        new()
+        {
+            Id = Guid.NewGuid(),
+            ChannelId = ChannelId,
+            UserId = UserId,
+            Allow = allow,
+            PermissionId = Guid.NewGuid(),
+            Permission = MakePerm(permName, "Channel"),
+        };
+
+    private static GuildChannelPermissionOverride RoleOverride(Guid roleId, string permName, bool allow) =>
+        new()
+        {
+            Id = Guid.NewGuid(),
+            ChannelId = ChannelId,
+            RoleId = roleId,
+            Allow = allow,
+            PermissionId = Guid.NewGuid(),
+            Permission = MakePerm(permName, "Channel"),
+        };
+
     // ────────────────────────────────────────────────────
     // GUILD PERMISSION TESTS
     // ────────────────────────────────────────────────────
 
     [Fact]
-    public async Task NonMember_DeniedAnyGuildPermission()
+    public async Task When_NonMember_ChecksGuildPermission_Should_Deny()
     {
         _guilds.Setup(g => g.GetGuildMemberAsync(GuildId, UserId))
             .ReturnsAsync((GuildMember?)null);
@@ -77,9 +106,65 @@ public class PermissionServiceTests
         Assert.False(result.Allowed);
     }
 
+    [Fact]
+    public async Task When_MemberWithRole_ChecksGrantedPermission_Should_Allow()
+    {
+        var roleId = Guid.NewGuid();
+        var member = MakeMember((roleId, GuildPerms("ManageRoles")));
+        _guilds.Setup(g => g.GetGuildMemberAsync(GuildId, UserId)).ReturnsAsync(member);
+
+        var svc = CreateService();
+        var result = await svc.HasGuildPermissionAsync(UserId, GuildId, GuildPermission.ManageRoles);
+
+        Assert.True(result.Allowed);
+    }
+
+    [Fact]
+    public async Task When_MemberWithRole_ChecksUngrantedPermission_Should_Deny()
+    {
+        var roleId = Guid.NewGuid();
+        var member = MakeMember((roleId, GuildPerms("ViewGuild")));
+        _guilds.Setup(g => g.GetGuildMemberAsync(GuildId, UserId)).ReturnsAsync(member);
+
+        var svc = CreateService();
+        var result = await svc.HasGuildPermissionAsync(UserId, GuildId, GuildPermission.BanMembers);
+
+        Assert.False(result.Allowed);
+    }
+
+    [Fact]
+    public async Task When_GetGrantedGuildPermissions_ForNonMember_Should_ReturnNull()
+    {
+        _guilds.Setup(g => g.GetGuildMemberAsync(GuildId, UserId))
+            .ReturnsAsync((GuildMember?)null);
+
+        var svc = CreateService();
+        var result = await svc.GetGrantedGuildPermissionsAsync(UserId, GuildId);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task When_GetGrantedGuildPermissions_ForMember_Should_ReturnAllRolePermissions()
+    {
+        var roleId = Guid.NewGuid();
+        var member = MakeMember((roleId, GuildPerms("ViewGuild", "ManageGuild", "KickMembers")));
+        _guilds.Setup(g => g.GetGuildMemberAsync(GuildId, UserId)).ReturnsAsync(member);
+
+        var svc = CreateService();
+        var result = await svc.GetGrantedGuildPermissionsAsync(UserId, GuildId);
+
+        Assert.NotNull(result);
+        Assert.Equal(3, result.Count);
+        Assert.Contains(GuildPermission.ViewGuild, result);
+        Assert.Contains(GuildPermission.ManageGuild, result);
+        Assert.Contains(GuildPermission.KickMembers, result);
+    }
+
     [Theory]
     [MemberData(nameof(AllGuildPermissions))]
-    public async Task GuildPermission_Granted_WhenRoleHasIt(PermissionCapability perm, string permKey)
+    public async Task When_CheckingEachGuildPermission_WithGrantedRole_Should_Allow(
+        PermissionCapability perm, string permKey)
     {
         var roleId = Guid.NewGuid();
         var member = MakeMember((roleId, GuildPerms(permKey)));
@@ -91,45 +176,87 @@ public class PermissionServiceTests
         Assert.True(result.Allowed);
     }
 
-    [Theory]
-    [MemberData(nameof(AllGuildPermissions))]
-    public async Task GuildPermission_Denied_WhenRoleLacksIt(PermissionCapability perm, string _)
+    // ────────────────────────────────────────────────────
+    // CHANNEL PERMISSION TESTS - Override Precedence
+    // ────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task When_UserOverrideAllows_Should_GrantRegardlessOfRoleOverride()
     {
         var roleId = Guid.NewGuid();
-        // Role has NO permissions
-        var member = MakeMember((roleId, GuildPerms()));
-        _guilds.Setup(g => g.GetGuildMemberAsync(GuildId, UserId)).ReturnsAsync(member);
+        var member = MakeMember((roleId, ChannelPerms()));
+        SetupChannelWithMember(member, [
+            RoleOverride(roleId, "SendMessages", false),
+            UserOverride("SendMessages", true),
+        ]);
 
         var svc = CreateService();
-        var result = await svc.HasGuildPermissionAsync(UserId, GuildId, perm);
+        var result = await svc.HasChannelPermissionAsync(UserId, ChannelId, ChannelPermission.SendMessages);
+
+        Assert.True(result.Allowed);
+    }
+
+    [Fact]
+    public async Task When_UserOverrideDenies_Should_DenyRegardlessOfRoleOverride()
+    {
+        var roleId = Guid.NewGuid();
+        var member = MakeMember((roleId, ChannelPerms("SendMessages")));
+        SetupChannelWithMember(member, [
+            RoleOverride(roleId, "SendMessages", true),
+            UserOverride("SendMessages", false),
+        ]);
+
+        var svc = CreateService();
+        var result = await svc.HasChannelPermissionAsync(UserId, ChannelId, ChannelPermission.SendMessages);
 
         Assert.False(result.Allowed);
     }
 
     [Fact]
-    public async Task GuildPermission_MultipleRoles_GrantedFromSecondRole()
+    public async Task When_RoleOverrideAllows_AndNoUserOverride_Should_Grant()
     {
-        var role1 = Guid.NewGuid();
-        var role2 = Guid.NewGuid();
-        var member = MakeMember(
-            (role1, GuildPerms("ViewGuild")),
-            (role2, GuildPerms("ManageRoles"))
-        );
-        _guilds.Setup(g => g.GetGuildMemberAsync(GuildId, UserId)).ReturnsAsync(member);
+        var roleId = Guid.NewGuid();
+        var member = MakeMember((roleId, ChannelPerms()));
+        SetupChannelWithMember(member, [
+            RoleOverride(roleId, "SendMessages", true),
+        ]);
 
         var svc = CreateService();
+        var result = await svc.HasChannelPermissionAsync(UserId, ChannelId, ChannelPermission.SendMessages);
 
-        Assert.True((await svc.HasGuildPermissionAsync(UserId, GuildId, GuildPermission.ManageRoles)).Allowed);
-        Assert.True((await svc.HasGuildPermissionAsync(UserId, GuildId, GuildPermission.ViewGuild)).Allowed);
-        Assert.False((await svc.HasGuildPermissionAsync(UserId, GuildId, GuildPermission.BanMembers)).Allowed);
+        Assert.True(result.Allowed);
     }
 
-    // ────────────────────────────────────────────────────
-    // CHANNEL PERMISSION TESTS
-    // ────────────────────────────────────────────────────
+    [Fact]
+    public async Task When_RoleOverrideDenies_AndNoUserOverride_Should_Deny()
+    {
+        var roleId = Guid.NewGuid();
+        var member = MakeMember((roleId, ChannelPerms("SendMessages")));
+        SetupChannelWithMember(member, [
+            RoleOverride(roleId, "SendMessages", false),
+        ]);
+
+        var svc = CreateService();
+        var result = await svc.HasChannelPermissionAsync(UserId, ChannelId, ChannelPermission.SendMessages);
+
+        Assert.False(result.Allowed);
+    }
 
     [Fact]
-    public async Task ChannelPermission_Denied_ChannelNotFound()
+    public async Task When_NoOverrides_Should_FallBackToGuildPermissions()
+    {
+        var roleId = Guid.NewGuid();
+        var member = MakeMember((roleId, ChannelPerms("SendMessages")));
+        SetupChannelWithMember(member, []);
+
+        var svc = CreateService();
+        var result = await svc.HasChannelPermissionAsync(UserId, ChannelId, ChannelPermission.SendMessages);
+
+        Assert.True(result.Allowed);
+    }
+
+    [Fact]
+    public async Task When_ChannelNotFound_Should_Deny()
     {
         _guilds.Setup(g => g.GetChannelAsync(ChannelId)).ReturnsAsync((GuildChannel?)null);
 
@@ -140,11 +267,10 @@ public class PermissionServiceTests
     }
 
     [Fact]
-    public async Task ChannelPermission_Denied_NonMember()
+    public async Task When_NonMember_ChecksChannelPermission_Should_Deny()
     {
         _guilds.Setup(g => g.GetChannelAsync(ChannelId)).ReturnsAsync(MakeChannel());
         _guilds.Setup(g => g.GetGuildMemberAsync(GuildId, UserId)).ReturnsAsync((GuildMember?)null);
-        _guilds.Setup(g => g.GetChannelOverridesAsync(ChannelId)).ReturnsAsync([]);
 
         var svc = CreateService();
         var result = await svc.HasChannelPermissionAsync(UserId, ChannelId, ChannelPermission.SendMessages);
@@ -152,15 +278,67 @@ public class PermissionServiceTests
         Assert.False(result.Allowed);
     }
 
+    [Fact]
+    public async Task When_UserOverrideAllows_WithNoGuildGrant_Should_StillAllow()
+    {
+        var roleId = Guid.NewGuid();
+        // Guild-level role does NOT grant ManageMessages
+        var member = MakeMember((roleId, ChannelPerms("ViewChannel")));
+        SetupChannelWithMember(member, [
+            UserOverride("ManageMessages", true),
+        ]);
+
+        var svc = CreateService();
+        var result = await svc.HasChannelPermissionAsync(UserId, ChannelId, ChannelPermission.ManageMessages);
+
+        Assert.True(result.Allowed);
+    }
+
+    [Fact]
+    public async Task When_MultipleRoles_OneAllowsOneDoesNotOverride_Should_AllowFromOverride()
+    {
+        var roleA = Guid.NewGuid();
+        var roleB = Guid.NewGuid();
+        // Neither role grants SendMessages at guild level
+        var member = MakeMember((roleA, ChannelPerms()), (roleB, ChannelPerms()));
+        SetupChannelWithMember(member, [
+            RoleOverride(roleA, "SendMessages", true),
+            // roleB has no override for SendMessages
+        ]);
+
+        var svc = CreateService();
+        var result = await svc.HasChannelPermissionAsync(UserId, ChannelId, ChannelPermission.SendMessages);
+
+        Assert.True(result.Allowed);
+    }
+
+    [Fact]
+    public async Task When_MultipleRoles_OneAllowsOneDenies_Should_FollowFirstMatchBehavior()
+    {
+        // The service iterates member.Roles in order — first match wins
+        var roleA = Guid.NewGuid();
+        var roleB = Guid.NewGuid();
+        var member = MakeMember((roleA, ChannelPerms()), (roleB, ChannelPerms()));
+        SetupChannelWithMember(member, [
+            RoleOverride(roleA, "SendMessages", true),
+            RoleOverride(roleB, "SendMessages", false),
+        ]);
+
+        var svc = CreateService();
+        var result = await svc.HasChannelPermissionAsync(UserId, ChannelId, ChannelPermission.SendMessages);
+
+        // HasChannelPermissionAsync: iterates roles, first override with Allow=true returns Allow
+        Assert.True(result.Allowed);
+    }
+
     [Theory]
     [MemberData(nameof(AllChannelPermissions))]
-    public async Task ChannelPermission_FallsBackToGuildRole(PermissionCapability perm, string permKey)
+    public async Task When_CheckingEachChannelPermission_WithGuildGrant_Should_Allow(
+        PermissionCapability perm, string permKey)
     {
         var roleId = Guid.NewGuid();
         var member = MakeMember((roleId, ChannelPerms(permKey)));
-        _guilds.Setup(g => g.GetChannelAsync(ChannelId)).ReturnsAsync(MakeChannel());
-        _guilds.Setup(g => g.GetGuildMemberAsync(GuildId, UserId)).ReturnsAsync(member);
-        _guilds.Setup(g => g.GetChannelOverridesAsync(ChannelId)).ReturnsAsync([]);
+        SetupChannelWithMember(member, []);
 
         var svc = CreateService();
         var result = await svc.HasChannelPermissionAsync(UserId, ChannelId, perm);
@@ -168,160 +346,167 @@ public class PermissionServiceTests
         Assert.True(result.Allowed);
     }
 
-    [Theory]
-    [MemberData(nameof(AllChannelPermissions))]
-    public async Task ChannelPermission_UserOverrideAllow_Grants(PermissionCapability perm, string permKey)
+    // ────────────────────────────────────────────────────
+    // BULK CHANNEL PERMISSIONS
+    // ────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task When_GetGrantedChannelPermissions_Should_ResolveAllChannelPermissions()
     {
         var roleId = Guid.NewGuid();
-        var member = MakeMember((roleId, ChannelPerms()));  // role has nothing
-        _guilds.Setup(g => g.GetChannelAsync(ChannelId)).ReturnsAsync(MakeChannel());
-        _guilds.Setup(g => g.GetGuildMemberAsync(GuildId, UserId)).ReturnsAsync(member);
-        _guilds.Setup(g => g.GetChannelOverridesAsync(ChannelId)).ReturnsAsync([
-            new GuildChannelPermissionOverride
-            {
-                Id = Guid.NewGuid(),
-                ChannelId = ChannelId,
-                UserId = UserId,
-                Allow = true,
-                PermissionId = Guid.NewGuid(),
-                Permission = MakePerm(permKey, "Channel"),
-            }
-        ]);
+        var member = MakeMember((roleId, ChannelPerms(
+            "ViewChannel", "ReadMessages", "SendMessages",
+            "SendAttachments", "AddReactions", "ManageMessages")));
+        SetupChannelWithMember(member, []);
 
         var svc = CreateService();
-        var result = await svc.HasChannelPermissionAsync(UserId, ChannelId, perm);
+        var result = await svc.GetGrantedChannelPermissionsAsync(UserId, ChannelId);
 
-        Assert.True(result.Allowed);
-    }
-
-    [Theory]
-    [MemberData(nameof(AllChannelPermissions))]
-    public async Task ChannelPermission_UserOverrideDeny_Denies(PermissionCapability perm, string permKey)
-    {
-        var roleId = Guid.NewGuid();
-        var member = MakeMember((roleId, ChannelPerms(permKey)));  // role grants it
-        _guilds.Setup(g => g.GetChannelAsync(ChannelId)).ReturnsAsync(MakeChannel());
-        _guilds.Setup(g => g.GetGuildMemberAsync(GuildId, UserId)).ReturnsAsync(member);
-        _guilds.Setup(g => g.GetChannelOverridesAsync(ChannelId)).ReturnsAsync([
-            new GuildChannelPermissionOverride
-            {
-                Id = Guid.NewGuid(),
-                ChannelId = ChannelId,
-                UserId = UserId,
-                Allow = false,
-                PermissionId = Guid.NewGuid(),
-                Permission = MakePerm(permKey, "Channel"),
-            }
-        ]);
-
-        var svc = CreateService();
-        var result = await svc.HasChannelPermissionAsync(UserId, ChannelId, perm);
-
-        Assert.False(result.Allowed);
-    }
-
-    [Theory]
-    [MemberData(nameof(AllChannelPermissions))]
-    public async Task ChannelPermission_RoleOverrideAllow_Grants(PermissionCapability perm, string permKey)
-    {
-        var roleId = Guid.NewGuid();
-        var member = MakeMember((roleId, ChannelPerms()));  // role has nothing at guild level
-        _guilds.Setup(g => g.GetChannelAsync(ChannelId)).ReturnsAsync(MakeChannel());
-        _guilds.Setup(g => g.GetGuildMemberAsync(GuildId, UserId)).ReturnsAsync(member);
-        _guilds.Setup(g => g.GetChannelOverridesAsync(ChannelId)).ReturnsAsync([
-            new GuildChannelPermissionOverride
-            {
-                Id = Guid.NewGuid(),
-                ChannelId = ChannelId,
-                RoleId = roleId,
-                Allow = true,
-                PermissionId = Guid.NewGuid(),
-                Permission = MakePerm(permKey, "Channel"),
-            }
-        ]);
-
-        var svc = CreateService();
-        var result = await svc.HasChannelPermissionAsync(UserId, ChannelId, perm);
-
-        Assert.True(result.Allowed);
-    }
-
-    [Theory]
-    [MemberData(nameof(AllChannelPermissions))]
-    public async Task ChannelPermission_RoleOverrideDeny_Denies(PermissionCapability perm, string permKey)
-    {
-        var roleId = Guid.NewGuid();
-        var member = MakeMember((roleId, ChannelPerms(permKey)));  // role grants at guild level
-        _guilds.Setup(g => g.GetChannelAsync(ChannelId)).ReturnsAsync(MakeChannel());
-        _guilds.Setup(g => g.GetGuildMemberAsync(GuildId, UserId)).ReturnsAsync(member);
-        _guilds.Setup(g => g.GetChannelOverridesAsync(ChannelId)).ReturnsAsync([
-            new GuildChannelPermissionOverride
-            {
-                Id = Guid.NewGuid(),
-                ChannelId = ChannelId,
-                RoleId = roleId,
-                Allow = false,
-                PermissionId = Guid.NewGuid(),
-                Permission = MakePerm(permKey, "Channel"),
-            }
-        ]);
-
-        var svc = CreateService();
-        var result = await svc.HasChannelPermissionAsync(UserId, ChannelId, perm);
-
-        Assert.False(result.Allowed);
+        Assert.Equal(6, result.Count);
+        Assert.Contains(ChannelPermission.ViewChannel, result);
+        Assert.Contains(ChannelPermission.ReadMessages, result);
+        Assert.Contains(ChannelPermission.SendMessages, result);
+        Assert.Contains(ChannelPermission.SendAttachments, result);
+        Assert.Contains(ChannelPermission.AddReactions, result);
+        Assert.Contains(ChannelPermission.ManageMessages, result);
     }
 
     [Fact]
-    public async Task ChannelPermission_UserOverride_TakesPriorityOverRoleOverride()
+    public async Task When_GetGrantedChannelPermissions_WithMixedOverrides_Should_ApplyCorrectPrecedence()
     {
         var roleId = Guid.NewGuid();
-        var member = MakeMember((roleId, ChannelPerms()));
-        _guilds.Setup(g => g.GetChannelAsync(ChannelId)).ReturnsAsync(MakeChannel());
-        _guilds.Setup(g => g.GetGuildMemberAsync(GuildId, UserId)).ReturnsAsync(member);
-        _guilds.Setup(g => g.GetChannelOverridesAsync(ChannelId)).ReturnsAsync([
-            // Role denies
-            new GuildChannelPermissionOverride
-            {
-                Id = Guid.NewGuid(),
-                ChannelId = ChannelId,
-                RoleId = roleId,
-                Allow = false,
-                PermissionId = Guid.NewGuid(),
-                Permission = MakePerm("SendMessages", "Channel"),
-            },
-            // User allows — should win
-            new GuildChannelPermissionOverride
-            {
-                Id = Guid.NewGuid(),
-                ChannelId = ChannelId,
-                UserId = UserId,
-                Allow = true,
-                PermissionId = Guid.NewGuid(),
-                Permission = MakePerm("SendMessages", "Channel"),
-            }
+        // Guild-level role grants SendMessages and ViewChannel
+        var member = MakeMember((roleId, ChannelPerms("SendMessages", "ViewChannel")));
+        SetupChannelWithMember(member, [
+            // User override denies SendMessages (overrides guild grant)
+            UserOverride("SendMessages", false),
+            // Role override allows ReadMessages (no guild grant, but override adds it)
+            RoleOverride(roleId, "ReadMessages", true),
+            // Role override denies ViewChannel (overrides guild grant)
+            RoleOverride(roleId, "ViewChannel", false),
         ]);
 
         var svc = CreateService();
-        var result = await svc.HasChannelPermissionAsync(UserId, ChannelId, ChannelPermission.SendMessages);
+        var result = await svc.GetGrantedChannelPermissionsAsync(UserId, ChannelId);
 
-        Assert.True(result.Allowed);
+        Assert.DoesNotContain(ChannelPermission.SendMessages, result); // user override deny
+        Assert.Contains(ChannelPermission.ReadMessages, result);       // role override allow
+        Assert.DoesNotContain(ChannelPermission.ViewChannel, result);  // role override deny
     }
 
     [Fact]
-    public async Task ChannelPermission_NoOverrides_FallsBackToGuildPermission()
+    public async Task When_GetGrantedChannelPermissions_ForNonMember_Should_ReturnEmpty()
     {
-        var roleId = Guid.NewGuid();
-        // Role has guild-level SendMessages (as a Channel perm on the role)
-        var member = MakeMember((roleId, ChannelPerms("SendMessages")));
         _guilds.Setup(g => g.GetChannelAsync(ChannelId)).ReturnsAsync(MakeChannel());
-        _guilds.Setup(g => g.GetGuildMemberAsync(GuildId, UserId)).ReturnsAsync(member);
-        _guilds.Setup(g => g.GetChannelOverridesAsync(ChannelId)).ReturnsAsync([]);
+        _guilds.Setup(g => g.GetGuildMemberAsync(GuildId, UserId)).ReturnsAsync((GuildMember?)null);
 
         var svc = CreateService();
-        var result = await svc.HasChannelPermissionAsync(UserId, ChannelId, ChannelPermission.SendMessages);
+        var result = await svc.GetGrantedChannelPermissionsAsync(UserId, ChannelId);
 
-        Assert.True(result.Allowed);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task When_GetGrantedChannelPermissions_ChannelNotFound_Should_ReturnEmpty()
+    {
+        _guilds.Setup(g => g.GetChannelAsync(ChannelId)).ReturnsAsync((GuildChannel?)null);
+
+        var svc = CreateService();
+        var result = await svc.GetGrantedChannelPermissionsAsync(UserId, ChannelId);
+
+        Assert.Empty(result);
+    }
+
+    // ────────────────────────────────────────────────────
+    // SET CHANNEL OVERRIDE
+    // ────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task When_SettingOverride_WithAllowTrue_Should_CreateOrUpdate()
+    {
+        var permissionId = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
+
+        // No existing override
+        _guilds.Setup(g => g.GetChannelOverrideAsync(ChannelId, permissionId, roleId, null))
+            .ReturnsAsync((GuildChannelPermissionOverride?)null);
+
+        var svc = CreateService();
+        await svc.SetChannelOverrideAsync(ChannelId, roleId, null, permissionId, true);
+
+        _guilds.Verify(g => g.AddChannelOverrideAsync(
+            It.Is<GuildChannelPermissionOverride>(o =>
+                o.ChannelId == ChannelId &&
+                o.RoleId == roleId &&
+                o.PermissionId == permissionId &&
+                o.Allow == true)),
+            Times.Once);
+        _guilds.Verify(g => g.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task When_SettingOverride_WithAllowNull_Should_RemoveExisting()
+    {
+        var permissionId = Guid.NewGuid();
+        var existing = new GuildChannelPermissionOverride
+        {
+            Id = Guid.NewGuid(),
+            ChannelId = ChannelId,
+            RoleId = Guid.NewGuid(),
+            PermissionId = permissionId,
+            Allow = true,
+        };
+
+        _guilds.Setup(g => g.GetChannelOverrideAsync(ChannelId, permissionId, existing.RoleId, null))
+            .ReturnsAsync(existing);
+
+        var svc = CreateService();
+        await svc.SetChannelOverrideAsync(ChannelId, existing.RoleId, null, permissionId, null);
+
+        _guilds.Verify(g => g.RemoveChannelOverrideAsync(existing), Times.Once);
+        _guilds.Verify(g => g.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task When_SettingOverride_WithExistingOverride_Should_UpdateInPlace()
+    {
+        var permissionId = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
+        var existing = new GuildChannelPermissionOverride
+        {
+            Id = Guid.NewGuid(),
+            ChannelId = ChannelId,
+            RoleId = roleId,
+            PermissionId = permissionId,
+            Allow = true,
+        };
+
+        _guilds.Setup(g => g.GetChannelOverrideAsync(ChannelId, permissionId, roleId, null))
+            .ReturnsAsync(existing);
+
+        var svc = CreateService();
+        await svc.SetChannelOverrideAsync(ChannelId, roleId, null, permissionId, false);
+
+        // Should update existing, not create new
+        Assert.Equal(false, existing.Allow);
+        _guilds.Verify(g => g.AddChannelOverrideAsync(It.IsAny<GuildChannelPermissionOverride>()), Times.Never);
+        _guilds.Verify(g => g.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task When_SettingOverride_WithAllowNull_AndNoExisting_Should_DoNothing()
+    {
+        var permissionId = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
+
+        _guilds.Setup(g => g.GetChannelOverrideAsync(ChannelId, permissionId, roleId, null))
+            .ReturnsAsync((GuildChannelPermissionOverride?)null);
+
+        var svc = CreateService();
+        await svc.SetChannelOverrideAsync(ChannelId, roleId, null, permissionId, null);
+
+        _guilds.Verify(g => g.RemoveChannelOverrideAsync(It.IsAny<GuildChannelPermissionOverride>()), Times.Never);
+        _guilds.Verify(g => g.SaveChangesAsync(), Times.Never);
     }
 
     // ────────────────────────────────────────────────────
@@ -348,6 +533,5 @@ public class PermissionServiceTests
         { ChannelPermission.SendAttachments, "SendAttachments" },
         { ChannelPermission.AddReactions, "AddReactions" },
         { ChannelPermission.ManageMessages, "ManageMessages" },
-        { ChannelPermission.ManageChannels, "ManageChannels" },
     };
 }

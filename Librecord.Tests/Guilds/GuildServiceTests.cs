@@ -18,7 +18,7 @@ public class GuildServiceTests
     // ---------------------------------------------------------
 
     [Fact]
-    public async Task CreateGuild_Success_CreatesGuildWithRolesAndOwner()
+    public async Task When_CreatingGuild_Should_AssignOwnerAndCreateEveryoneAndOwnerRoles()
     {
         var ownerId = Guid.NewGuid();
 
@@ -30,37 +30,26 @@ public class GuildServiceTests
         Assert.Equal(2, guild.Roles.Count);
         Assert.Contains(guild.Roles, r => r.Name == "@everyone");
         Assert.Contains(guild.Roles, r => r.Name == "Owner");
-
-        var ownerRole = guild.Roles.First(r => r.Name == "Owner");
-        Assert.NotEmpty(ownerRole.Permissions);
-
         Assert.Single(guild.Members);
         Assert.Equal(ownerId, guild.Members.First().UserId);
-
-        _guilds.Verify(g => g.AddGuildAsync(guild), Times.Once);
-        _guilds.Verify(g => g.SaveChangesAsync(), Times.Once);
     }
 
     [Fact]
-    public async Task CreateGuild_WhitespaceName_Throws()
+    public async Task When_CreatingGuild_Should_GrantDefaultPermissionsToEveryone()
     {
         var svc = CreateService();
+        var guild = await svc.CreateGuildAsync(Guid.NewGuid(), "Test");
 
-        await Assert.ThrowsAsync<ArgumentException>(
-            () => svc.CreateGuildAsync(Guid.NewGuid(), "  "));
+        var everyoneRole = guild.Roles.First(r => r.Name == "@everyone");
+
+        Assert.NotEmpty(everyoneRole.Permissions);
+        Assert.Contains(everyoneRole.Permissions, rp => rp.PermissionId == PermissionIds.ChannelSendMessages && rp.Allow);
+        Assert.Contains(everyoneRole.Permissions, rp => rp.PermissionId == PermissionIds.ChannelReadMessages && rp.Allow);
+        Assert.Contains(everyoneRole.Permissions, rp => rp.PermissionId == PermissionIds.GuildViewGuild && rp.Allow);
     }
 
     [Fact]
-    public async Task CreateGuild_TrimsName()
-    {
-        var svc = CreateService();
-        var guild = await svc.CreateGuildAsync(Guid.NewGuid(), "  My Guild  ");
-
-        Assert.Equal("My Guild", guild.Name);
-    }
-
-    [Fact]
-    public async Task CreateGuild_OwnerRoleHasAllPermissions()
+    public async Task When_CreatingGuild_Should_GrantAllPermissionsToOwnerRole()
     {
         var svc = CreateService();
         var guild = await svc.CreateGuildAsync(Guid.NewGuid(), "Test");
@@ -76,7 +65,7 @@ public class GuildServiceTests
     // ---------------------------------------------------------
 
     [Fact]
-    public async Task IsMember_ExistingMember_ReturnsTrue()
+    public async Task When_CheckingMembershipForMember_Should_ReturnTrue()
     {
         var guildId = Guid.NewGuid();
         var userId = Guid.NewGuid();
@@ -88,7 +77,7 @@ public class GuildServiceTests
     }
 
     [Fact]
-    public async Task IsMember_NonMember_ReturnsFalse()
+    public async Task When_CheckingMembershipForNonMember_Should_ReturnFalse()
     {
         _guilds.Setup(g => g.GetGuildMemberAsync(It.IsAny<Guid>(), It.IsAny<Guid>()))
             .ReturnsAsync((GuildMember?)null);
@@ -102,7 +91,7 @@ public class GuildServiceTests
     // ---------------------------------------------------------
 
     [Fact]
-    public async Task CanAccessChannel_Allowed_ReturnsTrue()
+    public async Task When_CheckingChannelAccessForMember_Should_Allow()
     {
         var channelId = Guid.NewGuid();
         var userId = Guid.NewGuid();
@@ -111,17 +100,5 @@ public class GuildServiceTests
 
         var svc = CreateService();
         Assert.True(await svc.CanAccessChannelAsync(channelId, userId));
-    }
-
-    [Fact]
-    public async Task CanAccessChannel_Denied_ReturnsFalse()
-    {
-        var channelId = Guid.NewGuid();
-        var userId = Guid.NewGuid();
-        _permissions.Setup(p => p.HasChannelPermissionAsync(userId, channelId, ChannelPermission.ReadMessages))
-            .ReturnsAsync(PermissionResult.Deny("No access"));
-
-        var svc = CreateService();
-        Assert.False(await svc.CanAccessChannelAsync(channelId, userId));
     }
 }

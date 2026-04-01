@@ -101,6 +101,60 @@ public class PermissionService : IPermissionService
             : PermissionResult.Deny($"Missing guild permission: {required.Key}");
     }
 
+    public async Task<HashSet<PermissionCapability>> GetGrantedChannelPermissionsAsync(
+        Guid userId, Guid channelId)
+    {
+        var granted = new HashSet<PermissionCapability>();
+
+        var channel = await _guilds.GetChannelAsync(channelId);
+        if (channel == null) return granted;
+
+        var member = await _guilds.GetGuildMemberAsync(channel.GuildId, userId);
+        if (member == null) return granted;
+
+        var overrides = await _guilds.GetChannelOverridesAsync(channelId);
+        var roleIds = member.Roles.Select(r => r.RoleId).ToHashSet();
+        var rolePerms = await _guilds.GetRolesPermissionsBatchAsync(roleIds);
+
+        var guildGranted = new HashSet<PermissionCapability>();
+        foreach (var perm in rolePerms)
+            guildGranted.Add(_registry.Resolve(perm.Name, perm.Type));
+
+        var channelPerms = KnownPermissions.All
+            .Where(p => p.Type == "Channel")
+            .Select(p => p.Perm);
+
+        foreach (var perm in channelPerms)
+        {
+            // User override takes priority
+            var userOverride = overrides.FirstOrDefault(o =>
+                o.UserId == userId &&
+                _registry.Resolve(o.Permission.Name, o.Permission.Type).Equals(perm));
+
+            if (userOverride?.Allow == true) { granted.Add(perm); continue; }
+            if (userOverride?.Allow == false) continue;
+
+            // Role overrides
+            var roleAllowed = false;
+            var roleDenied = false;
+            foreach (var roleLink in member.Roles)
+            {
+                var ro = overrides.FirstOrDefault(o =>
+                    o.RoleId == roleLink.RoleId &&
+                    _registry.Resolve(o.Permission.Name, o.Permission.Type).Equals(perm));
+                if (ro?.Allow == true) roleAllowed = true;
+                if (ro?.Allow == false) roleDenied = true;
+            }
+            if (roleAllowed) { granted.Add(perm); continue; }
+            if (roleDenied) continue;
+
+            // Fall back to guild-level
+            if (guildGranted.Contains(perm)) granted.Add(perm);
+        }
+
+        return granted;
+    }
+
     public async Task SetChannelOverrideAsync(
         Guid channelId, Guid? roleId, Guid? userId,
         Guid permissionId, bool? allow)

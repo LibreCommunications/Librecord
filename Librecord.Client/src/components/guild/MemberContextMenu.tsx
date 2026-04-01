@@ -75,7 +75,9 @@ export function MemberContextMenu({
 
     return (
         <>
-            <div className="absolute right-0 top-0 bg-[#111214] rounded-lg shadow-xl py-1.5 w-48 z-50 border border-[#2b2d31] animate-[scaleIn_0.1s_ease-out]">
+            {/* Backdrop to close menu on outside click */}
+            <div className="fixed inset-0 z-40" onClick={e => { e.stopPropagation(); onClose(); }} />
+            <div role="menu" onClick={e => e.stopPropagation()} className="absolute right-0 top-0 bg-[#111214] rounded-lg shadow-xl py-1.5 w-48 z-50 border border-[#2b2d31] animate-[scaleIn_0.1s_ease-out]">
                 {canManageRoles && (
                     <div className="relative">
                         <button

@@ -19,7 +19,7 @@ export default function ProfileSettings() {
     const [name, setName] = useState(user?.displayName ?? "");
     const [bio, setBio] = useState("");
     const [bannerUrl, setBannerUrl] = useState<string | null>(null);
-    const [friendsVisible, setFriendsVisible] = useState(true);
+    const [mutualFriendsVisible, setMutualFriendsVisible] = useState(true);
     const [saving, setSaving] = useState(false);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -33,7 +33,7 @@ export default function ProfileSettings() {
         userProfiles.get(user.userId).then(p => {
             setBio(p.bio ?? "");
             setBannerUrl(p.bannerUrl ?? null);
-            setFriendsVisible(p.friendsVisibleSetting ?? true);
+            setMutualFriendsVisible(p.mutualFriendsVisible ?? true);
             setOriginal({ name: user.displayName, bio: p.bio ?? "" });
         }).catch(e => logger.api.warn("Failed to load user profile", e));
     }, [user]);
@@ -57,7 +57,7 @@ export default function ProfileSettings() {
     }
 
     return (
-        <div className="max-w-3xl space-y-6">
+        <div className="max-w-3xl mx-auto space-y-6">
             <h1 className="text-2xl font-bold text-white">Profile & Account</h1>
 
             {/* ── Live Profile Preview ──────────────────────── */}
@@ -239,20 +239,19 @@ export default function ProfileSettings() {
 
                 <div className="flex items-center justify-between pt-2">
                     <div>
-                        <div className="text-sm font-medium text-white">Show Friends on Profile</div>
-                        <div className="text-xs text-[#949ba4] mt-0.5">Allow others to see your friend list.</div>
+                        <div className="text-sm font-medium text-white">Show Mutual Friends</div>
+                        <div className="text-xs text-[#949ba4] mt-0.5">Allow others to see friends you have in common.</div>
                     </div>
                     <button
                         onClick={async () => {
-                            const next = !friendsVisible;
-                            setFriendsVisible(next);
-                            await userProfiles.updateFriendsVisible(next);
+                            const next = !mutualFriendsVisible;
+                            setMutualFriendsVisible(next);
+                            await userProfiles.updateMutualFriendsVisible(next);
                         }}
-                        aria-label="Toggle friends visibility"
-                        data-testid="toggle-friends-visible"
-                        className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${friendsVisible ? "bg-[#248046]" : "bg-[#72767d]"}`}
+                        aria-label="Toggle mutual friends visibility"
+                        className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${mutualFriendsVisible ? "bg-[#248046]" : "bg-[#72767d]"}`}
                     >
-                        <span className={`block w-[18px] h-[18px] rounded-full bg-white shadow-md transition-all duration-200 absolute top-[3px] ${friendsVisible ? "left-[23px]" : "left-[3px]"}`} />
+                        <span className={`block w-[18px] h-[18px] rounded-full bg-white shadow-md transition-all duration-200 absolute top-[3px] ${mutualFriendsVisible ? "left-[23px]" : "left-[3px]"}`} />
                     </button>
                 </div>
 

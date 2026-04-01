@@ -7,6 +7,7 @@ import { VoiceControls } from "../components/voice/VoiceControls";
 import { DevOverlay } from "../components/voice/DevOverlay";
 import { FloatingScreenShare } from "../components/voice/FloatingScreenShare";
 import { UserProfilePopup } from "../components/user/UserProfilePopup";
+import { IncomingCallModal } from "../components/voice/IncomingCallModal";
 import { ConnectionBanner } from "../components/ui/ConnectionBanner";
 import { ErrorBoundary } from "../components/ui/ErrorBoundary";
 import { Spinner } from "../components/ui/Spinner";
@@ -70,6 +71,8 @@ export default function MainPage() {
                     </ErrorBoundary>
                 </Suspense>
             </div>
+
+            <IncomingCallModal />
 
             {profileUserId && (
                 <UserProfilePopup

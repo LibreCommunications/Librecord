@@ -127,6 +127,24 @@ function play(uri: string) {
     });
 }
 
+let ringtoneAudio: HTMLAudioElement | null = null;
+
+export function playRingtone() {
+    stopRingtone();
+    ringtoneAudio = new Audio("/sounds/call.mp3");
+    ringtoneAudio.loop = true;
+    ringtoneAudio.volume = VOLUME;
+    ringtoneAudio.play().catch(() => {});
+}
+
+export function stopRingtone() {
+    if (ringtoneAudio) {
+        ringtoneAudio.pause();
+        ringtoneAudio.currentTime = 0;
+        ringtoneAudio = null;
+    }
+}
+
 export function playJoinSound() { play(joinWav); }
 export function playLeaveSound() { play(leaveWav); }
 export function playStreamStartSound() { play(streamStartWav); }

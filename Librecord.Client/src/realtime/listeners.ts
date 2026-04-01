@@ -8,6 +8,7 @@ import {
     removeParticipant,
     updateParticipantState,
     getVoiceState,
+    setVoiceState,
 } from "../voice/voiceStore";
 import { playJoinSound, playLeaveSound } from "../voice/sounds";
 import type {
@@ -52,6 +53,7 @@ export function registerListeners() {
     appConnection.off("guild:user:stop-typing");
     appConnection.off("guild:user:presence");
     appConnection.off("guild:channel:created");
+    appConnection.off("guild:member:added");
     appConnection.off("guild:member:roles");
     appConnection.off("guild:member:removed");
     appConnection.off("guild:channel:updated");
@@ -66,6 +68,9 @@ export function registerListeners() {
     appConnection.off("channel:message:unpinned");
     appConnection.off("channel:reaction:added");
     appConnection.off("channel:reaction:removed");
+    appConnection.off("dm:call:incoming");
+    appConnection.off("dm:call:declined");
+    appConnection.off("guild:thread:message:new");
 
     appConnection.on(
         "dm:message:ping",
@@ -263,6 +268,13 @@ export function registerListeners() {
     );
 
     appConnection.on(
+        "guild:member:added",
+        (payload: AppEventMap["guild:member:added"]) => {
+            dispatchAppEvent("guild:member:added", payload);
+        }
+    );
+
+    appConnection.on(
         "guild:member:roles",
         (payload: { guildId: string; userId: string; roles: { id: string; name: string }[] }) => {
             dispatchAppEvent("guild:member:roles", payload);
@@ -321,6 +333,8 @@ export function registerListeners() {
             });
             dispatchAppEvent("voice:user:joined", payload);
             if (vsJoin.isConnected && vsJoin.channelId === payload.channelId) {
+                // Someone answered our outgoing call
+                if (vsJoin.isOutgoingCall) setVoiceState({ isOutgoingCall: false });
                 playJoinSound();
             }
         }
@@ -376,6 +390,27 @@ export function registerListeners() {
         "channel:reaction:removed",
         (payload: AppEventMap["channel:reaction:removed"]) => {
             dispatchAppEvent("channel:reaction:removed", payload);
+        }
+    );
+
+    appConnection.on(
+        "dm:call:incoming",
+        (payload: AppEventMap["dm:call:incoming"]) => {
+            dispatchAppEvent("dm:call:incoming", payload);
+        }
+    );
+
+    appConnection.on(
+        "dm:call:declined",
+        (payload: AppEventMap["dm:call:declined"]) => {
+            dispatchAppEvent("dm:call:declined", payload);
+        }
+    );
+
+    appConnection.on(
+        "guild:thread:message:new",
+        (payload: AppEventMap["guild:thread:message:new"]) => {
+            dispatchAppEvent("guild:thread:message:new", payload);
         }
     );
 }

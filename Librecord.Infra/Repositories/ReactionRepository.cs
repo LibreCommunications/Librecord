@@ -61,4 +61,12 @@ public class ReactionRepository : IReactionRepository
             .Select(d => (Guid?)d.ChannelId)
             .FirstOrDefaultAsync();
     }
+
+    public Task<Guid?> GetMessageGuildChannelIdAsync(Guid messageId)
+    {
+        return _db.GuildChannelMessages
+            .Where(g => g.MessageId == messageId)
+            .Select(g => (Guid?)g.ChannelId)
+            .FirstOrDefaultAsync();
+    }
 }

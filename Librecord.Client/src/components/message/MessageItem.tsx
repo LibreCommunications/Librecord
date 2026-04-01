@@ -6,7 +6,7 @@ import { UserHoverCard } from "../user/UserHoverCard";
 import { renderMarkdown } from "../../utils/markdown";
 import type { MessageItemProps } from "./MessageItemProps";
 import { API_URL } from "../../api/client";
-import { EditIcon, TrashIcon, ReplyIcon, MoreIcon, FileIcon } from "../../components/ui/Icons";
+import { EditIcon, TrashIcon, ReplyIcon, MoreIcon, FileIcon, ThreadIcon } from "../../components/ui/Icons";
 
 function resolveAttachmentUrl(url: string): string {
     if (url.startsWith("http://") || url.startsWith("https://")) return url;
@@ -37,6 +37,8 @@ export const MessageItem = memo(function MessageItem({
                                 currentUserId,
                                 isPinned,
                                 canManageMessages,
+                                canAddReactions,
+                                canSendMessages,
                                 onToggleMenu,
                                 onStartEdit,
                                 onReply,
@@ -44,6 +46,8 @@ export const MessageItem = memo(function MessageItem({
                                 onCancelEdit,
                                 onDelete,
                                 onPin,
+                                onStartThread,
+                                onOpenThread,
                                 onAddReaction,
                                 onRemoveReaction,
                                 editMessage,
@@ -219,9 +223,21 @@ export const MessageItem = memo(function MessageItem({
                     reactions={msg.reactions}
                     messageId={msg.id}
                     currentUserId={currentUserId}
-                    onAdd={onAddReaction}
+                    onAdd={canAddReactions !== false ? onAddReaction : undefined}
                     onRemove={onRemoveReaction}
                 />
+
+                {/* Thread indicator */}
+                {msg.threadId && onOpenThread && (
+                    <button
+                        onClick={() => onOpenThread(msg.id)}
+                        className="flex items-center gap-1.5 mt-1 px-2 py-1 text-xs text-[#00a8fc] hover:text-[#00bfff] hover:bg-[#00a8fc]/10 rounded transition-colors"
+                    >
+                        <ThreadIcon size={14} />
+                        <span className="font-medium">{msg.threadMessageCount ?? 0} {(msg.threadMessageCount ?? 0) === 1 ? "reply" : "replies"}</span>
+                        {msg.threadName && <span className="text-[#949ba4]">— {msg.threadName}</span>}
+                    </button>
+                )}
             </div>
 
             </div>{/* end flex gap-4 */}
@@ -252,15 +268,17 @@ export const MessageItem = memo(function MessageItem({
                                 <TrashIcon size={16} />
                             </button>
                         )}
-                        <button
-                            onClick={() => onReply(msg.id)}
-                            className="px-2 py-1 text-[#b5bac1] hover:text-white hover:bg-[#35373c] transition-colors"
-                            title="Reply"
-                            aria-label="Reply to message"
-                            data-testid="reply-message-btn"
-                        >
-                            <ReplyIcon size={16} />
-                        </button>
+                        {canSendMessages !== false && (
+                            <button
+                                onClick={() => onReply(msg.id)}
+                                className="px-2 py-1 text-[#b5bac1] hover:text-white hover:bg-[#35373c] transition-colors"
+                                title="Reply"
+                                aria-label="Reply to message"
+                                data-testid="reply-message-btn"
+                            >
+                                <ReplyIcon size={16} />
+                            </button>
+                        )}
                         <button
                             ref={moreButtonRef}
                             onClick={() => onToggleMenu(msg.id)}
@@ -275,11 +293,12 @@ export const MessageItem = memo(function MessageItem({
                     {menuOpen && (
                         <MessageMenu
                             anchorRef={moreButtonRef}
-                            onAddReaction={(emoji) => {
+                            onAddReaction={canAddReactions !== false ? (emoji) => {
                                 onAddReaction(msg.id, emoji);
                                 onToggleMenu(msg.id);
-                            }}
-                            onPin={onPin ? () => { onPin(msg.id); onToggleMenu(msg.id); } : undefined}
+                            } : undefined}
+                            onPin={onPin && canManageMessages ? () => { onPin(msg.id); onToggleMenu(msg.id); } : undefined}
+                            onStartThread={canSendMessages !== false && onStartThread && !msg.threadId ? () => { onStartThread(msg.id); onToggleMenu(msg.id); } : undefined}
                             onClose={() => onToggleMenu(msg.id)}
                             isPinned={isPinned}
                         />

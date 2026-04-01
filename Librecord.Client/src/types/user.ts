@@ -16,6 +16,5 @@ export interface UserProfile {
     isFriend: boolean;
     isSelf: boolean;
     mutualFriendCount?: number;
-    friendsVisible?: boolean;
-    friendsVisibleSetting?: boolean | null;
+    mutualFriendsVisible?: boolean | null;
 }

@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Librecord.Application.Guilds;
 using Librecord.Application.Permissions;
+using Librecord.Application.Realtime.Guild;
+using Librecord.Domain.Identity;
 using Librecord.Domain.Permissions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,15 +16,21 @@ public class GuildInviteController : AuthenticatedController
     private readonly IGuildInviteService _invites;
     private readonly IGuildService _guilds;
     private readonly IPermissionService _permissions;
+    private readonly IGuildRealtimeNotifier _notifier;
+    private readonly IUserRepository _users;
 
     public GuildInviteController(
         IGuildInviteService invites,
         IGuildService guilds,
-        IPermissionService permissions)
+        IPermissionService permissions,
+        IGuildRealtimeNotifier notifier,
+        IUserRepository users)
     {
         _invites = invites;
         _guilds = guilds;
         _permissions = permissions;
+        _notifier = notifier;
+        _users = users;
     }
     [HttpPost("guilds/{guildId:guid}/invites")]
     public async Task<IActionResult> Create(
@@ -67,6 +75,22 @@ public class GuildInviteController : AuthenticatedController
         try
         {
             var guild = await _invites.JoinByCodeAsync(code, UserId);
+
+            var user = await _users.GetByIdAsync(UserId);
+            if (user != null)
+            {
+                var channelIds = guild.Channels.Select(c => c.Id).ToList();
+                await _notifier.NotifyMemberAddedAsync(new GuildMemberAdded
+                {
+                    GuildId = guild.Id,
+                    UserId = user.Id,
+                    Username = user.UserName ?? "",
+                    DisplayName = user.DisplayName ?? "",
+                    AvatarUrl = user.AvatarUrl,
+                    JoinedAt = DateTime.UtcNow,
+                    ChannelIds = channelIds,
+                });
+            }
 
             return Ok(new
             {

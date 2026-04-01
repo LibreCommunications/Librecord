@@ -39,6 +39,12 @@ export interface GuildPermissions {
     kickMembers: boolean;
     banMembers: boolean;
     inviteMembers: boolean;
+    // Channel-level (present when channelId is provided)
+    channelSendMessages?: boolean;
+    channelSendAttachments?: boolean;
+    channelAddReactions?: boolean;
+    channelViewChannel?: boolean;
+    channelReadMessages?: boolean;
 }
 
 export interface GuildRole {

@@ -8,4 +8,5 @@ public interface IReactionRepository
     Task RemoveAsync(Guid messageId, Guid userId, string emoji);
     Task SaveChangesAsync();
     Task<Guid?> GetMessageChannelIdAsync(Guid messageId);
+    Task<Guid?> GetMessageGuildChannelIdAsync(Guid messageId);
 }

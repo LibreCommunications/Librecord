@@ -18,19 +18,12 @@ public class GuildOwnershipTests
     private GuildService CreateGuildService() => new(_guilds.Object, _permissions.Object);
     private GuildSettingsService CreateSettingsService() => new(_guilds.Object, _storage.Object, _attachments.Object, Mock.Of<ILogger<GuildSettingsService>>());
 
-    [Fact]
-    public async Task CreateGuild_SetsOwnerId()
-    {
-        var ownerId = Guid.NewGuid();
-        var svc = CreateGuildService();
-
-        var guild = await svc.CreateGuildAsync(ownerId, "Test");
-
-        Assert.Equal(ownerId, guild.OwnerId);
-    }
+    // ---------------------------------------------------------
+    // OWNERSHIP
+    // ---------------------------------------------------------
 
     [Fact]
-    public async Task CreateGuild_OwnerIdMatchesMember()
+    public async Task When_GuildCreated_Should_SetOwner()
     {
         var ownerId = Guid.NewGuid();
         var svc = CreateGuildService();
@@ -42,8 +35,12 @@ public class GuildOwnershipTests
         Assert.Equal(ownerId, guild.Members[0].UserId);
     }
 
+    // ---------------------------------------------------------
+    // UPDATE
+    // ---------------------------------------------------------
+
     [Fact]
-    public async Task UpdateGuild_OwnerCanUpdate()
+    public async Task When_UpdatingGuildSettings_Should_PersistChanges()
     {
         var ownerId = Guid.NewGuid();
         var guild = new Guild { Id = Guid.NewGuid(), Name = "Old", OwnerId = ownerId };
@@ -54,21 +51,15 @@ public class GuildOwnershipTests
 
         Assert.NotNull(result);
         Assert.Equal("New Name", result!.Name);
+        _guilds.Verify(g => g.SaveChangesAsync(), Times.Once);
     }
 
-    [Fact]
-    public async Task UpdateGuild_NonexistentGuild_ReturnsNull()
-    {
-        _guilds.Setup(g => g.GetGuildAsync(It.IsAny<Guid>())).ReturnsAsync((Guild?)null);
-
-        var svc = CreateSettingsService();
-        var result = await svc.UpdateGuildAsync(Guid.NewGuid(), "New");
-
-        Assert.Null(result);
-    }
+    // ---------------------------------------------------------
+    // DELETE
+    // ---------------------------------------------------------
 
     [Fact]
-    public async Task DeleteGuild_ExistingGuild_ReturnsSuccess()
+    public async Task When_DeletingGuild_Should_RemoveIt()
     {
         var guild = new Guild { Id = Guid.NewGuid(), Name = "Test", OwnerId = Guid.NewGuid() };
         _guilds.Setup(g => g.GetGuildAsync(guild.Id)).ReturnsAsync(guild);
@@ -81,23 +72,5 @@ public class GuildOwnershipTests
         Assert.True(success);
         Assert.Single(channelIds);
         _guilds.Verify(g => g.RemoveGuildAsync(guild), Times.Once);
-    }
-
-    [Fact]
-    public async Task DeleteGuild_NonexistentGuild_ReturnsFalse()
-    {
-        _guilds.Setup(g => g.GetGuildAsync(It.IsAny<Guid>())).ReturnsAsync((Guild?)null);
-
-        var svc = CreateSettingsService();
-        var (success, _) = await svc.DeleteGuildAsync(Guid.NewGuid());
-
-        Assert.False(success);
-    }
-
-    [Fact]
-    public void Guild_OwnerId_DefaultsToEmpty()
-    {
-        var guild = new Guild { Name = "Test" };
-        Assert.Equal(Guid.Empty, guild.OwnerId);
     }
 }

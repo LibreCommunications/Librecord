@@ -86,7 +86,9 @@ public class ThreadService : IThreadService
         await _threads.AddThreadMessageAsync(new ThreadMessage
         {
             MessageId = message.Id,
-            ThreadId = threadId
+            ThreadId = threadId,
+            EncryptionSalt = encrypted.Salt,
+            EncryptionAlgorithm = encrypted.Algorithm,
         });
 
         thread.MessageCount++;

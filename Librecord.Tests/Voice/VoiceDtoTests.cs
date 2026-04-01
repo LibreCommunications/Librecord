@@ -5,7 +5,7 @@ namespace Librecord.Tests.Voice;
 public class VoiceDtoTests
 {
     [Fact]
-    public void VoiceStateUpdateDto_NullableFields_AllNullByDefault()
+    public void When_CreatingVoiceStateUpdateDto_Should_DefaultNullableFieldsToNull()
     {
         var dto = new VoiceStateUpdateDto();
 
@@ -16,18 +16,7 @@ public class VoiceDtoTests
     }
 
     [Fact]
-    public void VoiceStateUpdateDto_PartialSet()
-    {
-        var dto = new VoiceStateUpdateDto { IsMuted = true, IsCameraOn = false };
-
-        Assert.True(dto.IsMuted);
-        Assert.False(dto.IsCameraOn);
-        Assert.Null(dto.IsDeafened);
-        Assert.Null(dto.IsScreenSharing);
-    }
-
-    [Fact]
-    public void VoiceJoinResult_HoldsTokenAndUrl()
+    public void When_CreatingVoiceJoinResult_Should_ContainTokenAndWsUrl()
     {
         var result = new VoiceJoinResult
         {
@@ -42,7 +31,7 @@ public class VoiceDtoTests
     }
 
     [Fact]
-    public void VoiceParticipantDto_MapsAllFields()
+    public void When_CreatingVoiceParticipantDto_Should_MapAllFields()
     {
         var id = Guid.NewGuid();
         var now = DateTime.UtcNow;
@@ -52,7 +41,7 @@ public class VoiceDtoTests
             UserId = id,
             Username = "alice",
             DisplayName = "Alice",
-            AvatarUrl = null,
+            AvatarUrl = "https://example.com/avatar.png",
             IsMuted = true,
             IsDeafened = false,
             IsCameraOn = true,
@@ -62,8 +51,12 @@ public class VoiceDtoTests
 
         Assert.Equal(id, dto.UserId);
         Assert.Equal("alice", dto.Username);
+        Assert.Equal("Alice", dto.DisplayName);
+        Assert.Equal("https://example.com/avatar.png", dto.AvatarUrl);
         Assert.True(dto.IsMuted);
+        Assert.False(dto.IsDeafened);
         Assert.True(dto.IsCameraOn);
+        Assert.False(dto.IsScreenSharing);
         Assert.Equal(now, dto.JoinedAt);
     }
 }

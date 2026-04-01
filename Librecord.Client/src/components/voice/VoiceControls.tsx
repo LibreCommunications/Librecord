@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useVoice } from "../../hooks/useVoice";
 import {
     MicIcon, MicOffIcon,
@@ -20,6 +21,8 @@ export function VoiceControls() {
         stopScreenShare,
     } = useVoice();
 
+    const navigate = useNavigate();
+    const location = useLocation();
     const [showScreenShareModal, setShowScreenShareModal] = useState(false);
     const [showCameraMenu, setShowCameraMenu] = useState(false);
     const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
@@ -47,6 +50,12 @@ export function VoiceControls() {
     }, [showCameraMenu]);
 
     if (!voiceState.isConnected) return null;
+
+    // Build the path to the call's channel
+    const callPath = voiceState.guildId
+        ? `/app/guild/${voiceState.guildId}/${voiceState.channelId}`
+        : `/app/dm/${voiceState.channelId}`;
+    const isOnCallPage = location.pathname === callPath;
 
     function handleScreenShareClick() {
         if (voiceState.isScreenSharing) {
@@ -80,6 +89,15 @@ export function VoiceControls() {
                          "Voice Connected"}
                     </span>
                 </div>
+
+                {!isOnCallPage && (
+                    <button
+                        onClick={() => navigate(callPath)}
+                        className="w-full mb-2 py-1 rounded text-xs font-medium text-white bg-[#248046] hover:bg-[#1a6334] transition-colors"
+                    >
+                        Back to Call
+                    </button>
+                )}
 
                 <div className="flex items-center gap-1">
                     <ControlButton

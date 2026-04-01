@@ -19,6 +19,5 @@ public static class KnownPermissions
         (ChannelPermission.SendAttachments, PermissionIds.ChannelSendAttachments, "Channel"),
         (ChannelPermission.AddReactions, PermissionIds.ChannelAddReactions, "Channel"),
         (ChannelPermission.ManageMessages, PermissionIds.ChannelManageMessages, "Channel"),
-        (ChannelPermission.ManageChannels, PermissionIds.ChannelManageChannels, "Channel"),
     ];
 }

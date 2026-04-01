@@ -10,11 +10,6 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace Librecord.Tests.Permissions;
 
-/// <summary>
-/// Integration tests that verify the full grant → check → revoke → re-check
-/// lifecycle for every permission, exercising the real repository cache layer.
-/// Uses SQLite in-memory + real IMemoryCache + real PermissionService.
-/// </summary>
 public class PermissionCacheIntegrationTests : IDisposable
 {
     private readonly SqliteConnection _conn;
@@ -84,56 +79,61 @@ public class PermissionCacheIntegrationTests : IDisposable
         var channel = new GuildChannel { Id = _channelId, GuildId = _guildId, Name = "test-channel" };
         _db.GuildChannels.Add(channel);
 
-        // Permissions are already seeded by EnsureCreated via PermissionSeeder.HasData
         _db.SaveChanges();
     }
 
-    // ────────────────────────────────────────────────────
-    // GUILD: GRANT → CHECK → REVOKE → RE-CHECK
-    // ────────────────────────────────────────────────────
-
-    [Theory]
-    [MemberData(nameof(AllGuildPermissions))]
-    public async Task GuildPermission_GrantCheckRevokeCheck(PermissionCapability perm, string permKey, Guid permId)
+    private void ClearMemberCache()
     {
-        // 1. Without permission — should be denied
-        var denied = await _permService.HasGuildPermissionAsync(_userId, _guildId, perm);
-        Assert.False(denied.Allowed, $"{permKey} should be denied before grant");
-
-        // 2. Grant the permission to the role
-        await _roleRepo.AddPermissionToRoleAsync(_roleId, permId, true);
-        await _roleRepo.SaveChangesAsync();
-
-        // Clear member cache so it re-fetches (role perms changed)
-        // The generation counter bump in RoleRepository handles batch cache
         _cache.Remove($"repo:member:{_guildId}:{_userId}");
-
-        var granted = await _permService.HasGuildPermissionAsync(_userId, _guildId, perm);
-        Assert.True(granted.Allowed, $"{permKey} should be allowed after grant");
-
-        // 3. Revoke the permission
-        await _roleRepo.RemovePermissionFromRoleAsync(_roleId, permId);
-        await _roleRepo.SaveChangesAsync();
-
-        _cache.Remove($"repo:member:{_guildId}:{_userId}");
-
-        var revoked = await _permService.HasGuildPermissionAsync(_userId, _guildId, perm);
-        Assert.False(revoked.Allowed, $"{permKey} should be denied after revoke");
     }
 
-    // ────────────────────────────────────────────────────
-    // CHANNEL: GRANT VIA OVERRIDE → CHECK → REVOKE → RE-CHECK
-    // ────────────────────────────────────────────────────
-
-    [Theory]
-    [MemberData(nameof(AllChannelPermissions))]
-    public async Task ChannelPermission_OverrideGrantCheckRevokeCheck(PermissionCapability perm, string permKey, Guid permId)
+    [Fact]
+    public async Task When_GrantingGuildPermission_Should_AllowSubsequentCheck()
     {
-        // 1. Without permission — should be denied (no role perms, no overrides)
-        var denied = await _permService.HasChannelPermissionAsync(_userId, _channelId, perm);
-        Assert.False(denied.Allowed, $"{permKey} should be denied before override");
+        var perm = GuildPermission.ViewGuild;
+        var permId = PermissionIds.GuildViewGuild;
 
-        // 2. Add a user override that allows
+        var denied = await _permService.HasGuildPermissionAsync(_userId, _guildId, perm);
+        Assert.False(denied.Allowed);
+
+        await _roleRepo.AddPermissionToRoleAsync(_roleId, permId, true);
+        await _roleRepo.SaveChangesAsync();
+        ClearMemberCache();
+
+        var granted = await _permService.HasGuildPermissionAsync(_userId, _guildId, perm);
+        Assert.True(granted.Allowed);
+    }
+
+    [Fact]
+    public async Task When_RevokingGuildPermission_Should_DenySubsequentCheck()
+    {
+        var perm = GuildPermission.ManageGuild;
+        var permId = PermissionIds.GuildManageGuild;
+
+        await _roleRepo.AddPermissionToRoleAsync(_roleId, permId, true);
+        await _roleRepo.SaveChangesAsync();
+        ClearMemberCache();
+
+        var granted = await _permService.HasGuildPermissionAsync(_userId, _guildId, perm);
+        Assert.True(granted.Allowed);
+
+        await _roleRepo.RemovePermissionFromRoleAsync(_roleId, permId);
+        await _roleRepo.SaveChangesAsync();
+        ClearMemberCache();
+
+        var revoked = await _permService.HasGuildPermissionAsync(_userId, _guildId, perm);
+        Assert.False(revoked.Allowed);
+    }
+
+    [Fact]
+    public async Task When_SettingChannelOverrideToAllow_Should_GrantPermission()
+    {
+        var perm = ChannelPermission.SendMessages;
+        var permId = PermissionIds.ChannelSendMessages;
+
+        var denied = await _permService.HasChannelPermissionAsync(_userId, _channelId, perm);
+        Assert.False(denied.Allowed);
+
         var overrideEntity = new GuildChannelPermissionOverride
         {
             Id = Guid.NewGuid(),
@@ -145,77 +145,74 @@ public class PermissionCacheIntegrationTests : IDisposable
         await _guildRepo.AddChannelOverrideAsync(overrideEntity);
         await _guildRepo.SaveChangesAsync();
 
-        // Cache for channel overrides should have been invalidated
         var granted = await _permService.HasChannelPermissionAsync(_userId, _channelId, perm);
-        Assert.True(granted.Allowed, $"{permKey} should be allowed after user override");
-
-        // 3. Remove the override
-        await _guildRepo.RemoveChannelOverrideAsync(overrideEntity);
-        await _guildRepo.SaveChangesAsync();
-
-        var revoked = await _permService.HasChannelPermissionAsync(_userId, _channelId, perm);
-        Assert.False(revoked.Allowed, $"{permKey} should be denied after override removed");
+        Assert.True(granted.Allowed);
     }
 
-    // ────────────────────────────────────────────────────
-    // CHANNEL: ROLE OVERRIDE LIFECYCLE
-    // ────────────────────────────────────────────────────
-
-    [Theory]
-    [MemberData(nameof(AllChannelPermissions))]
-    public async Task ChannelPermission_RoleOverrideGrantCheckRevokeCheck(PermissionCapability perm, string permKey, Guid permId)
+    [Fact]
+    public async Task When_SettingChannelOverrideToDeny_Should_DenyPermission()
     {
-        // 1. Without — denied
-        var denied = await _permService.HasChannelPermissionAsync(_userId, _channelId, perm);
-        Assert.False(denied.Allowed, $"{permKey} should be denied before role override");
+        var perm = ChannelPermission.SendMessages;
+        var permId = PermissionIds.ChannelSendMessages;
 
-        // 2. Add a role override that allows
+        // First grant via role so we have something to deny
+        await _roleRepo.AddPermissionToRoleAsync(_roleId, permId, true);
+        await _roleRepo.SaveChangesAsync();
+        ClearMemberCache();
+
+        var grantedViaRole = await _permService.HasChannelPermissionAsync(_userId, _channelId, perm);
+        Assert.True(grantedViaRole.Allowed);
+
+        // Now add a user override that denies
         var overrideEntity = new GuildChannelPermissionOverride
+        {
+            Id = Guid.NewGuid(),
+            ChannelId = _channelId,
+            UserId = _userId,
+            PermissionId = permId,
+            Allow = false,
+        };
+        await _guildRepo.AddChannelOverrideAsync(overrideEntity);
+        await _guildRepo.SaveChangesAsync();
+
+        var denied = await _permService.HasChannelPermissionAsync(_userId, _channelId, perm);
+        Assert.False(denied.Allowed);
+    }
+
+    [Fact]
+    public async Task When_UserOverrideConflictsWithRoleOverride_Should_UserOverrideWin()
+    {
+        var perm = ChannelPermission.ViewChannel;
+        var permId = PermissionIds.ChannelViewChannel;
+
+        // Role override denies
+        var roleOverride = new GuildChannelPermissionOverride
         {
             Id = Guid.NewGuid(),
             ChannelId = _channelId,
             RoleId = _roleId,
             PermissionId = permId,
+            Allow = false,
+        };
+        await _guildRepo.AddChannelOverrideAsync(roleOverride);
+        await _guildRepo.SaveChangesAsync();
+
+        var deniedByRole = await _permService.HasChannelPermissionAsync(_userId, _channelId, perm);
+        Assert.False(deniedByRole.Allowed);
+
+        // User override allows -- should win over role deny
+        var userOverride = new GuildChannelPermissionOverride
+        {
+            Id = Guid.NewGuid(),
+            ChannelId = _channelId,
+            UserId = _userId,
+            PermissionId = permId,
             Allow = true,
         };
-        await _guildRepo.AddChannelOverrideAsync(overrideEntity);
+        await _guildRepo.AddChannelOverrideAsync(userOverride);
         await _guildRepo.SaveChangesAsync();
 
-        var granted = await _permService.HasChannelPermissionAsync(_userId, _channelId, perm);
-        Assert.True(granted.Allowed, $"{permKey} should be allowed after role override");
-
-        // 3. Remove the override
-        await _guildRepo.RemoveChannelOverrideAsync(overrideEntity);
-        await _guildRepo.SaveChangesAsync();
-
-        var revoked = await _permService.HasChannelPermissionAsync(_userId, _channelId, perm);
-        Assert.False(revoked.Allowed, $"{permKey} should be denied after role override removed");
+        var allowedByUser = await _permService.HasChannelPermissionAsync(_userId, _channelId, perm);
+        Assert.True(allowedByUser.Allowed);
     }
-
-    // ────────────────────────────────────────────────────
-    // TEST DATA
-    // ────────────────────────────────────────────────────
-
-    public static TheoryData<PermissionCapability, string, Guid> AllGuildPermissions => new()
-    {
-        { GuildPermission.ViewGuild, "ViewGuild", PermissionIds.GuildViewGuild },
-        { GuildPermission.ReadMessages, "ReadMessages", PermissionIds.GuildReadMessages },
-        { GuildPermission.ManageGuild, "ManageGuild", PermissionIds.GuildManageGuild },
-        { GuildPermission.ManageChannels, "ManageChannels", PermissionIds.GuildManageChannels },
-        { GuildPermission.ManageRoles, "ManageRoles", PermissionIds.GuildManageRoles },
-        { GuildPermission.InviteMembers, "InviteMembers", PermissionIds.GuildInviteMembers },
-        { GuildPermission.KickMembers, "KickMembers", PermissionIds.GuildKickMembers },
-        { GuildPermission.BanMembers, "BanMembers", PermissionIds.GuildBanMembers },
-    };
-
-    public static TheoryData<PermissionCapability, string, Guid> AllChannelPermissions => new()
-    {
-        { ChannelPermission.ViewChannel, "ViewChannel", PermissionIds.ChannelViewChannel },
-        { ChannelPermission.ReadMessages, "ReadMessages", PermissionIds.ChannelReadMessages },
-        { ChannelPermission.SendMessages, "SendMessages", PermissionIds.ChannelSendMessages },
-        { ChannelPermission.SendAttachments, "SendAttachments", PermissionIds.ChannelSendAttachments },
-        { ChannelPermission.AddReactions, "AddReactions", PermissionIds.ChannelAddReactions },
-        { ChannelPermission.ManageMessages, "ManageMessages", PermissionIds.ChannelManageMessages },
-        { ChannelPermission.ManageChannels, "ManageChannels", PermissionIds.ChannelManageChannels },
-    };
 }

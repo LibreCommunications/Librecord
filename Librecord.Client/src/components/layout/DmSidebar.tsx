@@ -13,7 +13,7 @@ import { presence } from "../../api/client";
 import { onCustomEvent, onEvent } from "../../lib/typedEvent";
 import type { AppEventMap } from "../../realtime/events";
 import { CreateGroupModal } from "../dm/CreateGroupModal";
-import { CloseIcon, PersonsIcon } from "../ui/Icons";
+import { CloseIcon, PersonsIcon, PhoneIcon } from "../ui/Icons";
 
 export default function DmSidebar() {
     const { dmId } = useParams();
@@ -30,6 +30,8 @@ export default function DmSidebar() {
     const [showCreateGroup, setShowCreateGroup] = useState(false);
     const [leaveConfirmId, setLeaveConfirmId] = useState<string | null>(null);
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+    // Track DM channels with active voice calls: channelId → participant count
+    const [activeCalls, setActiveCalls] = useState<Record<string, number>>({});
 
     const isFriendsPage = location.pathname.startsWith("/app/dm/friends");
 
@@ -100,6 +102,30 @@ export default function DmSidebar() {
                 [detail.userId]: detail.status,
             }));
         });
+    }, []);
+
+    // Track active DM voice calls
+    const EMPTY_GUID = "00000000-0000-0000-0000-000000000000";
+    useEffect(() => {
+        const cleanups = [
+            onCustomEvent<AppEventMap["voice:user:joined"]>("voice:user:joined", (detail) => {
+                if (detail.guildId !== EMPTY_GUID) return;
+                setActiveCalls(prev => ({ ...prev, [detail.channelId]: (prev[detail.channelId] ?? 0) + 1 }));
+            }),
+            onCustomEvent<AppEventMap["voice:user:left"]>("voice:user:left", (detail) => {
+                if (detail.guildId !== EMPTY_GUID) return;
+                setActiveCalls(prev => {
+                    const count = (prev[detail.channelId] ?? 1) - 1;
+                    if (count <= 0) {
+                        const next = { ...prev };
+                        delete next[detail.channelId];
+                        return next;
+                    }
+                    return { ...prev, [detail.channelId]: count };
+                });
+            }),
+        ];
+        return () => cleanups.forEach(fn => fn());
     }, []);
 
     useEffect(() => {
@@ -202,6 +228,9 @@ export default function DmSidebar() {
 
                                     <span className="truncate flex-1 text-sm">{name}</span>
 
+                                    {activeCalls[dm.id] && (
+                                        <PhoneIcon size={14} className="text-green-400 shrink-0" />
+                                    )}
                                     {unreadCount > 0 && dmId !== dm.id && (
                                         <UnreadBadge count={unreadCount} />
                                     )}

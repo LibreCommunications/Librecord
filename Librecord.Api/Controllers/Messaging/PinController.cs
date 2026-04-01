@@ -1,5 +1,8 @@
 using Librecord.Api.Hubs;
 using Librecord.Application.Messaging;
+using Librecord.Application.Permissions;
+using Librecord.Domain.Guilds;
+using Librecord.Domain.Permissions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
@@ -12,13 +15,19 @@ namespace Librecord.Api.Controllers.Messaging;
 public class PinController : AuthenticatedController
 {
     private readonly IPinService _pins;
+    private readonly IPermissionService _permissions;
+    private readonly IGuildRepository _guilds;
     private readonly IHubContext<AppHub> _hub;
 
     public PinController(
         IPinService pins,
+        IPermissionService permissions,
+        IGuildRepository guilds,
         IHubContext<AppHub> hub)
     {
         _pins = pins;
+        _permissions = permissions;
+        _guilds = guilds;
         _hub = hub;
     }
 
@@ -27,6 +36,15 @@ public class PinController : AuthenticatedController
     {
         if (!await _pins.IsChannelMemberAsync(channelId, UserId))
             return Forbid();
+
+        // Guild channels require ManageMessages permission to pin
+        var guildChannel = await _guilds.GetChannelAsync(channelId);
+        if (guildChannel != null)
+        {
+            var perm = await _permissions.HasChannelPermissionAsync(
+                UserId, channelId, ChannelPermission.ManageMessages);
+            if (!perm.Allowed) return Forbid();
+        }
 
         var pinned = await _pins.PinMessageAsync(channelId, messageId, UserId);
         if (!pinned) return NotFound("Message not in this channel.");
@@ -45,6 +63,15 @@ public class PinController : AuthenticatedController
         if (!await _pins.IsChannelMemberAsync(channelId, UserId))
             return Forbid();
 
+        // Guild channels require ManageMessages permission to unpin
+        var guildChannel = await _guilds.GetChannelAsync(channelId);
+        if (guildChannel != null)
+        {
+            var perm = await _permissions.HasChannelPermissionAsync(
+                UserId, channelId, ChannelPermission.ManageMessages);
+            if (!perm.Allowed) return Forbid();
+        }
+
         var unpinned = await _pins.UnpinMessageAsync(channelId, messageId);
         if (!unpinned) return NotFound();
 
@@ -61,6 +88,15 @@ public class PinController : AuthenticatedController
     {
         if (!await _pins.IsChannelMemberAsync(channelId, UserId))
             return Forbid();
+
+        // Guild channels require ReadMessages permission to view pins
+        var guildChannel = await _guilds.GetChannelAsync(channelId);
+        if (guildChannel != null)
+        {
+            var perm = await _permissions.HasChannelPermissionAsync(
+                UserId, channelId, ChannelPermission.ReadMessages);
+            if (!perm.Allowed) return Forbid();
+        }
 
         var pins = await _pins.GetPinnedMessagesAsync(channelId);
 

@@ -21,6 +21,7 @@ export interface VoiceState {
     isCameraOn: boolean;
     isScreenSharing: boolean;
     isConnected: boolean;
+    isOutgoingCall: boolean;
 }
 
 
@@ -44,7 +45,7 @@ export function setVoicePrefs(prefs: Partial<VoicePrefs>) {
 
 interface PersistedVoiceSession {
     channelId: string;
-    guildId: string;
+    guildId: string | null;
 }
 
 const INITIAL_STATE: VoiceState = {
@@ -56,6 +57,7 @@ const INITIAL_STATE: VoiceState = {
     isCameraOn: false,
     isScreenSharing: false,
     isConnected: false,
+    isOutgoingCall: false,
 };
 
 let state: VoiceState = { ...INITIAL_STATE };
@@ -65,7 +67,7 @@ function emit() {
 }
 
 function persist() {
-    if (state.isConnected && state.channelId && state.guildId) {
+    if (state.isConnected && state.channelId) {
         const session: PersistedVoiceSession = {
             channelId: state.channelId,
             guildId: state.guildId,

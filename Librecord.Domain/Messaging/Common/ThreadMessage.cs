@@ -7,4 +7,7 @@ public class ThreadMessage
 
     public Guid ThreadId { get; set; }
     public MessageThread Thread { get; set; } = null!;
+    
+    public byte[] EncryptionSalt { get; set; } = [];
+    public string EncryptionAlgorithm { get; set; } = "";
 }

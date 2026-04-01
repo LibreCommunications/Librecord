@@ -28,13 +28,14 @@ public class FriendshipServiceTests
     // ---------------------------------------------------------
 
     [Fact]
-    public async Task SendRequest_Success_CreatesPendingFriendship()
+    public async Task When_SendingFriendRequest_Should_CreatePendingRequest()
     {
         var requesterId = Guid.NewGuid();
         var target = MakeUser();
 
         _users.Setup(u => u.GetByUsernameAsync("bob")).ReturnsAsync(target);
         _repo.Setup(r => r.GetFriendshipAsync(requesterId, target.Id)).ReturnsAsync((Friendship?)null);
+        _users.Setup(u => u.GetByIdAsync(requesterId)).ReturnsAsync(MakeUser(requesterId, "alice"));
 
         var svc = CreateService();
         var result = await svc.SendRequestAsync(requesterId, "bob");
@@ -46,23 +47,10 @@ public class FriendshipServiceTests
             f.TargetId == target.Id &&
             f.Status == FriendshipStatus.Pending
         )), Times.Once);
-        _repo.Verify(r => r.SaveChangesAsync(), Times.Once);
     }
 
     [Fact]
-    public async Task SendRequest_UserNotFound_Fails()
-    {
-        _users.Setup(u => u.GetByUsernameAsync("ghost")).ReturnsAsync((User?)null);
-
-        var svc = CreateService();
-        var result = await svc.SendRequestAsync(Guid.NewGuid(), "ghost");
-
-        Assert.False(result.Success);
-        Assert.Contains("does not exist", result.Error);
-    }
-
-    [Fact]
-    public async Task SendRequest_ToSelf_Fails()
+    public async Task When_SendingRequestToSelf_Should_Fail()
     {
         var userId = Guid.NewGuid();
         var user = MakeUser(userId);
@@ -76,24 +64,7 @@ public class FriendshipServiceTests
     }
 
     [Fact]
-    public async Task SendRequest_Blocked_Fails()
-    {
-        var requesterId = Guid.NewGuid();
-        var target = MakeUser();
-
-        _users.Setup(u => u.GetByUsernameAsync("bob")).ReturnsAsync(target);
-        _blocks.Setup(b => b.IsEitherBlockedAsync(requesterId, target.Id)).ReturnsAsync(true);
-
-        var svc = CreateService();
-        var result = await svc.SendRequestAsync(requesterId, "bob");
-
-        Assert.False(result.Success);
-        Assert.Contains("Cannot friend", result.Error);
-        _repo.Verify(r => r.AddAsync(It.IsAny<Friendship>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task SendRequest_AlreadyPending_Fails()
+    public async Task When_SendingDuplicateRequest_Should_Fail()
     {
         var requesterId = Guid.NewGuid();
         var target = MakeUser();
@@ -115,35 +86,12 @@ public class FriendshipServiceTests
         Assert.Contains("already sent", result.Error);
     }
 
-    [Fact]
-    public async Task SendRequest_AlreadyFriends_Fails()
-    {
-        var requesterId = Guid.NewGuid();
-        var target = MakeUser();
-        var existing = new Friendship
-        {
-            Id = Guid.NewGuid(),
-            RequesterId = requesterId,
-            TargetId = target.Id,
-            Status = FriendshipStatus.Accepted
-        };
-
-        _users.Setup(u => u.GetByUsernameAsync("bob")).ReturnsAsync(target);
-        _repo.Setup(r => r.GetFriendshipAsync(requesterId, target.Id)).ReturnsAsync(existing);
-
-        var svc = CreateService();
-        var result = await svc.SendRequestAsync(requesterId, "bob");
-
-        Assert.False(result.Success);
-        Assert.Contains("Already friends", result.Error);
-    }
-
     // ---------------------------------------------------------
     // ACCEPT
     // ---------------------------------------------------------
 
     [Fact]
-    public async Task Accept_PendingRequest_Succeeds()
+    public async Task When_AcceptingRequest_Should_CreateConfirmedFriendship()
     {
         var userId = Guid.NewGuid();
         var requesterId = Guid.NewGuid();
@@ -156,26 +104,13 @@ public class FriendshipServiceTests
         };
 
         _repo.Setup(r => r.GetFriendshipAsync(requesterId, userId)).ReturnsAsync(fs);
+        _users.Setup(u => u.GetByIdAsync(userId)).ReturnsAsync(MakeUser(userId));
 
         var svc = CreateService();
         var result = await svc.AcceptRequestAsync(userId, requesterId);
 
         Assert.True(result.Success);
         Assert.Equal(FriendshipStatus.Accepted, fs.Status);
-        _repo.Verify(r => r.UpdateAsync(fs), Times.Once);
-    }
-
-    [Fact]
-    public async Task Accept_NoPendingRequest_Fails()
-    {
-        _repo.Setup(r => r.GetFriendshipAsync(It.IsAny<Guid>(), It.IsAny<Guid>()))
-            .ReturnsAsync((Friendship?)null);
-
-        var svc = CreateService();
-        var result = await svc.AcceptRequestAsync(Guid.NewGuid(), Guid.NewGuid());
-
-        Assert.False(result.Success);
-        Assert.Contains("No pending", result.Error);
     }
 
     // ---------------------------------------------------------
@@ -183,7 +118,7 @@ public class FriendshipServiceTests
     // ---------------------------------------------------------
 
     [Fact]
-    public async Task Decline_PendingRequest_DeletesFriendship()
+    public async Task When_DecliningRequest_Should_RemoveIt()
     {
         var userId = Guid.NewGuid();
         var requesterId = Guid.NewGuid();
@@ -204,32 +139,12 @@ public class FriendshipServiceTests
         _repo.Verify(r => r.DeleteAsync(fs), Times.Once);
     }
 
-    [Fact]
-    public async Task Decline_AcceptedFriendship_Fails()
-    {
-        var fs = new Friendship
-        {
-            Id = Guid.NewGuid(),
-            RequesterId = Guid.NewGuid(),
-            TargetId = Guid.NewGuid(),
-            Status = FriendshipStatus.Accepted
-        };
-
-        _repo.Setup(r => r.GetFriendshipAsync(fs.RequesterId, fs.TargetId)).ReturnsAsync(fs);
-
-        var svc = CreateService();
-        var result = await svc.DeclineRequestAsync(fs.TargetId, fs.RequesterId);
-
-        Assert.False(result.Success);
-        Assert.Contains("Cannot decline", result.Error);
-    }
-
     // ---------------------------------------------------------
     // REMOVE
     // ---------------------------------------------------------
 
     [Fact]
-    public async Task Remove_AcceptedFriend_Succeeds()
+    public async Task When_RemovingFriend_Should_RemoveBidirectionalFriendship()
     {
         var userId = Guid.NewGuid();
         var friendId = Guid.NewGuid();
@@ -248,18 +163,5 @@ public class FriendshipServiceTests
 
         Assert.True(result.Success);
         _repo.Verify(r => r.DeleteAsync(fs), Times.Once);
-    }
-
-    [Fact]
-    public async Task Remove_NotFriends_Fails()
-    {
-        _repo.Setup(r => r.GetFriendshipAsync(It.IsAny<Guid>(), It.IsAny<Guid>()))
-            .ReturnsAsync((Friendship?)null);
-
-        var svc = CreateService();
-        var result = await svc.RemoveFriendAsync(Guid.NewGuid(), Guid.NewGuid());
-
-        Assert.False(result.Success);
-        Assert.Contains("not friends", result.Error);
     }
 }

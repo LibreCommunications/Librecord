@@ -173,6 +173,9 @@ interface AudioPipeline {
     source: MediaStreamAudioSourceNode;
 }
 const audioPipelines = new Map<string, AudioPipeline>();
+// Hidden <audio> elements per user — Chromium won't deliver remote WebRTC audio
+// to Web Audio API nodes unless an <audio> element is also consuming the stream.
+const audioElements = new Map<string, HTMLAudioElement>();
 
 // dB-linear volume curve (same approach as OBS / Discord / DAWs).
 // Slider maps linearly to decibels, then converted to gain.
@@ -217,6 +220,16 @@ function attachAudioTrack(identity: string, track: MediaStreamTrack) {
 
     gain.gain.value = pctToGain(getUserVolume(identity));
 
+    // Chromium won't deliver remote WebRTC audio data to MediaStreamAudioSourceNode
+    // unless an <audio> element is also consuming the stream. Attach a silent element
+    // to keep the pipeline active. volume=0 (not muted attr) still pulls data.
+    const el = document.createElement("audio");
+    el.srcObject = stream;
+    el.volume = 0;
+    el.autoplay = true;
+    el.play().catch(() => {});
+    audioElements.set(identity, el);
+
     audioPipelines.set(identity, { gain, source });
 }
 
@@ -226,6 +239,12 @@ function detachAudioTrack(identity: string) {
         pipe.source.disconnect();
         pipe.gain.disconnect();
         audioPipelines.delete(identity);
+    }
+    const el = audioElements.get(identity);
+    if (el) {
+        el.pause();
+        el.srcObject = null;
+        audioElements.delete(identity);
     }
 }
 
@@ -240,6 +259,7 @@ function bindRemoteAudioTrack(participant: RemoteParticipant) {
         const msTrack = pub.track?.mediaStreamTrack;
         if (msTrack) {
             startAnalysingTrack(participant.identity, msTrack);
+            attachAudioTrack(participant.identity, msTrack);
         }
     });
 }
@@ -257,6 +277,10 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
     room = new Room({
         dynacast: true,
         adaptiveStream: true,
+        // Disable single peer connection mode — causes a=inactive on subscriber
+        // audio lines in Chromium when joining after the publisher, resulting in
+        // no audio playback. Firefox handles it fine but Edge/Chrome does not.
+        singlePeerConnection: false,
         audioCaptureDefaults: {
             autoGainControl: true,
             noiseSuppression: browserNS,
@@ -301,11 +325,19 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
         }
     });
 
+    room.on(RoomEvent.ParticipantConnected, (p: RemoteParticipant) => {
+        logger.voice.info("Participant connected", p.identity);
+        // Bind any tracks that are already subscribed at join time
+        bindRemoteAudioTrack(p);
+    });
+
     room.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
         stopAnalysingTrack(p.identity);
+        detachAudioTrack(p.identity);
     });
 
     room.on(RoomEvent.TrackSubscribed, (track, _pub: RemoteTrackPublication, p: RemoteParticipant) => {
+        logger.voice.info("Track subscribed", p.identity, track.kind, track.source);
         if (track.kind === "audio") {
             const msTrack = track.mediaStreamTrack;
             if (msTrack) {
@@ -379,9 +411,13 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
         isDeafened = true;
     }
 
-    await room.startAudio();
+    await room.startAudio().catch(e => logger.voice.warn("startAudio failed", e));
 
-    room.remoteParticipants.forEach(bindRemoteAudioTrack);
+    // Bind tracks for participants already in the room
+    room.remoteParticipants.forEach((p) => {
+        logger.voice.info("Binding existing participant", p.identity, "tracks:", p.audioTrackPublications.size);
+        bindRemoteAudioTrack(p);
+    });
     // Local track speaking detection + noise suppression are handled
     // by the LocalTrackPublished event handler above.
 }

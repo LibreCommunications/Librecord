@@ -35,6 +35,17 @@ public sealed class GuildMessageDeleted : GuildMessageEvent
 {
 }
 
+public sealed class GuildMemberAdded
+{
+    public Guid GuildId { get; init; }
+    public Guid UserId { get; init; }
+    public string Username { get; init; } = null!;
+    public string DisplayName { get; init; } = null!;
+    public string? AvatarUrl { get; init; }
+    public DateTime JoinedAt { get; init; }
+    public IReadOnlyList<Guid> ChannelIds { get; init; } = [];
+}
+
 public sealed class GuildMemberRemoved
 {
     public Guid GuildId { get; init; }
@@ -50,6 +61,16 @@ public sealed class GuildUpdated
     public string? Name { get; init; }
     public string? IconUrl { get; init; }
     public IReadOnlyList<Guid> ChannelIds { get; init; } = [];
+}
+
+public sealed class ThreadMessageCreated
+{
+    public Guid ChannelId { get; init; }
+    public Guid ThreadId { get; init; }
+    public Guid MessageId { get; init; }
+    public string Content { get; init; } = null!;
+    public DateTime CreatedAt { get; init; }
+    public GuildAuthorSnapshot Author { get; init; } = null!;
 }
 
 // Uses ChannelId to target broadcast groups

@@ -7,10 +7,10 @@ public class Friendship
     public Guid Id { get; set; }
 
     public Guid RequesterId { get; set; }
-    public User Requester { get; set; }
+    public User Requester { get; set; } = null!;
 
     public Guid TargetId { get; set; }
-    public User Target { get; set; }
+    public User Target { get; set; } = null!;
 
     public FriendshipStatus Status { get; set; }
 

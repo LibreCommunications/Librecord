@@ -5,7 +5,7 @@ namespace Librecord.Tests.Voice;
 public class VoiceStateEntityTests
 {
     [Fact]
-    public void NewVoiceState_DefaultFlags_AllFalse()
+    public void When_VoiceStateCreated_Should_DefaultAllFlagsToFalse()
     {
         var state = new VoiceState
         {
@@ -22,7 +22,7 @@ public class VoiceStateEntityTests
     }
 
     [Fact]
-    public void VoiceState_FlagsCanBeToggled()
+    public void When_TogglingStateFlags_Should_UpdateCorrectly()
     {
         var state = new VoiceState
         {
@@ -39,5 +39,11 @@ public class VoiceStateEntityTests
         Assert.True(state.IsCameraOn);
         Assert.False(state.IsDeafened);
         Assert.False(state.IsScreenSharing);
+
+        state.IsMuted = false;
+        state.IsScreenSharing = true;
+
+        Assert.False(state.IsMuted);
+        Assert.True(state.IsScreenSharing);
     }
 }

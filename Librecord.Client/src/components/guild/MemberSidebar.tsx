@@ -41,6 +41,21 @@ export function MemberSidebar({ guildId }: Props) {
             onCustomEvent<AppEventMap["guild:user:presence"]>("guild:user:presence", (detail) => {
                 setPresenceMap(prev => ({ ...prev, [detail.userId]: detail.status }));
             }),
+            onCustomEvent<AppEventMap["guild:member:added"]>("guild:member:added", (detail) => {
+                if (detail.guildId !== guildId) return;
+                setMembers(prev => {
+                    if (prev.some(m => m.userId === detail.userId)) return prev;
+                    return [...prev, {
+                        userId: detail.userId,
+                        username: detail.username,
+                        displayName: detail.displayName,
+                        avatarUrl: detail.avatarUrl,
+                        joinedAt: detail.joinedAt,
+                        roles: [],
+                    }];
+                });
+                setPresenceMap(prev => ({ ...prev, [detail.userId]: "online" }));
+            }),
             onCustomEvent<AppEventMap["guild:member:removed"]>("guild:member:removed", (detail) => {
                 if (detail.guildId !== guildId) return;
                 setMembers(prev => prev.filter(m => m.userId !== detail.userId));
@@ -79,7 +94,11 @@ export function MemberSidebar({ guildId }: Props) {
                     {roleMembers.map(member => (
                         <div
                             key={member.userId}
-                            onClick={() => window.dispatchEvent(new CustomEvent("user:profile:open", { detail: { userId: member.userId } }))}
+                            onClick={() => {
+                                // Don't open profile if the context menu is showing
+                                if (ctxMember) return;
+                                window.dispatchEvent(new CustomEvent("user:profile:open", { detail: { userId: member.userId } }));
+                            }}
                             className="relative flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/5 cursor-pointer"
                             onContextMenu={e => {
                                 if (!canModerate || member.userId === user?.userId) return;

@@ -15,7 +15,9 @@ public sealed class SignalRVoiceRealtimeNotifier : IVoiceRealtimeNotifier
 
     public Task NotifyAsync(VoiceEvent evt)
     {
-        var group = AppHub.GuildGroup(evt.ChannelId);
+        var group = evt.GuildId == Guid.Empty
+            ? AppHub.DmGroup(evt.ChannelId)
+            : AppHub.GuildGroup(evt.ChannelId);
 
         return evt switch
         {

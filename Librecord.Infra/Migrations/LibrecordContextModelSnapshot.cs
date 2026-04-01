@@ -372,14 +372,14 @@ namespace Librecord.Infra.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("FriendsVisible")
-                        .HasColumnType("boolean");
-
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("LockoutEnd")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("MutualFriendsVisible")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
@@ -729,6 +729,14 @@ namespace Librecord.Infra.Migrations
                     b.Property<Guid>("MessageId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("EncryptionAlgorithm")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<byte[]>("EncryptionSalt")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
                     b.HasKey("ThreadId", "MessageId");
 
                     b.HasIndex("MessageId");
@@ -935,12 +943,6 @@ namespace Librecord.Infra.Migrations
                         {
                             Id = new Guid("22222222-2222-2222-2222-222222222206"),
                             Name = "ManageMessages",
-                            Type = "Channel"
-                        },
-                        new
-                        {
-                            Id = new Guid("22222222-2222-2222-2222-222222222207"),
-                            Name = "ManageChannels",
                             Type = "Channel"
                         });
                 });

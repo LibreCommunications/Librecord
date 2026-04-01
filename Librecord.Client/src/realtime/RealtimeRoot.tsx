@@ -37,13 +37,15 @@ async function tryRestoreVoiceSession() {
             isScreenSharing: false,
         });
 
-        // Row was lost — full rejoin
+        // RejoinVoiceChannel returns null when the row survived (just updated flags).
+        // We still need a fresh token, so do a full rejoin via the correct method.
         if (!result) {
+            const method = session.guildId ? "JoinVoiceChannel" : "AcceptDmCall";
             result = await appConnection.invoke<{
                 token: string;
                 wsUrl: string;
                 participants: VoiceParticipant[];
-            }>("JoinVoiceChannel", session.channelId);
+            }>(method, session.channelId);
         }
 
         setVoiceState({

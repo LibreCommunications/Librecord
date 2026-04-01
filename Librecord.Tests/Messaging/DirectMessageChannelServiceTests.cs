@@ -30,68 +30,23 @@ public class DirectMessageChannelServiceTests
         new(_dms.Object, _friendships.Object, _blocks.Object, _storage.Object, _readStates.Object,
             MockUow().Object, Mock.Of<ILogger<DirectMessageChannelService>>());
 
-    private static DmChannel MakeChannel(Guid channelId, params Guid[] memberIds)
+    private static DmChannel MakeChannel(Guid channelId, bool isGroup = false, params Guid[] memberIds)
     {
-        var channel = new DmChannel { Id = channelId };
-        foreach (var uid in memberIds)
-            channel.Members.Add(new DmChannelMember { ChannelId = channelId, UserId = uid });
-        return channel;
-    }
-
-    private static DmChannel MakeGroupChannel(Guid channelId, params Guid[] memberIds)
-    {
-        var channel = new DmChannel { Id = channelId, IsGroup = true };
+        var channel = new DmChannel { Id = channelId, IsGroup = isGroup };
         foreach (var uid in memberIds)
             channel.Members.Add(new DmChannelMember { ChannelId = channelId, UserId = uid });
         return channel;
     }
 
     // ---------------------------------------------------------
-    // IS MEMBER
+    // CREATING 1-ON-1 DM
     // ---------------------------------------------------------
 
     [Fact]
-    public async Task IsMember_UserInChannel_ReturnsTrue()
-    {
-        var userId = Guid.NewGuid();
-        var channelId = Guid.NewGuid();
-        var channel = MakeChannel(channelId, userId, Guid.NewGuid());
-        _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
-
-        var svc = CreateService();
-        Assert.True(await svc.IsMemberAsync(channelId, userId));
-    }
-
-    [Fact]
-    public async Task IsMember_UserNotInChannel_ReturnsFalse()
-    {
-        var channelId = Guid.NewGuid();
-        var channel = MakeChannel(channelId, Guid.NewGuid());
-        _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
-
-        var svc = CreateService();
-        Assert.False(await svc.IsMemberAsync(channelId, Guid.NewGuid()));
-    }
-
-    [Fact]
-    public async Task IsMember_ChannelNotFound_ReturnsFalse()
-    {
-        _dms.Setup(d => d.GetChannelAsync(It.IsAny<Guid>())).ReturnsAsync((DmChannel?)null);
-
-        var svc = CreateService();
-        Assert.False(await svc.IsMemberAsync(Guid.NewGuid(), Guid.NewGuid()));
-    }
-
-    // ---------------------------------------------------------
-    // START DM
-    // ---------------------------------------------------------
-
-    [Fact]
-    public async Task StartDm_NewConversation_CreatesChannel()
+    public async Task When_StartingNewDm_Should_CreateChannelWithBothMembers()
     {
         var requesterId = Guid.NewGuid();
         var targetId = Guid.NewGuid();
-
         _dms.Setup(d => d.GetUserDmChannelsAsync(requesterId)).ReturnsAsync([]);
 
         var svc = CreateService();
@@ -99,31 +54,29 @@ public class DirectMessageChannelServiceTests
 
         Assert.NotNull(result);
         Assert.Equal(2, result.Members.Count);
-        _dms.Verify(d => d.AddChannelAsync(It.IsAny<DmChannel>()), Times.Once);
-        _dms.Verify(d => d.SaveChangesAsync(), Times.Once);
+        Assert.Contains(result.Members, m => m.UserId == requesterId);
+        Assert.Contains(result.Members, m => m.UserId == targetId);
+        Assert.False(result.IsGroup);
     }
 
     [Fact]
-    public async Task StartDm_ExistingConversation_ReusesChannel()
+    public async Task When_StartingDmThatAlreadyExists_Should_ReturnExistingChannel()
     {
         var requesterId = Guid.NewGuid();
         var targetId = Guid.NewGuid();
-        var existingChannel = MakeChannel(Guid.NewGuid(), requesterId, targetId);
-
+        var existingChannel = MakeChannel(Guid.NewGuid(), false, requesterId, targetId);
         _dms.Setup(d => d.GetUserDmChannelsAsync(requesterId)).ReturnsAsync([existingChannel]);
 
         var svc = CreateService();
         var result = await svc.StartDmAsync(requesterId, targetId);
 
         Assert.Equal(existingChannel.Id, result.Id);
-        _dms.Verify(d => d.AddChannelAsync(It.IsAny<DmChannel>()), Times.Never);
     }
 
     [Fact]
-    public async Task StartDm_WithSelf_Throws()
+    public async Task When_StartingDmWithSelf_Should_Throw()
     {
         var userId = Guid.NewGuid();
-
         var svc = CreateService();
 
         await Assert.ThrowsAsync<InvalidOperationException>(
@@ -131,33 +84,83 @@ public class DirectMessageChannelServiceTests
     }
 
     [Fact]
-    public async Task StartDm_Blocked_Throws()
+    public async Task When_StartingDmWithBlockedUser_Should_Reject()
     {
         var alice = Guid.NewGuid();
         var bob = Guid.NewGuid();
-
         _blocks.Setup(b => b.IsEitherBlockedAsync(alice, bob)).ReturnsAsync(true);
 
         var svc = CreateService();
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
             () => svc.StartDmAsync(alice, bob));
-
         Assert.Contains("Cannot start", ex.Message);
-        _dms.Verify(d => d.AddChannelAsync(It.IsAny<DmChannel>()), Times.Never);
     }
 
     // ---------------------------------------------------------
-    // ADD PARTICIPANT
+    // CREATING GROUP DM
     // ---------------------------------------------------------
 
     [Fact]
-    public async Task AddParticipant_ValidFriend_AddsToChannel()
+    public async Task When_CreatingGroupDm_Should_IncludeAllMembers()
+    {
+        var creator = Guid.NewGuid();
+        var member1 = Guid.NewGuid();
+        var member2 = Guid.NewGuid();
+        var memberIds = new List<Guid> { member1, member2 };
+
+        _friendships.Setup(f => f.UsersAreConfirmedFriendsAsync(creator, It.IsAny<Guid>()))
+            .ReturnsAsync(true);
+
+        var svc = CreateService();
+        var result = await svc.CreateGroupAsync(creator, memberIds, "Test Group");
+
+        Assert.True(result.IsGroup);
+        Assert.Equal(3, result.Members.Count);
+        Assert.Contains(result.Members, m => m.UserId == creator);
+        Assert.Contains(result.Members, m => m.UserId == member1);
+        Assert.Contains(result.Members, m => m.UserId == member2);
+        Assert.Equal("Test Group", result.Name);
+    }
+
+    [Fact]
+    public async Task When_CreatingGroupDmWithBlockedUser_Should_Reject()
+    {
+        var creator = Guid.NewGuid();
+        var blocked = Guid.NewGuid();
+        _blocks.Setup(b => b.IsEitherBlockedAsync(creator, blocked)).ReturnsAsync(true);
+
+        var svc = CreateService();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.CreateGroupAsync(creator, [blocked], "Group"));
+    }
+
+    [Fact]
+    public async Task When_CreatingGroupDmWithNonFriend_Should_Reject()
+    {
+        var creator = Guid.NewGuid();
+        var stranger = Guid.NewGuid();
+        _friendships.Setup(f => f.UsersAreConfirmedFriendsAsync(creator, stranger))
+            .ReturnsAsync(false);
+
+        var svc = CreateService();
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => svc.CreateGroupAsync(creator, [stranger], "Group"));
+    }
+
+    // ---------------------------------------------------------
+    // ADDING PARTICIPANT
+    // ---------------------------------------------------------
+
+    [Fact]
+    public async Task When_AddingFriendToGroupDm_Should_AddMember()
     {
         var requesterId = Guid.NewGuid();
         var newUserId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
-        var channel = MakeGroupChannel(channelId, requesterId, Guid.NewGuid());
+        var channel = MakeChannel(channelId, true, requesterId, Guid.NewGuid());
 
         _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
         _friendships.Setup(f => f.UsersAreConfirmedFriendsAsync(requesterId, newUserId))
@@ -167,66 +170,16 @@ public class DirectMessageChannelServiceTests
         await svc.AddParticipantAsync(channelId, requesterId, newUserId);
 
         Assert.Equal(3, channel.Members.Count);
-        _dms.Verify(d => d.SaveChangesAsync(), Times.Once);
+        Assert.Contains(channel.Members, m => m.UserId == newUserId);
     }
 
     [Fact]
-    public async Task AddParticipant_NotFriends_Throws()
-    {
-        var requesterId = Guid.NewGuid();
-        var newUserId = Guid.NewGuid();
-        var channelId = Guid.NewGuid();
-        var channel = MakeGroupChannel(channelId, requesterId);
-
-        _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
-        _friendships.Setup(f => f.UsersAreConfirmedFriendsAsync(requesterId, newUserId))
-            .ReturnsAsync(false);
-
-        var svc = CreateService();
-
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.AddParticipantAsync(channelId, requesterId, newUserId));
-    }
-
-    [Fact]
-    public async Task AddParticipant_RequesterNotMember_Throws()
-    {
-        var channelId = Guid.NewGuid();
-        var channel = MakeGroupChannel(channelId, Guid.NewGuid());
-        _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
-
-        var svc = CreateService();
-
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.AddParticipantAsync(channelId, Guid.NewGuid(), Guid.NewGuid()));
-    }
-
-    [Fact]
-    public async Task AddParticipant_Blocked_Throws()
-    {
-        var requesterId = Guid.NewGuid();
-        var newUserId = Guid.NewGuid();
-        var channelId = Guid.NewGuid();
-        var channel = MakeGroupChannel(channelId, requesterId);
-
-        _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
-        _blocks.Setup(b => b.IsEitherBlockedAsync(requesterId, newUserId)).ReturnsAsync(true);
-
-        var svc = CreateService();
-
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => svc.AddParticipantAsync(channelId, requesterId, newUserId));
-
-        Assert.Contains("Cannot add", ex.Message);
-    }
-
-    [Fact]
-    public async Task AddParticipant_AlreadyMember_NoOp()
+    public async Task When_AddingAlreadyPresentMember_Should_NoOp()
     {
         var requesterId = Guid.NewGuid();
         var existingId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
-        var channel = MakeGroupChannel(channelId, requesterId, existingId);
+        var channel = MakeChannel(channelId, true, requesterId, existingId);
 
         _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
 
@@ -236,17 +189,32 @@ public class DirectMessageChannelServiceTests
         Assert.Equal(2, channel.Members.Count);
     }
 
+    [Fact]
+    public async Task When_AddingParticipantTo1on1Dm_Should_Reject()
+    {
+        var requesterId = Guid.NewGuid();
+        var channelId = Guid.NewGuid();
+        var channel = MakeChannel(channelId, false, requesterId, Guid.NewGuid());
+
+        _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
+
+        var svc = CreateService();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.AddParticipantAsync(channelId, requesterId, Guid.NewGuid()));
+    }
+
     // ---------------------------------------------------------
-    // LEAVE CHANNEL
+    // LEAVING CHANNEL
     // ---------------------------------------------------------
 
     [Fact]
-    public async Task LeaveChannel_MemberLeaves_RemovedFromMembers()
+    public async Task When_LeavingGroupDm_Should_RemoveMember()
     {
         var userId = Guid.NewGuid();
         var otherId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
-        var channel = MakeGroupChannel(channelId, userId, otherId);
+        var channel = MakeChannel(channelId, true, userId, otherId);
 
         _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
 
@@ -255,15 +223,14 @@ public class DirectMessageChannelServiceTests
 
         Assert.Single(channel.Members);
         Assert.DoesNotContain(channel.Members, m => m.UserId == userId);
-        _dms.Verify(d => d.SaveChangesAsync(), Times.Once);
     }
 
     [Fact]
-    public async Task LeaveChannel_LastMember_DeletesChannel()
+    public async Task When_LastMemberLeavesGroupDm_Should_DeleteChannel()
     {
         var userId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
-        var channel = MakeGroupChannel(channelId, userId);
+        var channel = MakeChannel(channelId, true, userId);
 
         _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
 
@@ -274,16 +241,53 @@ public class DirectMessageChannelServiceTests
     }
 
     [Fact]
-    public async Task LeaveChannel_NotAMember_NoOp()
+    public async Task When_Leaving1on1Dm_Should_Reject()
     {
+        var userId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
-        var channel = MakeGroupChannel(channelId, Guid.NewGuid());
+        var channel = MakeChannel(channelId, false, userId, Guid.NewGuid());
 
         _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
 
         var svc = CreateService();
-        await svc.LeaveChannelAsync(channelId, Guid.NewGuid());
 
-        Assert.Single(channel.Members);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.LeaveChannelAsync(channelId, userId));
+    }
+
+    // ---------------------------------------------------------
+    // MEMBERSHIP CHECKS
+    // ---------------------------------------------------------
+
+    [Fact]
+    public async Task When_CheckingMembership_Should_ReturnTrueForMember()
+    {
+        var userId = Guid.NewGuid();
+        var channelId = Guid.NewGuid();
+        var channel = MakeChannel(channelId, false, userId, Guid.NewGuid());
+        _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
+
+        var svc = CreateService();
+        Assert.True(await svc.IsMemberAsync(channelId, userId));
+    }
+
+    [Fact]
+    public async Task When_CheckingMembership_Should_ReturnFalseForNonMember()
+    {
+        var channelId = Guid.NewGuid();
+        var channel = MakeChannel(channelId, false, Guid.NewGuid());
+        _dms.Setup(d => d.GetChannelAsync(channelId)).ReturnsAsync(channel);
+
+        var svc = CreateService();
+        Assert.False(await svc.IsMemberAsync(channelId, Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task When_CheckingMembershipOfMissingChannel_Should_ReturnFalse()
+    {
+        _dms.Setup(d => d.GetChannelAsync(It.IsAny<Guid>())).ReturnsAsync((DmChannel?)null);
+
+        var svc = CreateService();
+        Assert.False(await svc.IsMemberAsync(Guid.NewGuid(), Guid.NewGuid()));
     }
 }

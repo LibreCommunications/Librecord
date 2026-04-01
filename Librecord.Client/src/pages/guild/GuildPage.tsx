@@ -8,12 +8,16 @@ import { useUserProfile } from "../../hooks/useUserProfile";
 import { useAttachmentUpload } from "../../hooks/useAttachmentUpload";
 import { useChatChannel, type ChatChannelConfig } from "../../hooks/useChatChannel";
 import { useGuildPermissions } from "../../hooks/useGuildPermissions";
+import { useThreads } from "../../hooks/useThreads";
+import { onCustomEvent } from "../../lib/typedEvent";
+import type { AppEventMap } from "../../realtime/events";
 
 import { MemberSidebar } from "../../components/guild/MemberSidebar";
 import { InviteModal } from "../../components/guild/InviteModal";
 import { SearchBar } from "../../components/messages/SearchBar";
 import { PinnedMessagesPanel } from "../../components/messages/PinnedMessagesPanel";
 import { ChatView } from "../../components/chat/ChatView";
+import { ThreadPanel } from "../../components/messages/ThreadPanel";
 import { VoiceChannelView } from "../../components/voice/VoiceChannelView";
 import { Spinner } from "../../components/ui/Spinner";
 import { PersonPlusIcon, PersonsIcon, PinIcon, ShieldIcon, VoiceChannelIcon } from "../../components/ui/Icons";
@@ -32,12 +36,17 @@ export default function GuildChannelPage() {
         deleteMessage: guildDeleteMessage,
     } = useGuildChannelMessages();
     const { sendGuildMessageWithAttachments } = useAttachmentUpload();
-    const { permissions } = useGuildPermissions(guildId);
+    const { permissions } = useGuildPermissions(guildId, channelId);
+    const { createThread, getThreads } = useThreads();
     const [channelName, setChannelName] = useState<string | null>(null);
     const [channelTopic, setChannelTopic] = useState<string | null>(null);
     const [channelType, setChannelType] = useState<number>(0);
     const [showInvite, setShowInvite] = useState(false);
     const [showMembers, setShowMembers] = useState(true);
+    const [activeThread, setActiveThread] = useState<{ id: string; name: string } | null>(null);
+    const [threadMap, setThreadMap] = useState<Map<string, { threadId: string; threadName: string; messageCount: number }>>(new Map());
+    const [threadPromptMsgId, setThreadPromptMsgId] = useState<string | null>(null);
+    const [threadNameInput, setThreadNameInput] = useState("");
 
     const [metadataReady, setMetadataReady] = useState(false);
 
@@ -47,6 +56,8 @@ export default function GuildChannelPage() {
         setChannelName(null);
         setChannelTopic(null);
         setMetadataReady(false);
+        setThreadMap(new Map());
+        setActiveThread(null);
     }
 
     useEffect(() => {
@@ -85,6 +96,82 @@ export default function GuildChannelPage() {
     }), [metadataReady, channelId, getChannelMessages, createMessage, sendGuildMessageWithAttachments, guildEditMessage, guildDeleteMessage]);
 
     const chat = useChatChannel(config);
+
+    // Load thread metadata for messages in this channel
+    useEffect(() => {
+        if (!channelId) return;
+        let stale = false;
+        getThreads(channelId).then(threads => {
+            if (stale) return;
+            const map = new Map<string, { threadId: string; threadName: string; messageCount: number }>();
+            for (const t of threads) {
+                map.set(t.parentMessageId, { threadId: t.id, threadName: t.name, messageCount: t.messageCount });
+            }
+            setThreadMap(map);
+        });
+        return () => { stale = true; };
+    }, [channelId, getThreads]);
+
+    // Update thread message count on real-time events
+    useEffect(() => {
+        return onCustomEvent<AppEventMap["guild:thread:message:new"]>(
+            "guild:thread:message:new",
+            (detail) => {
+                if (detail.channelId !== channelId) return;
+                setThreadMap(prev => {
+                    const next = new Map(prev);
+                    for (const [msgId, info] of next) {
+                        if (info.threadId === detail.threadId) {
+                            next.set(msgId, { ...info, messageCount: info.messageCount + 1 });
+                            break;
+                        }
+                    }
+                    return next;
+                });
+            },
+        );
+    }, [channelId]);
+
+    // Enrich messages with thread info
+    const messagesWithThreads = useMemo(() => {
+        if (threadMap.size === 0) return chat.messages;
+        return chat.messages.map(msg => {
+            const info = threadMap.get(msg.id);
+            if (!info) return msg;
+            return { ...msg, threadId: info.threadId, threadName: info.threadName, threadMessageCount: info.messageCount };
+        });
+    }, [chat.messages, threadMap]);
+
+    const chatWithThreads = useMemo(() => ({
+        ...chat,
+        messages: messagesWithThreads,
+    }), [chat, messagesWithThreads]);
+
+    async function handleStartThread(messageId: string) {
+        setThreadPromptMsgId(messageId);
+        setThreadNameInput("");
+    }
+
+    async function handleCreateThread() {
+        if (!channelId || !threadPromptMsgId || !threadNameInput.trim()) return;
+        const thread = await createThread(channelId, threadPromptMsgId, threadNameInput.trim());
+        setThreadPromptMsgId(null);
+        if (thread) {
+            setThreadMap(prev => {
+                const next = new Map(prev);
+                next.set(threadPromptMsgId, { threadId: thread.id, threadName: thread.name, messageCount: 0 });
+                return next;
+            });
+            setActiveThread({ id: thread.id, name: thread.name });
+        }
+    }
+
+    function handleOpenThread(messageId: string) {
+        const info = threadMap.get(messageId);
+        if (info) {
+            setActiveThread({ id: info.threadId, name: info.threadName });
+        }
+    }
 
     if (!channelId) {
         return (
@@ -173,17 +260,34 @@ export default function GuildChannelPage() {
                     />
                 ) : (
                     <ChatView
-                        chat={chat}
+                        chat={chatWithThreads}
                         currentUserId={user?.userId}
                         getAvatarUrl={getAvatarUrl}
                         inputPlaceholder={`Message #${channelName ?? ""}`}
                         canManageMessages={permissions.isOwner || permissions.manageMessages}
+                        channelPerms={{
+                            canSendMessages: permissions.isOwner || permissions.channelSendMessages !== false,
+                            canSendAttachments: permissions.isOwner || permissions.channelSendAttachments !== false,
+                            canAddReactions: permissions.isOwner || permissions.channelAddReactions !== false,
+                            canManageMessages: permissions.isOwner || permissions.manageMessages,
+                        }}
+                        onStartThread={handleStartThread}
+                        onOpenThread={handleOpenThread}
                     />
                 )}
             </div>
 
             {chat.showPins && !isVoice && channelId && (
                 <PinnedMessagesPanel channelId={channelId} onClose={() => chat.setShowPins(false)} />
+            )}
+
+            {activeThread && channelId && (
+                <ThreadPanel
+                    channelId={channelId}
+                    threadId={activeThread.id}
+                    threadName={activeThread.name}
+                    onClose={() => setActiveThread(null)}
+                />
             )}
 
             {showMembers && guildId && (
@@ -195,6 +299,33 @@ export default function GuildChannelPage() {
                     guildId={guildId}
                     onClose={() => setShowInvite(false)}
                 />
+            )}
+
+            {threadPromptMsgId && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setThreadPromptMsgId(null)}>
+                    <div className="bg-[#313338] rounded-lg p-5 w-96 shadow-xl" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-semibold text-white mb-3">Start Thread</h3>
+                        <input
+                            autoFocus
+                            value={threadNameInput}
+                            onChange={e => setThreadNameInput(e.target.value)}
+                            onKeyDown={e => { if (e.key === "Enter") handleCreateThread(); }}
+                            placeholder="Thread name"
+                            maxLength={64}
+                            className="w-full px-3 py-2 rounded bg-[#1e1f22] text-white text-sm outline-none border border-[#3f4147] focus:border-[#5865F2]"
+                        />
+                        <div className="flex justify-end gap-2 mt-4">
+                            <button onClick={() => setThreadPromptMsgId(null)} className="px-4 py-2 text-sm text-[#dbdee1] hover:underline">Cancel</button>
+                            <button
+                                onClick={handleCreateThread}
+                                disabled={!threadNameInput.trim()}
+                                className="px-4 py-2 text-sm bg-[#5865F2] text-white rounded hover:bg-[#4752c4] disabled:opacity-50"
+                            >
+                                Create
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

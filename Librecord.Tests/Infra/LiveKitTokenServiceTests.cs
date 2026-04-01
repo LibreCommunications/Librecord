@@ -18,18 +18,7 @@ public class LiveKitTokenServiceTests
         => new(Options.Create(_opts));
 
     [Fact]
-    public void GenerateToken_ReturnsNonEmptyJwt()
-    {
-        var svc = CreateService();
-        var token = svc.GenerateToken(Guid.NewGuid(), "Alice", Guid.NewGuid());
-
-        Assert.NotNull(token);
-        Assert.NotEmpty(token);
-        Assert.Contains(".", token); // JWT has 3 dot-separated parts
-    }
-
-    [Fact]
-    public void GenerateToken_ContainsIdentityClaim()
+    public void When_GeneratingToken_Should_ContainIdentityClaim()
     {
         var userId = Guid.NewGuid();
         var svc = CreateService();
@@ -38,25 +27,12 @@ public class LiveKitTokenServiceTests
         var handler = new JwtSecurityTokenHandler();
         var token = handler.ReadJwtToken(jwt);
 
-        // LiveKit SDK sets "sub" to the identity
         var sub = token.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
         Assert.Equal(userId.ToString(), sub);
     }
 
     [Fact]
-    public void GenerateToken_DifferentInputs_ProduceDifferentTokens()
-    {
-        var svc = CreateService();
-        var channelId = Guid.NewGuid();
-
-        var token1 = svc.GenerateToken(Guid.NewGuid(), "Alice", channelId);
-        var token2 = svc.GenerateToken(Guid.NewGuid(), "Bob", channelId);
-
-        Assert.NotEqual(token1, token2);
-    }
-
-    [Fact]
-    public void GenerateToken_HasExpiration()
+    public void When_GeneratingToken_Should_HaveValidExpiration()
     {
         var svc = CreateService();
         var jwt = svc.GenerateToken(Guid.NewGuid(), "Alice", Guid.NewGuid());
@@ -65,6 +41,18 @@ public class LiveKitTokenServiceTests
         var token = handler.ReadJwtToken(jwt);
 
         Assert.True(token.ValidTo > DateTime.UtcNow);
-        Assert.True(token.ValidTo <= DateTime.UtcNow.AddHours(7)); // ~6h TTL with some slack
+        Assert.True(token.ValidTo <= DateTime.UtcNow.AddHours(7)); // ~6h TTL with slack
+    }
+
+    [Fact]
+    public void When_GeneratingMultipleTokens_Should_BeUnique()
+    {
+        var svc = CreateService();
+        var channelId = Guid.NewGuid();
+
+        var token1 = svc.GenerateToken(Guid.NewGuid(), "Alice", channelId);
+        var token2 = svc.GenerateToken(Guid.NewGuid(), "Bob", channelId);
+
+        Assert.NotEqual(token1, token2);
     }
 }

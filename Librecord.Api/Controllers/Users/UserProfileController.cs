@@ -31,10 +31,8 @@ public class UserProfileController : AuthenticatedController
 
         var isFriend = await _friendships.UsersAreConfirmedFriendsAsync(UserId, userId);
 
-        // Mutual friends — only count if their friends are visible or they're a friend
-        var canSeeFriends = user.FriendsVisible || isFriend || user.Id == UserId;
         var mutualCount = 0;
-        if (canSeeFriends && user.Id != UserId)
+        if (user.Id != UserId && user.MutualFriendsVisible)
         {
             var myFriends = (await _friendService.GetFriendsAsync(UserId)).Select(f => f.UserId).ToHashSet();
             var theirFriends = (await _friendService.GetFriendsAsync(userId)).Select(f => f.UserId).ToHashSet();
@@ -53,8 +51,7 @@ public class UserProfileController : AuthenticatedController
             isFriend,
             isSelf = user.Id == UserId,
             mutualFriendCount = mutualCount,
-            friendsVisible = canSeeFriends,
-            friendsVisibleSetting = user.Id == UserId ? user.FriendsVisible : (bool?)null,
+            mutualFriendsVisible = user.Id == UserId ? user.MutualFriendsVisible : (bool?)null,
         });
     }
 
@@ -65,13 +62,15 @@ public class UserProfileController : AuthenticatedController
         var user = await _users.GetByIdAsync(userId);
         if (user == null) return NotFound();
 
-        // Respect privacy: only show friends if visible, or viewer is a friend, or it's self
-        var isFriend = await _friendships.UsersAreConfirmedFriendsAsync(UserId, userId);
-        if (!user.FriendsVisible && !isFriend && user.Id != UserId)
+        // Only return mutual friends; respect the target's privacy setting
+        if (user.Id == UserId || !user.MutualFriendsVisible)
             return Ok(Array.Empty<object>());
 
-        var friends = await _friendService.GetFriendsAsync(userId);
-        return Ok(friends.Select(f => new
+        var myFriendIds = (await _friendService.GetFriendsAsync(UserId)).Select(f => f.UserId).ToHashSet();
+        var theirFriends = await _friendService.GetFriendsAsync(userId);
+        var mutual = theirFriends.Where(f => myFriendIds.Contains(f.UserId));
+
+        return Ok(mutual.Select(f => new
         {
             id = f.UserId,
             username = f.Username,
@@ -81,10 +80,10 @@ public class UserProfileController : AuthenticatedController
     }
 
     [Authorize]
-    [HttpPut("friends-visible")]
-    public async Task<IActionResult> UpdateFriendsVisible([FromBody] UpdateFriendsVisibleRequest request)
+    [HttpPut("mutual-friends-visible")]
+    public async Task<IActionResult> UpdateMutualFriendsVisible([FromBody] UpdateMutualFriendsVisibleRequest request)
     {
-        var ok = await _users.UpdateFriendsVisibleAsync(UserId, request.Visible);
+        var ok = await _users.UpdateMutualFriendsVisibleAsync(UserId, request.Visible);
         return ok ? Ok() : Unauthorized();
     }
 
@@ -181,7 +180,8 @@ public class UpdateBioRequest
     public string? Bio { get; set; }
 }
 
-public class UpdateFriendsVisibleRequest
+public class UpdateMutualFriendsVisibleRequest
 {
     public bool Visible { get; set; }
 }
+

@@ -19,6 +19,10 @@ public interface IPermissionService
         Guid channelId,
         PermissionCapability permission);
 
+    Task<HashSet<PermissionCapability>> GetGrantedChannelPermissionsAsync(
+        Guid userId,
+        Guid channelId);
+
     Task SetChannelOverrideAsync(
         Guid channelId, Guid? roleId, Guid? userId,
         Guid permissionId, bool? allow);
