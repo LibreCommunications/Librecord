@@ -239,6 +239,10 @@ export const readState = {
     getUnreadCounts: (channelIds: string[]) =>
         request<Record<string, number>>("/channels/unread", { method: "POST", ...json({ channelIds }) })
             .catch(fallback("readState.getUnreadCounts", {} as Record<string, number>)),
+    getLastRead: (channelId: string) =>
+        request<{ messageId: string | null }>(`/channels/${channelId}/last-read`)
+            .then(r => r.messageId)
+            .catch(() => null),
 };
 
 export const presence = {

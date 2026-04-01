@@ -1,7 +1,7 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
 import { useChannels, type GuildChannel } from "../../hooks/useChannels";
-import { useReadState } from "../../hooks/useReadState";
+import { useUnreadContext } from "../../context/UnreadContext";
 import { useVoice } from "../../hooks/useVoice";
 import { useGuildPermissions } from "../../hooks/useGuildPermissions";
 import { useToast } from "../../hooks/useToast";
@@ -25,7 +25,7 @@ export default function ChannelSidebar({ guildId }: Props) {
     const { channelId } = useParams();
     const navigate = useNavigate();
     const { getGuildChannels, createChannel, updateChannel, deleteChannel } = useChannels();
-    const { getUnreadCounts } = useReadState();
+    const { counts: unreads, fetchUnreads, clearChannel, setActiveChannel } = useUnreadContext();
     const { voiceState, joinVoice } = useVoice();
     const { user } = useAuth();
     const { getAvatarUrl } = useUserProfile();
@@ -33,7 +33,6 @@ export default function ChannelSidebar({ guildId }: Props) {
     const { toast } = useToast();
 
     const [channels, setChannels] = useState<GuildChannel[]>([]);
-    const [unreads, setUnreads] = useState<Record<string, number>>({});
     const [loadedGuildId, setLoadedGuildId] = useState<string | null>(null);
     const loading = loadedGuildId !== guildId;
     const [showCreate, setShowCreate] = useState(false);
@@ -42,16 +41,24 @@ export default function ChannelSidebar({ guildId }: Props) {
     const [deleteTarget, setDeleteTarget] = useState<GuildChannel | null>(null);
     const [channelParticipants, setChannelParticipants] = useState<Record<string, { userId: string; username: string; displayName: string; avatarUrl: string | null; isMuted: boolean; isDeafened: boolean; isCameraOn: boolean; isScreenSharing: boolean }[]>>({});
 
+    // Clear unreads for active channel
+    useEffect(() => {
+        if (channelId) {
+            setActiveChannel(channelId);
+            clearChannel(channelId);
+        }
+        return () => setActiveChannel(undefined);
+    }, [channelId, setActiveChannel, clearChannel]);
+
     const loadChannels = useCallback(async function loadChannels() {
         const list = await getGuildChannels(guildId);
         setChannels(list);
         setLoadedGuildId(guildId);
 
         if (list.length > 0) {
-            const counts = await getUnreadCounts(list.map(c => c.id));
-            setUnreads(counts);
+            await fetchUnreads(list.map(c => c.id));
         }
-    }, [guildId, getGuildChannels, getUnreadCounts]);
+    }, [guildId, getGuildChannels, fetchUnreads]);
 
     useEffect(() => {
         if (!guildId) return;
@@ -134,28 +141,7 @@ export default function ChannelSidebar({ guildId }: Props) {
         });
     }, []);
 
-    useEffect(() => {
-        return onCustomEvent<AppEventMap["guild:message:ping"]>("guild:message:ping", (detail) => {
-            const { channelId: pingChannel, authorId } = detail;
-            if (pingChannel === channelId) return;
-            if (authorId === user?.userId) return;
-
-            setUnreads(prev => ({
-                ...prev,
-                [pingChannel]: (prev[pingChannel] ?? 0) + 1,
-            }));
-        });
-    }, [channelId, user?.userId]);
-
-    const [prevActiveChannelId, setPrevActiveChannelId] = useState(channelId);
-    if (channelId && channelId !== prevActiveChannelId) {
-        setPrevActiveChannelId(channelId);
-        if (unreads[channelId]) {
-            const next = { ...unreads };
-            delete next[channelId];
-            setUnreads(next);
-        }
-    }
+    // Unread increments and clearing are handled by UnreadContext
 
     async function handleCreateChannel(data: {
         name: string;

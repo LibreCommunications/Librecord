@@ -5,10 +5,12 @@ export type ScrollIntentRef = {
 };
 
 export interface MessageListProps {
+    channelId?: string;
     messages: Message[];
     loading: boolean;
     currentUserId?: string;
 
+    lastReadMessageId?: string | null;
     menuOpenId: string | null;
     editingId: string | null;
 
@@ -41,4 +43,6 @@ export interface MessageListProps {
     onLoadMore?: () => void;
     hasMore?: boolean;
     loadingMore?: boolean;
+
+    onMarkAsRead?: (channelId: string, messageId: string) => void;
 }

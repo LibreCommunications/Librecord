@@ -36,6 +36,13 @@ public class ReadStateController : AuthenticatedController
         return Ok();
     }
 
+    [HttpGet("{channelId:guid}/last-read")]
+    public async Task<IActionResult> GetLastRead(Guid channelId)
+    {
+        var state = await _readStates.GetAsync(UserId, channelId);
+        return Ok(new { messageId = state?.LastReadMessageId });
+    }
+
     [HttpPost("unread")]
     public async Task<IActionResult> GetUnreadCounts([FromBody] UnreadRequest request)
     {

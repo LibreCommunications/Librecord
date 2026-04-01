@@ -245,6 +245,7 @@ export default function DmConversationPage() {
                 ) : (
                     <ChatView
                         chat={chat}
+                        channelId={dmId}
                         currentUserId={user?.userId}
                         getAvatarUrl={getAvatarUrl}
                         inputPlaceholder={`Message ${channelName ?? ""}`}

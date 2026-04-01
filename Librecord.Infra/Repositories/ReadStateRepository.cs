@@ -55,6 +55,19 @@ public class ReadStateRepository : IReadStateRepository
         }
         else
         {
+            // Only advance the read pointer forward, never backward.
+            // Multiple markAsRead calls can arrive out-of-order; without
+            // this guard the slower request overwrites the newer one.
+            if (state.LastReadMessageId != null)
+            {
+                var currentMsg = await _db.Messages.FindAsync(state.LastReadMessageId);
+                var newMsg = await _db.Messages.FindAsync(messageId);
+                if (currentMsg != null && newMsg != null && newMsg.CreatedAt < currentMsg.CreatedAt)
+                {
+                    return;
+                }
+            }
+
             state.LastReadMessageId = messageId;
             state.LastReadAt = DateTime.UtcNow;
         }
