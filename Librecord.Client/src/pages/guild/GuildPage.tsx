@@ -265,6 +265,12 @@ export default function GuildChannelPage() {
                         getAvatarUrl={getAvatarUrl}
                         inputPlaceholder={`Message #${channelName ?? ""}`}
                         canManageMessages={permissions.isOwner || permissions.manageMessages}
+                        channelPerms={{
+                            canSendMessages: permissions.isOwner || permissions.channelSendMessages !== false,
+                            canSendAttachments: permissions.isOwner || permissions.channelSendAttachments !== false,
+                            canAddReactions: permissions.isOwner || permissions.channelAddReactions !== false,
+                            canManageMessages: permissions.isOwner || permissions.manageMessages,
+                        }}
                         onStartThread={handleStartThread}
                         onOpenThread={handleOpenThread}
                     />

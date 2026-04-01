@@ -37,6 +37,8 @@ export const MessageItem = memo(function MessageItem({
                                 currentUserId,
                                 isPinned,
                                 canManageMessages,
+                                canAddReactions,
+                                canSendMessages,
                                 onToggleMenu,
                                 onStartEdit,
                                 onReply,
@@ -221,7 +223,7 @@ export const MessageItem = memo(function MessageItem({
                     reactions={msg.reactions}
                     messageId={msg.id}
                     currentUserId={currentUserId}
-                    onAdd={onAddReaction}
+                    onAdd={canAddReactions !== false ? onAddReaction : undefined}
                     onRemove={onRemoveReaction}
                 />
 
@@ -266,15 +268,17 @@ export const MessageItem = memo(function MessageItem({
                                 <TrashIcon size={16} />
                             </button>
                         )}
-                        <button
-                            onClick={() => onReply(msg.id)}
-                            className="px-2 py-1 text-[#b5bac1] hover:text-white hover:bg-[#35373c] transition-colors"
-                            title="Reply"
-                            aria-label="Reply to message"
-                            data-testid="reply-message-btn"
-                        >
-                            <ReplyIcon size={16} />
-                        </button>
+                        {canSendMessages !== false && (
+                            <button
+                                onClick={() => onReply(msg.id)}
+                                className="px-2 py-1 text-[#b5bac1] hover:text-white hover:bg-[#35373c] transition-colors"
+                                title="Reply"
+                                aria-label="Reply to message"
+                                data-testid="reply-message-btn"
+                            >
+                                <ReplyIcon size={16} />
+                            </button>
+                        )}
                         <button
                             ref={moreButtonRef}
                             onClick={() => onToggleMenu(msg.id)}
@@ -289,12 +293,12 @@ export const MessageItem = memo(function MessageItem({
                     {menuOpen && (
                         <MessageMenu
                             anchorRef={moreButtonRef}
-                            onAddReaction={(emoji) => {
+                            onAddReaction={canAddReactions !== false ? (emoji) => {
                                 onAddReaction(msg.id, emoji);
                                 onToggleMenu(msg.id);
-                            }}
-                            onPin={onPin ? () => { onPin(msg.id); onToggleMenu(msg.id); } : undefined}
-                            onStartThread={onStartThread && !msg.threadId ? () => { onStartThread(msg.id); onToggleMenu(msg.id); } : undefined}
+                            } : undefined}
+                            onPin={onPin && canManageMessages ? () => { onPin(msg.id); onToggleMenu(msg.id); } : undefined}
+                            onStartThread={canSendMessages !== false && onStartThread && !msg.threadId ? () => { onStartThread(msg.id); onToggleMenu(msg.id); } : undefined}
                             onClose={() => onToggleMenu(msg.id)}
                             isPinned={isPinned}
                         />

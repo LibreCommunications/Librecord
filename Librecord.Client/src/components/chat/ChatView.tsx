@@ -8,19 +8,30 @@ import type { useChatChannel } from "../../hooks/useChatChannel";
 
 type ChatState = ReturnType<typeof useChatChannel>;
 
+export interface ChannelPerms {
+    canSendMessages?: boolean;
+    canSendAttachments?: boolean;
+    canAddReactions?: boolean;
+    canManageMessages?: boolean;
+}
+
 interface ChatViewProps {
     chat: ChatState;
     currentUserId: string | undefined;
     getAvatarUrl: (avatarUrl?: string | null) => string;
     inputPlaceholder: string;
     canManageMessages?: boolean;
+    channelPerms?: ChannelPerms;
     onStartThread?: (messageId: string) => void;
     onOpenThread?: (messageId: string) => void;
 }
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
-export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, canManageMessages, onStartThread, onOpenThread }: ChatViewProps) {
+export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, canManageMessages, channelPerms, onStartThread, onOpenThread }: ChatViewProps) {
+    const canSend = channelPerms?.canSendMessages ?? true;
+    const canAttach = canSend && (channelPerms?.canSendAttachments ?? true);
+    const canReact = channelPerms?.canAddReactions ?? true;
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const { toast } = useToast();
     const [dragging, setDragging] = useState(false);
@@ -81,6 +92,8 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, 
                 onPinMessage={chat.handlePin}
                 pinnedMessageIds={chat.pinnedIds}
                 canManageMessages={canManageMessages}
+                canAddReactions={canReact}
+                canSendMessages={canSend}
                 onStartThread={onStartThread}
                 onOpenThread={onOpenThread}
                 onReply={(msgId) => {
@@ -105,7 +118,12 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, 
             <TypingIndicator typingNames={chat.typingNames} />
 
             <div className="px-4 py-3 shrink-0">
-                {chat.replyingTo && (
+                {!canSend && (
+                    <div className="text-center text-sm text-[#949ba4] py-3">
+                        You do not have permission to send messages in this channel.
+                    </div>
+                )}
+                {canSend && chat.replyingTo && (
                     <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-[#2b2d31] rounded-t-lg border-l-2 border-[#5865F2]">
                         <ReplyIcon size={16} className="text-[#5865F2] shrink-0" />
                         <span className="text-xs text-[#949ba4]">Replying to</span>
@@ -120,8 +138,8 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, 
                         </button>
                     </div>
                 )}
-                <AttachmentUpload files={chat.pendingFiles} onFilesChange={chat.setPendingFiles} onReject={handleReject} triggerRef={chat.attachTriggerRef} />
-                {chat.sending && (
+                {canSend && <AttachmentUpload files={chat.pendingFiles} onFilesChange={chat.setPendingFiles} onReject={handleReject} triggerRef={chat.attachTriggerRef} />}
+                {canSend && chat.sending && (
                     <div className="flex items-center gap-2 px-4 py-1.5 text-xs text-[#949ba4]">
                         <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                             <circle cx="12" cy="12" r="10" strokeDasharray="56" strokeDashoffset="14" />
@@ -129,8 +147,8 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, 
                         Uploading…
                     </div>
                 )}
-                <div className="flex items-center bg-[#383a40] rounded-lg">
-                    <button
+                {canSend && <div className="flex items-center bg-[#383a40] rounded-lg">
+                    {canAttach && <button
                         onClick={() => chat.attachTriggerRef.current?.open()}
                         className="px-3 py-2.5 text-[#b5bac1] hover:text-[#dbdee1] shrink-0"
                         title="Attach files"
@@ -139,7 +157,7 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, 
                         type="button"
                     >
                         <PlusIcon size={20} />
-                    </button>
+                    </button>}
                     <textarea
                         ref={textareaRef}
                         value={chat.content}
@@ -181,7 +199,7 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, 
                             {chat.content.length}/4000
                         </span>
                     )}
-                </div>
+                </div>}
             </div>
         </div>
     );

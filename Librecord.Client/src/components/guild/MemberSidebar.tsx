@@ -94,7 +94,11 @@ export function MemberSidebar({ guildId }: Props) {
                     {roleMembers.map(member => (
                         <div
                             key={member.userId}
-                            onClick={() => window.dispatchEvent(new CustomEvent("user:profile:open", { detail: { userId: member.userId } }))}
+                            onClick={() => {
+                                // Don't open profile if the context menu is showing
+                                if (ctxMember) return;
+                                window.dispatchEvent(new CustomEvent("user:profile:open", { detail: { userId: member.userId } }));
+                            }}
                             className="relative flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/5 cursor-pointer"
                             onContextMenu={e => {
                                 if (!canModerate || member.userId === user?.userId) return;

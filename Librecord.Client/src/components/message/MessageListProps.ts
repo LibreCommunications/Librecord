@@ -28,6 +28,8 @@ export interface MessageListProps {
     onOpenThread?: (messageId: string) => void;
 
     canManageMessages?: boolean;
+    canAddReactions?: boolean;
+    canSendMessages?: boolean;
     onReply: (messageId: string) => void;
     onAddReaction: (messageId: string, emoji: string) => void;
     onRemoveReaction: (messageId: string, emoji: string) => void;

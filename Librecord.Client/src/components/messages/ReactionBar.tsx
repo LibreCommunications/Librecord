@@ -7,7 +7,7 @@ interface Props {
     reactions: MessageReaction[];
     messageId: string;
     currentUserId?: string;
-    onAdd: (messageId: string, emoji: string) => void;
+    onAdd?: (messageId: string, emoji: string) => void;
     onRemove: (messageId: string, emoji: string) => void;
 }
 
@@ -31,7 +31,7 @@ export const ReactionBar = memo(function ReactionBar({ reactions, messageId, cur
     function handleClick(emoji: string, userReacted: boolean) {
         if (userReacted) {
             onRemove(messageId, emoji);
-        } else {
+        } else if (onAdd) {
             onAdd(messageId, emoji);
         }
     }
@@ -57,7 +57,7 @@ export const ReactionBar = memo(function ReactionBar({ reactions, messageId, cur
                 </button>
             ))}
 
-            <div className="relative">
+            {onAdd && <div className="relative">
                 <button
                     onClick={() => setShowPicker(v => !v)}
                     className="px-1.5 py-0.5 rounded text-xs bg-[#2b2d31] text-gray-400 hover:text-white border border-transparent hover:border-gray-500"
@@ -81,7 +81,7 @@ export const ReactionBar = memo(function ReactionBar({ reactions, messageId, cur
                         ))}
                     </div>
                 )}
-            </div>
+            </div>}
         </div>
     );
 });

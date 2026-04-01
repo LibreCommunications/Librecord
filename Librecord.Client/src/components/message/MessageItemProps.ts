@@ -9,6 +9,8 @@ export interface MessageItemProps {
     isPinned?: boolean;
 
     canManageMessages?: boolean;
+    canAddReactions?: boolean;
+    canSendMessages?: boolean;
 
     onToggleMenu: (messageId: string) => void;
     onStartEdit: (messageId: string) => void;

@@ -1,5 +1,7 @@
 using Librecord.Application.Messaging;
+using Librecord.Application.Permissions;
 using Librecord.Application.Realtime.Guild;
+using Librecord.Domain.Permissions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,11 +13,13 @@ namespace Librecord.Api.Controllers.Messaging;
 public class ThreadController : AuthenticatedController
 {
     private readonly IThreadService _threads;
+    private readonly IPermissionService _permissions;
     private readonly IGuildRealtimeNotifier _notifier;
 
-    public ThreadController(IThreadService threads, IGuildRealtimeNotifier notifier)
+    public ThreadController(IThreadService threads, IPermissionService permissions, IGuildRealtimeNotifier notifier)
     {
         _threads = threads;
+        _permissions = permissions;
         _notifier = notifier;
     }
 
@@ -27,6 +31,9 @@ public class ThreadController : AuthenticatedController
 
         if (!await _threads.IsChannelMemberAsync(channelId, UserId))
             return Forbid();
+
+        var access = await _permissions.HasChannelPermissionAsync(UserId, channelId, ChannelPermission.SendMessages);
+        if (!access.Allowed) return Forbid();
 
         var thread = await _threads.CreateThreadAsync(channelId, request.ParentMessageId, request.Name, UserId);
         if (thread == null) return NotFound("Parent message not in this channel.");
@@ -99,6 +106,9 @@ public class ThreadController : AuthenticatedController
 
         if (!await _threads.IsChannelMemberAsync(channelId, UserId))
             return Forbid();
+
+        var access = await _permissions.HasChannelPermissionAsync(UserId, channelId, ChannelPermission.SendMessages);
+        if (!access.Allowed) return Forbid();
 
         var result = await _threads.PostMessageAsync(threadId, channelId, UserId, request.Content);
         if (result == null) return NotFound();
