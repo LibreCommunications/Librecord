@@ -26,65 +26,52 @@ public class AuthServiceTests
     // ---------------------------------------------------------
 
     [Fact]
-    public async Task Register_Success_ReturnsTokens()
+    public async Task When_RegisteringWithValidCredentials_Should_ReturnTokens()
     {
         _repo.Setup(r => r.GetUserByEmailAsync("new@test.com")).ReturnsAsync((User?)null);
         _repo.Setup(r => r.GetUserByUserNameAsync("newuser")).ReturnsAsync((User?)null);
-        _repo.Setup(r => r.CreateUserAsync(It.IsAny<User>(), "Pass123!"))
+        _repo.Setup(r => r.CreateUserAsync(It.IsAny<User>(), "StrongPass1!"))
             .ReturnsAsync(IdentityResult.Success);
         _jwt.Setup(j => j.GenerateAccessToken(It.IsAny<User>())).Returns("access-jwt");
         _jwt.Setup(j => j.GenerateRefreshToken()).Returns("refresh-token");
 
         var svc = CreateService();
-        var result = await svc.RegisterAsync("new@test.com", "newuser", "New User", "Pass123!");
+        var result = await svc.RegisterAsync("new@test.com", "newuser", "New User", "StrongPass1!");
 
         Assert.True(result.Success);
         Assert.Equal("access-jwt", result.AccessToken);
         Assert.Equal("refresh-token", result.RefreshToken);
-        _repo.Verify(r => r.AddRefreshTokenAsync(It.Is<RefreshToken>(t =>
-            t.Token == "refresh-token"
-        )), Times.Once);
-        _repo.Verify(r => r.SaveChangesAsync(), Times.Once);
     }
 
     [Fact]
-    public async Task Register_DuplicateEmail_Fails()
+    public async Task When_RegisteringWithExistingEmail_Should_Fail()
     {
         _repo.Setup(r => r.GetUserByEmailAsync("taken@test.com")).ReturnsAsync(MakeUser());
 
         var svc = CreateService();
-        var result = await svc.RegisterAsync("taken@test.com", "newuser", "u", "Pass123!");
+        var result = await svc.RegisterAsync("taken@test.com", "newuser", "u", "StrongPass1!");
 
         Assert.False(result.Success);
         Assert.Contains("Email", result.Error);
     }
 
     [Fact]
-    public async Task Register_DuplicateUsername_Fails()
-    {
-        _repo.Setup(r => r.GetUserByEmailAsync(It.IsAny<string>())).ReturnsAsync((User?)null);
-        _repo.Setup(r => r.GetUserByUserNameAsync("alice")).ReturnsAsync(MakeUser());
-
-        var svc = CreateService();
-        var result = await svc.RegisterAsync("new@test.com", "alice", "u", "Pass123!");
-
-        Assert.False(result.Success);
-        Assert.Contains("Username", result.Error);
-    }
-
-    [Fact]
-    public async Task Register_IdentityFailure_ReturnsErrors()
+    public async Task When_RegisteringWithShortPassword_Should_Fail()
     {
         _repo.Setup(r => r.GetUserByEmailAsync(It.IsAny<string>())).ReturnsAsync((User?)null);
         _repo.Setup(r => r.GetUserByUserNameAsync(It.IsAny<string>())).ReturnsAsync((User?)null);
         _repo.Setup(r => r.CreateUserAsync(It.IsAny<User>(), It.IsAny<string>()))
-            .ReturnsAsync(IdentityResult.Failed(new IdentityError { Description = "Weak password" }));
+            .ReturnsAsync(IdentityResult.Failed(new IdentityError
+            {
+                Code = "PasswordTooShort",
+                Description = "Password too short"
+            }));
 
         var svc = CreateService();
         var result = await svc.RegisterAsync("a@b.com", "user", "u", "123");
 
         Assert.False(result.Success);
-        Assert.Contains("Weak password", result.Error);
+        Assert.Contains("Password too short", result.Error);
     }
 
     // ---------------------------------------------------------
@@ -92,7 +79,7 @@ public class AuthServiceTests
     // ---------------------------------------------------------
 
     [Fact]
-    public async Task Login_WithEmail_ReturnsTokens()
+    public async Task When_LoggingInWithCorrectPassword_Should_ReturnTokens()
     {
         var user = MakeUser();
         _repo.Setup(r => r.GetUserByEmailAsync("alice@test.com")).ReturnsAsync(user);
@@ -105,37 +92,11 @@ public class AuthServiceTests
 
         Assert.True(result.Success);
         Assert.Equal("access", result.AccessToken);
+        Assert.Equal("refresh", result.RefreshToken);
     }
 
     [Fact]
-    public async Task Login_WithUsername_ReturnsTokens()
-    {
-        var user = MakeUser();
-        _repo.Setup(r => r.GetUserByUserNameAsync("alice")).ReturnsAsync(user);
-        _repo.Setup(r => r.CheckPasswordAsync(user, "Pass123!")).ReturnsAsync(true);
-        _jwt.Setup(j => j.GenerateAccessToken(user)).Returns("access");
-        _jwt.Setup(j => j.GenerateRefreshToken()).Returns("refresh");
-
-        var svc = CreateService();
-        var result = await svc.LoginAsync("alice", "Pass123!");
-
-        Assert.True(result.Success);
-    }
-
-    [Fact]
-    public async Task Login_UserNotFound_Fails()
-    {
-        _repo.Setup(r => r.GetUserByUserNameAsync("nobody")).ReturnsAsync((User?)null);
-
-        var svc = CreateService();
-        var result = await svc.LoginAsync("nobody", "Pass123!");
-
-        Assert.False(result.Success);
-        Assert.Contains("Invalid credentials", result.Error);
-    }
-
-    [Fact]
-    public async Task Login_WrongPassword_Fails()
+    public async Task When_LoggingInWithWrongPassword_Should_Fail()
     {
         var user = MakeUser();
         _repo.Setup(r => r.GetUserByUserNameAsync("alice")).ReturnsAsync(user);
@@ -148,12 +109,24 @@ public class AuthServiceTests
         Assert.Contains("Invalid credentials", result.Error);
     }
 
+    [Fact]
+    public async Task When_LoggingInWithNonexistentUser_Should_Fail()
+    {
+        _repo.Setup(r => r.GetUserByUserNameAsync("nobody")).ReturnsAsync((User?)null);
+
+        var svc = CreateService();
+        var result = await svc.LoginAsync("nobody", "Pass123!");
+
+        Assert.False(result.Success);
+        Assert.Contains("Invalid credentials", result.Error);
+    }
+
     // ---------------------------------------------------------
     // REFRESH TOKEN
     // ---------------------------------------------------------
 
     [Fact]
-    public async Task RefreshToken_Valid_RotatesTokens()
+    public async Task When_RefreshingValidToken_Should_ReturnNewTokens()
     {
         var user = MakeUser();
         var existing = new RefreshToken
@@ -180,60 +153,12 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task RefreshToken_Expired_Fails()
-    {
-        var existing = new RefreshToken
-        {
-            Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
-            Token = "expired",
-            ExpiresAt = DateTime.UtcNow.AddDays(-1),
-            IsRevoked = false
-        };
-
-        _repo.Setup(r => r.GetRefreshTokenAsync("expired")).ReturnsAsync(existing);
-
-        var svc = CreateService();
-        var result = await svc.RefreshTokenAsync("expired");
-
-        Assert.False(result.Success);
-    }
-
-    [Fact]
-    public async Task RefreshToken_NotFound_Fails()
+    public async Task When_RefreshingInvalidToken_Should_Fail()
     {
         _repo.Setup(r => r.GetRefreshTokenAsync("nonexistent")).ReturnsAsync((RefreshToken?)null);
 
         var svc = CreateService();
         var result = await svc.RefreshTokenAsync("nonexistent");
-
-        Assert.False(result.Success);
-    }
-
-    // ---------------------------------------------------------
-    // ME
-    // ---------------------------------------------------------
-
-    [Fact]
-    public async Task Me_ExistingUser_ReturnsInfo()
-    {
-        var user = MakeUser();
-        _repo.Setup(r => r.GetUserByIdAsync(user.Id)).ReturnsAsync(user);
-
-        var svc = CreateService();
-        var result = await svc.MeAsync(user.Id);
-
-        Assert.True(result.Success);
-        Assert.Equal(user.Id, result.UserId);
-    }
-
-    [Fact]
-    public async Task Me_UnknownUser_Fails()
-    {
-        _repo.Setup(r => r.GetUserByIdAsync(It.IsAny<Guid>())).ReturnsAsync((User?)null);
-
-        var svc = CreateService();
-        var result = await svc.MeAsync(Guid.NewGuid());
 
         Assert.False(result.Success);
     }

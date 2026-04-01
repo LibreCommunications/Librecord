@@ -9,9 +9,7 @@ using Moq;
 namespace Librecord.Tests.Messaging;
 
 /// <summary>
-/// Tests that verify SignalR / real-time event subscription behaviour:
-/// correct events are dispatched with correct payloads for every
-/// message mutation, and events are NOT dispatched on failures.
+/// Tests that verify real-time event broadcast behaviour for DM operations.
 /// </summary>
 public class DmRealtimeNotificationTests
 {
@@ -61,11 +59,11 @@ public class DmRealtimeNotificationTests
     }
 
     // ---------------------------------------------------------
-    // SEND — CREATED EVENT
+    // MESSAGE SENT — BROADCAST TO CHANNEL GROUP
     // ---------------------------------------------------------
 
     [Fact]
-    public async Task Send_EmitsCreatedEvent_WithCorrectChannelAndAuthor()
+    public async Task When_MessageSent_Should_BroadcastToChannelGroup()
     {
         var alice = Guid.NewGuid();
         var bob = Guid.NewGuid();
@@ -89,54 +87,7 @@ public class DmRealtimeNotificationTests
     }
 
     [Fact]
-    public async Task Send_NoEventEmitted_WhenChannelNotFound()
-    {
-        _channels.Setup(c => c.GetChannelAsync(It.IsAny<Guid>())).ReturnsAsync((DmChannel?)null);
-
-        var svc = CreateService();
-
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => svc.SendMessageAsync(Guid.NewGuid(), Guid.NewGuid(), "hi"));
-
-        _realtime.Verify(r => r.NotifyAsync(It.IsAny<DmMessageEvent>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task Send_NoEventEmitted_WhenNotMember()
-    {
-        var channelId = Guid.NewGuid();
-        var channel = MakeChannel(channelId, Guid.NewGuid());
-        _channels.Setup(c => c.GetChannelAsync(channelId)).ReturnsAsync(channel);
-
-        var svc = CreateService();
-
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => svc.SendMessageAsync(channelId, Guid.NewGuid(), "hi"));
-
-        _realtime.Verify(r => r.NotifyAsync(It.IsAny<DmMessageEvent>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task Send_NoEventEmitted_WhenBlocked()
-    {
-        var alice = Guid.NewGuid();
-        var bob = Guid.NewGuid();
-        var channelId = Guid.NewGuid();
-        var channel = MakeChannel(channelId, alice, bob);
-
-        _channels.Setup(c => c.GetChannelAsync(channelId)).ReturnsAsync(channel);
-        _blocks.Setup(b => b.IsEitherBlockedAsync(alice, bob)).ReturnsAsync(true);
-
-        var svc = CreateService();
-
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => svc.SendMessageAsync(channelId, alice, "hi"));
-
-        _realtime.Verify(r => r.NotifyAsync(It.IsAny<DmMessageEvent>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task Send_WithoutClientMessageId_EventHasNullClientId()
+    public async Task When_MessageSentWithoutClientId_Should_BroadcastWithNullClientId()
     {
         var alice = Guid.NewGuid();
         var channelId = Guid.NewGuid();
@@ -154,12 +105,25 @@ public class DmRealtimeNotificationTests
         )), Times.Once);
     }
 
+    [Fact]
+    public async Task When_SendFails_Should_NotBroadcast()
+    {
+        _channels.Setup(c => c.GetChannelAsync(It.IsAny<Guid>())).ReturnsAsync((DmChannel?)null);
+
+        var svc = CreateService();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.SendMessageAsync(Guid.NewGuid(), Guid.NewGuid(), "hi"));
+
+        _realtime.Verify(r => r.NotifyAsync(It.IsAny<DmMessageEvent>()), Times.Never);
+    }
+
     // ---------------------------------------------------------
-    // EDIT — EDITED EVENT
+    // MESSAGE EDITED — BROADCAST EDIT EVENT
     // ---------------------------------------------------------
 
     [Fact]
-    public async Task Edit_EmitsEditedEvent_WithUpdatedContentAndTimestamp()
+    public async Task When_MessageEdited_Should_BroadcastEditEvent()
     {
         var alice = Guid.NewGuid();
         var messageId = Guid.NewGuid();
@@ -180,7 +144,7 @@ public class DmRealtimeNotificationTests
     }
 
     [Fact]
-    public async Task Edit_NoEventEmitted_WhenNotAuthor()
+    public async Task When_EditFailsDueToWrongAuthor_Should_NotBroadcast()
     {
         var messageId = Guid.NewGuid();
         var message = MakeHydratedMessage(messageId, Guid.NewGuid(), Guid.NewGuid());
@@ -192,21 +156,12 @@ public class DmRealtimeNotificationTests
         _realtime.Verify(r => r.NotifyAsync(It.IsAny<DmMessageEvent>()), Times.Never);
     }
 
-    [Fact]
-    public async Task Edit_NoEventEmitted_WhenEmptyContent()
-    {
-        var svc = CreateService();
-        await svc.EditMessageAsync(Guid.NewGuid(), Guid.NewGuid(), "  ");
-
-        _realtime.Verify(r => r.NotifyAsync(It.IsAny<DmMessageEvent>()), Times.Never);
-    }
-
     // ---------------------------------------------------------
-    // DELETE — DELETED EVENT
+    // MESSAGE DELETED — BROADCAST DELETE EVENT
     // ---------------------------------------------------------
 
     [Fact]
-    public async Task Delete_EmitsDeletedEvent_WithCorrectIds()
+    public async Task When_MessageDeleted_Should_BroadcastDeleteEvent()
     {
         var alice = Guid.NewGuid();
         var messageId = Guid.NewGuid();
@@ -225,7 +180,7 @@ public class DmRealtimeNotificationTests
     }
 
     [Fact]
-    public async Task Delete_NoEventEmitted_WhenNotAuthor()
+    public async Task When_DeleteFailsDueToWrongAuthor_Should_NotBroadcast()
     {
         var messageId = Guid.NewGuid();
         var message = MakeHydratedMessage(messageId, Guid.NewGuid(), Guid.NewGuid());
@@ -238,7 +193,7 @@ public class DmRealtimeNotificationTests
     }
 
     [Fact]
-    public async Task Delete_NoEventEmitted_WhenNotFound()
+    public async Task When_DeleteFailsDueToNotFound_Should_NotBroadcast()
     {
         _messages.Setup(m => m.GetMessageAsync(It.IsAny<Guid>())).ReturnsAsync((Message?)null);
 

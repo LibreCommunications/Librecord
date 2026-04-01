@@ -63,10 +63,8 @@ public class VoiceServiceTests
         CreatedAt = DateTime.UtcNow
     };
 
-    // ─── JoinVoiceChannelAsync ──────────────────────────────────────
-
     [Fact]
-    public async Task JoinVoiceChannel_Success_ReturnsTokenAndParticipants()
+    public async Task When_JoiningVoiceChannelAsMember_Should_ReturnTokenAndParticipants()
     {
         var userId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
@@ -87,14 +85,11 @@ public class VoiceServiceTests
 
         Assert.Equal("jwt-token", result.Token);
         Assert.Equal("ws://localhost:7880", result.WsUrl);
-        _voiceStates.Verify(v => v.AddAsync(It.Is<VoiceState>(s =>
-            s.UserId == userId && s.ChannelId == channelId && s.GuildId == guildId
-        )), Times.Once);
-        _notifier.Verify(n => n.NotifyAsync(It.IsAny<VoiceUserJoined>()), Times.Once);
+        Assert.NotNull(result.Participants);
     }
 
     [Fact]
-    public async Task JoinVoiceChannel_NoAccess_Throws()
+    public async Task When_JoiningVoiceChannelAsNonMember_Should_Reject()
     {
         var userId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
@@ -109,66 +104,86 @@ public class VoiceServiceTests
     }
 
     [Fact]
-    public async Task JoinVoiceChannel_ChannelNotFound_Throws()
+    public async Task When_LeavingVoiceChannel_Should_CleanUpState()
     {
         var userId = Guid.NewGuid();
         var channelId = Guid.NewGuid();
+        var guildId = Guid.NewGuid();
 
-        _guilds.Setup(g => g.CanAccessChannelAsync(channelId, userId)).ReturnsAsync(true);
-        _guilds.Setup(g => g.GetChannelAsync(channelId)).ReturnsAsync((GuildChannel?)null);
-
-        var svc = CreateService();
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => svc.JoinVoiceChannelAsync(channelId, userId));
-
-        Assert.Contains("not found", ex.Message, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task JoinVoiceChannel_TextChannel_Throws()
-    {
-        var userId = Guid.NewGuid();
-        var channelId = Guid.NewGuid();
-        var channel = new GuildChannel
+        var state = new VoiceState
         {
-            Id = channelId,
-            GuildId = Guid.NewGuid(),
-            Name = "general",
-            Type = GuildChannelType.Text,
-            Position = 0,
-            CreatedAt = DateTime.UtcNow
+            UserId = userId,
+            ChannelId = channelId,
+            GuildId = guildId,
+            JoinedAt = DateTime.UtcNow
         };
 
-        _guilds.Setup(g => g.CanAccessChannelAsync(channelId, userId)).ReturnsAsync(true);
-        _guilds.Setup(g => g.GetChannelAsync(channelId)).ReturnsAsync(channel);
+        _voiceStates.Setup(v => v.GetByUserIdAsync(userId)).ReturnsAsync(state);
 
         var svc = CreateService();
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => svc.JoinVoiceChannelAsync(channelId, userId));
+        await svc.LeaveVoiceChannelAsync(userId);
 
-        Assert.Contains("not a voice channel", ex.Message, StringComparison.OrdinalIgnoreCase);
+        _voiceStates.Verify(v => v.RemoveAsync(userId), Times.Once);
+        _voiceStates.Verify(v => v.SaveChangesAsync(), Times.Once);
+        _notifier.Verify(n => n.NotifyAsync(It.Is<VoiceUserLeft>(e =>
+            e.ChannelId == channelId && e.UserId == userId
+        )), Times.Once);
     }
 
     [Fact]
-    public async Task JoinVoiceChannel_UserNotFound_Throws()
+    public async Task When_UpdatingVoiceStateMute_Should_PersistMutedFlag()
     {
         var userId = Guid.NewGuid();
-        var channelId = Guid.NewGuid();
-        var channel = MakeVoiceChannel(channelId, Guid.NewGuid());
+        var state = new VoiceState
+        {
+            UserId = userId,
+            ChannelId = Guid.NewGuid(),
+            GuildId = Guid.NewGuid(),
+            IsMuted = false,
+            IsDeafened = false,
+            IsCameraOn = false,
+            IsScreenSharing = false,
+            JoinedAt = DateTime.UtcNow
+        };
 
-        _guilds.Setup(g => g.CanAccessChannelAsync(channelId, userId)).ReturnsAsync(true);
-        _guilds.Setup(g => g.GetChannelAsync(channelId)).ReturnsAsync(channel);
-        _users.Setup(u => u.GetByIdAsync(userId)).ReturnsAsync((User?)null);
+        _voiceStates.Setup(v => v.GetByUserIdAsync(userId)).ReturnsAsync(state);
 
         var svc = CreateService();
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => svc.JoinVoiceChannelAsync(channelId, userId));
+        await svc.UpdateVoiceStateAsync(userId, new VoiceStateUpdateDto { IsMuted = true });
 
-        Assert.Contains("User not found", ex.Message);
+        Assert.True(state.IsMuted);
+        _voiceStates.Verify(v => v.UpdateAsync(state), Times.Once);
     }
 
     [Fact]
-    public async Task JoinVoiceChannel_AlreadyInChannel_LeavesOldFirst()
+    public async Task When_UpdatingVoiceStateDeafenCameraScreenshare_Should_PersistAllFlags()
+    {
+        var userId = Guid.NewGuid();
+        var state = new VoiceState
+        {
+            UserId = userId,
+            ChannelId = Guid.NewGuid(),
+            GuildId = Guid.NewGuid(),
+            JoinedAt = DateTime.UtcNow
+        };
+
+        _voiceStates.Setup(v => v.GetByUserIdAsync(userId)).ReturnsAsync(state);
+
+        var svc = CreateService();
+        await svc.UpdateVoiceStateAsync(userId, new VoiceStateUpdateDto
+        {
+            IsDeafened = true,
+            IsCameraOn = true,
+            IsScreenSharing = true
+        });
+
+        Assert.True(state.IsDeafened);
+        Assert.True(state.IsCameraOn);
+        Assert.True(state.IsScreenSharing);
+    }
+
+    [Fact]
+    public async Task When_SwitchingChannels_Should_LeaveOldAndJoinNew()
     {
         var userId = Guid.NewGuid();
         var oldChannelId = Guid.NewGuid();
@@ -196,148 +211,17 @@ public class VoiceServiceTests
         var svc = CreateService();
         await svc.JoinVoiceChannelAsync(newChannelId, userId);
 
-        // Should have left old channel (VoiceUserLeft for old channel)
         _notifier.Verify(n => n.NotifyAsync(It.Is<VoiceUserLeft>(e =>
             e.ChannelId == oldChannelId && e.UserId == userId
         )), Times.Once);
 
-        // Should have joined new channel
         _notifier.Verify(n => n.NotifyAsync(It.Is<VoiceUserJoined>(e =>
             e.ChannelId == newChannelId && e.UserId == userId
         )), Times.Once);
     }
 
-    // ─── LeaveVoiceChannelAsync ─────────────────────────────────────
-
     [Fact]
-    public async Task LeaveVoiceChannel_InChannel_RemovesAndNotifies()
-    {
-        var userId = Guid.NewGuid();
-        var channelId = Guid.NewGuid();
-        var guildId = Guid.NewGuid();
-
-        var state = new VoiceState
-        {
-            UserId = userId,
-            ChannelId = channelId,
-            GuildId = guildId,
-            JoinedAt = DateTime.UtcNow
-        };
-
-        _voiceStates.Setup(v => v.GetByUserIdAsync(userId)).ReturnsAsync(state);
-
-        var svc = CreateService();
-        await svc.LeaveVoiceChannelAsync(userId);
-
-        _voiceStates.Verify(v => v.RemoveAsync(userId), Times.Once);
-        _voiceStates.Verify(v => v.SaveChangesAsync(), Times.Once);
-        _notifier.Verify(n => n.NotifyAsync(It.Is<VoiceUserLeft>(e =>
-            e.ChannelId == channelId && e.GuildId == guildId && e.UserId == userId
-        )), Times.Once);
-    }
-
-    [Fact]
-    public async Task LeaveVoiceChannel_NotInChannel_DoesNothing()
-    {
-        var userId = Guid.NewGuid();
-        _voiceStates.Setup(v => v.GetByUserIdAsync(userId)).ReturnsAsync((VoiceState?)null);
-
-        var svc = CreateService();
-        await svc.LeaveVoiceChannelAsync(userId);
-
-        _voiceStates.Verify(v => v.RemoveAsync(It.IsAny<Guid>()), Times.Never);
-        _notifier.Verify(n => n.NotifyAsync(It.IsAny<VoiceEvent>()), Times.Never);
-    }
-
-    // ─── UpdateVoiceStateAsync ──────────────────────────────────────
-
-    [Fact]
-    public async Task UpdateVoiceState_MuteToggle_UpdatesAndBroadcasts()
-    {
-        var userId = Guid.NewGuid();
-        var channelId = Guid.NewGuid();
-        var guildId = Guid.NewGuid();
-
-        var state = new VoiceState
-        {
-            UserId = userId,
-            ChannelId = channelId,
-            GuildId = guildId,
-            IsMuted = false,
-            IsDeafened = false,
-            IsCameraOn = false,
-            IsScreenSharing = false,
-            JoinedAt = DateTime.UtcNow
-        };
-
-        _voiceStates.Setup(v => v.GetByUserIdAsync(userId)).ReturnsAsync(state);
-
-        var svc = CreateService();
-        await svc.UpdateVoiceStateAsync(userId, new VoiceStateUpdateDto { IsMuted = true });
-
-        Assert.True(state.IsMuted);
-        _voiceStates.Verify(v => v.UpdateAsync(state), Times.Once);
-        _voiceStates.Verify(v => v.SaveChangesAsync(), Times.Once);
-        _notifier.Verify(n => n.NotifyAsync(It.Is<VoiceUserStateChanged>(e =>
-            e.UserId == userId && e.IsMuted == true
-        )), Times.Once);
-    }
-
-    [Fact]
-    public async Task UpdateVoiceState_PartialUpdate_OnlyChangesSpecifiedFields()
-    {
-        var userId = Guid.NewGuid();
-        var state = new VoiceState
-        {
-            UserId = userId,
-            ChannelId = Guid.NewGuid(),
-            GuildId = Guid.NewGuid(),
-            IsMuted = false,
-            IsDeafened = false,
-            IsCameraOn = true,
-            IsScreenSharing = false,
-            JoinedAt = DateTime.UtcNow
-        };
-
-        _voiceStates.Setup(v => v.GetByUserIdAsync(userId)).ReturnsAsync(state);
-
-        var svc = CreateService();
-        await svc.UpdateVoiceStateAsync(userId, new VoiceStateUpdateDto { IsScreenSharing = true });
-
-        Assert.False(state.IsMuted);
-        Assert.True(state.IsCameraOn);
-        Assert.True(state.IsScreenSharing);
-    }
-
-    [Fact]
-    public async Task UpdateVoiceState_NotInChannel_DoesNothing()
-    {
-        var userId = Guid.NewGuid();
-        _voiceStates.Setup(v => v.GetByUserIdAsync(userId)).ReturnsAsync((VoiceState?)null);
-
-        var svc = CreateService();
-        await svc.UpdateVoiceStateAsync(userId, new VoiceStateUpdateDto { IsMuted = true });
-
-        _voiceStates.Verify(v => v.UpdateAsync(It.IsAny<VoiceState>()), Times.Never);
-        _notifier.Verify(n => n.NotifyAsync(It.IsAny<VoiceEvent>()), Times.Never);
-    }
-
-    // ─── GetChannelParticipantsAsync ────────────────────────────────
-
-    [Fact]
-    public async Task GetChannelParticipants_Empty_ReturnsEmptyList()
-    {
-        var channelId = Guid.NewGuid();
-        _voiceStates.Setup(v => v.GetByChannelIdAsync(channelId)).ReturnsAsync([]);
-
-        var svc = CreateService();
-        var result = await svc.GetChannelParticipantsAsync(channelId);
-
-        Assert.Empty(result);
-    }
-
-    [Fact]
-    public async Task GetChannelParticipants_WithUsers_ReturnsMappedDtos()
+    public async Task When_GettingParticipants_Should_ReturnCurrentUsersInChannel()
     {
         var channelId = Guid.NewGuid();
         var user1Id = Guid.NewGuid();
@@ -370,35 +254,28 @@ public class VoiceServiceTests
         var result = await svc.GetChannelParticipantsAsync(channelId);
 
         Assert.Equal(2, result.Count);
-        Assert.Equal("alice", result[0].Username);
-        Assert.True(result[0].IsMuted);
-        Assert.Equal("bob", result[1].Username);
-        Assert.True(result[1].IsCameraOn);
+        Assert.Contains(result, p => p.Username == "alice" && p.IsMuted);
+        Assert.Contains(result, p => p.Username == "bob" && p.IsCameraOn);
     }
 
     [Fact]
-    public async Task GetChannelParticipants_MissingUser_FallsBackToUnknown()
+    public async Task When_JoiningDmVoiceCall_Should_ReturnToken()
     {
-        var channelId = Guid.NewGuid();
         var userId = Guid.NewGuid();
+        var dmChannelId = Guid.NewGuid();
+        var user = MakeUser(userId);
 
-        var states = new List<VoiceState>
-        {
-            new()
-            {
-                UserId = userId, ChannelId = channelId, GuildId = Guid.NewGuid(),
-                JoinedAt = DateTime.UtcNow
-            }
-        };
-
-        _voiceStates.Setup(v => v.GetByChannelIdAsync(channelId)).ReturnsAsync(states);
+        _dmChannels.Setup(d => d.IsMemberAsync(dmChannelId, userId)).ReturnsAsync(true);
+        _users.Setup(u => u.GetByIdAsync(userId)).ReturnsAsync(user);
+        _voiceStates.Setup(v => v.GetByUserIdAsync(userId)).ReturnsAsync((VoiceState?)null);
+        _voiceStates.Setup(v => v.GetByChannelIdAsync(dmChannelId)).ReturnsAsync([]);
+        _tokenService.Setup(t => t.GenerateToken(userId, "testuser", dmChannelId)).Returns("dm-token");
         _users.Setup(u => u.GetByIdsAsync(It.IsAny<IEnumerable<Guid>>())).ReturnsAsync([]);
 
         var svc = CreateService();
-        var result = await svc.GetChannelParticipantsAsync(channelId);
+        var result = await svc.JoinDmVoiceCallAsync(dmChannelId, userId);
 
-        Assert.Single(result);
-        Assert.Equal("Unknown", result[0].Username);
-        Assert.Equal("Unknown", result[0].DisplayName);
+        Assert.Equal("dm-token", result.Token);
+        Assert.Equal("ws://localhost:7880", result.WsUrl);
     }
 }

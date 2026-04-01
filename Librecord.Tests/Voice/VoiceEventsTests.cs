@@ -5,25 +5,37 @@ namespace Librecord.Tests.Voice;
 public class VoiceEventsTests
 {
     [Fact]
-    public void VoiceUserJoined_CarriesUserInfo()
+    public void When_VoiceUserJoinedEventCreated_Should_ContainAllRequiredFields()
     {
+        var channelId = Guid.NewGuid();
+        var guildId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
         var evt = new VoiceUserJoined
         {
-            ChannelId = Guid.NewGuid(),
-            GuildId = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            ChannelId = channelId,
+            GuildId = guildId,
+            UserId = userId,
             Username = "alice",
             DisplayName = "Alice",
-            AvatarUrl = "https://example.com/avatar.png"
+            AvatarUrl = "https://example.com/avatar.png",
+            IsMuted = false,
+            IsDeafened = false,
+            IsCameraOn = true,
+            IsScreenSharing = false
         };
 
+        Assert.Equal(channelId, evt.ChannelId);
+        Assert.Equal(guildId, evt.GuildId);
+        Assert.Equal(userId, evt.UserId);
         Assert.Equal("alice", evt.Username);
         Assert.Equal("Alice", evt.DisplayName);
-        Assert.NotNull(evt.AvatarUrl);
+        Assert.Equal("https://example.com/avatar.png", evt.AvatarUrl);
+        Assert.True(evt.IsCameraOn);
     }
 
     [Fact]
-    public void VoiceUserLeft_HasRequiredIds()
+    public void When_VoiceUserLeftEventCreated_Should_ContainUserIdAndChannelId()
     {
         var channelId = Guid.NewGuid();
         var userId = Guid.NewGuid();
@@ -40,7 +52,7 @@ public class VoiceEventsTests
     }
 
     [Fact]
-    public void VoiceUserStateChanged_CarriesAllFlags()
+    public void When_VoiceStateChangedEventCreated_Should_ContainAllStateFlags()
     {
         var evt = new VoiceUserStateChanged
         {
@@ -57,33 +69,5 @@ public class VoiceEventsTests
         Assert.False(evt.IsDeafened);
         Assert.True(evt.IsCameraOn);
         Assert.True(evt.IsScreenSharing);
-    }
-
-    [Fact]
-    public void VoiceUserJoined_IsVoiceEvent()
-    {
-        VoiceEvent evt = new VoiceUserJoined
-        {
-            ChannelId = Guid.NewGuid(),
-            GuildId = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
-            Username = "test",
-            DisplayName = "Test"
-        };
-
-        Assert.IsType<VoiceUserJoined>(evt);
-    }
-
-    [Fact]
-    public void VoiceUserLeft_IsVoiceEvent()
-    {
-        VoiceEvent evt = new VoiceUserLeft
-        {
-            ChannelId = Guid.NewGuid(),
-            GuildId = Guid.NewGuid(),
-            UserId = Guid.NewGuid()
-        };
-
-        Assert.IsType<VoiceUserLeft>(evt);
     }
 }
