@@ -10,6 +10,7 @@ import { useChatChannel, type ChatChannelConfig } from "../../hooks/useChatChann
 import { Spinner } from "../../components/ui/Spinner";
 import { useVoice } from "../../hooks/useVoice";
 import { VoiceChannelView } from "../../components/voice/VoiceChannelView";
+import { OutgoingCallOverlay } from "../../components/voice/OutgoingCallOverlay";
 import { VoiceChannelIcon } from "../../components/ui/Icons";
 
 import { AddParticipantModal } from "./AddParticipantModal";
@@ -58,7 +59,12 @@ export default function DmConversationPage() {
     const { voiceState, startDmCall } = useVoice();
     const inCall = voiceState.isConnected && voiceState.channelId === dmId && !voiceState.guildId;
     const [showCallView, setShowCallView] = useState(inCall);
-    if (!inCall && showCallView) setShowCallView(false);
+    const [prevInCall, setPrevInCall] = useState(inCall);
+    if (inCall !== prevInCall) {
+        setPrevInCall(inCall);
+        // Auto-show call view when a call starts, auto-hide when it ends
+        setShowCallView(inCall);
+    }
     const { removeFriend } = useFriends();
     const { blockUser, unblockUser, isBlocked: checkBlocked } = useBlocks();
     const { toast } = useToast();
@@ -172,8 +178,8 @@ export default function DmConversationPage() {
                                 setShowAddModal(true);
                             }}
                             onLeave={() => setShowLeaveConfirm(true)}
-                            onStartCall={dmId ? () => { startDmCall(dmId); setShowCallView(true); } : undefined}
-                            inCall={inCall}
+                            onStartCall={!voiceState.isConnected && dmId ? () => { startDmCall(dmId); setShowCallView(true); } : undefined}
+                            inCall={voiceState.isConnected}
                         />
                     </div>
                     {!channel?.isGroup && (
@@ -229,10 +235,13 @@ export default function DmConversationPage() {
                 )}
 
                 {inCall && showCallView ? (
-                    <VoiceChannelView
-                        channelId={dmId!}
-                        channelName={channelName ?? "Call"}
-                    />
+                    <div className="flex-1 relative min-h-0">
+                        <VoiceChannelView
+                            channelId={dmId!}
+                            channelName={channelName ?? "Call"}
+                        />
+                        <OutgoingCallOverlay channelName={channelName ?? "Call"} />
+                    </div>
                 ) : (
                     <ChatView
                         chat={chat}

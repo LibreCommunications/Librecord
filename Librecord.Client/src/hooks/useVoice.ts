@@ -72,6 +72,9 @@ export function useVoice() {
 
         const prefs = getVoicePrefs();
 
+        // Mark as outgoing call if no other participants are present yet
+        const hasOthers = result.participants.length > 1;
+
         setVoiceState({
             channelId: dmChannelId,
             guildId: null,
@@ -81,6 +84,7 @@ export function useVoice() {
             isDeafened: prefs.isDeafened,
             isCameraOn: false,
             isScreenSharing: false,
+            isOutgoingCall: !hasOthers,
         });
 
         await livekitClient.connectToVoice(result.token, result.wsUrl, prefs.isMuted, prefs.isDeafened);

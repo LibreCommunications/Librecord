@@ -21,6 +21,7 @@ export interface VoiceState {
     isCameraOn: boolean;
     isScreenSharing: boolean;
     isConnected: boolean;
+    isOutgoingCall: boolean;
 }
 
 
@@ -56,6 +57,7 @@ const INITIAL_STATE: VoiceState = {
     isCameraOn: false,
     isScreenSharing: false,
     isConnected: false,
+    isOutgoingCall: false,
 };
 
 let state: VoiceState = { ...INITIAL_STATE };

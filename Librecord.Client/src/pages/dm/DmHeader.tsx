@@ -20,12 +20,11 @@ export function DmHeader({
             <span>{channelName ?? "Direct Message"}</span>
 
             <div className="flex gap-3 text-sm font-normal">
-                {onStartCall && (
+                {onStartCall && !inCall && (
                     <button
                         onClick={onStartCall}
-                        disabled={inCall}
-                        className={`${inCall ? "text-green-400" : "text-gray-400 hover:text-green-400"} transition-colors disabled:cursor-default`}
-                        title={inCall ? "In call" : "Start call"}
+                        className="text-gray-400 hover:text-green-400 transition-colors"
+                        title="Start call"
                     >
                         <PhoneIcon size={18} />
                     </button>

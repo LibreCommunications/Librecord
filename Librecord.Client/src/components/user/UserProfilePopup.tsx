@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BanIcon } from "../ui/Icons";
+import { BanIcon, PhoneIcon } from "../ui/Icons";
 import { userProfiles, API_URL } from "../../api/client";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import type { UserSummary } from "../../types/user";
 import { useFriends } from "../../hooks/useFriends";
 import { useBlocks } from "../../hooks/useBlocks";
 import { useDirectMessagesChannel } from "../../hooks/useDirectMessagesChannel";
+import { useVoice } from "../../hooks/useVoice";
 import { useToast } from "../../hooks/useToast";
 import type { UserProfile } from "../../types/user";
 
@@ -25,6 +26,7 @@ export function UserProfilePopup({ userId, onClose }: Props) {
     const { sendRequest: sendFriendRequest, removeFriend } = useFriends();
     const { blockUser, unblockUser, isBlocked: checkBlocked } = useBlocks();
     const { startDm } = useDirectMessagesChannel();
+    const { startDmCall, voiceState } = useVoice();
     const { toast } = useToast();
     const navigate = useNavigate();
 
@@ -146,6 +148,21 @@ export function UserProfilePopup({ userId, onClose }: Props) {
                                         className="flex-1 py-2 rounded-lg text-sm font-medium bg-[#5865F2] text-white hover:bg-[#4752c4] transition-colors"
                                     >
                                         Message
+                                    </button>
+
+                                    <button
+                                        onClick={async () => {
+                                            const chId = await startDm(profile.id, "");
+                                            if (!chId) { toast("Can't call this user.", "error"); return; }
+                                            await startDmCall(chId);
+                                            navigate(`/app/dm/${chId}`);
+                                            onClose();
+                                        }}
+                                        disabled={voiceState.isConnected}
+                                        className="px-3 py-2 rounded-lg text-sm bg-[#2b2d31] text-[#248046] hover:bg-[#248046] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-default"
+                                        title={voiceState.isConnected ? "Already in a call" : "Start call"}
+                                    >
+                                        <PhoneIcon size={16} />
                                     </button>
 
                                     {profile.isFriend ? (

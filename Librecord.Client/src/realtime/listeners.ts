@@ -8,6 +8,7 @@ import {
     removeParticipant,
     updateParticipantState,
     getVoiceState,
+    setVoiceState,
 } from "../voice/voiceStore";
 import { playJoinSound, playLeaveSound } from "../voice/sounds";
 import type {
@@ -332,6 +333,8 @@ export function registerListeners() {
             });
             dispatchAppEvent("voice:user:joined", payload);
             if (vsJoin.isConnected && vsJoin.channelId === payload.channelId) {
+                // Someone answered our outgoing call
+                if (vsJoin.isOutgoingCall) setVoiceState({ isOutgoingCall: false });
                 playJoinSound();
             }
         }
