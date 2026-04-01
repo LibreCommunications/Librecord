@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { appConnection, setConnectionState } from "./connection";
 import { registerListeners } from "./listeners";
 import { initNotifications, cleanupNotifications } from "./notifications";
+import { initCacheInvalidation } from "../lib/cacheInvalidation";
 import { resetVoiceState, getPersistedVoiceSession, clearPersistedVoiceSession, setVoiceState, getVoicePrefs } from "../voice/voiceStore";
 import { logger } from "../lib/logger";
 import * as livekitClient from "../voice/livekitClient";
@@ -97,6 +98,7 @@ export function RealtimeRoot() {
         setConnectionState("connecting");
         appConnection.start().then(async () => {
             registerListeners();
+            initCacheInvalidation();
             setConnectionState("connected");
             window.__realtimeReady = true;
             window.dispatchEvent(new Event("realtime:ready"));
