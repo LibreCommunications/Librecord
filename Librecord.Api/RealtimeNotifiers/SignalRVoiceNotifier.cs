@@ -62,6 +62,16 @@ public sealed class SignalRVoiceRealtimeNotifier : IVoiceRealtimeNotifier
                         isScreenSharing = changed.IsScreenSharing
                     }),
 
+            // Sent directly to the user (not channel group) — tells other devices to disconnect
+            VoiceSessionReplaced replaced =>
+                _hub.Clients.User(replaced.UserId.ToString()).SendAsync(
+                    "voice:session:replaced",
+                    new
+                    {
+                        channelId = replaced.ChannelId,
+                        userId = replaced.UserId
+                    }),
+
             _ => Task.CompletedTask
         };
     }

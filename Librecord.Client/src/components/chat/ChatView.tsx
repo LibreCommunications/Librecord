@@ -4,6 +4,7 @@ import { MessageList } from "../message/MessageList";
 import { TypingIndicator } from "../messages/TypingIndicator";
 import { AttachmentUpload } from "../messages/AttachmentUpload";
 import { useToast } from "../../hooks/useToast";
+import { useUnreadContext } from "../../context/UnreadContext";
 import type { useChatChannel } from "../../hooks/useChatChannel";
 
 type ChatState = ReturnType<typeof useChatChannel>;
@@ -17,6 +18,7 @@ export interface ChannelPerms {
 
 interface ChatViewProps {
     chat: ChatState;
+    channelId?: string;
     currentUserId: string | undefined;
     getAvatarUrl: (avatarUrl?: string | null) => string;
     inputPlaceholder: string;
@@ -28,7 +30,8 @@ interface ChatViewProps {
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
-export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, canManageMessages, channelPerms, onStartThread, onOpenThread }: ChatViewProps) {
+export function ChatView({ chat, channelId, currentUserId, getAvatarUrl, inputPlaceholder, canManageMessages, channelPerms, onStartThread, onOpenThread }: ChatViewProps) {
+    const { markAsRead } = useUnreadContext();
     const canSend = channelPerms?.canSendMessages ?? true;
     const canAttach = canSend && (channelPerms?.canSendAttachments ?? true);
     const canReact = channelPerms?.canAddReactions ?? true;
@@ -80,8 +83,10 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, 
                 </div>
             )}
             <MessageList
+                channelId={channelId}
                 messages={chat.messages}
                 loading={chat.loading}
+                lastReadMessageId={chat.lastReadMessageId}
                 currentUserId={currentUserId}
                 menuOpenId={chat.menuOpenId}
                 editingId={chat.editingId}
@@ -107,6 +112,7 @@ export function ChatView({ chat, currentUserId, getAvatarUrl, inputPlaceholder, 
                 onLoadMore={chat.handleLoadMore}
                 hasMore={chat.hasMore}
                 loadingMore={chat.loadingMore}
+                onMarkAsRead={markAsRead}
             />
 
             {chat.error && (

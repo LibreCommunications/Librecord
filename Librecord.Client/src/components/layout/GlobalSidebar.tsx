@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { useGuilds, type GuildSummary } from "../../hooks/useGuilds";
 import { useChannels } from "../../hooks/useChannels";
@@ -13,6 +13,7 @@ import { useToast } from "../../hooks/useToast";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { onCustomEvent, onEvent } from "../../lib/typedEvent";
 import type { AppEventMap } from "../../realtime/events";
+import { useUnreadContext } from "../../context/UnreadContext";
 import { API_URL } from "../../api/client";
 import { logger } from "../../lib/logger";
 import { STORAGE } from "../../lib/storageKeys";
@@ -56,8 +57,8 @@ function SidebarIcon({
                 onClick={onClick}
                 className={`
                     w-12 h-12 flex items-center justify-center relative
-                    transition-all duration-200 cursor-pointer
-                    ${active ? "rounded-2xl" : "rounded-full hover:rounded-2xl"}
+                    transition-all duration-200 cursor-pointer hover:scale-110
+                    ${active ? "rounded-2xl scale-105" : "rounded-full hover:rounded-2xl"}
                     ${className}
                 `}
             >
@@ -129,15 +130,11 @@ export default function GlobalSidebar() {
         createFolder, updateFolder, removeFromFolder, folderedGuildIds,
     } = useGuildFolders();
 
-    const [guildUnreads, setGuildUnreads] = useState<Record<string, number>>({});
-    const [dmUnread, setDmUnread] = useState(false);
-    const channelToGuildRef = useRef<Record<string, string>>({});
+    const { counts: unreadCounts } = useUnreadContext();
+    const [channelToGuild, setChannelToGuild] = useState<Record<string, string>>({});
+    const [dmChannelIds, setDmChannelIds] = useState<Set<string>>(new Set());
 
     const isDmPage = !guildId && location.pathname.startsWith("/app/dm");
-
-    if (isDmPage && dmUnread) {
-        setDmUnread(false);
-    }
 
     const loadGuilds = useCallback(() => {
         getGuilds().then(async (list) => {
@@ -147,9 +144,21 @@ export default function GlobalSidebar() {
                 const channels = await getGuildChannels(g.id);
                 for (const ch of channels) map[ch.id] = g.id;
             }
-            channelToGuildRef.current = map;
+            setChannelToGuild(map);
         }).catch(e => logger.api.warn("Failed to load guilds", e));
     }, [getGuilds, getGuildChannels]);
+
+    // Track DM channel IDs so we can derive DM unread state
+    useEffect(() => {
+        return onCustomEvent<AppEventMap["dm:message:ping"]>("dm:message:ping", (detail) => {
+            setDmChannelIds(prev => {
+                if (prev.has(detail.channelId)) return prev;
+                const next = new Set(prev);
+                next.add(detail.channelId);
+                return next;
+            });
+        });
+    }, []);
 
     useEffect(() => { loadGuilds(); }, [loadGuilds]);
 
@@ -172,11 +181,6 @@ export default function GlobalSidebar() {
         return onCustomEvent<AppEventMap["guild:deleted"]>("guild:deleted", (detail) => {
             const deletedId = detail.guildId;
             setGuilds(prev => prev.filter(g => g.id !== deletedId));
-            setGuildUnreads(prev => {
-                const next = { ...prev };
-                delete next[deletedId];
-                return next;
-            });
             if (guildId === deletedId) {
                 navigate("/app/dm");
             }
@@ -208,30 +212,14 @@ export default function GlobalSidebar() {
         });
     }, [user?.userId, guildId, voiceState.isConnected, voiceState.guildId, leaveVoice, navigate]);
 
-    useEffect(() => {
-        return onCustomEvent<AppEventMap["guild:message:ping"]>("guild:message:ping", (detail) => {
-            const { channelId: pingCh, authorId } = detail;
-            if (authorId === user?.userId) return;
-            const pingGuildId = channelToGuildRef.current[pingCh];
-            if (!pingGuildId) return;
-            if (guildId === pingGuildId) return;
-            setGuildUnreads(prev => ({ ...prev, [pingGuildId]: (prev[pingGuildId] ?? 0) + 1 }));
-        });
-    }, [guildId, user?.userId]);
+    // Derive guild-level and DM unreads from the shared UnreadContext
+    const guildHasUnread = useCallback((gId: string) => {
+        return Object.entries(channelToGuild)
+            .some(([chId, g]) => g === gId && (unreadCounts[chId] ?? 0) > 0);
+    }, [unreadCounts, channelToGuild]);
 
-    useEffect(() => {
-        return onCustomEvent<AppEventMap["dm:message:ping"]>("dm:message:ping", (detail) => {
-            if (detail.authorId === user?.userId) return;
-            if (isDmPage) return;
-            setDmUnread(true);
-        });
-    }, [isDmPage, user?.userId]);
-
-    const effectiveGuildUnreads = guildId
-        ? Object.fromEntries(Object.entries(guildUnreads).filter(([k]) => k !== guildId))
-        : guildUnreads;
-
-    const effectiveDmUnread = isDmPage ? false : dmUnread;
+    const hasDmUnread = !isDmPage && Array.from(dmChannelIds)
+        .some(chId => (unreadCounts[chId] ?? 0) > 0);
 
     const avatarSrc =
         user?.avatarUrl
@@ -265,11 +253,11 @@ export default function GlobalSidebar() {
                 }}
             >
 
-                <SidebarIcon to={getLastVisited().dm || "/app/dm"} active={isDmPage} unread={effectiveDmUnread} tooltip="Direct Messages" testId="dm-btn" className="bg-[#313338] hover:bg-[#5865F2] text-white">
+                <SidebarIcon to={getLastVisited().dm || "/app/dm"} active={isDmPage} unread={hasDmUnread} tooltip="Direct Messages" testId="dm-btn" className="bg-[#313338] hover:bg-[#5865F2] text-white">
                     <ChatBubbleIcon size={24} />
                 </SidebarIcon>
 
-                <div className="w-8 h-0.5 bg-[#35373c] rounded-full" />
+                <div className="w-8 h-0.5 rounded-full bg-gradient-to-r from-transparent via-[#5865F2]/40 to-transparent" />
 
                 {/* Folders */}
                 {folders.map(folder => {
@@ -277,7 +265,7 @@ export default function GlobalSidebar() {
                     if (folderGuilds.length === 0) return null;
                     const isExpanded = expandedFolders.has(folder.id);
                     const folderColor = folder.color ?? "#5865F2";
-                    const hasUnread = folderGuilds.some(g => (effectiveGuildUnreads[g.id] ?? 0) > 0);
+                    const hasUnread = folderGuilds.some(g => guildHasUnread(g.id));
                     const hasActive = folderGuilds.some(g => guildId === g.id);
 
                     return (
@@ -325,7 +313,7 @@ export default function GlobalSidebar() {
                                                 <SidebarIcon
                                                     to={getLastVisited()[`guild:${g.id}`] || `/app/guild/${g.id}`}
                                                     active={guildId === g.id}
-                                                    unread={(effectiveGuildUnreads[g.id] ?? 0) > 0}
+                                                    unread={guildHasUnread(g.id)}
                                                     tooltip={g.name}
                                                     className="bg-[#313338] hover:bg-[#5865F2] text-white"
                                                 >
@@ -399,7 +387,7 @@ export default function GlobalSidebar() {
                         <SidebarIcon
                             to={getLastVisited()[`guild:${g.id}`] || `/app/guild/${g.id}`}
                             active={guildId === g.id}
-                            unread={(effectiveGuildUnreads[g.id] ?? 0) > 0}
+                            unread={guildHasUnread(g.id)}
                             tooltip={g.name}
                             testId={`guild-icon-${g.id}`}
                             className={`bg-[#313338] hover:bg-[#5865F2] text-white ${dragOverTarget === `guild:${g.id}` ? "ring-2 ring-[#5865F2]" : ""}`}

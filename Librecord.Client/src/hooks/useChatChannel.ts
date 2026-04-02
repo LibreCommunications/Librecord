@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "./useAuth";
 import { useReactions } from "./useReactions";
-import { useReadState } from "./useReadState";
 import { useTypingIndicator } from "./useTypingIndicator";
+import { readState } from "../api/client";
 import { usePins } from "./usePins";
 import { useToast } from "./useToast";
 import { logger } from "../lib/logger";
@@ -39,7 +39,6 @@ export function useChatChannel(config: ChatChannelConfig) {
 
     const { user } = useAuth();
     const { addReaction, removeReaction } = useReactions();
-    const { markAsRead } = useReadState();
     const { pinMessage, unpinMessage, getPins } = usePins();
     const { toast } = useToast();
 
@@ -56,6 +55,7 @@ export function useChatChannel(config: ChatChannelConfig) {
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+    const [lastReadMessageId, setLastReadMessageId] = useState<string | null>(null);
 
     const shouldAutoScrollRef = useRef(false);
     const attachTriggerRef = useRef<{ open: () => void }>(null);
@@ -79,6 +79,7 @@ export function useChatChannel(config: ChatChannelConfig) {
         setLoading(true);
         setError(null);
         setMessages([]);
+        setLastReadMessageId(null);
     }
 
     useEffect(() => {
@@ -124,7 +125,6 @@ export function useChatChannel(config: ChatChannelConfig) {
                     if (newMsgs.length === 0) return prev;
                     return [...prev, ...newMsgs];
                 });
-                if (reversed.length > 0) markAsRead(channelId, reversed[reversed.length - 1].id);
             }).catch(() => { /* silent — will show on next user action */ });
         });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -136,21 +136,10 @@ export function useChatChannel(config: ChatChannelConfig) {
             const { message, clientMessageId } = detail;
             if (message.channelId !== channelId) return;
             setMessages(prev => applyNewMessage(prev, message, clientMessageId));
-            if (document.hasFocus()) markAsRead(channelId, message.id);
         });
-    }, [channelId, events.messageNew, markAsRead, applyNewMessage]);
+    }, [channelId, events.messageNew, applyNewMessage]);
 
-    useEffect(() => {
-        if (!channelId) return;
-        const onFocus = () => {
-            setMessages(prev => {
-                if (prev.length > 0) markAsRead(channelId, prev[prev.length - 1].id);
-                return prev;
-            });
-        };
-        window.addEventListener("focus", onFocus);
-        return () => window.removeEventListener("focus", onFocus);
-    }, [channelId, markAsRead]);
+    // markAsRead is now handled by MessageList via UnreadContext
 
     useEffect(() => {
         if (!channelId) return;
@@ -215,15 +204,15 @@ export function useChatChannel(config: ChatChannelConfig) {
         const ac = new AbortController();
         abortRef.current = ac;
 
-        Promise.all([config.getMessages(channelId), getPins(channelId)])
-            .then(([msgs, pins]) => {
+        Promise.all([config.getMessages(channelId), getPins(channelId), readState.getLastRead(channelId)])
+            .then(([msgs, pins, lastRead]) => {
                 if (ac.signal.aborted) return;
                 setError(null);
                 const reversed = msgs.slice().reverse();
                 setMessages(reversed);
                 setHasMore(msgs.length >= 50);
                 setPinnedIds(new Set(pins.map(p => p.messageId)));
-                if (reversed.length > 0) markAsRead(channelId, reversed[reversed.length - 1].id);
+                setLastReadMessageId(lastRead);
             })
             .catch((err) => {
                 if (err?.name !== 'AbortError') {
@@ -420,6 +409,7 @@ export function useChatChannel(config: ChatChannelConfig) {
         hasMore,
         loadingMore,
         pendingFiles, setPendingFiles,
+        lastReadMessageId,
         shouldAutoScrollRef,
         attachTriggerRef,
         typingNames, sendTyping, stopTyping,

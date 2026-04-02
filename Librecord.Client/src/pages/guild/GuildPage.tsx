@@ -261,6 +261,7 @@ export default function GuildChannelPage() {
                 ) : (
                     <ChatView
                         chat={chatWithThreads}
+                        channelId={channelId}
                         currentUserId={user?.userId}
                         getAvatarUrl={getAvatarUrl}
                         inputPlaceholder={`Message #${channelName ?? ""}`}

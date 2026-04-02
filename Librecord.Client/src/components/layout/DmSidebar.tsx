@@ -6,7 +6,7 @@ import {
 } from "../../hooks/useDirectMessagesChannel";
 import { useAuth } from "../../hooks/useAuth";
 import { useUserProfile } from "../../hooks/useUserProfile";
-import { useReadState } from "../../hooks/useReadState";
+import { useUnreadContext } from "../../context/UnreadContext";
 import { UnreadBadge } from "../ui/UnreadBadge";
 import { StatusDot } from "../user/StatusDot";
 import { presence } from "../../api/client";
@@ -22,26 +22,32 @@ export default function DmSidebar() {
     const { getMyDms, leaveChannel, deleteDm } = useDirectMessagesChannel();
     const { user } = useAuth();
     const { getAvatarUrl } = useUserProfile();
-    const { getUnreadCounts } = useReadState();
+    const { counts, fetchUnreads, clearChannel, setActiveChannel } = useUnreadContext();
 
     const [dms, setDms] = useState<DmChannel[]>([]);
-    const [unreads, setUnreads] = useState<Record<string, number>>({});
     const [presenceMap, setPresenceMap] = useState<Record<string, string>>({});
     const [showCreateGroup, setShowCreateGroup] = useState(false);
     const [leaveConfirmId, setLeaveConfirmId] = useState<string | null>(null);
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-    // Track DM channels with active voice calls: channelId → participant count
     const [activeCalls, setActiveCalls] = useState<Record<string, number>>({});
 
     const isFriendsPage = location.pathname.startsWith("/app/dm/friends");
+
+    // Clear unreads for active DM channel
+    useEffect(() => {
+        if (dmId) {
+            setActiveChannel(dmId);
+            clearChannel(dmId);
+        }
+        return () => setActiveChannel(undefined);
+    }, [dmId, setActiveChannel, clearChannel]);
 
     const loadDms = useCallback(async function loadDms() {
         const list = await getMyDms();
         setDms(list);
 
         if (list.length > 0) {
-            const counts = await getUnreadCounts(list.map(d => d.id));
-            setUnreads(counts);
+            await fetchUnreads(list.map(d => d.id));
 
             const otherUserIds = list.flatMap(dm =>
                 dm.members.filter(m => m.id !== user?.userId).map(m => m.id)
@@ -53,10 +59,9 @@ export default function DmSidebar() {
                 setPresenceMap(map);
             }
         }
-    }, [getMyDms, getUnreadCounts, user?.userId]);
+    }, [getMyDms, fetchUnreads, user?.userId]);
 
     useEffect(() => {
-        // Wrap in .then() to avoid lint rule about sync setState in effects
         Promise.resolve().then(loadDms);
     }, [loadDms]);
 
@@ -128,36 +133,17 @@ export default function DmSidebar() {
         return () => cleanups.forEach(fn => fn());
     }, []);
 
+    // Reload DM list when a ping arrives for an unknown channel
     useEffect(() => {
         return onCustomEvent<AppEventMap["dm:message:ping"]>("dm:message:ping", (detail) => {
-            const { channelId: pingChannel, authorId } = detail;
-            if (pingChannel === dmId) return;
-            if (authorId === user?.userId) return;
-
+            const { channelId: pingChannel } = detail;
             setDms(prev => {
                 const exists = prev.some(d => d.id === pingChannel);
-                if (!exists) {
-                    loadDms();
-                }
+                if (!exists) loadDms();
                 return prev;
             });
-
-            setUnreads(prev => ({
-                ...prev,
-                [pingChannel]: (prev[pingChannel] ?? 0) + 1,
-            }));
         });
-    }, [dmId, user?.userId, loadDms]);
-
-    const [prevActiveDmId, setPrevActiveDmId] = useState(dmId);
-    if (dmId && dmId !== prevActiveDmId) {
-        setPrevActiveDmId(dmId);
-        if (unreads[dmId]) {
-            const next = { ...unreads };
-            delete next[dmId];
-            setUnreads(next);
-        }
-    }
+    }, [loadDms]);
 
     return (
         <>
@@ -199,7 +185,7 @@ export default function DmSidebar() {
 
                     const showAvatar = others.length === 1;
                     const avatar = showAvatar ? getAvatarUrl(others[0].avatarUrl) : undefined;
-                    const unreadCount = unreads[dm.id] ?? 0;
+                    const unreadCount = counts[dm.id] ?? 0;
                     const otherStatus = showAvatar ? (presenceMap[others[0].id] ?? "offline") : undefined;
 
                     return (

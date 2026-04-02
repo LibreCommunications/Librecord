@@ -25,6 +25,8 @@ public class PublicCdnController : ControllerBase
 
     /// <summary>
     /// Returns a presigned URL for public assets stored in MinIO.
+    /// In production, nginx serves these directly from MinIO — this
+    /// endpoint is only hit in development or as a fallback.
     /// </summary>
     [HttpGet("{**key}")]
     [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any)]

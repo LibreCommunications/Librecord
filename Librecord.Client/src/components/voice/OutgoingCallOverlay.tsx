@@ -1,24 +1,72 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PhoneHangupIcon } from "../ui/Icons";
 import { useVoice } from "../../hooks/useVoice";
+import { useToast } from "../../hooks/useToast";
 import { setVoiceState } from "../../voice/voiceStore";
+import { onCustomEvent } from "../../lib/typedEvent";
+import type { AppEventMap } from "../../realtime/events";
 
 const CALL_TIMEOUT = 30_000;
 
-export function OutgoingCallOverlay({ channelName }: { channelName: string }) {
-    const { voiceState, leaveVoice } = useVoice();
-    const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+interface Props {
+    channelName: string;
+    memberCount?: number; // total members in the DM channel (including caller)
+}
 
+export function OutgoingCallOverlay({ channelName, memberCount }: Props) {
+    const { voiceState, leaveVoice } = useVoice();
+    const { toast } = useToast();
+    const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+    const [declinedIds, setDeclinedIds] = useState<Set<string>>(new Set());
+
+    // Reset declined set when a new outgoing call starts
+    const channelRef = useRef(voiceState.channelId);
+    useEffect(() => {
+        if (voiceState.channelId !== channelRef.current) {
+            channelRef.current = voiceState.channelId;
+            setDeclinedIds(new Set());
+        }
+    }, [voiceState.channelId]);
+
+    // Timeout — stop ringing but stay connected
     useEffect(() => {
         if (!voiceState.isOutgoingCall) return;
 
         timeoutRef.current = setTimeout(() => {
-            // Timeout — stop calling but stay connected (like Discord)
             setVoiceState({ isOutgoingCall: false });
         }, CALL_TIMEOUT);
 
         return () => clearTimeout(timeoutRef.current);
     }, [voiceState.isOutgoingCall]);
+
+    // Listen for decline events
+    useEffect(() => {
+        if (!voiceState.isOutgoingCall || !voiceState.channelId) return;
+
+        const callChannelId = voiceState.channelId;
+
+        return onCustomEvent<AppEventMap["dm:call:declined"]>("dm:call:declined", (detail) => {
+            if (detail.channelId !== callChannelId) return;
+
+            setDeclinedIds(prev => {
+                const next = new Set(prev);
+                next.add(detail.userId);
+                return next;
+            });
+        });
+    }, [voiceState.isOutgoingCall, voiceState.channelId]);
+
+    // Check if everyone declined
+    useEffect(() => {
+        if (!voiceState.isOutgoingCall || declinedIds.size === 0) return;
+
+        // memberCount includes the caller, so others = memberCount - 1
+        const othersCount = (memberCount ?? 2) - 1;
+        if (declinedIds.size >= othersCount) {
+            toast("Call declined", "info");
+            leaveVoice();
+        }
+    }, [declinedIds, memberCount, voiceState.isOutgoingCall, toast, leaveVoice]);
 
     if (!voiceState.isOutgoingCall) return null;
 

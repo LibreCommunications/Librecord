@@ -100,6 +100,11 @@ export function useVoice() {
     }, []);
 
     const acceptDmCall = useCallback(async (dmChannelId: string) => {
+        // Disconnect from current call if already in one
+        if (getVoiceState().isConnected) {
+            await livekitClient.disconnect();
+        }
+
         const result = await appConnection.invoke<{
             token: string;
             wsUrl: string;

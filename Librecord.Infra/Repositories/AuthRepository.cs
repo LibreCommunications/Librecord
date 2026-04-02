@@ -61,6 +61,16 @@ public class AuthRepository : IAuthRepository
         _db.Update(token);
     }
 
+    public async Task RevokeAllUserTokensAsync(Guid userId)
+    {
+        var tokens = await _db.Set<RefreshToken>()
+            .Where(t => t.UserId == userId && !t.IsRevoked)
+            .ToListAsync();
+
+        foreach (var token in tokens)
+            token.IsRevoked = true;
+    }
+
     public async Task SaveChangesAsync()
     {
         await _db.SaveChangesAsync();

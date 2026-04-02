@@ -1,21 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { MessageItem } from "./MessageItem";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import { EmptyState } from "../ui/EmptyState";
 import { Spinner } from "../ui/Spinner";
 import type { MessageListProps } from "./MessageListProps";
-import { ChevronDownIcon } from "../../components/ui/Icons";
 
 const START_INDEX = 100_000;
-const VIEWPORT_INCREASE = { top: 200, bottom: 100 };
+const VIEWPORT_INCREASE = { top: 800, bottom: 400 };
 
 export function MessageList({
+    channelId,
     messages,
     loading,
     currentUserId,
     menuOpenId,
     editingId,
+    lastReadMessageId,
     setMenuOpenId,
     setEditingId,
     editMessage,
@@ -35,18 +36,51 @@ export function MessageList({
     onLoadMore,
     hasMore,
     loadingMore,
+    onMarkAsRead,
 }: MessageListProps) {
     const virtuosoRef = useRef<VirtuosoHandle>(null);
+    const listRef = useRef<HTMLDivElement>(null);
     const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
-    const [newMsgCount, setNewMsgCount] = useState(0);
-    const [showScrollBtn, setShowScrollBtn] = useState(false);
-    const isAtBottomRef = useRef(true);
-    const prevMsgCountRef = useRef(messages.length);
+    const isAtBottomRef = useRef(false);
 
-    const firstItemIndex = useMemo(
-        () => Math.max(0, START_INDEX - messages.length),
-        [messages.length],
-    );
+    // ── firstItemIndex — only changes on prepend (setState-during-render) ──
+    const [prevFirstMsgId, setPrevFirstMsgId] = useState(messages[0]?.id);
+    const [firstItemIndex, setFirstItemIndex] = useState(Math.max(0, START_INDEX - messages.length));
+
+    if (messages[0]?.id !== prevFirstMsgId) {
+        setPrevFirstMsgId(messages[0]?.id);
+        setFirstItemIndex(Math.max(0, START_INDEX - messages.length));
+    }
+
+    // ── Unread separator — snapshot the last-read message ID once ──
+    // Captured when lastReadMessageId first arrives for this channel.
+    // Never updated after that, so new messages don't spawn a separator.
+    const [frozenLastRead, setFrozenLastRead] = useState<{ channelId: string; messageId: string } | null>(null);
+
+    if (
+        channelId &&
+        lastReadMessageId &&
+        frozenLastRead?.channelId !== channelId
+    ) {
+        setFrozenLastRead({ channelId, messageId: lastReadMessageId });
+    }
+
+    const unreadSepIndex = useMemo(() => {
+        if (!frozenLastRead || frozenLastRead.channelId !== channelId) return -1;
+        const idx = messages.findIndex(m => m.id === frozenLastRead.messageId);
+        if (idx < 0 || idx >= messages.length - 1) return -1;
+        return idx + 1;
+    }, [frozenLastRead, channelId, messages]);
+
+    // ── rangeChanged — call markAsRead for visible messages ─────
+    const handleRangeChanged = useCallback((range: { startIndex: number; endIndex: number }) => {
+        if (!channelId || messages.length === 0) return;
+        const bottomMsgIndex = Math.min(range.endIndex - firstItemIndex, messages.length - 1);
+        const bottomMsg = messages[bottomMsgIndex];
+        if (bottomMsg) {
+            onMarkAsRead?.(channelId, bottomMsg.id);
+        }
+    }, [channelId, firstItemIndex, messages, onMarkAsRead]);
 
     // ── Date separators ──────────────────────────────────────────
     const dateSepIndices = useMemo(() => {
@@ -59,65 +93,41 @@ export function MessageList({
         return result;
     }, [messages]);
 
-    // ── Auto-scroll on new messages ──────────────────────────────
+    // ── Media playing check ─────────────────────────────────────
+    const isMediaPlaying = useCallback(() => {
+        if (!listRef.current) return false;
+        const mediaEls = listRef.current.querySelectorAll("video, audio");
+        for (const el of mediaEls) {
+            if (!(el as HTMLMediaElement).paused) return true;
+        }
+        return false;
+    }, []);
+
+    // ── followOutput (auto-scroll on new messages) ───────────────
+    const msgCountRef = useRef(messages.length);
+
     const followOutput = useCallback(
         (atBottom: boolean) => {
             if (forceScrollOnNextUpdateRef?.current) {
                 forceScrollOnNextUpdateRef.current = false;
                 return true;
             }
+            const prevCount = msgCountRef.current;
+            msgCountRef.current = messages.length;
+            if (messages.length <= prevCount) return false;
+            if (isMediaPlaying()) return false;
             return atBottom ? true : false;
         },
-        [forceScrollOnNextUpdateRef],
+        [forceScrollOnNextUpdateRef, messages.length, isMediaPlaying],
     );
 
-    // ── Track bottom state + new-message badge ───────────────────
+    // ── Track bottom state + markAsRead ──────────────────────────
     const handleAtBottomStateChange = useCallback((atBottom: boolean) => {
         isAtBottomRef.current = atBottom;
-        if (atBottom) {
-            setShowScrollBtn(false);
-            setNewMsgCount(0);
+        if (atBottom && channelId && messages.length > 0) {
+            onMarkAsRead?.(channelId, messages[messages.length - 1].id);
         }
-    }, []);
-
-    // Show scroll button when user is not at bottom and new messages arrive
-    useEffect(() => {
-        if (messages.length > prevMsgCountRef.current && !isAtBottomRef.current) {
-            const delta = messages.length - prevMsgCountRef.current;
-            setNewMsgCount(n => n + delta);
-            setShowScrollBtn(true);
-        }
-        prevMsgCountRef.current = messages.length;
-    }, [messages.length]);
-
-    // Also show scroll button on any scroll away from bottom (via Virtuoso callback)
-    // We use a small delay so fast scroll-past doesn't flicker
-    const scrollCheckTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-    useEffect(() => () => clearTimeout(scrollCheckTimer.current), []);
-
-    const handleScroll = useCallback(() => {
-        clearTimeout(scrollCheckTimer.current);
-        if (!isAtBottomRef.current && !showScrollBtn) {
-            scrollCheckTimer.current = setTimeout(() => {
-                if (!isAtBottomRef.current) setShowScrollBtn(true);
-            }, 300);
-        }
-    }, [showScrollBtn]);
-
-    // ── Scroll to bottom ─────────────────────────────────────────
-    const scrollToBottom = useCallback(() => {
-        virtuosoRef.current?.scrollTo({ top: Number.MAX_SAFE_INTEGER, behavior: "smooth" });
-        setNewMsgCount(0);
-    }, []);
-
-    // ESC hotkey
-    useEffect(() => {
-        const onKey = (e: KeyboardEvent) => {
-            if (e.key === "Escape" && !isAtBottomRef.current) scrollToBottom();
-        };
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [scrollToBottom]);
+    }, [channelId, messages, onMarkAsRead]);
 
     // ── Load more (scroll to top) ────────────────────────────────
     const handleStartReached = useCallback(() => {
@@ -154,6 +164,17 @@ export function MessageList({
 
             return (
                 <div style={{ minHeight: 1 }}>
+                    {/* Unread separator */}
+                    {msgIndex === unreadSepIndex && (
+                        <div className="flex items-center gap-2 px-4 py-1 my-1">
+                            <div className="flex-1 h-px bg-[#f23f43]" />
+                            <span className="text-xs font-semibold text-[#f23f43] shrink-0 uppercase tracking-wide">
+                                New
+                            </span>
+                            <div className="flex-1 h-px bg-[#f23f43]" />
+                        </div>
+                    )}
+                    {/* Date separator */}
                     {dateSepIndices.has(msgIndex) && (
                         <div className="flex items-center gap-2 px-4 py-2 mt-2">
                             <div className="flex-1 h-px bg-[#3f4147]" />
@@ -193,12 +214,20 @@ export function MessageList({
             );
         },
         [
-            firstItemIndex, messages, currentUserId, dateSepIndices,
+            firstItemIndex, messages, currentUserId, dateSepIndices, unreadSepIndex,
             editingId, menuOpenId, pinnedMessageIds, canManageMessages, canAddReactions, canSendMessages,
             handleToggleMenu, handleStartEdit, handleCancelEdit, handleDelete,
             handleScrollToReply, onPinMessage, onStartThread, onOpenThread, onReply,
             onAddReaction, onRemoveReaction, editMessage, getAvatarUrl,
         ],
+    );
+
+    const computeItemKey = useCallback(
+        (index: number) => {
+            const msgIndex = index - firstItemIndex;
+            return messages[msgIndex]?.id ?? `placeholder-${index}`;
+        },
+        [firstItemIndex, messages],
     );
 
     const headerComponent = useMemo(
@@ -233,8 +262,9 @@ export function MessageList({
     }
 
     return (
-        <div className="flex-1 relative min-h-0 overflow-hidden" data-testid="message-list" aria-label="Message list">
+        <div ref={listRef} className="flex-1 relative min-h-0 overflow-hidden" data-testid="message-list" aria-label="Message list">
             <Virtuoso
+                key={channelId}
                 ref={virtuosoRef}
                 className="dark-scrollbar"
                 style={{ height: "100%" }}
@@ -243,29 +273,16 @@ export function MessageList({
                 alignToBottom
                 initialTopMostItemIndex={messages.length - 1}
                 itemContent={renderItem}
+                computeItemKey={computeItemKey}
                 followOutput={followOutput}
                 atBottomStateChange={handleAtBottomStateChange}
                 atBottomThreshold={60}
                 startReached={handleStartReached}
-                onScroll={handleScroll}
-                overscan={400}
+                rangeChanged={handleRangeChanged}
+                overscan={1500}
                 increaseViewportBy={VIEWPORT_INCREASE}
                 components={headerComponents}
             />
-
-            {showScrollBtn && (
-                <button
-                    onClick={scrollToBottom}
-                    aria-label="Scroll to bottom"
-                    data-testid="scroll-to-bottom-btn"
-                    className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#5865F2] hover:bg-[#4752c4] text-white text-sm font-medium shadow-lg transition-colors z-10"
-                >
-                    {newMsgCount > 0
-                        ? <>{newMsgCount} new message{newMsgCount > 1 ? "s" : ""}</>
-                        : <>Scroll to bottom</>}
-                    <ChevronDownIcon size={16} />
-                </button>
-            )}
 
             <ConfirmModal
                 open={!!deleteTargetId}

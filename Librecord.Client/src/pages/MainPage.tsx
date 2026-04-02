@@ -13,6 +13,7 @@ import { ErrorBoundary } from "../components/ui/ErrorBoundary";
 import { Spinner } from "../components/ui/Spinner";
 
 import { RealtimeRoot } from "../realtime/RealtimeRoot";
+import { UnreadProvider } from "../context/UnreadContext";
 import { onCustomEvent } from "../lib/typedEvent";
 
 export default function MainPage() {
@@ -31,6 +32,7 @@ export default function MainPage() {
     }, []);
 
     return (
+        <UnreadProvider>
         <div className="flex h-screen bg-[#2f3136] text-gray-200 overflow-hidden">
 
             <RealtimeRoot />
@@ -81,5 +83,6 @@ export default function MainPage() {
                 />
             )}
         </div>
+        </UnreadProvider>
     );
 }

@@ -1,8 +1,12 @@
-﻿using Librecord.Api.Dtos.Auth;
+﻿using System.Security.Claims;
+using Librecord.Api.Dtos.Auth;
+using Librecord.Api.Hubs;
 using Librecord.Api.Models.Auth;
 using Librecord.Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.SignalR;
 
 namespace Librecord.Api.Controllers;
 
@@ -13,11 +17,13 @@ public class AuthController : ControllerBase
 {
     private readonly IAuthService _auth;
     private readonly IWebHostEnvironment _env;
+    private readonly IHubContext<AppHub> _hub;
 
-    public AuthController(IAuthService auth, IWebHostEnvironment env)
+    public AuthController(IAuthService auth, IWebHostEnvironment env, IHubContext<AppHub> hub)
     {
         _auth = auth;
         _env = env;
+        _hub = hub;
     }
 
     [HttpPost("register")]
@@ -78,6 +84,25 @@ public class AuthController : ControllerBase
     [HttpPost("logout")]
     public ActionResult<AuthDto> Logout()
     {
+        Response.Cookies.Delete("accessToken");
+        Response.Cookies.Delete("refreshToken");
+
+        return Ok(new AuthDto { Success = true });
+    }
+
+    [Authorize]
+    [HttpPost("logout-all")]
+    public async Task<ActionResult<AuthDto>> LogoutAll()
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        // Revoke all refresh tokens in the database
+        await _auth.LogoutAllDevicesAsync(userId);
+
+        // Tell all connected sessions to log out
+        await _hub.Clients.User(userId.ToString()).SendAsync("auth:session:revoked");
+
+        // Clear this device's cookies too
         Response.Cookies.Delete("accessToken");
         Response.Cookies.Delete("refreshToken");
 

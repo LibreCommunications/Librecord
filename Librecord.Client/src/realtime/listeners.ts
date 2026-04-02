@@ -9,7 +9,9 @@ import {
     updateParticipantState,
     getVoiceState,
     setVoiceState,
+    resetVoiceState,
 } from "../voice/voiceStore";
+import * as livekitClient from "../voice/livekitClient";
 import { playJoinSound, playLeaveSound } from "../voice/sounds";
 import type {
     DmRealtimeMessageTransport,
@@ -320,23 +322,24 @@ export function registerListeners() {
         "voice:user:joined",
         (payload: AppEventMap["voice:user:joined"]) => {
             const vsJoin = getVoiceState();
-            addParticipant({
-                userId: payload.userId,
-                username: payload.username,
-                displayName: payload.displayName,
-                avatarUrl: payload.avatarUrl,
-                isMuted: payload.isMuted,
-                isDeafened: payload.isDeafened,
-                isCameraOn: payload.isCameraOn,
-                isScreenSharing: payload.isScreenSharing,
-                joinedAt: new Date().toISOString(),
-            });
-            dispatchAppEvent("voice:user:joined", payload);
+            // Only mutate local participant state if the event is for our channel
             if (vsJoin.isConnected && vsJoin.channelId === payload.channelId) {
-                // Someone answered our outgoing call
+                addParticipant({
+                    userId: payload.userId,
+                    username: payload.username,
+                    displayName: payload.displayName,
+                    avatarUrl: payload.avatarUrl,
+                    isMuted: payload.isMuted,
+                    isDeafened: payload.isDeafened,
+                    isCameraOn: payload.isCameraOn,
+                    isScreenSharing: payload.isScreenSharing,
+                    joinedAt: new Date().toISOString(),
+                });
                 if (vsJoin.isOutgoingCall) setVoiceState({ isOutgoingCall: false });
                 playJoinSound();
             }
+            // Always dispatch — VoiceChannelView preview needs it for re-fetching
+            dispatchAppEvent("voice:user:joined", payload);
         }
     );
 
@@ -344,23 +347,26 @@ export function registerListeners() {
         "voice:user:left",
         (payload: AppEventMap["voice:user:left"]) => {
             const vsLeave = getVoiceState();
-            removeParticipant(payload.userId);
-            dispatchAppEvent("voice:user:left", payload);
             if (vsLeave.isConnected && vsLeave.channelId === payload.channelId) {
+                removeParticipant(payload.userId);
                 playLeaveSound();
             }
+            dispatchAppEvent("voice:user:left", payload);
         }
     );
 
     appConnection.on(
         "voice:user:state",
         (payload: AppEventMap["voice:user:state"]) => {
-            updateParticipantState(payload.userId, {
-                isMuted: payload.isMuted,
-                isDeafened: payload.isDeafened,
-                isCameraOn: payload.isCameraOn,
-                isScreenSharing: payload.isScreenSharing,
-            });
+            const vsState = getVoiceState();
+            if (vsState.isConnected && vsState.channelId === payload.channelId) {
+                updateParticipantState(payload.userId, {
+                    isMuted: payload.isMuted,
+                    isDeafened: payload.isDeafened,
+                    isCameraOn: payload.isCameraOn,
+                    isScreenSharing: payload.isScreenSharing,
+                });
+            }
             dispatchAppEvent("voice:user:state", payload);
         }
     );
@@ -407,10 +413,37 @@ export function registerListeners() {
         }
     );
 
+    // Another device joined voice — disconnect this device's orphaned session
+    appConnection.on(
+        "voice:session:replaced",
+        () => {
+            const vs = getVoiceState();
+            if (vs.isConnected) {
+                livekitClient.disconnect();
+                resetVoiceState();
+                logger.voice.info("Voice session replaced by another device");
+            }
+        }
+    );
+
     appConnection.on(
         "guild:thread:message:new",
         (payload: AppEventMap["guild:thread:message:new"]) => {
             dispatchAppEvent("guild:thread:message:new", payload);
+        }
+    );
+
+    // Logged out from all devices — clear everything and redirect to login
+    appConnection.on(
+        "auth:session:revoked",
+        () => {
+            const vs = getVoiceState();
+            if (vs.isConnected) {
+                livekitClient.disconnect();
+                resetVoiceState();
+            }
+            appConnection.stop();
+            window.location.href = "/login";
         }
     );
 }
