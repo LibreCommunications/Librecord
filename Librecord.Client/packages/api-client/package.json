@@ -1,0 +1,17 @@
+{
+  "name": "@librecord/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@librecord/domain": "workspace:*",
+    "@librecord/platform": "workspace:*",
+    "@microsoft/signalr": "^10.0.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3"
+  }
+}

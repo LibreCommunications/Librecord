@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "outDir": "./dist",
+    "declarationDir": "./dist",
+    "types": ["vite/client"]
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../../packages/domain" },
+    { "path": "../../packages/platform" },
+    { "path": "../../packages/platform-web" },
+    { "path": "../../packages/api-client" },
+    { "path": "../../packages/app" },
+    { "path": "../../packages/design" },
+    { "path": "../../packages/ui-web" }
+  ]
+}

@@ -1,7 +1,16 @@
 {
   "files": [],
   "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
+    { "path": "packages/domain" },
+    { "path": "packages/platform" },
+    { "path": "packages/platform-web" },
+    { "path": "packages/platform-electron" },
+    { "path": "packages/platform-native" },
+    { "path": "packages/api-client" },
+    { "path": "packages/app" },
+    { "path": "packages/design" },
+    { "path": "packages/ui-web" },
+    { "path": "packages/ui-native" },
+    { "path": "apps/web" }
   ]
 }
