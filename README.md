@@ -124,8 +124,31 @@ Librecord.Client/
     hooks/           — Custom React hooks (API abstraction)
     realtime/        — SignalR connection management
     context/         — Auth, Toast, Presence providers
-  e2e/               — Playwright E2E tests
 ```
+
+## Note
+
+### The front end needs to be changed to something like this
+
+```text
+Librecord.Client/
+  apps/
+    web/
+    desktop/
+    mobile/
+  packages/
+    domain/
+    api-client/
+    app/
+    platform/
+    platform-web/
+    platform-electron/
+    platform-native/
+    design/
+    ui-web/
+    ui-native/
+```
+
 
 ## License
 
