@@ -23,8 +23,8 @@ export function IncomingCallModal() {
     const navigate = useNavigate();
     const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-    // Derived: suppress the modal if we're already connected (accepted from another tab)
-    const activeCall = (call && !voiceState.isConnected) ? call : null;
+    // Suppress only if we already accepted THIS call (same channel), not any call
+    const activeCall = call && !(voiceState.isConnected && voiceState.channelId === call.channelId) ? call : null;
 
     function dismiss() {
         setCall(null);

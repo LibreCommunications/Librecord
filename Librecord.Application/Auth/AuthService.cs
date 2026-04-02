@@ -128,6 +128,12 @@ public class AuthService : IAuthService
         return AuthResult.SuccessResult(user, newAccess, newRefresh);
     }
 
+    public async Task LogoutAllDevicesAsync(Guid userId)
+    {
+        await _repo.RevokeAllUserTokensAsync(userId);
+        await _repo.SaveChangesAsync();
+    }
+
     public async Task<AuthResult> MeAsync(Guid userId)
     {
         var user = await _repo.GetUserByIdAsync(userId);

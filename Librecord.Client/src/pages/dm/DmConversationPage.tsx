@@ -240,7 +240,7 @@ export default function DmConversationPage() {
                             channelId={dmId!}
                             channelName={channelName ?? "Call"}
                         />
-                        <OutgoingCallOverlay channelName={channelName ?? "Call"} />
+                        <OutgoingCallOverlay channelName={channelName ?? "Call"} memberCount={channel?.members.length} />
                     </div>
                 ) : (
                     <ChatView

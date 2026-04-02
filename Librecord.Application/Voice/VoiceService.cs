@@ -70,6 +70,14 @@ public class VoiceService : IVoiceService
             previousGuildId = existing.GuildId;
             await _voiceStates.RemoveAsync(userId);
             await _voiceStates.SaveChangesAsync();
+
+            // Tell other devices to disconnect their orphaned LiveKit session
+            await _notifier.NotifyAsync(new VoiceSessionReplaced
+            {
+                ChannelId = existing.ChannelId,
+                GuildId = existing.GuildId,
+                UserId = userId
+            });
         }
 
         var voiceState = new VoiceState
@@ -139,6 +147,13 @@ public class VoiceService : IVoiceService
             previousGuildId = existing.GuildId;
             await _voiceStates.RemoveAsync(userId);
             await _voiceStates.SaveChangesAsync();
+
+            await _notifier.NotifyAsync(new VoiceSessionReplaced
+            {
+                ChannelId = existing.ChannelId,
+                GuildId = existing.GuildId,
+                UserId = userId
+            });
         }
 
         var voiceState = new VoiceState

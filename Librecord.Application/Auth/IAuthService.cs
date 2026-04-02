@@ -10,5 +10,6 @@ public interface IAuthService
     Task<string?> TryRefreshTokenAsync(string refreshToken);
 
     Task<AuthResult> RefreshTokenAsync(string refreshToken);
+    Task LogoutAllDevicesAsync(Guid userId);
     Task<AuthResult> MeAsync(Guid userId);
 }

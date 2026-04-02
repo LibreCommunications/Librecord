@@ -77,6 +77,7 @@ export const auth = {
         avatarUrl?: string | null;
         guilds?: { guildId: string; name: string; iconUrl: string | null }[];
     }>("/users/me"),
+    logoutAll: () => request<void>("/auth/logout-all", { method: "POST" }),
 };
 
 export const userProfiles = {
