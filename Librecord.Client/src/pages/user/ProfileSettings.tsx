@@ -4,7 +4,7 @@ import { useUserProfile } from "../../hooks/useUserProfile";
 import { usePresence } from "../../hooks/usePresence";
 import { useToast } from "../../hooks/useToast";
 import { StatusDot } from "../../components/user/StatusDot";
-import { API_URL, userProfiles } from "../../api/client";
+import { API_URL, userProfiles, auth } from "../../api/client";
 import { logger } from "../../lib/logger";
 
 export default function ProfileSettings() {
@@ -255,13 +255,23 @@ export default function ProfileSettings() {
                     </button>
                 </div>
 
-                <div className="pt-2 border-t border-[#3f4147]">
+                <div className="pt-2 border-t border-[#3f4147] flex gap-2">
                     <button
                         onClick={logout}
                         data-testid="logout-btn"
-                        className="px-5 py-2 rounded bg-[#da373c] hover:bg-[#a12828] text-white text-sm font-medium transition-colors"
+                        className="px-5 py-2 rounded bg-[#72767d] hover:bg-[#5d6169]  text-white text-sm font-medium transition-colors"
                     >
                         Logout
+                    </button>
+                    <button
+                        onClick={async () => {
+                            await auth.logoutAll();
+                            logout(); 
+                        }}
+                        data-testid="logout-all-btn"
+                        className="px-5 py-2 rounded bg-[#da373c] hover:bg-[#a12828] text-white text-sm font-medium transition-colors"
+                    >
+                        Logout All Devices
                     </button>
                 </div>
             </section>
