@@ -57,8 +57,8 @@ function SidebarIcon({
                 onClick={onClick}
                 className={`
                     w-12 h-12 flex items-center justify-center relative
-                    transition-all duration-200 cursor-pointer
-                    ${active ? "rounded-2xl" : "rounded-full hover:rounded-2xl"}
+                    transition-all duration-200 cursor-pointer hover:scale-110
+                    ${active ? "rounded-2xl scale-105" : "rounded-full hover:rounded-2xl"}
                     ${className}
                 `}
             >
@@ -257,7 +257,7 @@ export default function GlobalSidebar() {
                     <ChatBubbleIcon size={24} />
                 </SidebarIcon>
 
-                <div className="w-8 h-0.5 bg-[#35373c] rounded-full" />
+                <div className="w-8 h-0.5 rounded-full bg-gradient-to-r from-transparent via-[#5865F2]/40 to-transparent" />
 
                 {/* Folders */}
                 {folders.map(folder => {

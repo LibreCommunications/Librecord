@@ -71,11 +71,15 @@ export default function ChannelSidebar({ guildId }: Props) {
             onEvent("realtime:reconnected", refresh),
             onCustomEvent<AppEventMap["guild:channel:created"]>("guild:channel:created", (detail) => {
                 if (detail.guildId !== guildId) return;
-                setChannels(prev => [...prev, { id: detail.channelId, name: detail.name, type: detail.type, position: detail.position, parentId: detail.parentId, guildId }]);
+                setChannels(prev => {
+                    // Skip if already present (avoids duplicate from loadChannels + event race)
+                    if (prev.some(c => c.id === detail.channelId)) return prev;
+                    return [...prev, { id: detail.channelId, name: detail.name, type: detail.type, position: detail.position, parentId: detail.parentId, guildId }];
+                });
             }),
             onCustomEvent<AppEventMap["guild:channel:updated"]>("guild:channel:updated", (detail) => {
                 if (detail.guildId !== guildId) return;
-                setChannels(prev => prev.map(c => c.id === detail.channelId ? { ...c, name: detail.name, parentId: detail.parentId } : c));
+                setChannels(prev => prev.map(c => c.id === detail.channelId ? { ...c, name: detail.name, parentId: detail.parentId ?? c.parentId } : c));
             }),
             onCustomEvent<AppEventMap["guild:channel:deleted"]>("guild:channel:deleted", (detail) => {
                 if (detail.guildId !== guildId) return;
@@ -150,7 +154,7 @@ export default function ChannelSidebar({ guildId }: Props) {
         parentId?: string | null;
     }) {
         await createChannel(guildId, { ...data, position: channels.length });
-        await loadChannels();
+        // No loadChannels() call — the guild:channel:created event handles adding it
     }
 
     const categories = channels.filter(c => c.type === 2);
