@@ -1,10 +1,86 @@
 {
   "name": "@librecord/desktop",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite -c electron.vite.config.ts",
+    "build": "vite build -c electron.vite.config.ts",
+    "package": "electron-builder",
+    "package:linux": "electron-builder --linux AppImage",
+    "package:mac": "electron-builder --mac",
+    "package:win": "electron-builder --win"
+  },
   "dependencies": {
+    "@librecord/domain": "workspace:*",
+    "@librecord/platform": "workspace:*",
     "@librecord/platform-electron": "workspace:*",
-    "@librecord/ui-web": "workspace:*"
+    "@librecord/platform-web": "workspace:*",
+    "@librecord/api-client": "workspace:*",
+    "@librecord/app": "workspace:*",
+    "@librecord/design": "workspace:*",
+    "@librecord/ui-web": "workspace:*",
+    "electron-updater": "^6.6.2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.9.6"
+  },
+  "devDependencies": {
+    "@rolldown/plugin-babel": "^0.2.2",
+    "@tailwindcss/vite": "^4.2.2",
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "electron": "^36.3.0",
+    "electron-builder": "^26.0.12",
+    "vite-plugin-electron": "^0.29.1",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "tailwindcss": "^4.2.2",
+    "typescript": "~5.9.3",
+    "vite": "^8.0.0"
+  },
+  "build": {
+    "appId": "com.librecord.desktop",
+    "productName": "Librecord",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Network;Chat;InstantMessaging",
+      "icon": "build/icons"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "build/icons/icon.icns",
+      "category": "public.app-category.social-networking"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icons/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "your-org",
+      "repo": "Librecord"
+    }
   }
 }
