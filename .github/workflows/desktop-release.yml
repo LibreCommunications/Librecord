@@ -54,7 +54,7 @@ jobs:
             Librecord.Client/apps/desktop/release/*.dmg
             Librecord.Client/apps/desktop/release/*.zip
             Librecord.Client/apps/desktop/release/*.exe
-            Librecord.Client/apps/desktop/release/*.yml
+            Librecord.Client/apps/desktop/release/latest*.yml
           if-no-files-found: error
 
   release:
