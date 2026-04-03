@@ -1,0 +1,77 @@
+name: Desktop Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag (e.g. v0.1.0)"
+        required: true
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: mac
+          - os: windows-latest
+            platform: win
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: Librecord.Client/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: Librecord.Client
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and package
+        working-directory: Librecord.Client/apps/desktop
+        run: |
+          pnpm build
+          pnpm package:${{ matrix.platform }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}
+          path: |
+            Librecord.Client/apps/desktop/release/*.AppImage
+            Librecord.Client/apps/desktop/release/*.dmg
+            Librecord.Client/apps/desktop/release/*.zip
+            Librecord.Client/apps/desktop/release/*.exe
+            Librecord.Client/apps/desktop/release/*.yml
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ inputs.version }} artifacts/* \
+            --repo ${{ github.repository }} \
+            --title "Librecord Desktop ${{ inputs.version }}" \
+            --generate-notes
