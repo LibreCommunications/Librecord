@@ -47,8 +47,10 @@ See [docs/deployment/](docs/deployment/) for a complete walkthrough covering ngi
 
 ## Contributing
 
-Open an issue first to discuss what you'd like to change.
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request.
 
 ## License
 
 [GNU Affero General Public License v3.0](LICENSE)
+
+For organizations that need an alternative to AGPL, commercial licensing is available. Contact [LibreCommunications](https://github.com/LibreCommunications) for details.
