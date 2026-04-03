@@ -10,11 +10,21 @@
     "lint": "turbo lint --filter=@librecord/web",
     "typecheck": "turbo typecheck",
     "preview": "turbo preview --filter=@librecord/web",
+    "dev:desktop": "turbo dev --filter=@librecord/desktop",
+    "build:desktop": "turbo build --filter=@librecord/desktop",
+    "package:desktop": "pnpm --filter @librecord/desktop package",
     "test:e2e": "npx playwright test",
     "test:e2e:headed": "npx playwright test --headed",
     "test:e2e:debug": "npx playwright test --debug"
   },
   "devDependencies": {
     "turbo": "^2.9.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-winstaller",
+      "esbuild"
+    ]
   }
 }
