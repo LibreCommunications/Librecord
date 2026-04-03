@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "Librecord desktop app",
+  "author": "LibreCommunications",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite -c electron.vite.config.ts",
