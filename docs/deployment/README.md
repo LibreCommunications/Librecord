@@ -141,7 +141,11 @@ cd ..
 
 ### Hardening config
 
-Create `/etc/nginx/conf.d/hardening.conf`:
+Install the Brotli module and create `/etc/nginx/conf.d/hardening.conf`:
+
+```bash
+sudo apt install libnginx-mod-brotli
+```
 
 ```nginx
 limit_req_zone $binary_remote_addr zone=api:10m rate=30r/s;
@@ -151,6 +155,13 @@ gzip_vary on;
 gzip_min_length 256;
 gzip_comp_level 5;
 gzip_types application/json application/javascript text/css text/plain text/xml image/svg+xml;
+
+# Brotli — ~20% smaller than gzip for text assets
+brotli on;
+brotli_comp_level 6;
+brotli_min_length 256;
+brotli_types application/json application/javascript text/css text/plain text/xml image/svg+xml application/wasm;
+brotli_static on;
 ```
 
 ### Cache config

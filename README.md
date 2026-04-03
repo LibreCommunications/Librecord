@@ -1,40 +1,54 @@
 # Librecord
 
-A free, open-source alternative to Discord. Real-time messaging, voice and video calls, screen sharing — all self-hosted.
+Self-hosted Discord alternative. Messaging, voice/video calls, screen sharing, servers with roles and permissions. Everything encrypted at rest.
 
-## What it does
+Built with .NET 10 and React 19. Licensed under [AGPL-3.0](LICENSE).
 
-- **Messaging** — DMs, group chats, and server channels with threads, reactions, and pins
-- **Voice & Video** — Calls with screen sharing
-- **Servers** — Create communities with channels, roles, and permissions
-- **Friends** — Friend requests, blocking, online status
-- **Privacy** — Messages are encrypted at rest on the server
-- **Notifications** — Typing indicators, read receipts, unread badges, desktop notifications
-- **Cross-platform** — Web app, desktop app (Electron), mobile app (planned)
+## Features
 
-## Quick Start
+- DMs, group chats, servers with channels, threads, reactions, pins
+- Voice and video calls with screen sharing (via LiveKit)
+- Roles, permissions, channel-level permission overrides
+- Friend requests, blocking, online/idle/DND/invisible status
+- Typing indicators, read receipts, unread badges
+- Server-side AES-256-GCM message encryption at rest
+- File attachments with image/video previews
+- Desktop app (Electron), mobile app (planned)
+
+## Development
+
+You need Docker, .NET 10 SDK, Node.js 20+, and pnpm.
 
 ```bash
-# One-command setup (requires Docker, .NET 10 SDK, Node.js 20+, pnpm)
-./setup-dev.sh
+# Start PostgreSQL and MinIO
+docker compose up -d postgres minio
 
-# Start backend
+# Run database migrations
+./ef-migrate.sh --apply-only
+
+# Start the backend
 dotnet run --project Librecord.Api
 
-# Start frontend (separate terminal)
-cd Librecord.Client && pnpm dev
+# In another terminal — start the frontend
+cd Librecord.Client
+pnpm install
+pnpm dev
 ```
 
-See [DEV_SETUP.md](DEV_SETUP.md) for detailed setup instructions.
+The frontend is at `https://localhost:5173`, the API at `https://localhost:5111`.
 
-## Screenshots
+See [docs/development.md](docs/development.md) for the full setup guide (HTTPS certs, MinIO bucket creation, migrations, troubleshooting).
 
-*Coming soon*
+## Deploying
+
+Fork this repo and deploy from your own GitHub. The included CI pipeline builds, tests, and deploys automatically on push using a self-hosted GitHub Actions runner.
+
+See [docs/deployment/](docs/deployment/) for a full step-by-step guide covering nginx, Docker, SSL, blue-green deployment, and optional LiveKit setup for voice/video.
 
 ## Contributing
 
-Contributions are welcome! Please open an issue first to discuss what you'd like to change.
+Open an issue first to discuss what you'd like to change.
 
 ## License
 
-This project is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+[GNU Affero General Public License v3.0](LICENSE)

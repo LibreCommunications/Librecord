@@ -153,7 +153,9 @@ server {
 
 ## Hardening Config
 
-Place in `/etc/nginx/conf.d/hardening.conf`:
+Place in `/etc/nginx/conf.d/hardening.conf`.
+
+Requires the `ngx_brotli` module — install it with `sudo apt install libnginx-mod-brotli` (Debian/Ubuntu) or build from source.
 
 ```nginx
 # Rate limiting zones
@@ -165,6 +167,13 @@ gzip_vary on;
 gzip_min_length 256;
 gzip_comp_level 5;
 gzip_types application/json application/javascript text/css text/plain text/xml image/svg+xml;
+
+# Brotli — ~20% smaller than gzip for text assets
+brotli on;
+brotli_comp_level 6;
+brotli_min_length 256;
+brotli_types application/json application/javascript text/css text/plain text/xml image/svg+xml application/wasm;
+brotli_static on;
 ```
 
 ## LiveKit Config (optional, for voice/video)
