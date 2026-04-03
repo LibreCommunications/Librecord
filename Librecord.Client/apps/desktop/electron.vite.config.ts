@@ -17,17 +17,14 @@ export default defineConfig({
         vite: {
           build: {
             outDir: "dist-electron",
+            lib: {
+              entry: "electron/main.ts",
+              formats: ["cjs"],
+              fileName: () => "main.cjs",
+            },
             rollupOptions: {
               external: ["electron", "electron-updater"],
             },
-          },
-        },
-      },
-      preload: {
-        input: "electron/preload.ts",
-        vite: {
-          build: {
-            outDir: "dist-electron",
           },
         },
       },

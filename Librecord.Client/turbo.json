@@ -8,7 +8,8 @@
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "env": ["ELECTRON_OZONE_PLATFORM_HINT", "VITE_*", "XDG_SESSION_TYPE"]
     },
     "lint": {
       "dependsOn": ["^build"]

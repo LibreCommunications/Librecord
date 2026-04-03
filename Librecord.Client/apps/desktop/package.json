@@ -5,9 +5,9 @@
   "type": "module",
   "description": "Librecord desktop app",
   "author": "LibreCommunications",
-  "main": "dist-electron/main.js",
+  "main": "dist-electron/main.cjs",
   "scripts": {
-    "dev": "vite -c electron.vite.config.ts",
+    "dev": "ELECTRON_OZONE_PLATFORM_HINT=auto vite -c electron.vite.config.ts",
     "build": "vite build -c electron.vite.config.ts",
     "package": "electron-builder",
     "package:linux": "electron-builder --linux AppImage",
