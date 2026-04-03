@@ -116,10 +116,10 @@ jobs:
             if [ ! -d node_modules ] || [ pnpm-lock.yaml -nt node_modules/.pnpm/lock.yaml ]; then
               pnpm install --frozen-lockfile --prefer-offline
             fi
-            npx tsc -b || { echo "::error::TypeScript check failed"; exit 1; }
-            npx turbo build --filter=@librecord/web &
+            pnpm exec tsc -b || { echo "::error::TypeScript check failed"; exit 1; }
+            pnpm exec turbo build --filter=@librecord/web &
             PID_VITE=$!
-            npx turbo lint --filter=@librecord/web &
+            pnpm exec turbo lint --filter=@librecord/web &
             PID_LINT=$!
             FAIL=0
             wait $PID_VITE || { echo "::error::Vite build failed"; FAIL=1; }
