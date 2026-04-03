@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.renderer.tsbuildinfo",
+    "outDir": "./out/renderer-types",
+    "declarationDir": "./out/renderer-types"
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../../packages/domain" },
+    { "path": "../../packages/platform" },
+    { "path": "../../packages/platform-web" },
+    { "path": "../../packages/platform-electron" },
+    { "path": "../../packages/api-client" },
+    { "path": "../../packages/app" },
+    { "path": "../../packages/design" },
+    { "path": "../../packages/ui-web" }
+  ]
+}

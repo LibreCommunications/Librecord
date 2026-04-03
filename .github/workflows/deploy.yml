@@ -113,13 +113,13 @@ jobs:
           # ── Frontend: install + build + lint ──────────────────────
           (
             cd Librecord.Client
-            if [ ! -d node_modules ] || [ package-lock.json -nt node_modules/.package-lock.json ]; then
-              npm ci --prefer-offline --no-audit --no-fund
+            if [ ! -d node_modules ] || [ pnpm-lock.yaml -nt node_modules/.pnpm/lock.yaml ]; then
+              pnpm install --frozen-lockfile --prefer-offline
             fi
-            npx tsc -b || { echo "::error::TypeScript check failed"; exit 1; }
-            npx vite build &
+            pnpm --filter @librecord/web exec tsc -b || { echo "::error::TypeScript check failed"; exit 1; }
+            pnpm exec turbo build --filter=@librecord/web &
             PID_VITE=$!
-            npx eslint . &
+            pnpm exec turbo lint --filter=@librecord/web &
             PID_LINT=$!
             FAIL=0
             wait $PID_VITE || { echo "::error::Vite build failed"; FAIL=1; }
@@ -147,28 +147,9 @@ jobs:
           PID_IMG=$!
 
           rm -rf "/var/www/${SITE}/dist"
-          cp -r Librecord.Client/dist "/var/www/${SITE}/dist"
+          cp -r Librecord.Client/apps/web/dist "/var/www/${SITE}/dist"
 
           wait $PID_IMG || exit 1
-
-      - name: Restart LiveKit if config changed
-        if: env.IS_PROD == 'true'
-        run: |
-          RESTART=false
-          if git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -q '^livekit\.yaml$'; then
-            echo "livekit.yaml changed in diff"
-            RESTART=true
-          fi
-          if git log -1 --pretty=%s | grep -qi '\[LIVEKIT\]'; then
-            echo "[LIVEKIT] tag in commit message"
-            RESTART=true
-          fi
-          if [ "$RESTART" = true ]; then
-            echo "Restarting LiveKit..."
-            docker compose -p librecord --env-file .env -f docker-compose.yml --profile livekit restart livekit
-          else
-            echo "No LiveKit restart needed — skipping"
-          fi
 
       - name: Blue-green deploy backend
         run: .github/scripts/deploy.sh ${{ steps.config.outputs.slug }}

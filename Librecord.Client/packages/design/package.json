@@ -1,0 +1,17 @@
+{
+  "name": "@librecord/design",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles": "./src/index.css",
+    "./src/*": "./src/*"
+  },
+  "dependencies": {
+    "tailwindcss": "^4.2.2"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3"
+  }
+}

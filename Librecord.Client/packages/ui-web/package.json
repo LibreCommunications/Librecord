@@ -1,0 +1,27 @@
+{
+  "name": "@librecord/ui-web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./src/*": "./src/*"
+  },
+  "dependencies": {
+    "@librecord/domain": "workspace:*",
+    "@librecord/platform": "workspace:*",
+    "@librecord/api-client": "workspace:*",
+    "@librecord/app": "workspace:*",
+    "@librecord/design": "workspace:*",
+    "livekit-client": "^2.18.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.9.6",
+    "react-virtuoso": "^4.18.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "~5.9.3"
+  }
+}

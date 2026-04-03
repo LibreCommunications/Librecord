@@ -1,0 +1,23 @@
+{
+  "name": "@librecord/app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*/index.ts"
+  },
+  "dependencies": {
+    "@librecord/domain": "workspace:*",
+    "@librecord/platform": "workspace:*",
+    "@librecord/api-client": "workspace:*",
+    "@microsoft/signalr": "^10.0.0",
+    "@shiguredo/rnnoise-wasm": "^2025.1.5",
+    "livekit-client": "^2.18.0",
+    "react": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.5",
+    "typescript": "~5.9.3"
+  }
+}

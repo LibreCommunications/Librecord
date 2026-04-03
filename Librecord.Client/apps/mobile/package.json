@@ -1,0 +1,10 @@
+{
+  "name": "@librecord/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@librecord/platform-native": "workspace:*",
+    "@librecord/ui-native": "workspace:*"
+  }
+}
