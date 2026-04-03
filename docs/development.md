@@ -1,16 +1,19 @@
 # Local Development Setup
 
-How to get Librecord running on your machine.
+How to get Librecord running on your machine for development.
+
+> [!WARNING]
+> This documentation was written after the fact and may not be fully accurate. This is a solo project - if something doesn't work, please open an issue and be patient.
 
 ## Prerequisites
 
-- **Docker** — for PostgreSQL and MinIO
-- **.NET 10 SDK** — [install instructions](https://dotnet.microsoft.com/download)
-- **EF Core tools** — `dotnet tool install --global dotnet-ef`
-- **Node.js 20+** — [nodejs.org](https://nodejs.org)
-- **pnpm** — `npm i -g pnpm`
+- **Docker** -- runs PostgreSQL and MinIO
+- **.NET 10 SDK** -- [install instructions](https://dotnet.microsoft.com/download)
+- **EF Core tools** -- `dotnet tool install --global dotnet-ef`
+- **Node.js 20+** -- [nodejs.org](https://nodejs.org)
+- **pnpm** -- `npm i -g pnpm`
 
-## 1. Clone and enter the repo
+## 1. Clone the repository
 
 ```bash
 git clone https://github.com/LibreCommunications/Librecord.git
@@ -24,16 +27,17 @@ docker compose up -d postgres minio
 ```
 
 This starts:
-- **PostgreSQL** on `localhost:5432` (user: `dev`, password: `devpass`, database: `librecord`)
-- **MinIO** on `localhost:9000` (console at `localhost:9001`, credentials: `minioadmin`/`minioadmin`)
 
-These match the defaults in `appsettings.Development.json` — no config needed.
+- **PostgreSQL** on `localhost:5432` (user: `dev`, password: `devpass`, database: `librecord`)
+- **MinIO** on `localhost:9000` (console at `localhost:9001`, credentials: `minioadmin` / `minioadmin`)
+
+These match the defaults in `appsettings.Development.json` -- no extra configuration needed.
 
 ## 3. Create the MinIO bucket
 
-First time only. Open `http://localhost:9001` in your browser, log in with `minioadmin`/`minioadmin`, and create a bucket called `librecord-attachments`.
+This is a one-time step. Open `http://localhost:9001`, log in with `minioadmin` / `minioadmin`, and create a bucket called `librecord-attachments`.
 
-Or via CLI:
+Or use the MinIO CLI:
 
 ```bash
 # Install mc (MinIO client) if you don't have it
@@ -50,13 +54,14 @@ mc anonymous set download local/librecord-attachments/emojis
 
 ## 4. Generate HTTPS certificates
 
-The backend and frontend both use HTTPS locally. Generate a self-signed cert:
+Both the backend and frontend use HTTPS in development. Generate a self-signed certificate:
 
 ```bash
 dotnet dev-certs https --export-path ~/.aspnet/https/localhost.pem --format Pem --no-password
 ```
 
-If you're on Linux and your browser doesn't trust it, you may need to add it manually or just accept the warning.
+> [!NOTE]
+> On Linux, browsers may not trust the self-signed certificate automatically. You can add it to your system trust store or accept the browser warning.
 
 ## 5. Run database migrations
 
@@ -64,13 +69,13 @@ If you're on Linux and your browser doesn't trust it, you may need to add it man
 ./ef-migrate.sh --apply-only
 ```
 
-This applies all existing migrations to your local PostgreSQL. First time it creates all the tables.
+This applies all existing migrations to your local PostgreSQL instance. On first run, it creates the full schema.
 
 To create a new migration after changing entities:
 
 ```bash
 ./ef-migrate.sh
-# It will prompt you for a migration name
+# The script will prompt you for a migration name
 ```
 
 ## 6. Start the backend
@@ -79,7 +84,7 @@ To create a new migration after changing entities:
 dotnet run --project Librecord.Api
 ```
 
-The API runs at `https://localhost:5111`. You can verify it's working:
+The API runs at `https://localhost:5111`. Verify it's working:
 
 ```bash
 curl -k https://localhost:5111/health
@@ -93,17 +98,20 @@ pnpm install
 pnpm dev
 ```
 
-Opens at `https://localhost:5173`. The `.env` file is already set up to point at the local backend.
+The frontend runs at `https://localhost:5173`. The `.env` file is pre-configured to point at the local backend.
 
-## 8. Voice/Video (optional)
+## 8. Voice and video (optional)
 
-Voice and video calls need a LiveKit server. For local dev:
+Voice and video calls require a LiveKit server. For local development:
 
 ```bash
 docker compose --profile livekit up -d livekit
 ```
 
-This requires a `livekit.yaml` config file — see [docs/deployment/livekit.md](deployment/livekit.md). For local dev you can skip this; everything else works without it.
+This requires a `livekit.yaml` config file. See [deployment/livekit.md](deployment/livekit.md) for details.
+
+> [!TIP]
+> You can skip LiveKit entirely for local development. All other features work without it.
 
 ## Project layout
 
@@ -151,10 +159,10 @@ docker compose down                                    # Stop everything
 
 ## Troubleshooting
 
-**"Connection refused" on the frontend** — Make sure the backend is running and the `.env` in `Librecord.Client/` has `VITE_API_URL=https://localhost:5111`.
+**"Connection refused" on the frontend** -- Make sure the backend is running and `Librecord.Client/.env` contains `VITE_API_URL=https://localhost:5111`.
 
-**Database migration fails** — Check that PostgreSQL is running: `docker compose ps`. If the schema is out of sync, the migration script offers to drop and recreate the database.
+**Database migration fails** -- Check that PostgreSQL is running with `docker compose ps`. If the schema is out of sync, the migration script offers to drop and recreate the database.
 
-**HTTPS certificate errors** — Run `dotnet dev-certs https --trust` (macOS/Windows) or accept the browser warning (Linux).
+**HTTPS certificate errors** -- Run `dotnet dev-certs https --trust` (macOS/Windows) or accept the browser warning (Linux).
 
-**MinIO "bucket not found"** — Make sure you created the bucket (step 3).
+**MinIO "bucket not found"** -- You need to create the bucket first. See [step 3](#3-create-the-minio-bucket).

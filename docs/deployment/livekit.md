@@ -1,25 +1,28 @@
-# LiveKit Setup (Voice & Video)
+# LiveKit Setup (Voice and Video)
 
-LiveKit handles voice calls, video calls, and screen sharing. It's optional — skip this if you don't need voice/video.
+How to set up LiveKit for voice calls, video calls, and screen sharing in Librecord.
+
+LiveKit is optional. Skip this guide if you do not need voice or video features. All other Librecord functionality works without it.
 
 ## How it works
 
-LiveKit runs as a Docker container with `network_mode: host` so it can handle WebRTC UDP media traffic directly. Nginx proxies the WebSocket signaling on port 443.
+LiveKit runs as a Docker container with `network_mode: host` so it can handle WebRTC UDP media traffic directly. Nginx proxies the WebSocket signaling traffic on port 443.
 
 ## Subdomains
 
-You need a separate subdomain for LiveKit:
-- `livekit.your-domain.com` — WebSocket signaling (proxied by nginx)
-- `turn.your-domain.com` — TURN relay for users behind strict firewalls (optional but recommended)
+LiveKit requires a separate subdomain:
 
-## SSL Certificates
+- `livekit.your-domain.com` -- WebSocket signaling (proxied by nginx)
+- `turn.your-domain.com` -- TURN relay for users behind strict firewalls (optional but recommended)
+
+## SSL certificates
 
 ```bash
 sudo certbot certonly --nginx -d livekit.your-domain.com
 sudo certbot certonly --nginx -d turn.your-domain.com  # if using TURN
 ```
 
-## LiveKit Config
+## LiveKit configuration
 
 Create `/etc/livekit/livekit.yaml`:
 
@@ -47,9 +50,10 @@ Replace:
 - `YOUR_SERVER_PUBLIC_IP` with your server's public IP address
 - `turn.your-domain.com` with your TURN subdomain
 
-The `keys: {}` field is intentional — LiveKit reads API keys from the `LIVEKIT_KEYS` environment variable set in docker-compose.yml.
+> [!NOTE]
+> The `keys: {}` field is intentional. LiveKit reads API keys from the `LIVEKIT_KEYS` environment variable set in `docker-compose.yml`. See [secrets.md](secrets.md) for key generation.
 
-## Firewall Ports
+## Firewall ports
 
 Open these ports on your server:
 
@@ -68,7 +72,8 @@ sudo ufw allow 10000:30000/udp
 sudo ufw allow 50000:60000/udp
 ```
 
-Port 7880 doesn't need to be opened — nginx proxies it on 443.
+> [!TIP]
+> Port 7880 does not need to be opened in the firewall. Nginx proxies it on port 443. See [nginx.md](nginx.md) for the LiveKit proxy configuration.
 
 ## Start LiveKit
 
@@ -82,4 +87,4 @@ docker compose --profile livekit up -d livekit
 curl http://localhost:7880
 ```
 
-Should return a response (not connection refused).
+A successful response (not "connection refused") confirms LiveKit is running.

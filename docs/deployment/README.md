@@ -1,8 +1,11 @@
 # Deploying Librecord
 
-A complete guide to deploy Librecord from scratch on a Linux server.
+A complete guide to deploying Librecord on a Linux server from scratch.
 
-## What you need
+> [!WARNING]
+> This documentation was written after the fact and may not be fully accurate. This is a solo project - if something doesn't work, please open an issue and be patient.
+
+## Prerequisites
 
 - A Linux server (Debian/Ubuntu recommended)
 - A domain name with DNS pointing to your server
@@ -39,7 +42,7 @@ sudo certbot certonly --nginx -d livekit.your-domain.com    # optional, for voic
 sudo certbot certonly --nginx -d turn.your-domain.com       # optional, for TURN relay
 ```
 
-## Step 3: Clone the repo
+## Step 3: Clone the repository
 
 ```bash
 git clone https://github.com/LibreCommunications/Librecord.git
@@ -66,14 +69,16 @@ BLUE_PORT=5111
 GREEN_PORT=5112
 ```
 
-The rest of the file (passwords, keys) was generated automatically.
+The remaining values (passwords, keys, tokens) were generated automatically.
 
-Also create the frontend env:
+Then create the frontend environment file:
 
 ```bash
 echo 'VITE_API_URL=https://your-domain.com/api' > Librecord.Client/.env
 echo 'VITE_LIVEKIT_URL=wss://livekit.your-domain.com' >> Librecord.Client/.env
 ```
+
+For details on all environment variables, see [secrets.md](secrets.md).
 
 ## Step 5: Start Docker services
 
@@ -93,7 +98,7 @@ curl -O https://dl.min.io/client/mc/release/linux-amd64/mc
 chmod +x mc
 sudo mv mc /usr/local/bin/
 
-# Configure it (use the access/secret key from your .env)
+# Configure it (uses the access/secret key from your .env)
 source .env
 mc alias set local http://localhost:9000 "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY"
 
@@ -123,6 +128,8 @@ docker build -t librecord-backend:latest -f - .
 chmod +x .github/scripts/deploy.sh
 .github/scripts/deploy.sh prod
 ```
+
+See [blue-green.md](blue-green.md) for how the deployment pipeline works.
 
 ## Step 7: Build and deploy the frontend
 
@@ -156,7 +163,7 @@ gzip_min_length 256;
 gzip_comp_level 5;
 gzip_types application/json application/javascript text/css text/plain text/xml image/svg+xml;
 
-# Brotli — ~20% smaller than gzip for text assets
+# Brotli -- ~20% smaller than gzip for text assets
 brotli on;
 brotli_comp_level 6;
 brotli_min_length 256;
@@ -166,7 +173,7 @@ brotli_static on;
 
 ### Cache config
 
-Make sure your `/etc/nginx/nginx.conf` has this inside the `http {}` block:
+Add this inside the `http {}` block in `/etc/nginx/nginx.conf` (or in a file under `conf.d/`):
 
 ```nginx
 proxy_cache_path /var/cache/nginx/cdn levels=1:2 keys_zone=cdn_cache:10m max_size=500m inactive=24h;
@@ -174,7 +181,7 @@ proxy_cache_path /var/cache/nginx/cdn levels=1:2 keys_zone=cdn_cache:10m max_siz
 
 ### Site config
 
-Copy the nginx config from [nginx.md](nginx.md) into `/etc/nginx/sites-enabled/librecord`. Replace all `your-domain.com` with your actual domain.
+Copy the nginx config from [nginx.md](nginx.md) into `/etc/nginx/sites-enabled/librecord`. Replace all instances of `your-domain.com` with your actual domain.
 
 ### Test and reload
 
@@ -183,9 +190,11 @@ sudo nginx -t
 sudo nginx -s reload
 ```
 
-## Step 9: LiveKit setup (optional — for voice/video)
+For the full nginx reference (all config files, security headers, LiveKit proxy), see [nginx.md](nginx.md).
 
-See [livekit.md](livekit.md) for the full setup including firewall ports and TURN configuration.
+## Step 9: LiveKit setup (optional)
+
+LiveKit powers voice calls, video calls, and screen sharing. See [livekit.md](livekit.md) for the full setup guide including firewall ports and TURN configuration.
 
 Quick version:
 
@@ -206,11 +215,11 @@ docker compose --profile livekit up -d livekit
 
 ## Step 10: Set up CI (optional)
 
-To get automatic deployments on git push:
+Automatic deployments on push to `master`:
 
-1. Install a [GitHub Actions self-hosted runner](https://docs.github.com/en/actions/hosting-your-own-runners) on your server
+1. Install a [GitHub Actions self-hosted runner](https://docs.github.com/en/actions/hosting-your-own-runners) on your server.
 
-2. Add secrets in GitHub repo settings (Settings > Secrets > Actions):
+2. Add secrets in your GitHub repo settings (Settings > Secrets > Actions):
    - `DOMAIN`, `POSTGRES_PASSWORD`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`
    - `JWT_SIGNING_KEY`, `MESSAGE_ENCRYPTION_KEY`
    - `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`
@@ -220,7 +229,7 @@ To get automatic deployments on git push:
    echo "$USER ALL=(root) NOPASSWD: /usr/sbin/nginx -t, /usr/sbin/nginx -s reload" | sudo tee /etc/sudoers.d/nginx-reload
    ```
 
-4. Push to `master` for production, `test` for test environment
+4. Push to `master` for production, `test` for the test environment.
 
 See [blue-green.md](blue-green.md) for how the deployment pipeline works.
 
@@ -230,7 +239,7 @@ Open `https://your-domain.com` in your browser. You should see the login page.
 
 ## Updating
 
-If you set up CI (step 10), just push to master and it deploys automatically.
+With CI set up (step 10), push to `master` and it deploys automatically.
 
 For manual updates:
 
@@ -253,18 +262,18 @@ sudo cp -r apps/web/dist /var/www/librecord/dist
 ## Architecture overview
 
 ```
-Internet → nginx (SSL, rate limit, static files)
-              ├── /            → Static frontend (Vite build)
-              ├── /api/        → .NET backend (blue or green container)
-              ├── /api/hubs/   → SignalR WebSocket
-              ├── /api/cdn/    → MinIO public assets (cached by nginx)
-              └── /storage/    → MinIO private attachments
+Internet --> nginx (SSL, rate limiting, static files)
+                |-- /            --> Static frontend (Vite build)
+                |-- /api/        --> .NET backend (blue or green container)
+                |-- /api/hubs/   --> SignalR WebSocket
+                |-- /api/cdn/    --> MinIO public assets (cached by nginx)
+                \-- /storage/    --> MinIO private attachments
 ```
 
-## More details
+## Detailed guides
 
-- [nginx.md](nginx.md) — Full nginx config examples
-- [docker.md](docker.md) — Docker Compose services
-- [blue-green.md](blue-green.md) — How zero-downtime deployment works
-- [secrets.md](secrets.md) — Environment variables and secret management
-- [livekit.md](livekit.md) — Voice/video server setup
+- [nginx.md](nginx.md) -- Full nginx configuration reference
+- [docker.md](docker.md) -- Docker Compose services and setup
+- [blue-green.md](blue-green.md) -- Zero-downtime deployment pipeline
+- [secrets.md](secrets.md) -- Environment variables and secret management
+- [livekit.md](livekit.md) -- Voice and video server setup

@@ -1,37 +1,33 @@
 # Nginx Configuration
 
-Librecord uses nginx as a reverse proxy with blue-green deployment support.
+Full nginx configuration reference for Librecord. Nginx acts as the reverse proxy, serving the static frontend, proxying API and WebSocket traffic, and caching public CDN assets.
 
 ## Overview
 
-- Nginx serves the static frontend from `/var/www/librecord/dist`
-- API requests are proxied to the .NET backend
-- SignalR WebSocket connections are proxied with upgrade headers
-- Public CDN assets (avatars, icons) are served directly from MinIO with nginx caching
-- Private attachments go through MinIO presigned URLs
+- Static frontend served from `/var/www/librecord/dist`
+- API requests proxied to the .NET backend (blue-green upstream)
+- SignalR WebSocket connections proxied with upgrade headers
+- Public CDN assets (avatars, icons) served from MinIO with nginx disk caching
+- Private attachments served through MinIO presigned URLs
 
-## Files
-
-You'll need three config files:
+## Config files
 
 | File | Location | Purpose |
 |------|----------|---------|
 | `librecord.conf` | `/etc/nginx/sites-enabled/` | Main site config |
-| `hardening.conf` | `/etc/nginx/conf.d/` | Rate limiting and gzip |
-| `livekit.conf` | `/etc/nginx/sites-enabled/` | LiveKit WebSocket proxy (if using voice/video) |
-
-The blue-green upstream file is managed automatically by `deploy.sh`:
-- `/etc/nginx/conf.d/librecord-upstream.conf`
+| `hardening.conf` | `/etc/nginx/conf.d/` | Rate limiting, gzip, Brotli |
+| `livekit.conf` | `/etc/nginx/sites-enabled/` | LiveKit WebSocket proxy (optional) |
+| `librecord-upstream.conf` | `/etc/nginx/conf.d/` | Blue-green upstream (managed by `deploy.sh`) |
 
 ## Prerequisites
 
-Add this to your `nginx.conf` http block (or a file in `conf.d/`):
+Add this to your `nginx.conf` inside the `http {}` block (or to a file in `conf.d/`):
 
 ```nginx
 proxy_cache_path /var/cache/nginx/cdn levels=1:2 keys_zone=cdn_cache:10m max_size=500m inactive=24h;
 ```
 
-## Main Site Config
+## Main site config
 
 Replace `your-domain.com` with your actual domain. Replace `livekit.your-domain.com` with your LiveKit subdomain in the CSP header.
 
@@ -49,7 +45,7 @@ server {
     root /var/www/librecord/dist;
     index index.html;
 
-    # Auth endpoints — strict rate limit
+    # Auth endpoints -- strict rate limit
     location /api/auth/ {
         limit_req zone=auth burst=10 nodelay;
 
@@ -62,7 +58,7 @@ server {
         proxy_cookie_path / /;
     }
 
-    # Public CDN — nginx serves directly from MinIO, cached on disk
+    # Public CDN -- nginx serves directly from MinIO, cached on disk
     location ~ ^/api/cdn/public/(avatars|guild-icons|banners|thumbnails|emojis)/ {
         rewrite ^/api/cdn/public/(.*)$ /librecord-attachments/$1 break;
 
@@ -120,7 +116,7 @@ server {
         proxy_buffering on;
     }
 
-    # Vite assets — hashed filenames, cache forever
+    # Vite assets -- hashed filenames, cache forever
     location /assets/ {
         expires 1y;
         add_header Cache-Control "public, immutable";
@@ -151,11 +147,15 @@ server {
 }
 ```
 
-## Hardening Config
+## Hardening config
 
 Place in `/etc/nginx/conf.d/hardening.conf`.
 
-Requires the `ngx_brotli` module — install it with `sudo apt install libnginx-mod-brotli` (Debian/Ubuntu) or build from source.
+Requires the `ngx_brotli` module:
+
+```bash
+sudo apt install libnginx-mod-brotli   # Debian/Ubuntu
+```
 
 ```nginx
 # Rate limiting zones
@@ -168,7 +168,7 @@ gzip_min_length 256;
 gzip_comp_level 5;
 gzip_types application/json application/javascript text/css text/plain text/xml image/svg+xml;
 
-# Brotli — ~20% smaller than gzip for text assets
+# Brotli -- ~20% smaller than gzip for text assets
 brotli on;
 brotli_comp_level 6;
 brotli_min_length 256;
@@ -176,9 +176,11 @@ brotli_types application/json application/javascript text/css text/plain text/xm
 brotli_static on;
 ```
 
-## LiveKit Config (optional, for voice/video)
+## LiveKit config (optional)
 
-Place in `/etc/nginx/sites-enabled/livekit.conf`:
+Required for voice and video. Place in `/etc/nginx/sites-enabled/livekit.conf`.
+
+See [livekit.md](livekit.md) for the full LiveKit server setup.
 
 ```nginx
 server {

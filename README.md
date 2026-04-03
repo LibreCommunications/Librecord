@@ -1,23 +1,23 @@
 # Librecord
 
-Self-hosted Discord alternative. Messaging, voice/video calls, screen sharing, servers with roles and permissions. Everything encrypted at rest.
+A self-hosted Discord alternative. Real-time messaging, voice and video calls, screen sharing, servers with roles and permissions -- all encrypted at rest. Fork it, deploy it, own your communication.
 
 Built with .NET 10 and React 19. Licensed under [AGPL-3.0](LICENSE).
 
 ## Features
 
-- DMs, group chats, servers with channels, threads, reactions, pins
-- Voice and video calls with screen sharing (via LiveKit)
-- Roles, permissions, channel-level permission overrides
-- Friend requests, blocking, online/idle/DND/invisible status
-- Typing indicators, read receipts, unread badges
+- Direct messages, group chats, servers with channels, threads, reactions, and pins
+- Voice and video calls with screen sharing (powered by LiveKit)
+- Roles, permissions, and per-channel permission overrides
+- Friend requests, blocking, and presence (online / idle / DND / invisible)
+- Typing indicators, read receipts, and unread badges
 - Server-side AES-256-GCM message encryption at rest
-- File attachments with image/video previews
-- Desktop app (Electron), mobile app (planned)
+- File attachments with image and video previews
+- Desktop app (Electron) and mobile app (planned)
 
-## Development
+## Quick Start
 
-You need Docker, .NET 10 SDK, Node.js 20+, and pnpm.
+Prerequisites: Docker, .NET 10 SDK, Node.js 20+, and pnpm.
 
 ```bash
 # Start PostgreSQL and MinIO
@@ -29,21 +29,21 @@ docker compose up -d postgres minio
 # Start the backend
 dotnet run --project Librecord.Api
 
-# In another terminal — start the frontend
+# In another terminal -- start the frontend
 cd Librecord.Client
 pnpm install
 pnpm dev
 ```
 
-The frontend is at `https://localhost:5173`, the API at `https://localhost:5111`.
+The frontend runs at `https://localhost:5173` and the API at `https://localhost:5111`.
 
-See [docs/development.md](docs/development.md) for the full setup guide (HTTPS certs, MinIO bucket creation, migrations, troubleshooting).
+For the full setup guide (HTTPS certificates, MinIO bucket creation, troubleshooting), see [docs/development.md](docs/development.md).
 
 ## Deploying
 
-Fork this repo and deploy from your own GitHub. The included CI pipeline builds, tests, and deploys automatically on push using a self-hosted GitHub Actions runner.
+Fork this repo and deploy from your own GitHub. The included CI pipeline builds, tests, and deploys on push using a self-hosted GitHub Actions runner with zero-downtime blue-green deployment.
 
-See [docs/deployment/](docs/deployment/) for a full step-by-step guide covering nginx, Docker, SSL, blue-green deployment, and optional LiveKit setup for voice/video.
+See [docs/deployment/](docs/deployment/) for a complete walkthrough covering nginx, Docker, SSL, secrets, and optional LiveKit setup for voice and video.
 
 ## Contributing
 
