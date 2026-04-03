@@ -106,7 +106,7 @@ docker run -d \
   -e Minio__UseSSL=false \
   -e "Minio__PublicEndpoint=https://${DOMAIN}/storage" \
   -e "Security__MessageEncryptionKey=${MESSAGE_ENCRYPTION_KEY}" \
-  -e "LiveKit__Host=${LIVEKIT_HOST:-wss://livekit.gros-sans-dessein.com}" \
+  -e "LiveKit__Host=${LIVEKIT_HOST:-wss://livekit.${DOMAIN}}" \
   -e "LiveKit__ApiKey=${LIVEKIT_API_KEY}" \
   -e "LiveKit__ApiSecret=${LIVEKIT_API_SECRET}" \
   -e "Cors__Origins__0=https://${DOMAIN}" \
