@@ -379,7 +379,8 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
     });
 
     room.on(RoomEvent.LocalTrackPublished, async (pub: LocalTrackPublication) => {
-        if (pub.kind !== "audio" || !pub.track) return;
+        // Only analyse the mic track for speaking detection, not screen share audio
+        if (pub.kind !== "audio" || !pub.track || pub.source === Track.Source.ScreenShareAudio) return;
         const identity = room!.localParticipant.identity;
 
         if (getNoiseSuppressionSettings().mode !== "off") {
@@ -404,7 +405,7 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
     });
 
     room.on(RoomEvent.LocalTrackUnpublished, (pub) => {
-        if (pub.kind === "audio") {
+        if (pub.kind === "audio" && pub.source !== Track.Source.ScreenShareAudio) {
             stopAnalysingTrack(room!.localParticipant.identity);
         }
     });
