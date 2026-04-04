@@ -26,8 +26,24 @@ if (!gotLock) {
 }
 
 let mainWindow: BrowserWindow | null = null;
-let minimizeToTray = true;
 let isQuitting = false;
+
+// Persist minimizeToTray setting across restarts
+const settingsFile = join(app.getPath("userData"), "desktop-settings.json");
+
+function loadSettings(): { minimizeToTray: boolean } {
+  try {
+    return JSON.parse(fs.readFileSync(settingsFile, "utf-8"));
+  } catch {
+    return { minimizeToTray: true };
+  }
+}
+
+function saveSettings(settings: { minimizeToTray: boolean }) {
+  fs.writeFileSync(settingsFile, JSON.stringify(settings), "utf-8");
+}
+
+let minimizeToTray = loadSettings().minimizeToTray;
 
 // --- Deep link parsing ---
 
@@ -248,6 +264,7 @@ app.whenReady().then(() => {
   ipcMain.handle("desktop:getMinimizeToTray", () => minimizeToTray);
   ipcMain.handle("desktop:setMinimizeToTray", (_e, enabled: boolean) => {
     minimizeToTray = enabled;
+    saveSettings({ minimizeToTray });
     return minimizeToTray;
   });
 
