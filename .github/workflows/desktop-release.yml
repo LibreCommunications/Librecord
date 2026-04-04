@@ -6,9 +6,6 @@ on:
       version:
         description: "Version tag (e.g. v0.1.0)"
         required: true
-      api_url:
-        description: "API URL (e.g. https://chat.example.com/api)"
-        required: true
 
 jobs:
   build:
@@ -41,7 +38,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Write frontend env
-        run: echo "VITE_API_URL=${{ inputs.api_url }}" > Librecord.Client/.env
+        run: echo "VITE_API_URL=https://${{ secrets.DOMAIN }}/api" > Librecord.Client/.env
 
       - name: Build and package
         working-directory: Librecord.Client/apps/desktop
