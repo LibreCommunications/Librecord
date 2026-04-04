@@ -65,6 +65,7 @@ POSTGRES_PORT=5432
 MINIO_PORT=9000
 MINIO_CONSOLE_PORT=9001
 MINIO_BUCKET=librecord-attachments
+LIVEKIT_HOST=wss://livekit.your-domain.com
 BLUE_PORT=5111
 GREEN_PORT=5112
 ```
@@ -222,7 +223,7 @@ Automatic deployments on push to `master`:
 2. Add secrets in your GitHub repo settings (Settings > Secrets > Actions):
    - `DOMAIN`, `POSTGRES_PASSWORD`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`
    - `JWT_SIGNING_KEY`, `MESSAGE_ENCRYPTION_KEY`
-   - `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`
+   - `LIVEKIT_HOST`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`
 
 3. Allow the runner to reload nginx without a password:
    ```bash

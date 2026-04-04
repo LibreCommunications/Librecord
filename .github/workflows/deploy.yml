@@ -71,6 +71,7 @@ jobs:
           MINIO_CONSOLE_PORT=${{ steps.config.outputs.minio_console }}
           JWT_SIGNING_KEY=${{ secrets.JWT_SIGNING_KEY }}
           MESSAGE_ENCRYPTION_KEY=${{ secrets.MESSAGE_ENCRYPTION_KEY }}
+          LIVEKIT_HOST=${{ secrets.LIVEKIT_HOST }}
           LIVEKIT_API_KEY=${{ secrets.LIVEKIT_API_KEY }}
           LIVEKIT_API_SECRET=${{ secrets.LIVEKIT_API_SECRET }}
           BLUE_PORT=${{ steps.config.outputs.blue_port }}

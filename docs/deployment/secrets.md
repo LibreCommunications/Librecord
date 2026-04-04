@@ -37,6 +37,7 @@ For CI deployment, add these as repository secrets in GitHub (Settings > Secrets
 | `MINIO_SECRET_KEY` | MinIO secret key |
 | `JWT_SIGNING_KEY` | JWT signing key |
 | `MESSAGE_ENCRYPTION_KEY` | Message encryption key |
+| `LIVEKIT_HOST` | LiveKit WebSocket URL (e.g., `wss://livekit.example.com`) |
 | `LIVEKIT_API_KEY` | LiveKit API key |
 | `LIVEKIT_API_SECRET` | LiveKit API secret |
 
