@@ -6,7 +6,7 @@ import { execSync } from "child_process";
 // --- Platform-specific paths ---
 
 function getLinuxDesktopFilePath(): string {
-  return join(app.getPath("appData"), "..", "autostart", "com.librecord.desktop.desktop");
+  return join(app.getPath("appData"), "autostart", "com.librecord.desktop.desktop");
 }
 
 function getWindowsRegistryKey(): string {
@@ -35,7 +35,7 @@ function setLinuxAutostart(enabled: boolean): boolean {
 Name=Librecord
 Comment=Self-hosted chat, voice, and video
 Exec="${execPath}" --hidden
-Icon=com.librecord.desktop
+Icon=librecord
 Type=Application
 Terminal=false
 Categories=Network;Chat;InstantMessaging;

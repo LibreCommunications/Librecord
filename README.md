@@ -15,6 +15,10 @@ Built with .NET 10 and React 19. Licensed under [AGPL-3.0](LICENSE).
 - File attachments with image and video previews
 - Desktop app (Electron) and mobile app (planned)
 
+## Install
+
+Download the desktop app for Linux, Windows, or macOS from the [releases page](https://github.com/LibreCommunications/Librecord/releases/latest). See [docs/install.md](docs/install.md) for detailed instructions.
+
 ## Quick Start
 
 Prerequisites: Docker, .NET 10 SDK, Node.js 20+, and pnpm.

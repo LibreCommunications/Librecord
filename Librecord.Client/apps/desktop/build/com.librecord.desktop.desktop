@@ -2,7 +2,7 @@
 Name=Librecord
 Comment=Self-hosted chat, voice, and video
 Exec=librecord %U
-Icon=com.librecord.desktop
+Icon=librecord
 Type=Application
 Terminal=false
 Categories=Network;Chat;InstantMessaging;

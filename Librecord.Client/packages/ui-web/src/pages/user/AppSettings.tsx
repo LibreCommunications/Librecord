@@ -14,11 +14,14 @@ export default function AppSettings() {
 
     const [autostart, setAutostart] = useState(false);
     const [minimizeToTray, setMinimizeToTray] = useState(true);
+    const [appVersion, setAppVersion] = useState<string | null>(null);
 
     useEffect(() => {
         if (!isDesktop) return;
-        getElectronAPI()!.getAutostart().then(setAutostart);
-        getElectronAPI()!.getMinimizeToTray().then(setMinimizeToTray);
+        const api = getElectronAPI()!;
+        api.getAutostart().then(setAutostart);
+        api.getMinimizeToTray().then(setMinimizeToTray);
+        api.getAppVersion().then(setAppVersion);
     }, []);
 
     function toggle(key: string, value: boolean, setter: (v: boolean) => void) {
@@ -38,7 +41,14 @@ export default function AppSettings() {
 
     return (
         <div className="space-y-8">
-            <h1 className="text-2xl font-bold text-white">App Settings</h1>
+            <div className="flex items-baseline justify-between">
+                <h1 className="text-2xl font-bold text-white">App Settings</h1>
+                {appVersion && (
+                    <span className="text-sm font-medium text-[#949ba4]">
+                        v{appVersion}
+                    </span>
+                )}
+            </div>
 
             {/* Notifications */}
             <section>

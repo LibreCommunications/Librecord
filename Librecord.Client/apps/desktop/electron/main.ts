@@ -1,5 +1,6 @@
 import { app, BrowserWindow, desktopCapturer, ipcMain, Notification, shell, session } from "electron";
 import { join } from "path";
+import * as fs from "fs";
 import { initUpdater } from "./updater";
 import { initTray, destroyTray } from "./tray";
 import { isAutostartEnabled, setAutostart } from "./autostart";
@@ -154,15 +155,91 @@ app.whenReady().then(() => {
     callback({ responseHeaders: headers });
   });
 
-  // Allow screen share with system audio (#108/#76)
-  session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
-    const sources = await desktopCapturer.getSources({ types: ["screen", "window"] });
-    if (sources.length > 0) {
-      callback({ video: sources[0] });
+  // Screen share with source picker (#122) and system audio (#76)
+  // Abort function for the previous in-flight pick request (handles race condition)
+  let abortPreviousPick: (() => void) | null = null;
+
+  session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
+    // If a previous pick is in-flight, cancel it
+    if (abortPreviousPick) {
+      abortPreviousPick();
+      abortPreviousPick = null;
+    }
+
+    const sources = await desktopCapturer.getSources({
+      types: ["screen", "window"],
+      thumbnailSize: { width: 320, height: 180 },
+      fetchWindowIcons: true,
+    });
+
+    if (sources.length === 0) {
+      try { callback({}); } catch { /* expected — Electron throws to deny request */ }
+      return;
+    }
+
+    // Send sources to renderer for the user to pick
+    const serialized = sources.map(s => ({
+      id: s.id,
+      name: s.name,
+      thumbnailDataUrl: s.thumbnail.toDataURL(),
+      displayId: s.display_id,
+      appIconDataUrl: !s.appIcon || s.appIcon.isEmpty() ? null : s.appIcon.toDataURL(),
+    }));
+    mainWindow?.webContents.send("screen-share-pick", serialized);
+
+    // Wait for user selection, cancellation, or window close
+    const selectedId = await new Promise<string | null>((resolve) => {
+      const cleanup = () => {
+        ipcMain.removeListener("screen-share-selected", onSelected);
+        ipcMain.removeListener("screen-share-cancelled", onCancelled);
+        mainWindow?.removeListener("closed", onWindowClosed);
+        if (abortPreviousPick === abort) abortPreviousPick = null;
+      };
+      const onSelected = (_e: Electron.IpcMainEvent, sourceId: string) => {
+        cleanup();
+        resolve(sourceId);
+      };
+      const onCancelled = () => {
+        cleanup();
+        resolve(null);
+      };
+      const onWindowClosed = () => {
+        cleanup();
+        resolve(null);
+      };
+      const abort = () => {
+        cleanup();
+        resolve(null);
+      };
+
+      abortPreviousPick = abort;
+      ipcMain.once("screen-share-selected", onSelected);
+      ipcMain.once("screen-share-cancelled", onCancelled);
+      mainWindow?.once("closed", onWindowClosed);
+    });
+
+    if (!selectedId) {
+      try { callback({}); } catch { /* expected — Electron throws to deny request */ }
+      return;
+    }
+
+    const selected = sources.find(s => s.id === selectedId);
+    if (!selected) {
+      try { callback({}); } catch { /* expected — Electron throws to deny request */ }
+      return;
+    }
+
+    // Include system audio loopback when requested (Windows only;
+    // silent no-op on macOS/Linux — OS limitation)
+    if (request.audioRequested) {
+      callback({ video: selected, audio: "loopback" });
     } else {
-      callback({});
+      callback({ video: selected });
     }
   });
+
+  // IPC: app version
+  ipcMain.handle("desktop:getAppVersion", () => app.getVersion());
 
   // IPC: desktop settings
   ipcMain.handle("desktop:getAutostart", () => isAutostartEnabled());
@@ -198,12 +275,42 @@ app.whenReady().then(() => {
 
   createWindow();
   initTray(() => mainWindow);
-  initUpdater();
+  initUpdater(() => mainWindow);
 
-  // Handle deep link from startup args
+  // Show post-update notification if version changed since last launch
+  const currentVersion = app.getVersion();
+  const versionFile = join(app.getPath("userData"), "last-version.txt");
+  let wasUpdated = false;
+  try {
+    const lastVersion = fs.readFileSync(versionFile, "utf-8").trim();
+    if (lastVersion && lastVersion !== currentVersion) {
+      wasUpdated = true;
+      const iconPath = join(__dirname, "../build/icons/256x256.png");
+      const notification = new Notification({
+        title: "Librecord Updated",
+        body: `Successfully updated to v${currentVersion}.`,
+        icon: iconPath,
+      });
+      notification.on("click", () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      });
+      notification.show();
+    }
+  } catch {
+    // First launch or file doesn't exist — ignore
+  }
+  fs.writeFileSync(versionFile, currentVersion, "utf-8");
+
+  // Handle deep link and update-installed IPC after renderer is ready
   const startupUrl = process.argv.find((arg) => arg.startsWith("librecord://"));
-  if (startupUrl && mainWindow) {
-    mainWindow.webContents.once("did-finish-load", () => handleDeepLinkUrl(startupUrl));
+  if (mainWindow && (startupUrl || wasUpdated)) {
+    mainWindow.webContents.once("did-finish-load", () => {
+      if (startupUrl) handleDeepLinkUrl(startupUrl);
+      if (wasUpdated) mainWindow?.webContents.send("update-installed", currentVersion);
+    });
   }
 
   app.on("activate", () => {

@@ -7,11 +7,21 @@ contextBridge.exposeInMainWorld("electronAPI", {
     chrome: process.versions.chrome,
     node: process.versions.node,
   },
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke("desktop:getAppVersion"),
   onUpdateAvailable: (callback: (version: string) => void) => {
-    ipcRenderer.on("update-available", (_event, version) => callback(version));
+    const handler = (_event: Electron.IpcRendererEvent, version: string) => callback(version);
+    ipcRenderer.on("update-available", handler);
+    return () => { ipcRenderer.removeListener("update-available", handler); };
   },
   onUpdateDownloaded: (callback: (version: string) => void) => {
-    ipcRenderer.on("update-downloaded", (_event, version) => callback(version));
+    const handler = (_event: Electron.IpcRendererEvent, version: string) => callback(version);
+    ipcRenderer.on("update-downloaded", handler);
+    return () => { ipcRenderer.removeListener("update-downloaded", handler); };
+  },
+  onUpdateInstalled: (callback: (version: string) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, version: string) => callback(version);
+    ipcRenderer.on("update-installed", handler);
+    return () => { ipcRenderer.removeListener("update-installed", handler); };
   },
 
   // Desktop settings
@@ -24,11 +34,37 @@ contextBridge.exposeInMainWorld("electronAPI", {
   showNotification: (opts: { title: string; body: string; channelId?: string }): Promise<void> =>
     ipcRenderer.invoke("desktop:showNotification", opts),
   onNavigate: (callback: (channelId: string) => void) => {
-    ipcRenderer.on("navigate", (_event, channelId) => callback(channelId));
+    const handler = (_event: Electron.IpcRendererEvent, channelId: string) => callback(channelId);
+    ipcRenderer.on("navigate", handler);
+    return () => { ipcRenderer.removeListener("navigate", handler); };
   },
 
   // Deep linking (#109)
   onDeepLink: (callback: (link: { type: string; params: string[] }) => void) => {
-    ipcRenderer.on("deep-link", (_event, link) => callback(link));
+    const handler = (_event: Electron.IpcRendererEvent, link: { type: string; params: string[] }) => callback(link);
+    ipcRenderer.on("deep-link", handler);
+    return () => { ipcRenderer.removeListener("deep-link", handler); };
+  },
+
+  // Screen share source picker (#122)
+  onScreenSharePick: (callback: (sources: Array<{
+    id: string;
+    name: string;
+    thumbnailDataUrl: string;
+    displayId: string;
+    appIconDataUrl: string | null;
+  }>) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, sources: Array<{
+      id: string; name: string; thumbnailDataUrl: string;
+      displayId: string; appIconDataUrl: string | null;
+    }>) => callback(sources);
+    ipcRenderer.on("screen-share-pick", handler);
+    return () => { ipcRenderer.removeListener("screen-share-pick", handler); };
+  },
+  selectScreenShareSource: (sourceId: string) => {
+    ipcRenderer.send("screen-share-selected", sourceId);
+  },
+  cancelScreenSharePick: () => {
+    ipcRenderer.send("screen-share-cancelled");
   },
 });
