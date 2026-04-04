@@ -351,15 +351,18 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
         if (track.kind === "audio") {
             const msTrack = track.mediaStreamTrack;
             if (msTrack) {
-                // Use separate pipeline key for screen share audio so volume is independent
                 const pipelineKey = isScreenAudio ? `${p.identity}:screen` : p.identity;
-                if (!isScreenAudio) {
+                if (isScreenAudio) {
+                    // Screen share audio is attached when the user clicks "Watch"
+                    // via ScreenShareTile subscription toggle — attach it here too
+                    // since TrackSubscribed fires after setSubscribed(true).
+                    attachAudioTrack(pipelineKey, msTrack);
+                    logger.voice.info(`Screen share audio attached for ${p.identity}`);
+                } else {
                     startAnalysingTrack(p.identity, msTrack);
+                    attachAudioTrack(pipelineKey, msTrack);
+                    logger.voice.info(`Voice audio attached for ${p.identity}`);
                 }
-                attachAudioTrack(pipelineKey, msTrack);
-                logger.voice.info(isScreenAudio
-                    ? `Screen share audio attached for ${p.identity}`
-                    : `Voice audio attached for ${p.identity}`);
             }
         }
     });

@@ -37,7 +37,7 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
         const remote = room.remoteParticipants.get(participant.userId);
         if (!remote) return;
         for (const pub of remote.trackPublications.values()) {
-            if (pub.source === Track.Source.ScreenShare) {
+            if (pub.source === Track.Source.ScreenShare || pub.source === Track.Source.ScreenShareAudio) {
                 pub.setSubscribed(isWatching);
             }
         }
