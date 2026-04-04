@@ -317,7 +317,7 @@ export default function DmConversationPage() {
                         {otherProfile.bio && (
                             <div className="mt-3 bg-[#1e1f22] rounded-lg px-3 py-2">
                                 <p className="text-[10px] font-semibold text-[#b5bac1] uppercase mb-1">About Me</p>
-                                <p className="text-xs text-[#dbdee1] whitespace-pre-wrap">{otherProfile.bio}</p>
+                                <p className="text-xs text-[#dbdee1] whitespace-pre-wrap break-words">{otherProfile.bio}</p>
                             </div>
                         )}
                         <div className="mt-3 text-[10px] text-[#949ba4]">
