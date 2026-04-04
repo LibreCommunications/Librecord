@@ -544,11 +544,27 @@ let venmicActive = false;
 
 async function findVenmicDevice(): Promise<string | undefined> {
     const devices = await navigator.mediaDevices.enumerateDevices();
-    // venmic creates a device with "vencord-screen-share" in the label
     const venmic = devices.find(d =>
         d.kind === "audioinput" && d.label.toLowerCase().includes("vencord-screen-share"),
     );
     return venmic?.deviceId;
+}
+
+/**
+ * Temporarily patches getDisplayMedia to return a pre-built stream
+ * (portal video + optional venmic audio). LiveKit calls getDisplayMedia
+ * internally; the patch intercepts it and returns our stream instead.
+ */
+function installStreamPatch(stream: MediaStream): () => void {
+    const original = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
+
+    navigator.mediaDevices.getDisplayMedia = async function (_constraints) {
+        return stream;
+    };
+
+    return () => {
+        navigator.mediaDevices.getDisplayMedia = original;
+    };
 }
 
 export async function startScreenShare(options: ScreenShareSettings): Promise<boolean> {
@@ -557,7 +573,6 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
     const res = RESOLUTION_MAP[options.resolution];
     const encodeFps = options.frameRate;
 
-    // "source" gives sender's native resolution, capped at 4K.
     let resolution: { width: number; height: number; frameRate?: number } | undefined;
     if (res) {
         resolution = { ...res, frameRate: encodeFps };
@@ -565,24 +580,93 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
         resolution = { width: 3840, height: 2160, frameRate: encodeFps };
     }
 
-    // Encoding: match FPS with appropriate bitrate
     const encodingBitrate = encodeFps >= 60 ? 4_000_000 : encodeFps >= 30 ? 2_500_000 : 1_200_000;
 
-    // On Linux desktop, use venmic for audio instead of Electron's loopback
-    // (which only works on Windows). Venmic creates a PipeWire virtual mic.
-    const useVenmic = options.audio && isDesktop && getElectronAPI()?.platform === "linux";
-    if (useVenmic) {
-        const started = await getElectronAPI()!.venmicStart();
-        if (started) {
-            venmicActive = true;
-            logger.voice.info("venmic: system audio capture active");
-        } else {
-            logger.voice.warn("venmic: failed to start, screen share will be video-only");
+    const isLinuxDesktop = isDesktop && getElectronAPI()?.platform === "linux";
+    let restoreGetDisplayMedia: (() => void) | null = null;
+
+    // On Linux: use xdg-desktop-portal (D-Bus) for the picker, venmic for audio.
+    // We build a MediaStream from both and patch getDisplayMedia so LiveKit uses it.
+    if (isLinuxDesktop) {
+        // Step 1: Call portal to show native picker, get PipeWire node ID
+        const streams = await getElectronAPI()!.portalScreenCast();
+        if (!streams || streams.length === 0) {
+            logger.voice.info("Screen share cancelled by user");
+            return false;
         }
+        const nodeId = streams[0].nodeId;
+        logger.voice.info("portal: selected PipeWire node", nodeId);
+
+        // Step 2: Create a video stream from the PipeWire node
+        // Chromium with WebRTCPipeWireCapturer can capture from a PipeWire node
+        // via getUserMedia with chromeMediaSource constraints
+        let videoStream: MediaStream;
+        try {
+            videoStream = await navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: {
+                    mandatory: {
+                        chromeMediaSource: "desktop",
+                        chromeMediaSourceId: `screen:${nodeId}:0`,
+                    },
+                } as any,
+            });
+        } catch (e1) {
+            logger.voice.warn("portal: chromeMediaSource failed, trying alternate ID format", e1);
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({
+                    audio: false,
+                    video: {
+                        mandatory: {
+                            chromeMediaSource: "desktop",
+                            chromeMediaSourceId: `${nodeId}`,
+                        },
+                    } as any,
+                });
+            } catch (e2) {
+                logger.voice.warn("portal: all getUserMedia attempts failed", e2);
+                showToast("Screen share failed", "error");
+                return false;
+            }
+        }
+
+        // Step 3: Optionally add venmic audio
+        if (options.audio) {
+            const started = await getElectronAPI()!.venmicStart();
+            if (started) {
+                venmicActive = true;
+                logger.voice.info("venmic: system audio capture active");
+                await new Promise(r => setTimeout(r, 300));
+                const deviceId = await findVenmicDevice();
+                if (deviceId) {
+                    try {
+                        const audioStream = await navigator.mediaDevices.getUserMedia({
+                            audio: {
+                                deviceId: { exact: deviceId },
+                                autoGainControl: false,
+                                echoCancellation: false,
+                                noiseSuppression: false,
+                                channelCount: 2,
+                                sampleRate: 48000,
+                            },
+                        });
+                        audioStream.getAudioTracks().forEach(t => videoStream.addTrack(t));
+                        logger.voice.info("venmic: audio added to portal stream");
+                    } catch (e) {
+                        logger.voice.warn("venmic: failed to capture audio", e);
+                    }
+                }
+            }
+        }
+
+        // Step 4: Patch getDisplayMedia to return our portal stream
+        restoreGetDisplayMedia = installStreamPatch(videoStream);
+    } else if (options.audio && isDesktop) {
+        // Windows: audio via loopback (handled by setDisplayMediaRequestHandler)
+        // Nothing extra to do here
     }
 
-    // Request screen share — on Linux, audio: false since venmic handles it separately
-    const requestAudio = options.audio && !useVenmic;
+    const requestAudio = options.audio;
 
     try {
         await room.localParticipant.setScreenShareEnabled(true, {
@@ -593,7 +677,6 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
                 maxFramerate: encodeFps,
                 maxBitrate: encodingBitrate,
             },
-            // One simulcast layer for small-tile viewers (960x540 capped at 30fps)
             screenShareSimulcastLayers: [
                 new VideoPreset(960, 540, 800_000, Math.min(encodeFps, 30)),
             ],
@@ -608,45 +691,14 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
             logger.voice.warn("Screen share failed entirely", e2);
             showToast("Screen share failed", "error");
             if (venmicActive) { getElectronAPI()?.venmicStop(); venmicActive = false; }
+            restoreGetDisplayMedia?.();
             return false;
         }
     }
 
-    // Publish venmic audio as screen share audio track
-    if (venmicActive) {
-        try {
-            // Wait briefly for venmic PipeWire device to appear
-            await new Promise(r => setTimeout(r, 200));
-            const deviceId = await findVenmicDevice();
-            if (deviceId) {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        deviceId: { exact: deviceId },
-                        autoGainControl: false,
-                        echoCancellation: false,
-                        noiseSuppression: false,
-                        channelCount: 2,
-                        sampleRate: 48000,
-                    },
-                });
-                const audioTrack = stream.getAudioTracks()[0];
-                if (audioTrack) {
-                    const { LocalAudioTrack } = await import("livekit-client");
-                    const lvTrack = new LocalAudioTrack(audioTrack, undefined, false);
-                    await room.localParticipant.publishTrack(lvTrack, {
-                        source: Track.Source.ScreenShareAudio,
-                    });
-                    logger.voice.info("venmic: screen share audio published");
-                }
-            } else {
-                logger.voice.warn("venmic: virtual mic device not found in enumerateDevices");
-            }
-        } catch (e) {
-            logger.voice.warn("venmic: failed to capture/publish audio", e);
-        }
-    }
+    restoreGetDisplayMedia?.();
 
-    // Some browsers reject contentHint in constraints but accept it post-capture
+    // Set content hint for encoder optimization
     try {
         const hint = encodeFps >= 30 ? "motion" : "detail";
         room.localParticipant.videoTrackPublications.forEach(pub => {
@@ -664,17 +716,9 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
 export async function stopScreenShare(): Promise<boolean> {
     if (!room) return false;
 
-    // Stop venmic capture if active
     if (venmicActive) {
         getElectronAPI()?.venmicStop();
         venmicActive = false;
-    }
-
-    // Unpublish venmic audio track if we published one
-    for (const pub of room.localParticipant.audioTrackPublications.values()) {
-        if (pub.source === Track.Source.ScreenShareAudio) {
-            await room.localParticipant.unpublishTrack(pub.track!.mediaStreamTrack);
-        }
     }
 
     await room.localParticipant.setScreenShareEnabled(false);

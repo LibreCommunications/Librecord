@@ -23,7 +23,7 @@ export default defineConfig({
               fileName: () => "main.cjs",
             },
             rollupOptions: {
-              external: ["electron", "electron-updater", "@vencord/venmic", "pkg-prebuilds"],
+              external: ["electron", "electron-updater", "@vencord/venmic", "pkg-prebuilds", "dbus-next"],
             },
           },
         },

@@ -6,9 +6,10 @@ import { AuthProvider, ToastProvider, PresenceProvider } from "@librecord/app";
 import { ErrorBoundary } from "@librecord/ui-web/src/components/ui/ErrorBoundary.tsx";
 import { ScreenSourcePicker } from "@librecord/ui-web/src/components/voice/ScreenSourcePicker.tsx";
 import { ElectronPlatformProvider } from "@librecord/platform-electron";
-import { setHttpClient, setEventBus, setConnectionEventBus } from "@librecord/api-client";
+import { setHttpClient, setEventBus, setConnectionEventBus, appConnection } from "@librecord/api-client";
 import { webHttpClient, webEventBus } from "@librecord/platform-web";
 import { getElectronAPI } from "@librecord/domain";
+import { livekitClient } from "@librecord/app";
 import { HashRouter } from "react-router-dom";
 
 // Wire platform adapters into api-client
@@ -17,6 +18,12 @@ setEventBus(webEventBus);
 setConnectionEventBus(webEventBus);
 
 const electronAPI = getElectronAPI();
+
+// Expose cleanup for main process to call before quit
+(window as unknown as Record<string, unknown>).__librecordCleanup = async () => {
+    await livekitClient.disconnect();
+    await appConnection.invoke("LeaveVoiceChannel").catch(() => {});
+};
 
 // Listen for notification click-to-navigate from main process
 electronAPI?.onNavigate((channelId) => {

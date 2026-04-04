@@ -72,4 +72,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
   venmicAvailable: (): Promise<boolean> => ipcRenderer.invoke("desktop:venmicAvailable"),
   venmicStart: (): Promise<boolean> => ipcRenderer.invoke("desktop:venmicStart"),
   venmicStop: (): Promise<void> => ipcRenderer.invoke("desktop:venmicStop"),
+
+  // Portal screen cast (Linux — native Wayland picker via D-Bus)
+  portalScreenCast: (): Promise<Array<{ nodeId: number; sourceType: number; width: number; height: number }> | null> =>
+    ipcRenderer.invoke("desktop:portalScreenCast"),
+
+  // App lifecycle
+  onQuitting: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on("app-quitting", handler);
+    return () => { ipcRenderer.removeListener("app-quitting", handler); };
+  },
 });

@@ -5,6 +5,7 @@ import { initUpdater } from "./updater";
 import { initTray, destroyTray } from "./tray";
 import { isAutostartEnabled, setAutostart } from "./autostart";
 import { isVenmicAvailable, startVenmic, stopVenmic } from "./venmic";
+import { requestPortalScreenCast } from "./portalScreenCast";
 
 // Work around GPU process crashes on some Linux drivers (e.g. radv)
 app.commandLine.appendSwitch("disable-gpu-sandbox");
@@ -12,10 +13,23 @@ app.commandLine.appendSwitch("disable-gpu-sandbox");
 // Ignore certificate errors for self-signed dev certs
 app.commandLine.appendSwitch("ignore-certificate-errors");
 
-// Enable PipeWire screen capture for native xdg-desktop-portal picker on Wayland
+// Enable PipeWire screen capture on Linux (merge with existing features)
 if (process.platform === "linux") {
-  app.commandLine.appendSwitch("enable-features", "WebRTCPipeWireCapturer");
-  app.commandLine.appendSwitch("ozone-platform-hint", "auto");
+  const isWayland = !!process.env.WAYLAND_DISPLAY || process.env.XDG_SESSION_TYPE === "wayland";
+
+  const existingFeatures = app.commandLine.getSwitchValue("enable-features");
+  app.commandLine.removeSwitch("enable-features");
+  const features = existingFeatures ? existingFeatures.split(",").filter(Boolean) : [];
+  for (const f of ["WebRTCPipeWireCapturer", "PipeWireV4L2"]) {
+    if (!features.includes(f)) features.push(f);
+  }
+  app.commandLine.appendSwitch("enable-features", features.join(","));
+
+  if (isWayland) {
+    app.commandLine.appendSwitch("ozone-platform", "wayland");
+  } else {
+    app.commandLine.appendSwitch("ozone-platform-hint", "auto");
+  }
 }
 
 // Register librecord:// protocol handler
@@ -137,8 +151,19 @@ app.on("certificate-error", (event, _webContents, _url, _error, _cert, callback)
   callback(true);
 });
 
-app.on("before-quit", () => {
-  isQuitting = true;
+app.on("before-quit", (e) => {
+  if (!isQuitting && mainWindow && !mainWindow.isDestroyed()) {
+    e.preventDefault();
+    isQuitting = true;
+    // Call renderer cleanup (disconnect voice), then quit
+    mainWindow.webContents.executeJavaScript(
+      `window.__librecordCleanup ? window.__librecordCleanup() : Promise.resolve()`
+    ).catch(() => {}).finally(() => {
+      app.quit();
+    });
+    // Safety timeout — don't hang forever
+    setTimeout(() => app.quit(), 3000);
+  }
 });
 
 app.on("second-instance", (_event, argv) => {
@@ -179,12 +204,37 @@ app.whenReady().then(() => {
   });
 
   // Screen share (#122, #76)
-  // Uses desktopCapturer + custom in-app picker on all platforms.
-  // On Wayland, desktopCapturer returns limited sources (full screen + focused
-  // window) due to compositor security — same approach as Vesktop.
-  // Audio: Windows uses loopback, Linux uses venmic (PipeWire).
-  {
-    // Windows/macOS: custom in-app source picker
+  // IPC: portal screen cast (Linux — shows native picker via D-Bus)
+  ipcMain.handle("desktop:portalScreenCast", async () => {
+    if (process.platform !== "linux") return null;
+    try {
+      return await requestPortalScreenCast();
+    } catch (e) {
+      console.error("portal: screen cast failed", e);
+      return null;
+    }
+  });
+
+  if (process.platform === "linux") {
+    // Linux: the renderer handles screen share via the portal IPC above.
+    // We still need a handler registered so getDisplayMedia doesn't error,
+    // but the renderer will patch getDisplayMedia to use the portal stream
+    // BEFORE LiveKit calls it.
+    session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
+      // Fallback: if the renderer somehow calls getDisplayMedia without
+      // the portal patch, use desktopCapturer as a last resort.
+      const sources = await desktopCapturer.getSources({
+        types: ["screen", "window"],
+        thumbnailSize: { width: 320, height: 180 },
+      });
+      if (sources.length > 0) {
+        callback({ video: sources[0] });
+      } else {
+        try { callback({}); } catch { /* deny */ }
+      }
+    });
+  } else {
+    // Windows/macOS: custom in-app source picker via desktopCapturer.
     let abortPreviousPick: (() => void) | null = null;
 
     session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {

@@ -30,6 +30,8 @@ export interface ElectronAPI {
     venmicAvailable: () => Promise<boolean>;
     venmicStart: () => Promise<boolean>;
     venmicStop: () => Promise<void>;
+    portalScreenCast: () => Promise<Array<{ nodeId: number; sourceType: number; width: number; height: number }> | null>;
+    onQuitting: (callback: () => void) => () => void;
 }
 
 /** Returns the Electron API if running in the desktop app, undefined otherwise. */

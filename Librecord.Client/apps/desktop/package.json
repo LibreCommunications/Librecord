@@ -23,6 +23,7 @@
     "@librecord/platform-electron": "workspace:*",
     "@librecord/platform-web": "workspace:*",
     "@librecord/ui-web": "workspace:*",
+    "dbus-next": "^0.10.2",
     "electron-updater": "^6.6.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
