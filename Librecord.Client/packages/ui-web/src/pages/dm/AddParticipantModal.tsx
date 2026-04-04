@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { useFriends, type FriendshipListDto } from "@librecord/app";
 import { useDirectMessagesChannel } from "@librecord/app";
 import type { DmUser } from "@librecord/domain";
+import { DEFAULT_AVATAR } from "@librecord/domain";
 
 interface Props {
     channelId: string;
@@ -106,7 +107,7 @@ export function AddParticipantModal({
                                 src={
                                     f.otherAvatarUrl
                                         ? `${import.meta.env.VITE_API_URL}${f.otherAvatarUrl}`
-                                        : "/default-avatar.png"
+                                        : DEFAULT_AVATAR
                                 }
                                 className="w-8 h-8 rounded-full object-cover bg-[#313338]"
                             />

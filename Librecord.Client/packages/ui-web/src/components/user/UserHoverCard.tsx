@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { userProfiles, API_URL } from "@librecord/api-client";
 import type { UserProfile } from "@librecord/domain";
-import { logger } from "@librecord/domain";
+import { logger, DEFAULT_AVATAR } from "@librecord/domain";
 
 interface Props {
     userId: string;
@@ -31,7 +31,7 @@ export function UserHoverCard({ userId, children }: Props) {
 
     useEffect(() => () => clearTimeout(timeoutRef.current), []);
 
-    const avatarSrc = profile?.avatarUrl ? `${API_URL}${profile.avatarUrl}` : "/default-avatar.png";
+    const avatarSrc = profile?.avatarUrl ? `${API_URL}${profile.avatarUrl}` : DEFAULT_AVATAR;
 
     return (
         <div

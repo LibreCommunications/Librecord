@@ -7,7 +7,7 @@
   "author": "LibreCommunications",
   "main": "dist-electron/main.cjs",
   "scripts": {
-    "dev": "ELECTRON_OZONE_PLATFORM_HINT=auto vite -c electron.vite.config.ts",
+    "dev": "vite -c electron.vite.config.ts",
     "build": "vite build -c electron.vite.config.ts",
     "package": "electron-builder",
     "package:linux": "electron-builder --linux AppImage",
@@ -36,7 +36,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "babel-plugin-react-compiler": "^1.0.0",
-    "electron": "^36.3.0",
+    "electron": "41.1.1",
     "electron-builder": "^26.0.12",
     "vite-plugin-electron": "^0.29.1",
     "vite-plugin-electron-renderer": "^0.14.6",

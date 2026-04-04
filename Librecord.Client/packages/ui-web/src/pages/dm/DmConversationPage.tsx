@@ -28,7 +28,7 @@ import type { UserProfile, UserSummary } from "@librecord/domain";
 import type { AppEventMap } from "@librecord/domain";
 import { onCustomEvent } from "@librecord/app";
 import { logger } from "@librecord/domain";
-import { STORAGE } from "@librecord/domain";
+import { STORAGE, DEFAULT_AVATAR } from "@librecord/domain";
 
 export default function DmConversationPage() {
     const { dmId } = useParams();
@@ -306,7 +306,7 @@ export default function DmConversationPage() {
                     {/* Avatar + Info */}
                     <div className="px-4 -mt-8">
                         <img
-                            src={otherProfile.avatarUrl ? `${API_URL}${otherProfile.avatarUrl}` : "/default-avatar.png"}
+                            src={otherProfile.avatarUrl ? `${API_URL}${otherProfile.avatarUrl}` : DEFAULT_AVATAR}
                             className="w-16 h-16 rounded-full object-cover border-4 border-[#232428]"
                             alt=""
                         />

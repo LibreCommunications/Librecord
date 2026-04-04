@@ -3,6 +3,7 @@ import { useFriends, type FriendSuggestion } from "@librecord/app";
 import { useToast } from "@librecord/app";
 import { Spinner } from "../../components/ui/Spinner";
 import { API_URL } from "@librecord/api-client";
+import { DEFAULT_AVATAR } from "@librecord/domain";
 
 export default function FriendsAddPage() {
     const { sendRequest, suggestUsernames } = useFriends();
@@ -76,7 +77,7 @@ export default function FriendsAddPage() {
                                     className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-[#5865F2] transition-colors"
                                 >
                                     <img
-                                        src={s.avatarUrl ? `${API_URL}${s.avatarUrl}` : "/default-avatar.png"}
+                                        src={s.avatarUrl ? `${API_URL}${s.avatarUrl}` : DEFAULT_AVATAR}
                                         className="w-8 h-8 rounded-full object-cover"
                                         alt=""
                                     />

@@ -5,6 +5,7 @@ import {
 } from "@librecord/app";
 import { useBlocks } from "@librecord/app";
 import type { BlockedUser } from "@librecord/domain";
+import { DEFAULT_AVATAR } from "@librecord/domain";
 
 import RemoveFriendModal from "../../pages/friends/RemoveFriendModal";
 import { useNavigate } from "react-router-dom";
@@ -75,7 +76,7 @@ export default function FriendsListPage() {
     }, [loadData]);
 
     function avatar(url: string | null) {
-        return url ? `${API_URL}${url}` : "/default-avatar.png";
+        return url ? `${API_URL}${url}` : DEFAULT_AVATAR;
     }
 
     if (loading) {

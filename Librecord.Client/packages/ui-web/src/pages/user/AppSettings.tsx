@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { STORAGE } from "@librecord/domain";
+
+const isDesktop = !!window.electronAPI;
 
 export default function AppSettings() {
     const [desktopNotifs, setDesktopNotifs] = useState(() => {
@@ -12,9 +14,28 @@ export default function AppSettings() {
         return localStorage.getItem(STORAGE.devMode) === "true";
     });
 
+    const [autostart, setAutostart] = useState(false);
+    const [minimizeToTray, setMinimizeToTray] = useState(true);
+
+    useEffect(() => {
+        if (!isDesktop) return;
+        window.electronAPI!.getAutostart().then(setAutostart);
+        window.electronAPI!.getMinimizeToTray().then(setMinimizeToTray);
+    }, []);
+
     function toggle(key: string, value: boolean, setter: (v: boolean) => void) {
         localStorage.setItem(key, String(value));
         setter(value);
+    }
+
+    async function toggleAutostart(value: boolean) {
+        const result = await window.electronAPI!.setAutostart(value);
+        setAutostart(result);
+    }
+
+    async function toggleMinimizeToTray(value: boolean) {
+        const result = await window.electronAPI!.setMinimizeToTray(value);
+        setMinimizeToTray(result);
     }
 
     return (
@@ -39,6 +60,27 @@ export default function AppSettings() {
                     />
                 </div>
             </section>
+
+            {/* Desktop-only settings */}
+            {isDesktop && (
+                <section>
+                    <h2 className="section-label mb-4">Desktop</h2>
+                    <div className="space-y-3">
+                        <ToggleRow
+                            label="Start on Boot"
+                            description="Automatically start Librecord when you log in."
+                            checked={autostart}
+                            onChange={toggleAutostart}
+                        />
+                        <ToggleRow
+                            label="Minimize to Tray"
+                            description="Keep Librecord running in the system tray when you close the window."
+                            checked={minimizeToTray}
+                            onChange={toggleMinimizeToTray}
+                        />
+                    </div>
+                </section>
+            )}
 
             {/* Developer */}
             <section>

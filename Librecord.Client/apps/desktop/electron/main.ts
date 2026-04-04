@@ -1,6 +1,8 @@
-import { app, BrowserWindow, shell, session } from "electron";
+import { app, BrowserWindow, ipcMain, shell, session } from "electron";
 import { join } from "path";
 import { initUpdater } from "./updater";
+import { initTray, destroyTray } from "./tray";
+import { isAutostartEnabled, setAutostart } from "./autostart";
 
 // Work around GPU process crashes on some Linux drivers (e.g. radv)
 app.commandLine.appendSwitch("disable-gpu-sandbox");
@@ -8,9 +10,19 @@ app.commandLine.appendSwitch("disable-gpu-sandbox");
 // Ignore certificate errors for self-signed dev certs
 app.commandLine.appendSwitch("ignore-certificate-errors");
 
+// Single instance lock — focus existing window if already running
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+}
+
 let mainWindow: BrowserWindow | null = null;
+let minimizeToTray = true;
+let isQuitting = false;
 
 function createWindow() {
+  const startHidden = process.argv.includes("--hidden");
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -29,7 +41,17 @@ function createWindow() {
   });
 
   mainWindow.on("ready-to-show", () => {
-    mainWindow?.show();
+    if (!startHidden) {
+      mainWindow?.show();
+    }
+  });
+
+  // Minimize to tray instead of closing
+  mainWindow.on("close", (e) => {
+    if (minimizeToTray && mainWindow && !isQuitting) {
+      e.preventDefault();
+      mainWindow.hide();
+    }
   });
 
   // Open external links in the default browser
@@ -50,6 +72,18 @@ function createWindow() {
 app.on("certificate-error", (event, _webContents, _url, _error, _cert, callback) => {
   event.preventDefault();
   callback(true);
+});
+
+app.on("before-quit", () => {
+  isQuitting = true;
+});
+
+app.on("second-instance", () => {
+  if (mainWindow) {
+    if (!mainWindow.isVisible()) mainWindow.show();
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
 });
 
 app.whenReady().then(() => {
@@ -73,7 +107,17 @@ app.whenReady().then(() => {
     callback({ responseHeaders: headers });
   });
 
+  // IPC handlers for desktop settings
+  ipcMain.handle("desktop:getAutostart", () => isAutostartEnabled());
+  ipcMain.handle("desktop:setAutostart", (_e, enabled: boolean) => setAutostart(enabled));
+  ipcMain.handle("desktop:getMinimizeToTray", () => minimizeToTray);
+  ipcMain.handle("desktop:setMinimizeToTray", (_e, enabled: boolean) => {
+    minimizeToTray = enabled;
+    return minimizeToTray;
+  });
+
   createWindow();
+  initTray(() => mainWindow);
   initUpdater();
 
   app.on("activate", () => {
@@ -84,7 +128,10 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
+  // On macOS, apps stay active until Cmd+Q.
+  // On Linux/Windows, keep running if minimize-to-tray is on.
+  if (process.platform !== "darwin" && !minimizeToTray) {
+    destroyTray();
     app.quit();
   }
 });

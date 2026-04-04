@@ -5,7 +5,7 @@ import { usePresence } from "@librecord/app";
 import { useToast } from "@librecord/app";
 import { StatusDot } from "../../components/user/StatusDot";
 import { API_URL, userProfiles, auth } from "@librecord/api-client";
-import { logger } from "@librecord/domain";
+import { logger, DEFAULT_AVATAR } from "@librecord/domain";
 
 export default function ProfileSettings() {
     const { user, logout } = useAuth();
@@ -40,7 +40,7 @@ export default function ProfileSettings() {
 
     if (!user) return null;
 
-    const avatarSrc = avatarPreview || (user.avatarUrl ? `${API_URL}${user.avatarUrl}` : "/default-avatar.png");
+    const avatarSrc = avatarPreview || (user.avatarUrl ? `${API_URL}${user.avatarUrl}` : DEFAULT_AVATAR);
 
     async function handleSaveAll() {
         setSaving(true);

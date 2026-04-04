@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { userProfile, API_URL } from "@librecord/api-client";
-const DEFAULT_AVATAR = "/default-avatar.png";
+import { DEFAULT_AVATAR } from "@librecord/domain";
 
 export function useUserProfile() {
     const { user, loadUser } = useAuth();

@@ -4,6 +4,7 @@ import { BanIcon, PhoneIcon } from "../ui/Icons";
 import { userProfiles, API_URL } from "@librecord/api-client";
 import { ConfirmModal } from "../ui/ConfirmModal";
 import type { UserSummary } from "@librecord/domain";
+import { DEFAULT_AVATAR } from "@librecord/domain";
 import { useFriends } from "@librecord/app";
 import { useBlocks } from "@librecord/app";
 import { useDirectMessagesChannel } from "@librecord/app";
@@ -50,7 +51,7 @@ export function UserProfilePopup({ userId, onClose }: Props) {
         return null;
     }
 
-    const avatarSrc = profile.avatarUrl ? `${API_URL}${profile.avatarUrl}` : "/default-avatar.png";
+    const avatarSrc = profile.avatarUrl ? `${API_URL}${profile.avatarUrl}` : DEFAULT_AVATAR;
     const bannerSrc = profile.bannerUrl ? `${API_URL}${profile.bannerUrl}` : null;
 
     return (
@@ -113,7 +114,7 @@ export function UserProfilePopup({ userId, onClose }: Props) {
                                             className="flex items-center gap-2 px-2 py-1 rounded hover:bg-white/5 cursor-pointer"
                                             onClick={() => window.dispatchEvent(new CustomEvent("user:profile:open", { detail: { userId: f.id } }))}
                                         >
-                                            <img src={f.avatarUrl ? `${API_URL}${f.avatarUrl}` : "/default-avatar.png"} className="w-6 h-6 rounded-full object-cover" alt="" />
+                                            <img src={f.avatarUrl ? `${API_URL}${f.avatarUrl}` : DEFAULT_AVATAR} className="w-6 h-6 rounded-full object-cover" alt="" />
                                             <span className="text-xs text-[#dbdee1] truncate">{f.displayName}</span>
                                         </div>
                                     ))}

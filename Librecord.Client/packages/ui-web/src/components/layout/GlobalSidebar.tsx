@@ -17,7 +17,7 @@ import type { AppEventMap } from "@librecord/domain";
 import { useUnreadContext } from "@librecord/app";
 import { API_URL } from "@librecord/api-client";
 import { logger } from "@librecord/domain";
-import { STORAGE } from "@librecord/domain";
+import { STORAGE, DEFAULT_AVATAR } from "@librecord/domain";
 import { useGuildFolders } from "@librecord/app";
 import { FolderSettingsModal } from "./FolderSettingsModal";
 import { ChatBubbleIcon, PlusIcon, LoginArrowIcon } from "../ui/Icons";
@@ -225,7 +225,7 @@ export default function GlobalSidebar() {
     const avatarSrc =
         user?.avatarUrl
             ? `${API_URL}${user.avatarUrl}`
-            : "/default-avatar.png";
+            : DEFAULT_AVATAR;
 
     async function handleCreateGuild(name: string) {
         const guild = await createGuild(name);
