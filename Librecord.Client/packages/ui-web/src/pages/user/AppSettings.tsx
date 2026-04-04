@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react";
-import { STORAGE } from "@librecord/domain";
-
-const isDesktop = !!window.electronAPI;
+import { STORAGE, isDesktop, getElectronAPI } from "@librecord/domain";
 
 export default function AppSettings() {
     const [desktopNotifs, setDesktopNotifs] = useState(() => {
@@ -19,8 +17,8 @@ export default function AppSettings() {
 
     useEffect(() => {
         if (!isDesktop) return;
-        window.electronAPI!.getAutostart().then(setAutostart);
-        window.electronAPI!.getMinimizeToTray().then(setMinimizeToTray);
+        getElectronAPI()!.getAutostart().then(setAutostart);
+        getElectronAPI()!.getMinimizeToTray().then(setMinimizeToTray);
     }, []);
 
     function toggle(key: string, value: boolean, setter: (v: boolean) => void) {
@@ -29,12 +27,12 @@ export default function AppSettings() {
     }
 
     async function toggleAutostart(value: boolean) {
-        const result = await window.electronAPI!.setAutostart(value);
+        const result = await getElectronAPI()!.setAutostart(value);
         setAutostart(result);
     }
 
     async function toggleMinimizeToTray(value: boolean) {
-        const result = await window.electronAPI!.setMinimizeToTray(value);
+        const result = await getElectronAPI()!.setMinimizeToTray(value);
         setMinimizeToTray(result);
     }
 

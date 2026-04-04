@@ -8,6 +8,7 @@ import { PlayIcon, ExitFullscreenIcon, FullscreenIcon } from "../ui/Icons";
 import { DevOverlay } from "./DevOverlay";
 import { VolumePopup } from "./VolumePopup";
 import { useFullscreen } from "./useFullscreen";
+import { isDesktop } from "@librecord/domain";
 
 interface Props {
     participant: VoiceParticipant;
@@ -53,7 +54,7 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
     const trackStatus: "loading" | "active" = isWatching && track ? "active" : "loading";
 
     const handleContextMenu = (e: React.MouseEvent) => {
-        if (isSelf || !window.electronAPI) return;
+        if (isSelf || !isDesktop) return;
         e.preventDefault();
         setVolumePopup({ x: e.clientX, y: e.clientY });
     };

@@ -27,7 +27,7 @@ interface Props {
     onCancel: () => void;
 }
 
-const isDesktop = !!window.electronAPI;
+import { isDesktop } from "@librecord/domain";
 
 export function ScreenShareModal({ open, onStart, onCancel }: Props) {
     const [resolution, setResolution] = useState<ScreenShareOptions["resolution"]>("1080p");

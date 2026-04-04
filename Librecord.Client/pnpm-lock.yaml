@@ -266,6 +266,9 @@ importers:
 
   packages/platform-electron:
     dependencies:
+      '@librecord/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@librecord/platform':
         specifier: workspace:*
         version: link:../platform

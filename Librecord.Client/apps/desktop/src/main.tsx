@@ -7,6 +7,7 @@ import { ErrorBoundary } from "@librecord/ui-web/src/components/ui/ErrorBoundary
 import { ElectronPlatformProvider } from "@librecord/platform-electron";
 import { setHttpClient, setEventBus, setConnectionEventBus } from "@librecord/api-client";
 import { webHttpClient, webEventBus } from "@librecord/platform-web";
+import { getElectronAPI } from "@librecord/domain";
 import { HashRouter } from "react-router-dom";
 
 // Wire platform adapters into api-client
@@ -14,8 +15,10 @@ setHttpClient(webHttpClient);
 setEventBus(webEventBus);
 setConnectionEventBus(webEventBus);
 
+const electronAPI = getElectronAPI();
+
 // Listen for notification click-to-navigate from main process
-window.electronAPI?.onNavigate((channelId) => {
+electronAPI?.onNavigate((channelId) => {
     // channelId could be a DM channel or guild channel — navigate to it
     if (channelId.includes("/")) {
         window.location.hash = `#/app/${channelId}`;
@@ -25,7 +28,7 @@ window.electronAPI?.onNavigate((channelId) => {
 });
 
 // Listen for deep links from main process
-window.electronAPI?.onDeepLink((link) => {
+electronAPI?.onDeepLink((link) => {
     switch (link.type) {
         case "guild":
             window.location.hash = link.params.length > 1
