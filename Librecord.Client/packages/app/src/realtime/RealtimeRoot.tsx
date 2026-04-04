@@ -7,6 +7,7 @@ import { resetVoiceState, getPersistedVoiceSession, clearPersistedVoiceSession, 
 import { logger } from "@librecord/domain";
 import * as livekitClient from "../voice/livekitClient";
 import { useAuth } from "../hooks/useAuth";
+import { usePlatform } from "@librecord/platform";
 import { STORAGE } from "@librecord/domain";
 import type { VoiceParticipant } from "../voice/voiceStore";
 
@@ -86,6 +87,7 @@ function restoreReturnUrl() {
 
 export function RealtimeRoot() {
     const { user } = useAuth();
+    const { notifications } = usePlatform();
     const userIdRef = useRef<string | null>(null);
 
     useEffect(() => {
@@ -93,7 +95,7 @@ export function RealtimeRoot() {
         started = true;
         userIdRef.current = user.userId;
 
-        initNotifications(user.userId);
+        initNotifications(user.userId, notifications);
 
         setConnectionState("connecting");
         appConnection.start().then(async () => {

@@ -12,7 +12,7 @@ import {
     type VoiceState,
     type VoiceParticipant,
 } from "../voice/voiceStore";
-import { playJoinSound, playLeaveSound, playStreamStartSound, playStreamStopSound } from "../voice/sounds";
+import { playJoinSound, playLeaveSound, playStreamStartSound, playStreamStopSound, stopRingtone } from "../voice/sounds";
 import { logger } from "@librecord/domain";
 
 function getLocalUserId(): string | null {
@@ -100,6 +100,8 @@ export function useVoice() {
     }, []);
 
     const acceptDmCall = useCallback(async (dmChannelId: string) => {
+        stopRingtone();
+
         // Disconnect from current call if already in one
         if (getVoiceState().isConnected) {
             await livekitClient.disconnect();

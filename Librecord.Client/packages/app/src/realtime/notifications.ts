@@ -1,6 +1,9 @@
-let permissionGranted = false;
-let currentUserId: string | null = null;
+import type { NotificationService } from "@librecord/platform";
+import { onCustomEvent } from "../typedEvent";
+import { STORAGE } from "@librecord/domain";
 
+let currentUserId: string | null = null;
+let cleanupFns: (() => void)[] = [];
 let audioCtx: AudioContext | null = null;
 
 function getAudioContext(): AudioContext {
@@ -50,28 +53,21 @@ function playNotificationSound() {
     }
 }
 
-import { onCustomEvent } from "../typedEvent";
-import { STORAGE } from "@librecord/domain";
-
-let cleanupFns: (() => void)[] = [];
-
 interface MessagePing {
     channelId: string;
     authorId: string;
     authorName: string;
 }
 
-export function initNotifications(userId: string) {
+export function initNotifications(userId: string, notificationService?: NotificationService) {
     cleanupNotifications();
 
     currentUserId = userId;
 
-    if ("Notification" in window && Notification.permission === "default") {
-        Notification.requestPermission().then(perm => {
-            permissionGranted = perm === "granted";
-        });
-    } else {
-        permissionGranted = Notification.permission === "granted";
+    if (notificationService) {
+        notificationService.requestPermission();
+    } else if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission();
     }
 
     cleanupFns = [
@@ -81,7 +77,7 @@ export function initNotifications(userId: string) {
             if (document.hasFocus() && isViewingChannel(channelId)) return;
             if (localStorage.getItem(STORAGE.notifSounds) !== "false") playNotificationSound();
             if (!document.hasFocus() && localStorage.getItem(STORAGE.desktopNotifs) !== "false") {
-                showDesktopNotification(authorName, "sent you a message");
+                showDesktopNotification(authorName, "sent you a message", channelId, notificationService);
             }
         }),
         onCustomEvent<MessagePing>("guild:message:ping", (detail) => {
@@ -90,7 +86,7 @@ export function initNotifications(userId: string) {
             if (document.hasFocus() && isViewingChannel(channelId)) return;
             if (localStorage.getItem(STORAGE.notifSounds) !== "false") playNotificationSound();
             if (!document.hasFocus() && localStorage.getItem(STORAGE.desktopNotifs) !== "false") {
-                showDesktopNotification(authorName, "sent a message");
+                showDesktopNotification(authorName, "sent a message", channelId, notificationService);
             }
         }),
     ];
@@ -103,22 +99,24 @@ export function cleanupNotifications() {
 }
 
 function isViewingChannel(channelId: string): boolean {
-    const path = window.location.pathname;
+    const path = window.location.pathname + window.location.hash;
     return path.includes(channelId);
 }
 
-function showDesktopNotification(title: string, body: string) {
-    if (!permissionGranted) return;
+function showDesktopNotification(title: string, body: string, channelId?: string, notificationService?: NotificationService) {
+    if (notificationService) {
+        notificationService.show(title, { body, channelId });
+        return;
+    }
 
+    // Fallback to browser Notification API (web)
     try {
+        if (!("Notification" in window) || Notification.permission !== "granted") return;
         const notification = new Notification(title, {
             body: body.length > 100 ? body.slice(0, 100) + "..." : body,
-            icon: "/favicon.ico",
             silent: true,
         });
-
         setTimeout(() => notification.close(), 5000);
-
         notification.onclick = () => {
             window.focus();
             notification.close();

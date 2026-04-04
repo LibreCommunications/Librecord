@@ -27,10 +27,12 @@ interface Props {
     onCancel: () => void;
 }
 
+const isDesktop = !!window.electronAPI;
+
 export function ScreenShareModal({ open, onStart, onCancel }: Props) {
     const [resolution, setResolution] = useState<ScreenShareOptions["resolution"]>("1080p");
     const [frameRate, setFrameRate] = useState<ScreenShareOptions["frameRate"]>(30);
-    const [audio, setAudio] = useState(true);
+    const [audio, setAudio] = useState(isDesktop);
 
     if (!open) return null;
 
@@ -116,32 +118,34 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
                         </div>
                     </div>
 
-                    <div
-                        className="flex items-center justify-between p-3 rounded-lg bg-[#2b2d31] cursor-pointer"
-                        onClick={() => setAudio(!audio)}
-                    >
-                        <div>
-                            <div className="text-sm font-medium text-[#dbdee1]">
-                                Share Audio
-                            </div>
-                            <div className="text-xs text-[#949ba4]">
-                                Include system audio in your stream
-                            </div>
-                        </div>
+                    {isDesktop && (
                         <div
-                            className={`
-                                w-10 h-6 rounded-full relative transition-colors cursor-pointer
-                                ${audio ? "bg-[#5865F2]" : "bg-[#4e5058]"}
-                            `}
+                            className="flex items-center justify-between p-3 rounded-lg bg-[#2b2d31] cursor-pointer"
+                            onClick={() => setAudio(!audio)}
                         >
+                            <div>
+                                <div className="text-sm font-medium text-[#dbdee1]">
+                                    Share Audio
+                                </div>
+                                <div className="text-xs text-[#949ba4]">
+                                    Include system audio in your stream
+                                </div>
+                            </div>
                             <div
                                 className={`
-                                    absolute top-1 w-4 h-4 rounded-full bg-white transition-transform
-                                    ${audio ? "translate-x-5" : "translate-x-1"}
+                                    w-10 h-6 rounded-full relative transition-colors cursor-pointer
+                                    ${audio ? "bg-[#5865F2]" : "bg-[#4e5058]"}
                                 `}
-                            />
+                            >
+                                <div
+                                    className={`
+                                        absolute top-1 w-4 h-4 rounded-full bg-white transition-transform
+                                        ${audio ? "translate-x-5" : "translate-x-1"}
+                                    `}
+                                />
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 <div className="flex justify-end gap-3 px-5 py-4 bg-[#2b2d31]">

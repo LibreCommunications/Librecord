@@ -258,8 +258,12 @@ function bindRemoteAudioTrack(participant: RemoteParticipant) {
     participant.audioTrackPublications.forEach(pub => {
         const msTrack = pub.track?.mediaStreamTrack;
         if (msTrack) {
-            startAnalysingTrack(participant.identity, msTrack);
-            attachAudioTrack(participant.identity, msTrack);
+            const isScreenAudio = pub.source === Track.Source.ScreenShareAudio;
+            const pipelineKey = isScreenAudio ? `${participant.identity}:screen` : participant.identity;
+            if (!isScreenAudio) {
+                startAnalysingTrack(participant.identity, msTrack);
+            }
+            attachAudioTrack(pipelineKey, msTrack);
         }
     });
 }
@@ -334,23 +338,39 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
     room.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
         stopAnalysingTrack(p.identity);
         detachAudioTrack(p.identity);
+        detachAudioTrack(`${p.identity}:screen`);
     });
 
     room.on(RoomEvent.TrackSubscribed, (track, _pub: RemoteTrackPublication, p: RemoteParticipant) => {
-        logger.voice.info("Track subscribed", p.identity, track.kind, track.source);
+        const isScreenAudio = track.source === Track.Source.ScreenShareAudio;
+        logger.voice.info("Track subscribed", p.identity, track.kind, track.source, isScreenAudio ? "(screen share audio)" : "");
         if (track.kind === "audio") {
             const msTrack = track.mediaStreamTrack;
             if (msTrack) {
-                startAnalysingTrack(p.identity, msTrack);
-                attachAudioTrack(p.identity, msTrack);
+                // Use separate pipeline key for screen share audio so volume is independent
+                const pipelineKey = isScreenAudio ? `${p.identity}:screen` : p.identity;
+                if (!isScreenAudio) {
+                    startAnalysingTrack(p.identity, msTrack);
+                }
+                attachAudioTrack(pipelineKey, msTrack);
+                logger.voice.info(isScreenAudio
+                    ? `Screen share audio attached for ${p.identity}`
+                    : `Voice audio attached for ${p.identity}`);
             }
         }
     });
 
     room.on(RoomEvent.TrackUnsubscribed, (_t, pub: RemoteTrackPublication, p: RemoteParticipant) => {
         if (pub.kind === "audio") {
-            stopAnalysingTrack(p.identity);
-            detachAudioTrack(p.identity);
+            const isScreenAudio = pub.source === Track.Source.ScreenShareAudio;
+            const pipelineKey = isScreenAudio ? `${p.identity}:screen` : p.identity;
+            if (!isScreenAudio) {
+                stopAnalysingTrack(p.identity);
+            }
+            detachAudioTrack(pipelineKey);
+            logger.voice.info(isScreenAudio
+                ? `Screen share audio detached for ${p.identity}`
+                : `Voice audio detached for ${p.identity}`);
         }
     });
 

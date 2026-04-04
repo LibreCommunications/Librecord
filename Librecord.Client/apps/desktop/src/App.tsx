@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@librecord/app";
 import LoadingSpinner from "@librecord/ui-web/src/components/LoadingSpinner.tsx";
+import { DeepLinkHandler } from "./DeepLinkHandler.tsx";
 
 const LoginPage = lazy(() => import("@librecord/ui-web/src/pages/auth/LoginPage.tsx"));
 const RegisterPage = lazy(() => import("@librecord/ui-web/src/pages/auth/RegisterPage.tsx"));
@@ -27,6 +28,7 @@ function ProtectedRoute() {
 export default function App() {
     return (
         <Suspense fallback={<LoadingSpinner />}>
+            <DeepLinkHandler />
             <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />

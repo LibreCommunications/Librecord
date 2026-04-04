@@ -14,6 +14,36 @@ setHttpClient(webHttpClient);
 setEventBus(webEventBus);
 setConnectionEventBus(webEventBus);
 
+// Listen for notification click-to-navigate from main process
+window.electronAPI?.onNavigate((channelId) => {
+    // channelId could be a DM channel or guild channel — navigate to it
+    if (channelId.includes("/")) {
+        window.location.hash = `#/app/${channelId}`;
+    } else {
+        window.location.hash = `#/app/dm/${channelId}`;
+    }
+});
+
+// Listen for deep links from main process
+window.electronAPI?.onDeepLink((link) => {
+    switch (link.type) {
+        case "guild":
+            window.location.hash = link.params.length > 1
+                ? `#/app/guild/${link.params[0]}/${link.params[1]}`
+                : `#/app/guild/${link.params[0]}`;
+            break;
+        case "dm":
+            window.location.hash = `#/app/dm/${link.params[0]}`;
+            break;
+        case "invite":
+            window.location.hash = "#/app/dm";
+            window.dispatchEvent(new CustomEvent("deep-link:invite", {
+                detail: { code: link.params[0] },
+            }));
+            break;
+    }
+});
+
 createRoot(document.getElementById("root")!).render(
     <ErrorBoundary>
         <ElectronPlatformProvider>

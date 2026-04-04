@@ -22,6 +22,9 @@ interface ElectronAPI {
     setAutostart: (enabled: boolean) => Promise<boolean>;
     getMinimizeToTray: () => Promise<boolean>;
     setMinimizeToTray: (enabled: boolean) => Promise<boolean>;
+    showNotification: (opts: { title: string; body: string; channelId?: string }) => Promise<void>;
+    onNavigate: (callback: (channelId: string) => void) => void;
+    onDeepLink: (callback: (link: { type: string; params: string[] }) => void) => void;
 }
 
 interface Window {

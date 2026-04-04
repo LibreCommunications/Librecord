@@ -236,7 +236,7 @@ export default function DmConversationPage() {
                 )}
 
                 {inCall && showCallView ? (
-                    <div className="flex-1 relative min-h-0">
+                    <div className="flex-1 flex flex-col min-w-0 min-h-0 relative">
                         <VoiceChannelView
                             channelId={dmId!}
                             channelName={channelName ?? "Call"}

@@ -53,7 +53,7 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
     const trackStatus: "loading" | "active" = isWatching && track ? "active" : "loading";
 
     const handleContextMenu = (e: React.MouseEvent) => {
-        if (isSelf) return;
+        if (isSelf || !window.electronAPI) return;
         e.preventDefault();
         setVolumePopup({ x: e.clientX, y: e.clientY });
     };
@@ -82,7 +82,7 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
                 </div>
             </div>
             {volumePopup && (
-                <VolumePopup userId={participant.userId} displayName={participant.displayName} x={volumePopup.x} y={volumePopup.y} onClose={() => setVolumePopup(null)} />
+                <VolumePopup userId={`${participant.userId}:screen`} displayName={`${participant.displayName}'s stream`} x={volumePopup.x} y={volumePopup.y} onClose={() => setVolumePopup(null)} />
             )}
         </>);
     }
@@ -150,7 +150,7 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
             )}
         </div>
         {volumePopup && (
-            <VolumePopup userId={participant.userId} displayName={participant.displayName} x={volumePopup.x} y={volumePopup.y} onClose={() => setVolumePopup(null)} />
+            <VolumePopup userId={`${participant.userId}:screen`} displayName={`${participant.displayName}'s stream`} x={volumePopup.x} y={volumePopup.y} onClose={() => setVolumePopup(null)} />
         )}
     </>);
 }
