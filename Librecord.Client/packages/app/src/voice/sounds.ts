@@ -131,7 +131,7 @@ let ringtoneAudio: HTMLAudioElement | null = null;
 
 export function playRingtone() {
     stopRingtone();
-    ringtoneAudio = new Audio("/sounds/call.mp3");
+    ringtoneAudio = new Audio("sounds/call.mp3");
     ringtoneAudio.loop = true;
     ringtoneAudio.volume = VOLUME;
     ringtoneAudio.play().catch(() => {});

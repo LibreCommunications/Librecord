@@ -161,11 +161,15 @@ function pollSpeaking() {
 let _playbackCtx: AudioContext | null = null;
 
 function getPlaybackCtx(): AudioContext {
-    if (!_playbackCtx || _playbackCtx.state === "closed") {
-        _playbackCtx = new AudioContext();
+    try {
+        if (!_playbackCtx || _playbackCtx.state === "closed") {
+            _playbackCtx = new AudioContext();
+        }
+        if (_playbackCtx.state === "suspended") _playbackCtx.resume().catch(e => logger.voice.warn("AudioContext resume failed", e));
+    } catch (e) {
+        logger.voice.warn("AudioContext creation failed", e);
     }
-    if (_playbackCtx.state === "suspended") _playbackCtx.resume().catch(e => logger.voice.warn("AudioContext resume failed", e));
-    return _playbackCtx;
+    return _playbackCtx!;
 }
 
 interface AudioPipeline {
@@ -545,8 +549,8 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
         resolution = { width: 3840, height: 2160, frameRate: encodeFps };
     }
 
-    // Encoding: match FPS with appropriate bitrate (LiveKit presets)
-    const encodingBitrate = encodeFps >= 60 ? 7_000_000 : encodeFps >= 30 ? 5_000_000 : 2_500_000;
+    // Encoding: match FPS with appropriate bitrate
+    const encodingBitrate = encodeFps >= 60 ? 4_000_000 : encodeFps >= 30 ? 2_500_000 : 1_200_000;
 
     try {
         await room.localParticipant.setScreenShareEnabled(true, {
@@ -559,7 +563,7 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
             },
             // One simulcast layer for small-tile viewers (960x540 capped at 30fps)
             screenShareSimulcastLayers: [
-                new VideoPreset(960, 540, 1_500_000, Math.min(encodeFps, 30)),
+                new VideoPreset(960, 540, 800_000, Math.min(encodeFps, 30)),
             ],
         });
     } catch (e) {
