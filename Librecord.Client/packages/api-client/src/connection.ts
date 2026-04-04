@@ -2,7 +2,9 @@ import * as signalR from "@microsoft/signalr";
 import { logger } from "@librecord/domain";
 import type { EventBus } from "@librecord/platform";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL: string =
+    (typeof localStorage !== "undefined" && localStorage.getItem("lr:api-url")) ||
+    import.meta.env.VITE_API_URL;
 
 export type ConnectionState = "disconnected" | "connecting" | "connected" | "reconnecting";
 
