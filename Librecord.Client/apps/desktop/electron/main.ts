@@ -4,6 +4,7 @@ import * as fs from "fs";
 import { initUpdater } from "./updater";
 import { initTray, destroyTray } from "./tray";
 import { isAutostartEnabled, setAutostart } from "./autostart";
+import { isVenmicAvailable, startVenmic, stopVenmic } from "./venmic";
 
 // Work around GPU process crashes on some Linux drivers (e.g. radv)
 app.commandLine.appendSwitch("disable-gpu-sandbox");
@@ -249,6 +250,11 @@ app.whenReady().then(() => {
     minimizeToTray = enabled;
     return minimizeToTray;
   });
+
+  // IPC: venmic (Linux screen share audio via PipeWire)
+  ipcMain.handle("desktop:venmicAvailable", () => process.platform === "linux" && isVenmicAvailable());
+  ipcMain.handle("desktop:venmicStart", () => startVenmic());
+  ipcMain.handle("desktop:venmicStop", () => stopVenmic());
 
   // IPC: native notifications (#105)
   ipcMain.handle("desktop:showNotification", (_e, opts: { title: string; body: string; channelId?: string }) => {

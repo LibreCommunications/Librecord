@@ -67,4 +67,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   cancelScreenSharePick: () => {
     ipcRenderer.send("screen-share-cancelled");
   },
+
+  // Venmic: Linux screen share audio via PipeWire
+  venmicAvailable: (): Promise<boolean> => ipcRenderer.invoke("desktop:venmicAvailable"),
+  venmicStart: (): Promise<boolean> => ipcRenderer.invoke("desktop:venmicStart"),
+  venmicStop: (): Promise<void> => ipcRenderer.invoke("desktop:venmicStop"),
 });

@@ -27,6 +27,9 @@ export interface ElectronAPI {
     onScreenSharePick: (callback: (sources: ScreenShareSource[]) => void) => () => void;
     selectScreenShareSource: (sourceId: string) => void;
     cancelScreenSharePick: () => void;
+    venmicAvailable: () => Promise<boolean>;
+    venmicStart: () => Promise<boolean>;
+    venmicStop: () => Promise<void>;
 }
 
 /** Returns the Electron API if running in the desktop app, undefined otherwise. */
