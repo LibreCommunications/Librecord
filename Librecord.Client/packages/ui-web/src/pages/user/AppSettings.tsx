@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { STORAGE, isDesktop, getElectronAPI } from "@librecord/domain";
+import { API_URL } from "@librecord/api-client";
 
 export default function AppSettings() {
     const [desktopNotifs, setDesktopNotifs] = useState(() => {
@@ -15,6 +16,8 @@ export default function AppSettings() {
     const [autostart, setAutostart] = useState(false);
     const [minimizeToTray, setMinimizeToTray] = useState(true);
     const [appVersion, setAppVersion] = useState<string | null>(null);
+    const [apiUrl, setApiUrl] = useState(() => localStorage.getItem(STORAGE.apiUrl) ?? "");
+    const savedApiUrl = useRef(apiUrl);
 
     useEffect(() => {
         if (!isDesktop) return;
@@ -89,6 +92,46 @@ export default function AppSettings() {
                     </div>
                 </section>
             )}
+
+            {/* Connection */}
+            <section>
+                <h2 className="section-label mb-4">Connection</h2>
+                <div className="space-y-3">
+                    <div className="bg-[#2b2d31] rounded-lg px-4 py-3">
+                        <div className="text-sm font-medium text-white mb-0.5">Backend URL</div>
+                        <div className="text-xs text-[#949ba4] mb-2">
+                            Override the server this app connects to. Leave empty to use the default ({API_URL}).
+                        </div>
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={apiUrl}
+                                onChange={e => setApiUrl(e.target.value)}
+                                placeholder={API_URL}
+                                className="flex-1 bg-[#1e1f22] rounded px-3 py-1.5 text-sm text-[#dbdee1] border border-[#3f4147] focus:border-[#5865F2] outline-none placeholder-[#4e5058]"
+                            />
+                            <button
+                                onClick={() => {
+                                    const trimmed = apiUrl.trim();
+                                    if (trimmed && trimmed !== savedApiUrl.current) {
+                                        localStorage.setItem(STORAGE.apiUrl, trimmed);
+                                        savedApiUrl.current = trimmed;
+                                        window.location.reload();
+                                    } else if (!trimmed && savedApiUrl.current) {
+                                        localStorage.removeItem(STORAGE.apiUrl);
+                                        savedApiUrl.current = "";
+                                        window.location.reload();
+                                    }
+                                }}
+                                disabled={apiUrl.trim() === savedApiUrl.current}
+                                className="px-3 py-1.5 rounded text-sm font-medium text-white bg-[#5865F2] hover:bg-[#4752c4] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
             {/* Developer */}
             <section>

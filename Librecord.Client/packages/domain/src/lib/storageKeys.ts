@@ -14,6 +14,7 @@ export const STORAGE = {
     notifSounds: "lr:notif-sounds",
     devMode: "lr:dev-mode",
     showDmProfile: "lr:show-dm-profile",
+    apiUrl: "lr:api-url",
 
     // Navigation
     lastVisited: "lr:last-visited",

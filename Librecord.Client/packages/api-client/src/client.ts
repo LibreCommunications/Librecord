@@ -1,7 +1,9 @@
 import { fetchWithAuth } from "./fetchWithAuth.ts";
 import { logger, cached, invalidate } from "@librecord/domain";
 
-export const API_URL: string = import.meta.env.VITE_API_URL;
+export const API_URL: string =
+    (typeof localStorage !== "undefined" && localStorage.getItem("lr:api-url")) ||
+    import.meta.env.VITE_API_URL;
 
 export class ApiError extends Error {
     status: number;
