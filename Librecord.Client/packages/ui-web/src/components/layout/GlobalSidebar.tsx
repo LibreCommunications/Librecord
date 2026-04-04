@@ -312,7 +312,7 @@ export default function GlobalSidebar() {
                                                 onContextMenu={e => { e.preventDefault(); setGuildCtxMenu({ x: e.clientX, y: e.clientY, guild: g }); }}
                                             >
                                                 <SidebarIcon
-                                                    to={getLastVisited()[`guild:${g.id}`] || `/app/guild/${g.id}`}
+                                                    to={guildId === g.id ? undefined : (getLastVisited()[`guild:${g.id}`] || `/app/guild/${g.id}`)}
                                                     active={guildId === g.id}
                                                     unread={guildHasUnread(g.id)}
                                                     tooltip={g.name}
@@ -386,7 +386,7 @@ export default function GlobalSidebar() {
                         onContextMenu={e => { e.preventDefault(); setGuildCtxMenu({ x: e.clientX, y: e.clientY, guild: g }); }}
                     >
                         <SidebarIcon
-                            to={getLastVisited()[`guild:${g.id}`] || `/app/guild/${g.id}`}
+                            to={guildId === g.id ? undefined : (getLastVisited()[`guild:${g.id}`] || `/app/guild/${g.id}`)}
                             active={guildId === g.id}
                             unread={guildHasUnread(g.id)}
                             tooltip={g.name}

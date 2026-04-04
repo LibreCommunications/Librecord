@@ -81,7 +81,7 @@ export function UserProfilePopup({ userId, onClose }: Props) {
                     {profile.bio && (
                         <div className="mt-3 bg-[#2b2d31] rounded-lg px-3 py-2">
                             <p className="text-xs font-semibold text-[#b5bac1] uppercase mb-1">About Me</p>
-                            <p className="text-sm text-[#dbdee1] whitespace-pre-wrap">{profile.bio}</p>
+                            <p className="text-sm text-[#dbdee1] whitespace-pre-wrap break-words">{profile.bio}</p>
                         </div>
                     )}
 

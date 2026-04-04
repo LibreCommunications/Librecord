@@ -12,6 +12,7 @@ export function ImageLightbox({ src, alt, onClose }: Props) {
     const [translate, setTranslate] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const lastPos = useRef({ x: 0, y: 0 });
+    const overlayRef = useRef<HTMLDivElement>(null);
 
     const isZoomed = scale > 1.05;
 
@@ -26,10 +27,24 @@ export function ImageLightbox({ src, alt, onClose }: Props) {
         return () => window.removeEventListener("keydown", onKey);
     }, [onClose]);
 
-    const handleWheel = useCallback((e: React.WheelEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setScale(prev => Math.min(Math.max(prev - e.deltaY * 0.002, 0.5), 8));
+    // Lock body scroll while lightbox is open
+    useEffect(() => {
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => { document.body.style.overflow = prev; };
+    }, []);
+
+    // Native non-passive wheel listener so preventDefault() actually works
+    useEffect(() => {
+        const el = overlayRef.current;
+        if (!el) return;
+        function onWheel(e: WheelEvent) {
+            e.preventDefault();
+            e.stopPropagation();
+            setScale(prev => Math.min(Math.max(prev - e.deltaY * 0.002, 0.5), 8));
+        }
+        el.addEventListener("wheel", onWheel, { passive: false });
+        return () => el.removeEventListener("wheel", onWheel);
     }, []);
 
     const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -63,10 +78,10 @@ export function ImageLightbox({ src, alt, onClose }: Props) {
 
     return (
         <div
+            ref={overlayRef}
             className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 animate-[fadeIn_0.15s_ease-out]"
             onClick={isZoomed ? undefined : onClose}
-            onWheel={handleWheel}
-            style={{ cursor: isZoomed ? (isDragging ? "grabbing" : "grab") : "zoom-in", touchAction: "none" }}
+            style={{ cursor: isZoomed ? (isDragging ? "grabbing" : "grab") : "zoom-in", touchAction: "none", overscrollBehavior: "contain" }}
         >
             <img
                 src={src}

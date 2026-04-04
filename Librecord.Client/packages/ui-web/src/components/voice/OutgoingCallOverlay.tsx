@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { PhoneHangupIcon } from "../ui/Icons";
 import { useVoice } from "@librecord/app";
 import { useToast } from "@librecord/app";
-import { setVoiceState } from "@librecord/app";
 import { onCustomEvent } from "@librecord/app";
 import type { AppEventMap } from "@librecord/domain";
 
@@ -28,20 +27,21 @@ export function OutgoingCallOverlay({ channelName, memberCount }: Props) {
         }
     }, [voiceState.channelId]);
 
-    // Timeout — stop ringing but stay connected
+    // Timeout — no answer, leave the call
     useEffect(() => {
         if (!voiceState.isOutgoingCall) return;
 
         timeoutRef.current = setTimeout(() => {
-            setVoiceState({ isOutgoingCall: false });
+            toast("No answer", "info");
+            leaveVoice();
         }, CALL_TIMEOUT);
 
         return () => clearTimeout(timeoutRef.current);
-    }, [voiceState.isOutgoingCall]);
+    }, [voiceState.isOutgoingCall, toast, leaveVoice]);
 
-    // Listen for decline events
+    // Listen for decline events (keep active while connected, not just while ringing)
     useEffect(() => {
-        if (!voiceState.isOutgoingCall || !voiceState.channelId) return;
+        if (!voiceState.isConnected || !voiceState.channelId) return;
 
         const callChannelId = voiceState.channelId;
 
@@ -54,11 +54,11 @@ export function OutgoingCallOverlay({ channelName, memberCount }: Props) {
                 return next;
             });
         });
-    }, [voiceState.isOutgoingCall, voiceState.channelId]);
+    }, [voiceState.isConnected, voiceState.channelId]);
 
     // Check if everyone declined
     useEffect(() => {
-        if (!voiceState.isOutgoingCall || declinedIds.size === 0) return;
+        if (!voiceState.isConnected || declinedIds.size === 0) return;
 
         // memberCount includes the caller, so others = memberCount - 1
         const othersCount = (memberCount ?? 2) - 1;
@@ -66,7 +66,7 @@ export function OutgoingCallOverlay({ channelName, memberCount }: Props) {
             toast("Call declined", "info");
             leaveVoice();
         }
-    }, [declinedIds, memberCount, voiceState.isOutgoingCall, toast, leaveVoice]);
+    }, [declinedIds, memberCount, voiceState.isConnected, toast, leaveVoice]);
 
     if (!voiceState.isOutgoingCall) return null;
 

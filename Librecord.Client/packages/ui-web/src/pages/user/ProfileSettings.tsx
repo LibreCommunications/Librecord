@@ -120,7 +120,7 @@ export default function ProfileSettings() {
                     {bio && (
                         <div className="mt-3 bg-[#1e1f22] rounded-lg px-3 py-2">
                             <p className="text-[10px] font-semibold text-[#b5bac1] uppercase mb-1">About Me</p>
-                            <p className="text-sm text-[#dbdee1] whitespace-pre-wrap">{bio}</p>
+                            <p className="text-sm text-[#dbdee1] whitespace-pre-wrap break-words">{bio}</p>
                         </div>
                     )}
                 </div>

@@ -170,6 +170,7 @@ export const MessageItem = memo(function MessageItem({
                                         key={att.id}
                                         src={src}
                                         alt={att.fileName}
+                                        loading="lazy"
                                         onClick={() => setLightboxSrc({ src, alt: att.fileName })}
                                         style={style}
                                         className="rounded-lg object-cover cursor-zoom-in hover:brightness-110 transition"
@@ -183,7 +184,7 @@ export const MessageItem = memo(function MessageItem({
                                         key={att.id}
                                         src={src}
                                         controls
-                                        preload="metadata"
+                                        preload="none"
                                         className="max-w-md rounded-lg"
                                         style={{ maxHeight: 320 }}
                                     />

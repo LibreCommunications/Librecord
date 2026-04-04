@@ -47,28 +47,29 @@ export function IncomingCallModal() {
         return onCustomEvent<AppEventMap["dm:call:incoming"]>(
             "dm:call:incoming",
             (detail) => {
-                setCall(prev => {
-                    // Don't show if already ringing
-                    if (prev) return prev;
+                // Don't ring if already connected to this channel
+                if (voiceState.isConnected && voiceState.channelId === detail.channelId) return;
 
-                    playRingtone();
+                // Clean up any previous ring state before starting new one
+                stopRingtone();
+                clearTimeout(timeoutRef.current);
 
-                    clearTimeout(timeoutRef.current);
-                    timeoutRef.current = setTimeout(() => {
-                        setCall(null);
-                        stopRingtone();
-                    }, RING_TIMEOUT);
+                playRingtone();
 
-                    return {
-                        channelId: detail.channelId,
-                        callerId: detail.callerId,
-                        callerDisplayName: detail.callerDisplayName,
-                        callerAvatarUrl: detail.callerAvatarUrl,
-                    };
+                timeoutRef.current = setTimeout(() => {
+                    setCall(null);
+                    stopRingtone();
+                }, RING_TIMEOUT);
+
+                setCall({
+                    channelId: detail.channelId,
+                    callerId: detail.callerId,
+                    callerDisplayName: detail.callerDisplayName,
+                    callerAvatarUrl: detail.callerAvatarUrl,
                 });
             },
         );
-    }, []);
+    }, [voiceState.isConnected, voiceState.channelId]);
 
     // Dismiss if caller leaves before we answer
     useEffect(() => {

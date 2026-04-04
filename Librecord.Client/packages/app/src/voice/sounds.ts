@@ -140,7 +140,8 @@ export function playRingtone() {
 export function stopRingtone() {
     if (ringtoneAudio) {
         ringtoneAudio.pause();
-        ringtoneAudio.currentTime = 0;
+        ringtoneAudio.removeAttribute("src");
+        ringtoneAudio.load(); // Abort any pending network/decode to prevent late playback
         ringtoneAudio = null;
     }
 }

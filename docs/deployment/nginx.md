@@ -77,6 +77,19 @@ server {
         add_header Cache-Control "public, max-age=86400";
     }
 
+    # Private CDN -- attachment redirects (lightweight, auth-gated in backend)
+    location /api/cdn/private/ {
+        limit_req zone=api burst=200 nodelay;
+
+        proxy_pass http://librecord-backend/cdn/private/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cookie_path / /;
+    }
+
     # API reverse proxy
     location /api/ {
         limit_req zone=api burst=60 nodelay;
