@@ -136,6 +136,7 @@ export default function GlobalSidebar() {
     const [dmChannelIds, setDmChannelIds] = useState<Set<string>>(new Set());
 
     const isDmPage = !guildId && location.pathname.startsWith("/app/dm");
+    const activeDmId = isDmPage ? location.pathname.match(/^\/app\/dm\/([^/]+)/)?.[1] : undefined;
 
     const loadGuilds = useCallback(() => {
         getGuilds().then(async (list) => {
@@ -219,8 +220,8 @@ export default function GlobalSidebar() {
             .some(([chId, g]) => g === gId && (unreadCounts[chId] ?? 0) > 0);
     }, [unreadCounts, channelToGuild]);
 
-    const hasDmUnread = !isDmPage && Array.from(dmChannelIds)
-        .some(chId => (unreadCounts[chId] ?? 0) > 0);
+    const hasDmUnread = Array.from(dmChannelIds)
+        .some(chId => chId !== activeDmId && (unreadCounts[chId] ?? 0) > 0);
 
     const avatarSrc =
         user?.avatarUrl
