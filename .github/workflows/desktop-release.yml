@@ -19,6 +19,7 @@ jobs:
           - os: windows-latest
             platform: win
     runs-on: ${{ matrix.os }}
+    environment: production
 
     steps:
       - uses: actions/checkout@v4
