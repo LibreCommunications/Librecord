@@ -23,11 +23,13 @@
     "@librecord/platform-electron": "workspace:*",
     "@librecord/platform-web": "workspace:*",
     "@librecord/ui-web": "workspace:*",
-    "@vencord/venmic": "^6.1.0",
     "electron-updater": "^6.6.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.6"
+  },
+  "optionalDependencies": {
+    "@vencord/venmic": "^6.1.0"
   },
   "devDependencies": {
     "@rolldown/plugin-babel": "^0.2.2",
