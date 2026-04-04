@@ -12,6 +12,12 @@ app.commandLine.appendSwitch("disable-gpu-sandbox");
 // Ignore certificate errors for self-signed dev certs
 app.commandLine.appendSwitch("ignore-certificate-errors");
 
+// Enable PipeWire screen capture for native xdg-desktop-portal picker on Wayland
+if (process.platform === "linux") {
+  app.commandLine.appendSwitch("enable-features", "WebRTCPipeWireCapturer");
+  app.commandLine.appendSwitch("ozone-platform-hint", "auto");
+}
+
 // Register librecord:// protocol handler
 if (process.defaultApp) {
   app.setAsDefaultProtocolClient("librecord", process.execPath, [process.argv[1]]);
@@ -172,88 +178,90 @@ app.whenReady().then(() => {
     callback({ responseHeaders: headers });
   });
 
-  // Screen share with source picker (#122) and system audio (#76)
-  // Abort function for the previous in-flight pick request (handles race condition)
-  let abortPreviousPick: (() => void) | null = null;
+  // Screen share (#122, #76)
+  // Uses desktopCapturer + custom in-app picker on all platforms.
+  // On Wayland, desktopCapturer returns limited sources (full screen + focused
+  // window) due to compositor security — same approach as Vesktop.
+  // Audio: Windows uses loopback, Linux uses venmic (PipeWire).
+  {
+    // Windows/macOS: custom in-app source picker
+    let abortPreviousPick: (() => void) | null = null;
 
-  session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
-    // If a previous pick is in-flight, cancel it
-    if (abortPreviousPick) {
-      abortPreviousPick();
-      abortPreviousPick = null;
-    }
+    session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
+      if (abortPreviousPick) {
+        abortPreviousPick();
+        abortPreviousPick = null;
+      }
 
-    const sources = await desktopCapturer.getSources({
-      types: ["screen", "window"],
-      thumbnailSize: { width: 320, height: 180 },
-      fetchWindowIcons: true,
+      const sources = await desktopCapturer.getSources({
+        types: ["screen", "window"],
+        thumbnailSize: { width: 320, height: 180 },
+        fetchWindowIcons: true,
+      });
+
+      if (sources.length === 0) {
+        try { callback({}); } catch { /* expected — Electron throws to deny request */ }
+        return;
+      }
+
+      const serialized = sources.map(s => ({
+        id: s.id,
+        name: s.name,
+        thumbnailDataUrl: s.thumbnail.toDataURL(),
+        displayId: s.display_id,
+        appIconDataUrl: !s.appIcon || s.appIcon.isEmpty() ? null : s.appIcon.toDataURL(),
+      }));
+      mainWindow?.webContents.send("screen-share-pick", serialized);
+
+      const selectedId = await new Promise<string | null>((resolve) => {
+        const cleanup = () => {
+          ipcMain.removeListener("screen-share-selected", onSelected);
+          ipcMain.removeListener("screen-share-cancelled", onCancelled);
+          mainWindow?.removeListener("closed", onWindowClosed);
+          if (abortPreviousPick === abort) abortPreviousPick = null;
+        };
+        const onSelected = (_e: Electron.IpcMainEvent, sourceId: string) => {
+          cleanup();
+          resolve(sourceId);
+        };
+        const onCancelled = () => {
+          cleanup();
+          resolve(null);
+        };
+        const onWindowClosed = () => {
+          cleanup();
+          resolve(null);
+        };
+        const abort = () => {
+          cleanup();
+          resolve(null);
+        };
+
+        abortPreviousPick = abort;
+        ipcMain.once("screen-share-selected", onSelected);
+        ipcMain.once("screen-share-cancelled", onCancelled);
+        mainWindow?.once("closed", onWindowClosed);
+      });
+
+      if (!selectedId) {
+        try { callback({}); } catch { /* expected — Electron throws to deny request */ }
+        return;
+      }
+
+      const selected = sources.find(s => s.id === selectedId);
+      if (!selected) {
+        try { callback({}); } catch { /* expected — Electron throws to deny request */ }
+        return;
+      }
+
+      // System audio loopback — Windows only
+      if (request.audioRequested && process.platform === "win32") {
+        callback({ video: selected, audio: "loopback" });
+      } else {
+        callback({ video: selected });
+      }
     });
-
-    if (sources.length === 0) {
-      try { callback({}); } catch { /* expected — Electron throws to deny request */ }
-      return;
-    }
-
-    // Send sources to renderer for the user to pick
-    const serialized = sources.map(s => ({
-      id: s.id,
-      name: s.name,
-      thumbnailDataUrl: s.thumbnail.toDataURL(),
-      displayId: s.display_id,
-      appIconDataUrl: !s.appIcon || s.appIcon.isEmpty() ? null : s.appIcon.toDataURL(),
-    }));
-    mainWindow?.webContents.send("screen-share-pick", serialized);
-
-    // Wait for user selection, cancellation, or window close
-    const selectedId = await new Promise<string | null>((resolve) => {
-      const cleanup = () => {
-        ipcMain.removeListener("screen-share-selected", onSelected);
-        ipcMain.removeListener("screen-share-cancelled", onCancelled);
-        mainWindow?.removeListener("closed", onWindowClosed);
-        if (abortPreviousPick === abort) abortPreviousPick = null;
-      };
-      const onSelected = (_e: Electron.IpcMainEvent, sourceId: string) => {
-        cleanup();
-        resolve(sourceId);
-      };
-      const onCancelled = () => {
-        cleanup();
-        resolve(null);
-      };
-      const onWindowClosed = () => {
-        cleanup();
-        resolve(null);
-      };
-      const abort = () => {
-        cleanup();
-        resolve(null);
-      };
-
-      abortPreviousPick = abort;
-      ipcMain.once("screen-share-selected", onSelected);
-      ipcMain.once("screen-share-cancelled", onCancelled);
-      mainWindow?.once("closed", onWindowClosed);
-    });
-
-    if (!selectedId) {
-      try { callback({}); } catch { /* expected — Electron throws to deny request */ }
-      return;
-    }
-
-    const selected = sources.find(s => s.id === selectedId);
-    if (!selected) {
-      try { callback({}); } catch { /* expected — Electron throws to deny request */ }
-      return;
-    }
-
-    // System audio loopback is only supported on Windows.
-    // On Linux/macOS it breaks the audio pipeline, so skip it.
-    if (request.audioRequested && process.platform === "win32") {
-      callback({ video: selected, audio: "loopback" });
-    } else {
-      callback({ video: selected });
-    }
-  });
+  }
 
   // IPC: app version
   ipcMain.handle("desktop:getAppVersion", () => app.getVersion());
