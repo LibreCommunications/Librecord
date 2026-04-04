@@ -18,15 +18,6 @@ setConnectionEventBus(webEventBus);
 
 const electronAPI = getElectronAPI();
 
-// Listen for update events from main process
-electronAPI?.onUpdateDownloaded((version) => {
-    console.log(`Update v${version} downloaded — will install on restart`);
-});
-
-electronAPI?.onUpdateInstalled((version) => {
-    console.log(`Successfully updated to v${version}`);
-});
-
 // Listen for notification click-to-navigate from main process
 electronAPI?.onNavigate((channelId) => {
     // channelId could be a DM channel or guild channel — navigate to it

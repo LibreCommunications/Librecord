@@ -1,6 +1,8 @@
 import { app, BrowserWindow, Notification } from "electron";
 import { join } from "path";
 
+const CHECK_INTERVAL = 30 * 60 * 1000; // 30 minutes
+
 export function initUpdater(getMainWindow: () => BrowserWindow | null) {
   if (!app.isPackaged) return;
 
@@ -40,6 +42,10 @@ export function initUpdater(getMainWindow: () => BrowserWindow | null) {
       console.error("Auto-update error:", err.message);
     });
 
+    // Check on startup, then periodically while running
     autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+    setInterval(() => {
+      autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+    }, CHECK_INTERVAL);
   }).catch(() => {});
 }

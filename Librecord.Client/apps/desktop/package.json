@@ -61,7 +61,9 @@
         "AppImage"
       ],
       "category": "Network;Chat;InstantMessaging",
-      "icon": "build/icons"
+      "icon": "build/icons",
+      "executableName": "librecord",
+      "artifactName": "${productName}.${ext}"
     },
     "mac": {
       "target": [

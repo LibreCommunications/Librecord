@@ -229,9 +229,9 @@ app.whenReady().then(() => {
       return;
     }
 
-    // Include system audio loopback when requested (Windows only;
-    // silent no-op on macOS/Linux — OS limitation)
-    if (request.audioRequested) {
+    // System audio loopback is only supported on Windows.
+    // On Linux/macOS it breaks the audio pipeline, so skip it.
+    if (request.audioRequested && process.platform === "win32") {
       callback({ video: selected, audio: "loopback" });
     } else {
       callback({ video: selected });
