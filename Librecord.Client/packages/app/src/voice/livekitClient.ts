@@ -585,60 +585,22 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
     const isLinuxDesktop = isDesktop && getElectronAPI()?.platform === "linux";
     let restoreGetDisplayMedia: (() => void) | null = null;
 
-    // On Linux: use xdg-desktop-portal (D-Bus) for the picker, venmic for audio.
-    // We build a MediaStream from both and patch getDisplayMedia so LiveKit uses it.
-    if (isLinuxDesktop) {
-        // Step 1: Call portal to show native picker, get PipeWire node ID
-        const streams = await getElectronAPI()!.portalScreenCast();
-        if (!streams || streams.length === 0) {
-            logger.voice.info("Screen share cancelled by user");
-            return false;
-        }
-        const nodeId = streams[0].nodeId;
-        logger.voice.info("portal: selected PipeWire node", nodeId);
-
-        // Step 2: Create a video stream from the PipeWire node
-        // Chromium with WebRTCPipeWireCapturer can capture from a PipeWire node
-        // via getUserMedia with chromeMediaSource constraints
-        let videoStream: MediaStream;
-        try {
-            videoStream = await navigator.mediaDevices.getUserMedia({
-                audio: false,
-                video: {
-                    mandatory: {
-                        chromeMediaSource: "desktop",
-                        chromeMediaSourceId: `screen:${nodeId}:0`,
-                    },
-                } as any,
-            });
-        } catch (e1) {
-            logger.voice.warn("portal: chromeMediaSource failed, trying alternate ID format", e1);
-            try {
-                videoStream = await navigator.mediaDevices.getUserMedia({
-                    audio: false,
-                    video: {
-                        mandatory: {
-                            chromeMediaSource: "desktop",
-                            chromeMediaSourceId: `${nodeId}`,
-                        },
-                    } as any,
-                });
-            } catch (e2) {
-                logger.voice.warn("portal: all getUserMedia attempts failed", e2);
-                showToast("Screen share failed", "error");
-                return false;
-            }
-        }
-
-        // Step 3: Optionally add venmic audio
-        if (options.audio) {
-            const started = await getElectronAPI()!.venmicStart();
-            if (started) {
-                venmicActive = true;
-                logger.voice.info("venmic: system audio capture active");
-                await new Promise(r => setTimeout(r, 300));
-                const deviceId = await findVenmicDevice();
-                if (deviceId) {
+    // On Linux: Chromium handles the portal natively (FLATPAK_ID is set).
+    // getDisplayMedia() will show the native picker and return a PipeWire stream.
+    // We just need to set up venmic for audio.
+    if (isLinuxDesktop && options.audio) {
+        const started = await getElectronAPI()!.venmicStart();
+        if (started) {
+            venmicActive = true;
+            logger.voice.info("venmic: system audio capture active");
+            await new Promise(r => setTimeout(r, 300));
+            const deviceId = await findVenmicDevice();
+            if (deviceId) {
+                restoreGetDisplayMedia = installStreamPatch(null!); // placeholder
+                // Patch getDisplayMedia to add venmic audio to the portal stream
+                const original = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
+                navigator.mediaDevices.getDisplayMedia = async function(constraints) {
+                    const stream = await original(constraints);
                     try {
                         const audioStream = await navigator.mediaDevices.getUserMedia({
                             audio: {
@@ -650,20 +612,19 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
                                 sampleRate: 48000,
                             },
                         });
-                        audioStream.getAudioTracks().forEach(t => videoStream.addTrack(t));
-                        logger.voice.info("venmic: audio added to portal stream");
+                        stream.getAudioTracks().forEach(t => stream.removeTrack(t));
+                        audioStream.getAudioTracks().forEach(t => stream.addTrack(t));
+                        logger.voice.info("venmic: audio spliced into portal stream");
                     } catch (e) {
-                        logger.voice.warn("venmic: failed to capture audio", e);
+                        logger.voice.warn("venmic: failed to add audio", e);
                     }
-                }
+                    return stream;
+                };
+                restoreGetDisplayMedia = () => {
+                    navigator.mediaDevices.getDisplayMedia = original;
+                };
             }
         }
-
-        // Step 4: Patch getDisplayMedia to return our portal stream
-        restoreGetDisplayMedia = installStreamPatch(videoStream);
-    } else if (options.audio && isDesktop) {
-        // Windows: audio via loopback (handled by setDisplayMediaRequestHandler)
-        // Nothing extra to do here
     }
 
     const requestAudio = options.audio;

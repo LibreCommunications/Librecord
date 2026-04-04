@@ -7,6 +7,13 @@ import { isAutostartEnabled, setAutostart } from "./autostart";
 import { isVenmicAvailable, startVenmic, stopVenmic } from "./venmic";
 import { requestPortalScreenCast } from "./portalScreenCast";
 
+// On Linux, trick Chromium into using xdg-desktop-portal for screen capture
+// by pretending we're in a Flatpak sandbox. This makes getDisplayMedia() use
+// PipeWire natively instead of requiring desktopCapturer.
+if (process.platform === "linux" && !process.env.FLATPAK_ID) {
+  process.env.FLATPAK_ID = "com.librecord.desktop";
+}
+
 // Work around GPU process crashes on some Linux drivers (e.g. radv)
 app.commandLine.appendSwitch("disable-gpu-sandbox");
 
@@ -215,24 +222,17 @@ app.whenReady().then(() => {
     }
   });
 
+  // Grant all permissions (needed for display-capture on Linux)
+  session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => {
+    callback(true);
+  });
+  session.defaultSession.setPermissionCheckHandler(() => true);
+
   if (process.platform === "linux") {
-    // Linux: the renderer handles screen share via the portal IPC above.
-    // We still need a handler registered so getDisplayMedia doesn't error,
-    // but the renderer will patch getDisplayMedia to use the portal stream
-    // BEFORE LiveKit calls it.
-    session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
-      // Fallback: if the renderer somehow calls getDisplayMedia without
-      // the portal patch, use desktopCapturer as a last resort.
-      const sources = await desktopCapturer.getSources({
-        types: ["screen", "window"],
-        thumbnailSize: { width: 320, height: 180 },
-      });
-      if (sources.length > 0) {
-        callback({ video: sources[0] });
-      } else {
-        try { callback({}); } catch { /* deny */ }
-      }
-    });
+    // Linux: with FLATPAK_ID set, Chromium uses xdg-desktop-portal natively
+    // for getDisplayMedia(). No handler needed — the portal shows the native
+    // picker and returns a PipeWire stream directly.
+    // Audio is handled separately via venmic.
   } else {
     // Windows/macOS: custom in-app source picker via desktopCapturer.
     let abortPreviousPick: (() => void) | null = null;
