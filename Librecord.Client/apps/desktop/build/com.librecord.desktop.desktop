@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Librecord
+Comment=Self-hosted chat, voice, and video
+Exec=librecord %U
+Icon=com.librecord.desktop
+Type=Application
+Terminal=false
+Categories=Network;Chat;InstantMessaging;
+MimeType=x-scheme-handler/librecord;
+StartupWMClass=Librecord
+Keywords=chat;voice;video;messaging;discord;

@@ -175,7 +175,7 @@ app.whenReady().then(() => {
 
   // IPC: native notifications (#105)
   ipcMain.handle("desktop:showNotification", (_e, opts: { title: string; body: string; channelId?: string }) => {
-    const iconPath = join(__dirname, "../dist/librecord.svg");
+    const iconPath = join(__dirname, "../build/icons/256x256.png");
     const notification = new Notification({
       title: opts.title,
       body: opts.body,

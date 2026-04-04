@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.librecord.desktop</id>
+  <name>Librecord</name>
+  <summary>Self-hosted chat, voice, and video</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-or-later</project_license>
+  <description>
+    <p>
+      Librecord is a self-hosted Discord alternative with real-time messaging,
+      voice and video calls, servers with roles and permissions, and end-to-end
+      encrypted message storage.
+    </p>
+  </description>
+  <url type="homepage">https://github.com/LibreCommunications/Librecord</url>
+  <url type="bugtracker">https://github.com/LibreCommunications/Librecord/issues</url>
+  <launchable type="desktop-id">com.librecord.desktop.desktop</launchable>
+  <content_rating type="oars-1.1">
+    <content_attribute id="social-chat">intense</content_attribute>
+    <content_attribute id="social-audio">intense</content_attribute>
+  </content_rating>
+  <branding>
+    <color type="primary" scheme_preference="light">#5865F2</color>
+    <color type="primary" scheme_preference="dark">#4047d0</color>
+  </branding>
+</component>

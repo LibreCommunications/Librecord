@@ -53,6 +53,7 @@
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
+      "build/icons/**/*",
       "package.json"
     ],
     "linux": {
@@ -67,7 +68,7 @@
         "dmg",
         "zip"
       ],
-      "icon": "build/icons/icon.icns",
+      "icon": "build/icons/512x512.png",
       "category": "public.app-category.social-networking"
     },
     "win": {

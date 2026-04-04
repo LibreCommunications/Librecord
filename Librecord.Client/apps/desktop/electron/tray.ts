@@ -4,8 +4,22 @@ import { join } from "path";
 let tray: Tray | null = null;
 
 export function initTray(getWindow: () => BrowserWindow | null) {
-  const iconPath = join(__dirname, "../dist/librecord.svg");
-  const icon = nativeImage.createFromPath(iconPath).resize({ width: 24, height: 24 });
+  let icon: Electron.NativeImage;
+
+  if (process.platform === "win32") {
+    // Windows: use .ico
+    icon = nativeImage.createFromPath(join(__dirname, "../build/icons/icon.ico"));
+  } else {
+    // Linux & macOS: use 32x32 PNG (macOS will auto-template if needed)
+    icon = nativeImage.createFromPath(join(__dirname, "../build/icons/32x32.png"));
+  }
+
+  // Fallback: resize from SVG if PNGs aren't bundled
+  if (icon.isEmpty()) {
+    icon = nativeImage
+      .createFromPath(join(__dirname, "../dist/librecord.svg"))
+      .resize({ width: 24, height: 24 });
+  }
 
   tray = new Tray(icon);
   tray.setToolTip("Librecord");
