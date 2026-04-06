@@ -27,9 +27,6 @@ export interface ElectronAPI {
     onScreenSharePick: (callback: (sources: ScreenShareSource[]) => void) => () => void;
     selectScreenShareSource: (sourceId: string) => void;
     cancelScreenSharePick: () => void;
-    venmicAvailable: () => Promise<boolean>;
-    venmicStart: () => Promise<boolean>;
-    venmicStop: () => Promise<void>;
     portalScreenCast: () => Promise<Array<{ nodeId: number; sourceType: number; width: number; height: number }> | null>;
     onQuitting: (callback: () => void) => () => void;
 }

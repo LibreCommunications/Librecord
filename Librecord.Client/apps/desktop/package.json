@@ -29,9 +29,6 @@
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.6"
   },
-  "optionalDependencies": {
-    "@vencord/venmic": "^6.1.0"
-  },
   "devDependencies": {
     "@rolldown/plugin-babel": "^0.2.2",
     "@tailwindcss/vite": "^4.2.2",
@@ -59,7 +56,6 @@
       "dist-electron/**/*",
       "build/icons/**/*",
       "package.json",
-      "node_modules/@vencord/venmic/**/*",
       "node_modules/pkg-prebuilds/**/*"
     ],
     "linux": {

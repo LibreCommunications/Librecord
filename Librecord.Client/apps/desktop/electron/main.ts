@@ -4,7 +4,6 @@ import * as fs from "fs";
 import { initUpdater } from "./updater";
 import { initTray, destroyTray } from "./tray";
 import { isAutostartEnabled, setAutostart } from "./autostart";
-import { isVenmicAvailable, startVenmic, stopVenmic } from "./venmic";
 import { requestPortalScreenCast } from "./portalScreenCast";
 
 // On Linux, trick Chromium into using xdg-desktop-portal for screen capture
@@ -325,11 +324,6 @@ app.whenReady().then(() => {
     saveSettings({ minimizeToTray });
     return minimizeToTray;
   });
-
-  // IPC: venmic (Linux screen share audio via PipeWire)
-  ipcMain.handle("desktop:venmicAvailable", () => process.platform === "linux" && isVenmicAvailable());
-  ipcMain.handle("desktop:venmicStart", () => startVenmic());
-  ipcMain.handle("desktop:venmicStop", () => stopVenmic());
 
   // IPC: native notifications (#105)
   ipcMain.handle("desktop:showNotification", (_e, opts: { title: string; body: string; channelId?: string }) => {

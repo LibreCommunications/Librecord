@@ -22,7 +22,6 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "@vencord/venmic",
       "electron",
       "electron-winstaller",
       "esbuild"

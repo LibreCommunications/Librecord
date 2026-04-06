@@ -539,34 +539,6 @@ const RESOLUTION_MAP: Record<string, { width: number; height: number } | undefin
     "1440p": { width: 2560, height: 1440 },
 };
 
-// Whether venmic is currently capturing system audio for screen share
-let venmicActive = false;
-
-async function findVenmicDevice(): Promise<string | undefined> {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const venmic = devices.find(d =>
-        d.kind === "audioinput" && d.label.toLowerCase().includes("vencord-screen-share"),
-    );
-    return venmic?.deviceId;
-}
-
-/**
- * Temporarily patches getDisplayMedia to return a pre-built stream
- * (portal video + optional venmic audio). LiveKit calls getDisplayMedia
- * internally; the patch intercepts it and returns our stream instead.
- */
-function installStreamPatch(stream: MediaStream): () => void {
-    const original = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
-
-    navigator.mediaDevices.getDisplayMedia = async function (_constraints) {
-        return stream;
-    };
-
-    return () => {
-        navigator.mediaDevices.getDisplayMedia = original;
-    };
-}
-
 export async function startScreenShare(options: ScreenShareSettings): Promise<boolean> {
     if (!room) return false;
 
@@ -582,52 +554,10 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
 
     const encodingBitrate = encodeFps >= 60 ? 4_000_000 : encodeFps >= 30 ? 2_500_000 : 1_200_000;
 
+    // On Linux, screen share audio is not supported (no venmic).
+    // Windows uses loopback audio; macOS has no system audio support.
     const isLinuxDesktop = isDesktop && getElectronAPI()?.platform === "linux";
-    let restoreGetDisplayMedia: (() => void) | null = null;
-
-    // On Linux: Chromium handles the portal natively (FLATPAK_ID is set).
-    // getDisplayMedia() will show the native picker and return a PipeWire stream.
-    // We just need to set up venmic for audio.
-    if (isLinuxDesktop && options.audio) {
-        const started = await getElectronAPI()!.venmicStart();
-        if (started) {
-            venmicActive = true;
-            logger.voice.info("venmic: system audio capture active");
-            await new Promise(r => setTimeout(r, 300));
-            const deviceId = await findVenmicDevice();
-            if (deviceId) {
-                restoreGetDisplayMedia = installStreamPatch(null!); // placeholder
-                // Patch getDisplayMedia to add venmic audio to the portal stream
-                const original = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
-                navigator.mediaDevices.getDisplayMedia = async function(constraints) {
-                    const stream = await original(constraints);
-                    try {
-                        const audioStream = await navigator.mediaDevices.getUserMedia({
-                            audio: {
-                                deviceId: { exact: deviceId },
-                                autoGainControl: false,
-                                echoCancellation: false,
-                                noiseSuppression: false,
-                                channelCount: 2,
-                                sampleRate: 48000,
-                            },
-                        });
-                        stream.getAudioTracks().forEach(t => stream.removeTrack(t));
-                        audioStream.getAudioTracks().forEach(t => stream.addTrack(t));
-                        logger.voice.info("venmic: audio spliced into portal stream");
-                    } catch (e) {
-                        logger.voice.warn("venmic: failed to add audio", e);
-                    }
-                    return stream;
-                };
-                restoreGetDisplayMedia = () => {
-                    navigator.mediaDevices.getDisplayMedia = original;
-                };
-            }
-        }
-    }
-
-    const requestAudio = options.audio;
+    const requestAudio = isLinuxDesktop ? false : options.audio;
 
     try {
         await room.localParticipant.setScreenShareEnabled(true, {
@@ -651,13 +581,9 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
         } catch (e2) {
             logger.voice.warn("Screen share failed entirely", e2);
             showToast("Screen share failed", "error");
-            if (venmicActive) { getElectronAPI()?.venmicStop(); venmicActive = false; }
-            restoreGetDisplayMedia?.();
             return false;
         }
     }
-
-    restoreGetDisplayMedia?.();
 
     // Set content hint for encoder optimization
     try {
@@ -676,11 +602,6 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
 
 export async function stopScreenShare(): Promise<boolean> {
     if (!room) return false;
-
-    if (venmicActive) {
-        getElectronAPI()?.venmicStop();
-        venmicActive = false;
-    }
 
     await room.localParticipant.setScreenShareEnabled(false);
     return false;
