@@ -287,6 +287,11 @@ app.whenReady().then(() => {
     try {
       const { setupPipecap } = require("@librecord/pipecap/electron/main");
       setupPipecap(ipcMain, () => mainWindow);
+
+      // Extra handlers not in setupPipecap: audio source switching
+      const pipecap = require("@librecord/pipecap");
+      ipcMain.handle("pipecap:listAudioApps", () => pipecap.listAudioApps());
+      ipcMain.handle("pipecap:setAudioTarget", (_e: Electron.IpcMainInvokeEvent, target: string) => pipecap.setAudioTarget(target));
     } catch (e) {
       console.warn("pipecap: native module not available", (e as Error).message);
     }

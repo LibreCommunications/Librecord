@@ -3,12 +3,20 @@ import * as fs from "fs";
 
 // Expose pipecap API on Linux (window.pipecap + window.pipecapShm)
 if (process.platform === "linux") {
-  try {
-    const { exposePipecap } = require("@librecord/pipecap/electron/preload");
-    exposePipecap(contextBridge, ipcRenderer);
-  } catch {
-    // pipecap not available — screen share will be unavailable on Linux
-  }
+  contextBridge.exposeInMainWorld("pipecap", {
+    available: () => ipcRenderer.invoke("pipecap:available"),
+    showPicker: (sourceTypes?: number) => ipcRenderer.invoke("pipecap:showPicker", sourceTypes),
+    startCapture: (options: Record<string, unknown>) => ipcRenderer.invoke("pipecap:startCapture", options),
+    stopCapture: () => ipcRenderer.invoke("pipecap:stopCapture"),
+    isCapturing: () => ipcRenderer.invoke("pipecap:isCapturing"),
+    listAudioApps: () => ipcRenderer.invoke("pipecap:listAudioApps"),
+    setAudioTarget: (target: string) => ipcRenderer.invoke("pipecap:setAudioTarget", target),
+    onAudio: (callback: (audio: { channels: number; sampleRate: number; data: Buffer }) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, audio: { channels: number; sampleRate: number; data: Buffer }) => callback(audio);
+      ipcRenderer.on("pipecap:audio", handler);
+      return () => ipcRenderer.removeListener("pipecap:audio", handler);
+    },
+  });
 
   // Expose shared memory frame reader for zero-copy video frames.
   // pipecap writes frames to /dev/shm/pipecap-frames; we read them

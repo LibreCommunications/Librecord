@@ -4,11 +4,14 @@ import { useTrackBySource } from "@librecord/app";
 import { getRoom } from "@librecord/app";
 import type { VoiceParticipant } from "@librecord/app";
 import { ScreenShareIcon } from "./VoiceIcons";
-import { PlayIcon, ExitFullscreenIcon, FullscreenIcon } from "../ui/Icons";
+import { PlayIcon, ExitFullscreenIcon, FullscreenIcon, AudioIcon } from "../ui/Icons";
 import { DevOverlay } from "./DevOverlay";
 import { VolumePopup } from "./VolumePopup";
+import { AudioSourcePicker } from "./AudioSourcePicker";
 import { useFullscreen } from "./useFullscreen";
-import { isDesktop } from "@librecord/domain";
+import { isDesktop, getElectronAPI, getPipecapAPI } from "@librecord/domain";
+
+const isLinuxDesktop = isDesktop && getElectronAPI()?.platform === "linux" && !!getPipecapAPI();
 
 interface Props {
     participant: VoiceParticipant;
@@ -26,6 +29,7 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
     const videoRef = useRef<HTMLVideoElement>(null);
     const { containerRef, isFullscreen, toggleFullscreen } = useFullscreen();
     const [volumePopup, setVolumePopup] = useState<{ x: number; y: number } | null>(null);
+    const [showAudioPicker, setShowAudioPicker] = useState(false);
 
     const track = useTrackBySource(participant.userId, Track.Source.ScreenShare);
 
@@ -136,6 +140,20 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
 
             {trackStatus === "active" && (
                 <div className="absolute bottom-2 right-2 flex items-center gap-1.5 opacity-0 group-hover/screen:opacity-100 transition-opacity">
+                    {isSelf && isLinuxDesktop && (
+                        <div className="relative">
+                            <button
+                                onClick={e => { e.stopPropagation(); setShowAudioPicker(!showAudioPicker); }}
+                                title="Change audio source"
+                                className="p-1.5 rounded-md bg-black/60 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/80"
+                            >
+                                <AudioIcon size={16} />
+                            </button>
+                            {showAudioPicker && (
+                                <AudioSourcePicker onClose={() => setShowAudioPicker(false)} />
+                            )}
+                        </div>
+                    )}
                     <button
                         onClick={e => { e.stopPropagation(); toggleFullscreen(); }}
                         title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}

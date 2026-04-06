@@ -38,6 +38,11 @@ export function getElectronAPI(): ElectronAPI | undefined {
 /** Whether the app is running in the Electron desktop shell. */
 export const isDesktop = typeof window !== "undefined" && !!(window as unknown as { electronAPI?: ElectronAPI }).electronAPI;
 
+export interface AudioAppInfo {
+    name: string;
+    binary: string;
+}
+
 /** Pipecap API exposed on window.pipecap (Linux only). */
 export interface PipecapAPI {
     available: () => Promise<boolean>;
@@ -45,7 +50,8 @@ export interface PipecapAPI {
     startCapture: (options: { nodeId: number; pipewireFd: number; fps: number; audio: boolean; sourceType: number }) => Promise<{ shmPath: string; shmSize: number; headerSize: number; width: number; height: number; detectedApp?: string } | false>;
     stopCapture: () => Promise<void>;
     isCapturing: () => Promise<boolean>;
-    onFrame: (callback: (frame: { width: number; height: number; data: ArrayBuffer }) => void) => () => void;
+    listAudioApps: () => Promise<AudioAppInfo[]>;
+    setAudioTarget: (target: string) => Promise<void>;
     onAudio: (callback: (audio: { channels: number; sampleRate: number; data: Buffer }) => void) => () => void;
 }
 

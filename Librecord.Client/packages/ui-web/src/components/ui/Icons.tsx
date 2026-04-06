@@ -128,6 +128,10 @@ export function ExitFullscreenIcon({ size, className }: IconProps) {
     return <Icon size={size} className={className}><polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="14" y1="10" x2="21" y2="3" /><line x1="3" y1="21" x2="10" y2="14" /></Icon>;
 }
 
+export function AudioIcon({ size, className }: IconProps) {
+    return <Icon size={size} className={className}><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></Icon>;
+}
+
 export function ExternalLinkIcon({ size, className }: IconProps) {
     return <Icon size={size} className={className}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></Icon>;
 }
