@@ -27,6 +27,7 @@ interface Props {
 
 export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf, fill }: Props) {
     const videoRef = useRef<HTMLVideoElement>(null);
+    const audioPickerBtnRef = useRef<HTMLButtonElement>(null);
     const { containerRef, isFullscreen, toggleFullscreen } = useFullscreen();
     const [volumePopup, setVolumePopup] = useState<{ x: number; y: number } | null>(null);
     const [showAudioPicker, setShowAudioPicker] = useState(false);
@@ -141,8 +142,9 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
             {trackStatus === "active" && (
                 <div className="absolute bottom-2 right-2 flex items-center gap-1.5 opacity-0 group-hover/screen:opacity-100 transition-opacity">
                     {isSelf && isLinuxDesktop && (
-                        <div className="relative">
+                        <>
                             <button
+                                ref={audioPickerBtnRef}
                                 onClick={e => { e.stopPropagation(); setShowAudioPicker(!showAudioPicker); }}
                                 title="Change audio source"
                                 className="p-1.5 rounded-md bg-black/60 backdrop-blur-sm text-white/80 hover:text-white hover:bg-black/80"
@@ -150,9 +152,9 @@ export function ScreenShareTile({ participant, isWatching, onToggleWatch, isSelf
                                 <AudioIcon size={16} />
                             </button>
                             {showAudioPicker && (
-                                <AudioSourcePicker onClose={() => setShowAudioPicker(false)} />
+                                <AudioSourcePicker anchorRef={audioPickerBtnRef} onClose={() => setShowAudioPicker(false)} />
                             )}
-                        </div>
+                        </>
                     )}
                     <button
                         onClick={e => { e.stopPropagation(); toggleFullscreen(); }}

@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { getPipecapAPI, type AudioAppInfo } from "@librecord/domain";
 
 interface Props {
+    anchorRef: React.RefObject<HTMLButtonElement | null>;
     onClose: () => void;
 }
 
-export function AudioSourcePicker({ onClose }: Props) {
+export function AudioSourcePicker({ anchorRef, onClose }: Props) {
     const [apps, setApps] = useState<AudioAppInfo[]>([]);
     const [loading, setLoading] = useState(true);
     const ref = useRef<HTMLDivElement>(null);
@@ -21,11 +23,25 @@ export function AudioSourcePicker({ onClose }: Props) {
 
     useEffect(() => {
         function onClick(e: MouseEvent) {
-            if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+            if (ref.current && !ref.current.contains(e.target as Node) &&
+                anchorRef.current && !anchorRef.current.contains(e.target as Node)) {
+                onClose();
+            }
         }
         document.addEventListener("mousedown", onClick);
         return () => document.removeEventListener("mousedown", onClick);
-    }, [onClose]);
+    }, [onClose, anchorRef]);
+
+    // Position above the anchor button
+    const rect = anchorRef.current?.getBoundingClientRect();
+    if (!rect) return null;
+
+    const style: React.CSSProperties = {
+        position: "fixed",
+        bottom: window.innerHeight - rect.top + 8,
+        left: rect.left,
+        zIndex: 9999,
+    };
 
     function select(target: string) {
         const pipecap = getPipecapAPI();
@@ -33,10 +49,11 @@ export function AudioSourcePicker({ onClose }: Props) {
         onClose();
     }
 
-    return (
+    return createPortal(
         <div
             ref={ref}
-            className="absolute bottom-full left-0 mb-2 bg-[#111214] border border-[#2b2d31] rounded-lg shadow-xl py-1 min-w-[220px] max-h-[300px] overflow-y-auto z-50"
+            style={style}
+            className="bg-[#111214] border border-[#2b2d31] rounded-lg shadow-xl py-1 min-w-[220px] max-h-[300px] overflow-y-auto"
         >
             <div className="px-3 py-1.5 text-xs font-semibold text-[#949ba4] uppercase tracking-wide">
                 Audio Source
@@ -46,9 +63,7 @@ export function AudioSourcePicker({ onClose }: Props) {
                 onClick={() => select("system")}
                 className="w-full text-left px-3 py-2 text-sm text-[#dbdee1] hover:bg-white/10 flex items-center gap-2"
             >
-                <span className="text-[#949ba4]">
-                    <SpeakerIcon />
-                </span>
+                <span className="text-[#949ba4]"><SpeakerIcon /></span>
                 System Audio
             </button>
 
@@ -56,9 +71,7 @@ export function AudioSourcePicker({ onClose }: Props) {
                 onClick={() => select("none")}
                 className="w-full text-left px-3 py-2 text-sm text-[#dbdee1] hover:bg-white/10 flex items-center gap-2"
             >
-                <span className="text-[#949ba4]">
-                    <MuteIcon />
-                </span>
+                <span className="text-[#949ba4]"><MuteIcon /></span>
                 No Audio
             </button>
 
@@ -83,7 +96,8 @@ export function AudioSourcePicker({ onClose }: Props) {
             {loading && (
                 <div className="px-3 py-2 text-xs text-[#949ba4]">Loading...</div>
             )}
-        </div>
+        </div>,
+        document.body,
     );
 }
 
