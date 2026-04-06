@@ -4,14 +4,6 @@ import * as fs from "fs";
 import { initUpdater } from "./updater";
 import { initTray, destroyTray } from "./tray";
 import { isAutostartEnabled, setAutostart } from "./autostart";
-import { requestPortalScreenCast } from "./portalScreenCast";
-
-// On Linux, trick Chromium into using xdg-desktop-portal for screen capture
-// by pretending we're in a Flatpak sandbox. This makes getDisplayMedia() use
-// PipeWire natively instead of requiring desktopCapturer.
-if (process.platform === "linux" && !process.env.FLATPAK_ID) {
-  process.env.FLATPAK_ID = "com.librecord.desktop";
-}
 
 // Work around GPU process crashes on some Linux drivers (e.g. radv)
 app.commandLine.appendSwitch("disable-gpu-sandbox");
@@ -19,18 +11,9 @@ app.commandLine.appendSwitch("disable-gpu-sandbox");
 // Ignore certificate errors for self-signed dev certs
 app.commandLine.appendSwitch("ignore-certificate-errors");
 
-// Enable PipeWire screen capture on Linux (merge with existing features)
+// Linux Wayland/X11 display server detection
 if (process.platform === "linux") {
   const isWayland = !!process.env.WAYLAND_DISPLAY || process.env.XDG_SESSION_TYPE === "wayland";
-
-  const existingFeatures = app.commandLine.getSwitchValue("enable-features");
-  app.commandLine.removeSwitch("enable-features");
-  const features = existingFeatures ? existingFeatures.split(",").filter(Boolean) : [];
-  for (const f of ["WebRTCPipeWireCapturer", "PipeWireV4L2"]) {
-    if (!features.includes(f)) features.push(f);
-  }
-  app.commandLine.appendSwitch("enable-features", features.join(","));
-
   if (isWayland) {
     app.commandLine.appendSwitch("ozone-platform", "wayland");
   } else {
@@ -210,30 +193,17 @@ app.whenReady().then(() => {
   });
 
   // Screen share (#122, #76)
-  // IPC: portal screen cast (Linux — shows native picker via D-Bus)
-  ipcMain.handle("desktop:portalScreenCast", async () => {
-    if (process.platform !== "linux") return null;
-    try {
-      return await requestPortalScreenCast();
-    } catch (e) {
-      console.error("portal: screen cast failed", e);
-      return null;
-    }
-  });
-
-  // Grant all permissions (needed for display-capture on Linux)
+  // Grant all permissions (needed for display-capture)
   session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => {
     callback(true);
   });
   session.defaultSession.setPermissionCheckHandler(() => true);
 
-  if (process.platform === "linux") {
-    // Linux: with FLATPAK_ID set, Chromium uses xdg-desktop-portal natively
-    // for getDisplayMedia(). No handler needed — the portal shows the native
-    // picker and returns a PipeWire stream directly.
-    // Audio is handled separately via venmic.
-  } else {
-    // Windows/macOS: custom in-app source picker via desktopCapturer.
+  // Linux: pipecap handles screen capture natively via PipeWire (IPC from renderer).
+  // The setDisplayMediaRequestHandler is not needed on Linux — pipecap bypasses
+  // getDisplayMedia entirely and provides a MediaStream directly.
+  // Windows/macOS: custom in-app source picker via desktopCapturer.
+  if (process.platform !== "linux") {
     let abortPreviousPick: (() => void) | null = null;
 
     session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
@@ -310,6 +280,16 @@ app.whenReady().then(() => {
         callback({ video: selected });
       }
     });
+  }
+
+  // IPC: pipecap (Linux screen capture via PipeWire)
+  if (process.platform === "linux") {
+    try {
+      const { setupPipecap } = require("@librecord/pipecap/electron/main");
+      setupPipecap(ipcMain, () => mainWindow);
+    } catch (e) {
+      console.warn("pipecap: native module not available", (e as Error).message);
+    }
   }
 
   // IPC: app version

@@ -27,7 +27,6 @@ export interface ElectronAPI {
     onScreenSharePick: (callback: (sources: ScreenShareSource[]) => void) => () => void;
     selectScreenShareSource: (sourceId: string) => void;
     cancelScreenSharePick: () => void;
-    portalScreenCast: () => Promise<Array<{ nodeId: number; sourceType: number; width: number; height: number }> | null>;
     onQuitting: (callback: () => void) => () => void;
 }
 
@@ -38,3 +37,31 @@ export function getElectronAPI(): ElectronAPI | undefined {
 
 /** Whether the app is running in the Electron desktop shell. */
 export const isDesktop = typeof window !== "undefined" && !!(window as unknown as { electronAPI?: ElectronAPI }).electronAPI;
+
+/** Pipecap API exposed on window.pipecap (Linux only). */
+export interface PipecapAPI {
+    available: () => Promise<boolean>;
+    showPicker: (sourceTypes?: number) => Promise<{ streams: Array<{ nodeId: number; sourceType: number; width: number; height: number }>; pipewireFd: number } | null>;
+    startCapture: (options: { nodeId: number; pipewireFd: number; fps: number; audio: boolean; sourceType: number }) => Promise<{ shmPath: string; shmSize: number; headerSize: number; width: number; height: number; detectedApp?: string } | false>;
+    stopCapture: () => Promise<void>;
+    isCapturing: () => Promise<boolean>;
+    onFrame: (callback: (frame: { width: number; height: number; data: ArrayBuffer }) => void) => () => void;
+    onAudio: (callback: (audio: { channels: number; sampleRate: number; data: Buffer }) => void) => () => void;
+}
+
+/** Returns the pipecap API if available (Linux desktop only), undefined otherwise. */
+export function getPipecapAPI(): PipecapAPI | undefined {
+    return (window as unknown as { pipecap?: PipecapAPI }).pipecap;
+}
+
+/** Shared memory frame reader for pipecap video (Linux only). */
+export interface PipecapShmAPI {
+    open: (shmPath: string) => boolean;
+    readFrame: () => { width: number; height: number; data: ArrayBuffer } | null;
+    close: () => void;
+}
+
+/** Returns the pipecap shm reader if available (Linux desktop only). */
+export function getPipecapShmAPI(): PipecapShmAPI | undefined {
+    return (window as unknown as { pipecapShm?: PipecapShmAPI }).pipecapShm;
+}

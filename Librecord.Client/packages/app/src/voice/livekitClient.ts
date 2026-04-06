@@ -18,7 +18,7 @@ import {
     clearActiveProcessor,
     type LocalAudioTrackLike,
 } from "./noiseSuppression";
-import { logger, getElectronAPI, isDesktop } from "@librecord/domain";
+import { logger, getElectronAPI, getPipecapAPI, getPipecapShmAPI, isDesktop } from "@librecord/domain";
 import { onCustomEvent } from "../typedEvent";
 import { STORAGE } from "@librecord/domain";
 
@@ -539,6 +539,136 @@ const RESOLUTION_MAP: Record<string, { width: number; height: number } | undefin
     "1440p": { width: 2560, height: 1440 },
 };
 
+// Active pipecap cleanup function (Linux only)
+let pipecapCleanup: (() => void) | null = null;
+
+/**
+ * Create a MediaStream from pipecap's shared memory video frames
+ * and IPC audio chunks. Reads frames directly from /dev/shm via
+ * the preload's pipecapShm API (no IPC overhead for video).
+ */
+function createPipecapStream(fps: number, includeAudio: boolean): { stream: MediaStream; stop: () => void } {
+    const pipecap = getPipecapAPI()!;
+    const shm = getPipecapShmAPI()!;
+    const cleanups: (() => void)[] = [];
+
+    // Video: WebGL canvas reads frames from shm, captureStream() produces video track
+    const canvas = document.createElement("canvas");
+    canvas.width = 1920;
+    canvas.height = 1080;
+    const gl = canvas.getContext("webgl2")!;
+
+    // Shader swaps B↔R on the GPU (PipeWire delivers BGRA, canvas needs RGBA)
+    const vs = gl.createShader(gl.VERTEX_SHADER)!;
+    gl.shaderSource(vs, `#version 300 es
+        in vec2 pos; out vec2 uv;
+        void main() { uv = pos * 0.5 + 0.5; uv.y = 1.0 - uv.y; gl_Position = vec4(pos, 0, 1); }
+    `);
+    gl.compileShader(vs);
+    const fs = gl.createShader(gl.FRAGMENT_SHADER)!;
+    gl.shaderSource(fs, `#version 300 es
+        precision mediump float; in vec2 uv; uniform sampler2D tex; out vec4 color;
+        void main() { vec4 c = texture(tex, uv); color = vec4(c.b, c.g, c.r, 1.0); }
+    `);
+    gl.compileShader(fs);
+    const prog = gl.createProgram()!;
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    gl.useProgram(prog);
+
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const posLoc = gl.getAttribLocation(prog, "pos");
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    let curW = 0, curH = 0;
+    const videoStream = canvas.captureStream(fps);
+
+    // Poll shm for new frames at target FPS
+    let frameRunning = true;
+    const frameInterval = setInterval(() => {
+        if (!frameRunning) return;
+        const frame = shm.readFrame();
+        if (!frame) return;
+        if (frame.width !== curW || frame.height !== curH) {
+            canvas.width = frame.width;
+            canvas.height = frame.height;
+            gl.viewport(0, 0, frame.width, frame.height);
+            curW = frame.width;
+            curH = frame.height;
+        }
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, frame.width, frame.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(frame.data));
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }, Math.floor(1000 / fps));
+    cleanups.push(() => { frameRunning = false; clearInterval(frameInterval); });
+
+    const stream = new MediaStream();
+    videoStream.getVideoTracks().forEach(t => stream.addTrack(t));
+
+    // Audio: pipecap sends audio chunks via IPC (small data, fine for IPC)
+    if (includeAudio) {
+        const audioCtx = new AudioContext({ sampleRate: 48000 });
+        const dest = audioCtx.createMediaStreamDestination();
+        let pendingSamples = new Float32Array(0);
+
+        const unsubAudio = pipecap.onAudio((chunk) => {
+            const f32 = new Float32Array(
+                chunk.data.buffer,
+                chunk.data.byteOffset,
+                chunk.data.byteLength / 4,
+            );
+            const combined = new Float32Array(pendingSamples.length + f32.length);
+            combined.set(pendingSamples);
+            combined.set(f32, pendingSamples.length);
+            pendingSamples = combined;
+        });
+        cleanups.push(unsubAudio);
+
+        const channels = 2;
+        const bufferSize = 4096;
+        const processor = audioCtx.createScriptProcessor(bufferSize, 0, channels);
+        processor.onaudioprocess = (e) => {
+            const needed = bufferSize * channels;
+            if (pendingSamples.length >= needed) {
+                for (let ch = 0; ch < channels; ch++) {
+                    const output = e.outputBuffer.getChannelData(ch);
+                    for (let i = 0; i < bufferSize; i++) {
+                        output[i] = pendingSamples[i * channels + ch] || 0;
+                    }
+                }
+                pendingSamples = pendingSamples.slice(needed);
+            } else {
+                for (let ch = 0; ch < channels; ch++) {
+                    e.outputBuffer.getChannelData(ch).fill(0);
+                }
+            }
+        };
+        processor.connect(dest);
+        audioCtx.resume();
+        dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+        cleanups.push(() => { processor.disconnect(); audioCtx.close(); });
+    }
+
+    return {
+        stream,
+        stop: () => {
+            cleanups.forEach(fn => fn());
+            stream.getTracks().forEach(t => t.stop());
+            shm.close();
+            pipecap.stopCapture();
+        },
+    };
+}
+
 export async function startScreenShare(options: ScreenShareSettings): Promise<boolean> {
     if (!room) return false;
 
@@ -554,34 +684,101 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
 
     const encodingBitrate = encodeFps >= 60 ? 4_000_000 : encodeFps >= 30 ? 2_500_000 : 1_200_000;
 
-    // On Linux, screen share audio is not supported (no venmic).
-    // Windows uses loopback audio; macOS has no system audio support.
     const isLinuxDesktop = isDesktop && getElectronAPI()?.platform === "linux";
-    const requestAudio = isLinuxDesktop ? false : options.audio;
+    const pipecap = isLinuxDesktop ? getPipecapAPI() : undefined;
 
-    try {
-        await room.localParticipant.setScreenShareEnabled(true, {
-            audio: requestAudio,
-            resolution,
-        }, {
-            screenShareEncoding: {
-                maxFramerate: encodeFps,
-                maxBitrate: encodingBitrate,
-            },
-            screenShareSimulcastLayers: [
-                new VideoPreset(960, 540, 800_000, Math.min(encodeFps, 30)),
-            ],
+    // Linux: use pipecap for native PipeWire capture
+    if (pipecap) {
+        const pickerResult = await pipecap.showPicker(3); // 3 = monitors + windows
+        if (!pickerResult || pickerResult.streams.length === 0) {
+            return false; // User cancelled picker
+        }
+
+        const source = pickerResult.streams[0];
+        const captureInfo = await pipecap.startCapture({
+            nodeId: source.nodeId,
+            pipewireFd: pickerResult.pipewireFd,
+            fps: encodeFps,
+            audio: options.audio,
+            sourceType: source.sourceType,
         });
-    } catch (e) {
-        logger.voice.warn("Screen share failed, retrying without constraints", e);
-        try {
-            await room.localParticipant.setScreenShareEnabled(true, {
-                audio: requestAudio,
-            });
-        } catch (e2) {
-            logger.voice.warn("Screen share failed entirely", e2);
+        if (!captureInfo) {
             showToast("Screen share failed", "error");
             return false;
+        }
+
+        // Open shared memory for frame reading
+        const shmApi = getPipecapShmAPI();
+        if (!shmApi || !shmApi.open(captureInfo.shmPath)) {
+            showToast("Screen share failed — could not open frame buffer", "error");
+            pipecap.stopCapture();
+            return false;
+        }
+
+        // Create MediaStream from pipecap frames + audio
+        const { stream, stop } = createPipecapStream(encodeFps, options.audio);
+        pipecapCleanup = stop;
+
+        // Patch getDisplayMedia so LiveKit picks up our pipecap stream
+        const originalGDM = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
+        navigator.mediaDevices.getDisplayMedia = async () => stream;
+
+        try {
+            await room.localParticipant.setScreenShareEnabled(true, {
+                audio: options.audio,
+                resolution,
+            }, {
+                screenShareEncoding: {
+                    maxFramerate: encodeFps,
+                    maxBitrate: encodingBitrate,
+                },
+                screenShareSimulcastLayers: [
+                    new VideoPreset(960, 540, 800_000, Math.min(encodeFps, 30)),
+                ],
+            });
+        } catch (e) {
+            logger.voice.warn("Screen share failed, retrying without constraints", e);
+            try {
+                await room.localParticipant.setScreenShareEnabled(true, {
+                    audio: options.audio,
+                });
+            } catch (e2) {
+                logger.voice.warn("Screen share failed entirely", e2);
+                showToast("Screen share failed", "error");
+                stop();
+                pipecapCleanup = null;
+                navigator.mediaDevices.getDisplayMedia = originalGDM;
+                return false;
+            }
+        }
+
+        navigator.mediaDevices.getDisplayMedia = originalGDM;
+    } else {
+        // Windows/macOS: standard getDisplayMedia flow
+        try {
+            await room.localParticipant.setScreenShareEnabled(true, {
+                audio: options.audio,
+                resolution,
+            }, {
+                screenShareEncoding: {
+                    maxFramerate: encodeFps,
+                    maxBitrate: encodingBitrate,
+                },
+                screenShareSimulcastLayers: [
+                    new VideoPreset(960, 540, 800_000, Math.min(encodeFps, 30)),
+                ],
+            });
+        } catch (e) {
+            logger.voice.warn("Screen share failed, retrying without constraints", e);
+            try {
+                await room.localParticipant.setScreenShareEnabled(true, {
+                    audio: options.audio,
+                });
+            } catch (e2) {
+                logger.voice.warn("Screen share failed entirely", e2);
+                showToast("Screen share failed", "error");
+                return false;
+            }
         }
     }
 
@@ -602,6 +799,11 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
 
 export async function stopScreenShare(): Promise<boolean> {
     if (!room) return false;
+
+    if (pipecapCleanup) {
+        pipecapCleanup();
+        pipecapCleanup = null;
+    }
 
     await room.localParticipant.setScreenShareEnabled(false);
     return false;

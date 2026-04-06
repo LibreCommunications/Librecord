@@ -1,4 +1,58 @@
 import { contextBridge, ipcRenderer } from "electron";
+import * as fs from "fs";
+
+// Expose pipecap API on Linux (window.pipecap + window.pipecapShm)
+if (process.platform === "linux") {
+  try {
+    const { exposePipecap } = require("@librecord/pipecap/electron/preload");
+    exposePipecap(contextBridge, ipcRenderer);
+  } catch {
+    // pipecap not available — screen share will be unavailable on Linux
+  }
+
+  // Expose shared memory frame reader for zero-copy video frames.
+  // pipecap writes frames to /dev/shm/pipecap-frames; we read them
+  // directly from the preload (Node.js access) to avoid IPC copying.
+  let shmFd: number | null = null;
+  let lastSeq = BigInt(0);
+
+  contextBridge.exposeInMainWorld("pipecapShm", {
+    open: (shmPath: string) => {
+      try {
+        shmFd = fs.openSync(shmPath, "r");
+        lastSeq = BigInt(0);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    readFrame: (): { width: number; height: number; data: ArrayBuffer } | null => {
+      if (shmFd === null) return null;
+      // Header layout (from pipecap shm.rs):
+      //   seq: u64 (offset 0), width: u32 (8), height: u32 (12),
+      //   stride: u32 (16), data_offset: u32 (20), data_size: u32 (24)
+      const headerBuf = Buffer.alloc(32);
+      fs.readSync(shmFd, headerBuf, 0, 32, 0);
+      const seq = headerBuf.readBigUInt64LE(0);
+      if (seq === lastSeq) return null; // No new frame
+      lastSeq = seq;
+      const width = headerBuf.readUInt32LE(8);
+      const height = headerBuf.readUInt32LE(12);
+      const dataOffset = headerBuf.readUInt32LE(20);
+      const dataSize = headerBuf.readUInt32LE(24);
+      if (width === 0 || height === 0 || dataSize === 0) return null;
+      const frameBuf = Buffer.alloc(dataSize);
+      fs.readSync(shmFd, frameBuf, 0, dataSize, dataOffset);
+      return { width, height, data: frameBuf.buffer.slice(frameBuf.byteOffset, frameBuf.byteOffset + frameBuf.byteLength) };
+    },
+    close: () => {
+      if (shmFd !== null) {
+        try { fs.closeSync(shmFd); } catch { /* ignore */ }
+        shmFd = null;
+      }
+    },
+  });
+}
 
 contextBridge.exposeInMainWorld("electronAPI", {
   platform: process.platform,
@@ -67,10 +121,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   cancelScreenSharePick: () => {
     ipcRenderer.send("screen-share-cancelled");
   },
-
-  // Portal screen cast (Linux — native Wayland picker via D-Bus)
-  portalScreenCast: (): Promise<Array<{ nodeId: number; sourceType: number; width: number; height: number }> | null> =>
-    ipcRenderer.invoke("desktop:portalScreenCast"),
 
   // App lifecycle
   onQuitting: (callback: () => void) => {

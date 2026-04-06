@@ -22,6 +22,7 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "@librecord/pipecap",
       "electron",
       "electron-winstaller",
       "esbuild"

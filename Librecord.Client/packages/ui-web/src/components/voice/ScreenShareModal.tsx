@@ -27,15 +27,12 @@ interface Props {
     onCancel: () => void;
 }
 
-import { isDesktop, getElectronAPI } from "@librecord/domain";
-
-const isLinuxDesktop = isDesktop && getElectronAPI()?.platform === "linux";
-const showAudioToggle = isDesktop && !isLinuxDesktop;
+import { isDesktop } from "@librecord/domain";
 
 export function ScreenShareModal({ open, onStart, onCancel }: Props) {
     const [resolution, setResolution] = useState<ScreenShareOptions["resolution"]>("1080p");
     const [frameRate, setFrameRate] = useState<ScreenShareOptions["frameRate"]>(30);
-    const [audio, setAudio] = useState(showAudioToggle);
+    const [audio, setAudio] = useState(isDesktop);
 
     if (!open) return null;
 
@@ -121,7 +118,7 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
                         </div>
                     </div>
 
-                    {showAudioToggle && (
+                    {isDesktop && (
                         <div
                             className="flex items-center justify-between p-3 rounded-lg bg-[#2b2d31] cursor-pointer"
                             onClick={() => setAudio(!audio)}
