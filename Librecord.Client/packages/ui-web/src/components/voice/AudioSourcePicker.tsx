@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getPipecapAPI, type AudioAppInfo } from "@librecord/domain";
+import { useToast } from "@librecord/app";
 
 interface Props {
     anchorRef: React.RefObject<HTMLButtonElement | null>;
@@ -11,6 +12,7 @@ export function AudioSourcePicker({ anchorRef, onClose }: Props) {
     const [apps, setApps] = useState<AudioAppInfo[]>([]);
     const [loading, setLoading] = useState(true);
     const ref = useRef<HTMLDivElement>(null);
+    const { toast } = useToast();
 
     useEffect(() => {
         const pipecap = getPipecapAPI();
@@ -43,9 +45,20 @@ export function AudioSourcePicker({ anchorRef, onClose }: Props) {
         zIndex: 9999,
     };
 
-    function select(target: string) {
+    async function select(target: string) {
         const pipecap = getPipecapAPI();
-        if (pipecap) pipecap.setAudioTarget(target);
+        if (pipecap) {
+            try {
+                await pipecap.setAudioTarget(target);
+                const label =
+                    target === "system" ? "System audio" :
+                    target === "none" ? "Audio muted" :
+                    `Audio: ${target}`;
+                toast(label, target === "none" ? "info" : "success");
+            } catch (e) {
+                toast(`Failed to switch audio source: ${(e as Error).message}`, "error");
+            }
+        }
         onClose();
     }
 

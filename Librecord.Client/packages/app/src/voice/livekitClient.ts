@@ -575,6 +575,16 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
         }
 
         navigator.mediaDevices.getDisplayMedia = originalGDM;
+
+        // Tell the user which audio source the share started with so they
+        // know whether the auto-detection picked their app or fell back.
+        if (options.audio) {
+            if (result.detectedApp) {
+                showToast(`Sharing audio from ${result.detectedApp}`, "success");
+            } else {
+                showToast("Sharing system audio", "info");
+            }
+        }
     } else {
         // Windows/macOS: standard getDisplayMedia flow
         try {
