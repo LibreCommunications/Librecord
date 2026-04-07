@@ -30,6 +30,21 @@ jobs:
           cache: pnpm
           cache-dependency-path: Librecord.Client/pnpm-lock.yaml
 
+      - name: Fetch latest pipecap (linux only)
+        if: matrix.platform == 'linux'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PIPECAP_TAG=$(gh release view --repo LibreCommunications/pipecap --json tagName -q .tagName)
+          echo "Using pipecap $PIPECAP_TAG"
+          git clone --depth 1 --branch "$PIPECAP_TAG" \
+            https://github.com/LibreCommunications/pipecap.git "${GITHUB_WORKSPACE}/../pipecap"
+          gh release download "$PIPECAP_TAG" \
+            --repo LibreCommunications/pipecap \
+            --pattern "*.node" \
+            --dir "${GITHUB_WORKSPACE}/../pipecap"
+
       - name: Install dependencies
         working-directory: Librecord.Client
         run: pnpm install --frozen-lockfile
