@@ -52,7 +52,7 @@ export interface PipecapAPI {
     isCapturing: () => Promise<boolean>;
     listAudioApps: () => Promise<AudioAppInfo[]>;
     setAudioTarget: (target: string) => Promise<void>;
-    onAudio: (callback: (audio: { channels: number; sampleRate: number; data: Buffer }) => void) => () => void;
+    onAudio: (callback: (audio: { channels: number; sampleRate: number; data: Uint8Array }) => void) => () => void;
 }
 
 /** Returns the pipecap API if available (Linux desktop only), undefined otherwise. */
