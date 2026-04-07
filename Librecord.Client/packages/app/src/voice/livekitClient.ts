@@ -548,10 +548,32 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
     const resolution = res
         ? { ...res, frameRate: encodeFps }
         : { width: 3840, height: 2160, frameRate: encodeFps };
-    const encodingBitrate = encodeFps >= 60 ? 4_000_000 : encodeFps >= 30 ? 2_500_000 : 1_200_000;
+
+    // Bitrate scales with pixels-per-second so 60 fps is actually attainable.
+    // The flat 4 Mbps ceiling we used to use was the main reason higher rates
+    // dropped to ~30 on receivers — the encoder couldn't fit the frames and
+    // (with default `maintain-resolution`) dropped framerate to compensate.
+    // ~0.08 bits/pixel is a reasonable motion screen-share target across
+    // H.264/VP9. Floor at 1 Mbps, ceiling at 25 Mbps.
+    const bitrateForPixels = (w: number, h: number, fps: number) =>
+        Math.min(25_000_000, Math.max(1_000_000, Math.round(w * h * fps * 0.08)));
+    const encodingBitrate = bitrateForPixels(resolution.width, resolution.height, encodeFps);
+
+    // Two simulcast layers. LiveKit's `adaptiveStream` (enabled in
+    // connectToRoom) auto-subscribes each receiver to the layer that
+    // matches their video element size — small grid tiles get the low
+    // layer, maximized/fullscreen tiles get the high layer. Critically
+    // both layers run at the **same** framerate so a fallback never
+    // means "stuck at 30". The previous bug was hardcoding the low
+    // layer to `Math.min(encodeFps, 30)`, which capped receivers there.
+    const lowWidth = 960;
+    const lowHeight = 540;
+    const lowBitrate = bitrateForPixels(lowWidth, lowHeight, encodeFps);
     const publishOpts = {
         screenShareEncoding: { maxFramerate: encodeFps, maxBitrate: encodingBitrate },
-        screenShareSimulcastLayers: [new VideoPreset(960, 540, 800_000, Math.min(encodeFps, 30))],
+        screenShareSimulcastLayers: [
+            new VideoPreset(lowWidth, lowHeight, lowBitrate, encodeFps),
+        ],
     };
 
     const isLinuxDesktop = isDesktop && getElectronAPI()?.platform === "linux";
@@ -594,15 +616,35 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
         }
     }
 
-    // Set content hint for encoder optimization
+    // Set content hint + tell WebRTC to drop *resolution* (not framerate)
+    // when bandwidth is constrained. Default for screen share is
+    // `maintain-resolution`, which is the wrong tradeoff if the user
+    // explicitly picked a high frame rate.
     try {
         const hint = encodeFps >= 30 ? "motion" : "detail";
         room.localParticipant.videoTrackPublications.forEach(pub => {
-            if (pub.source === Track.Source.ScreenShare && pub.track?.mediaStreamTrack) {
-                pub.track.mediaStreamTrack.contentHint = hint;
+            if (pub.source !== Track.Source.ScreenShare) return;
+            const track = pub.track;
+            if (!track?.mediaStreamTrack) return;
+            track.mediaStreamTrack.contentHint = hint;
+
+            // Reach into the underlying RTCRtpSender so we can set
+            // degradationPreference + reaffirm maxBitrate/maxFramerate.
+            const sender = track.sender as RTCRtpSender | undefined;
+            if (!sender) return;
+            const params = sender.getParameters();
+            params.degradationPreference = "maintain-framerate";
+            for (const enc of params.encodings) {
+                enc.maxBitrate = encodingBitrate;
+                enc.maxFramerate = encodeFps;
             }
+            sender.setParameters(params).catch((e) => {
+                logger.voice.warn("Failed to apply screen-share sender params", e);
+            });
         });
-    } catch { /* contentHint not supported */ }
+    } catch (e) {
+        logger.voice.warn("Failed to set screen-share encoder hints", e);
+    }
 
     return true;
 }
