@@ -46,8 +46,13 @@ export interface AudioAppInfo {
 /** Pipecap API exposed on window.pipecap (Linux only). */
 export interface PipecapAPI {
     available: () => Promise<boolean>;
-    showPicker: (sourceTypes?: number) => Promise<{ streams: Array<{ nodeId: number; sourceType: number; width: number; height: number }>; pipewireFd: number } | null>;
-    startCapture: (options: { nodeId: number; pipewireFd: number; fps: number; audio: boolean; sourceType: number }) => Promise<{ shmPath: string; shmSize: number; headerSize: number; width: number; height: number; detectedApp?: string } | false>;
+    /** Show the native portal picker. The returned PipeWire fd is held inside
+     * the main process — the renderer never sees it. */
+    showPicker: (sourceTypes?: number) => Promise<{ streams: Array<{ nodeId: number; sourceType: number; width: number; height: number }> } | null>;
+    /** Start capture. The Electron main process automatically injects the
+     * full set of host PIDs as `excludePids` so we never hear ourselves in
+     * the share — callers do not need to set it. */
+    startCapture: (options: { nodeId: number; fps: number; audio: boolean; sourceType: number }) => Promise<{ shmPath: string; shmSize: number; headerSize: number; width: number; height: number; detectedApp?: string } | false>;
     stopCapture: () => Promise<void>;
     isCapturing: () => Promise<boolean>;
     listAudioApps: () => Promise<AudioAppInfo[]>;

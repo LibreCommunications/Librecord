@@ -19,8 +19,9 @@ if (process.platform === "linux") {
   });
 
   // Expose shared memory frame reader for zero-copy video frames.
-  // pipecap writes frames to /dev/shm/pipecap-frames; we read them
-  // directly from the preload (Node.js access) to avoid IPC copying.
+  // pipecap writes frames to /dev/shm/pipecap-frames-<pid> (the path is
+  // returned in captureInfo.shmPath); we read them directly from the
+  // preload (Node.js access) to avoid IPC copying.
   let shmFd: number | null = null;
   let lastSeq = BigInt(0);
 

@@ -56,7 +56,6 @@ export async function startCapture(fps: number, audio: boolean): Promise<Pipecap
     const source = pickerResult.streams[0];
     const captureInfo = await pipecap.startCapture({
         nodeId: source.nodeId,
-        pipewireFd: pickerResult.pipewireFd,
         fps,
         audio,
         sourceType: source.sourceType,

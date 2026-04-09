@@ -286,7 +286,15 @@ app.whenReady().then(() => {
   if (process.platform === "linux") {
     try {
       const { setupPipecap } = require("@librecord/pipecap/electron/main");
-      setupPipecap(ipcMain, () => mainWindow);
+      // Inject every Electron process pid (main + all renderers + GPU/utility
+      // helpers) as `excludePids` so the host app never appears in its own
+      // audio share. The renderer doesn't need to know its own pid.
+      setupPipecap(ipcMain, () => mainWindow, {
+        transformStartOptions: (options: Record<string, unknown>) => ({
+          ...options,
+          excludePids: app.getAppMetrics().map(m => m.pid),
+        }),
+      });
 
       // Extra handlers not in setupPipecap: audio source switching
       const pipecap = require("@librecord/pipecap");
