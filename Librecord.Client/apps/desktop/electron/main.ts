@@ -273,9 +273,16 @@ app.whenReady().then(() => {
         return;
       }
 
-      // System audio loopback — Windows only
+      // System audio loopback — Windows only.
+      // `loopbackWithMute` captures the system audio mix with our own
+      // process's contribution removed from the captured stream (the user
+      // still hears it locally — only the share track is filtered). This
+      // is the Windows analog of pipecap's `excludePids` on Linux: it
+      // prevents the call participants' voices, played out of our speakers,
+      // from being re-captured back into the share and creating a feedback
+      // loop.
       if (request.audioRequested && process.platform === "win32") {
-        callback({ video: selected, audio: "loopback" });
+        callback({ video: selected, audio: "loopbackWithMute" });
       } else {
         callback({ video: selected });
       }

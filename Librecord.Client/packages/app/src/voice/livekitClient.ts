@@ -2,13 +2,15 @@ import {
     Room,
     RoomEvent,
     Track,
-    VideoPreset,
+    LocalVideoTrack,
+    LocalAudioTrack,
     ConnectionQuality,
     DisconnectReason,
     type RemoteParticipant,
     type RemoteTrackPublication,
     type LocalParticipant,
     type LocalTrackPublication,
+    type TrackPublishOptions,
 } from "livekit-client";
 import { showToast } from "../toast";
 import { getUserVolume } from "../userVolume";
@@ -540,6 +542,42 @@ const RESOLUTION_MAP: Record<string, { width: number; height: number } | undefin
     "1440p": { width: 2560, height: 1440 },
 };
 
+/**
+ * Bitrate target for screen content over VP9 SVC. Screen content (UI, text)
+ * is highly compressible — VP9 + the default `L3T3_KEY` scalability mode
+ * give us 3 spatial × 3 temporal layers from a single encode. ~0.05
+ * bits/pixel is enough to keep text crisp at 1080p30; the floor protects
+ * tiny windows and the ceiling caps 1440p60 so we don't blow people's
+ * uplink. Tuned empirically — was 0.08 (VP8 motion video) which both
+ * over-allocated and was paired with a `maintain-framerate` preference
+ * that stripped resolution at the wrong moment.
+ */
+const SCREENSHARE_BITS_PER_PIXEL = 0.05;
+const SCREENSHARE_BITRATE_FLOOR = 1_000_000;   // 1 Mbps
+const SCREENSHARE_BITRATE_CEILING = 15_000_000; // 15 Mbps
+
+function screenShareBitrate(w: number, h: number, fps: number): number {
+    const raw = Math.round(w * h * fps * SCREENSHARE_BITS_PER_PIXEL);
+    return Math.min(SCREENSHARE_BITRATE_CEILING, Math.max(SCREENSHARE_BITRATE_FLOOR, raw));
+}
+
+/**
+ * Build the publish options shared by both the native and pipecap paths so
+ * encoder settings stay in sync. VP9 SVC means LiveKit auto-disables the
+ * old "manual simulcast" path and uses temporal/spatial layering inside a
+ * single encode — there's nothing to configure beyond the codec itself
+ * (`scalabilityMode` defaults to `L3T3_KEY`, which is what we want).
+ * `backupCodec` is on by default so Safari / older Chromium fall back to
+ * VP8 automatically.
+ */
+function buildScreenSharePublishOpts(encodingBitrate: number, encodeFps: number): TrackPublishOptions {
+    return {
+        source: Track.Source.ScreenShare,
+        videoCodec: "vp9",
+        screenShareEncoding: { maxFramerate: encodeFps, maxBitrate: encodingBitrate },
+    };
+}
+
 export async function startScreenShare(options: ScreenShareSettings): Promise<boolean> {
     if (!room) return false;
 
@@ -549,57 +587,36 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
         ? { ...res, frameRate: encodeFps }
         : { width: 3840, height: 2160, frameRate: encodeFps };
 
-    // Bitrate scales with pixels-per-second so 60 fps is actually attainable.
-    // The flat 4 Mbps ceiling we used to use was the main reason higher rates
-    // dropped to ~30 on receivers — the encoder couldn't fit the frames and
-    // (with default `maintain-resolution`) dropped framerate to compensate.
-    // ~0.08 bits/pixel is a reasonable motion screen-share target across
-    // H.264/VP9. Floor at 1 Mbps, ceiling at 25 Mbps.
-    const bitrateForPixels = (w: number, h: number, fps: number) =>
-        Math.min(25_000_000, Math.max(1_000_000, Math.round(w * h * fps * 0.08)));
-    const encodingBitrate = bitrateForPixels(resolution.width, resolution.height, encodeFps);
-
-    // Two simulcast layers. LiveKit's `adaptiveStream` (enabled in
-    // connectToRoom) auto-subscribes each receiver to the layer that
-    // matches their video element size — small grid tiles get the low
-    // layer, maximized/fullscreen tiles get the high layer. Critically
-    // both layers run at the **same** framerate so a fallback never
-    // means "stuck at 30". The previous bug was hardcoding the low
-    // layer to `Math.min(encodeFps, 30)`, which capped receivers there.
-    const lowWidth = 960;
-    const lowHeight = 540;
-    const lowBitrate = bitrateForPixels(lowWidth, lowHeight, encodeFps);
-    const publishOpts = {
-        screenShareEncoding: { maxFramerate: encodeFps, maxBitrate: encodingBitrate },
-        screenShareSimulcastLayers: [
-            new VideoPreset(lowWidth, lowHeight, lowBitrate, encodeFps),
-        ],
-    };
+    const encodingBitrate = screenShareBitrate(resolution.width, resolution.height, encodeFps);
+    const publishOpts = buildScreenSharePublishOpts(encodingBitrate, encodeFps);
 
     const isLinuxDesktop = isDesktop && getElectronAPI()?.platform === "linux";
     const usePipecap = isLinuxDesktop && !!getPipecapAPI();
 
-    // Linux: pipecap captures via PipeWire, produces a MediaStream we inject into LiveKit
     if (usePipecap) {
+        // Linux: pipecap delivers real MediaStreamTracks (video via
+        // MediaStreamTrackGenerator from WebCodecs, audio via AudioWorklet).
+        // We publish them directly — no `setScreenShareEnabled`, no
+        // getDisplayMedia monkey-patching.
         const result = await pipecapScreenShare.startCapture(encodeFps, options.audio);
-        if (!result) return false; // User cancelled or pipecap unavailable
-
-        // Temporarily patch getDisplayMedia so LiveKit uses our stream
-        const originalGDM = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
-        navigator.mediaDevices.getDisplayMedia = async () => result.stream;
+        if (!result) return false;
 
         try {
-            await publishScreenShare(room, options.audio, resolution, publishOpts);
-        } catch {
+            const videoTrack = new LocalVideoTrack(result.videoTrack, undefined, false);
+            await room.localParticipant.publishTrack(videoTrack, publishOpts);
+
+            if (result.audioTrack) {
+                const audioTrack = new LocalAudioTrack(result.audioTrack, undefined, false);
+                await room.localParticipant.publishTrack(audioTrack, {
+                    source: Track.Source.ScreenShareAudio,
+                });
+            }
+        } catch (e) {
+            logger.voice.warn("Pipecap screen share publish failed", e);
             pipecapScreenShare.stop();
-            navigator.mediaDevices.getDisplayMedia = originalGDM;
             return false;
         }
 
-        navigator.mediaDevices.getDisplayMedia = originalGDM;
-
-        // Tell the user which audio source the share started with so they
-        // know whether the auto-detection picked their app or fell back.
         if (options.audio) {
             if (result.detectedApp) {
                 showToast(`Sharing audio from ${result.detectedApp}`, "success");
@@ -608,7 +625,7 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
             }
         }
     } else {
-        // Windows/macOS: standard getDisplayMedia flow
+        // Windows/macOS/web: native getDisplayMedia via LiveKit's helper.
         try {
             await publishScreenShare(room, options.audio, resolution, publishOpts);
         } catch {
@@ -616,24 +633,24 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
         }
     }
 
-    // Set content hint + tell WebRTC to drop *resolution* (not framerate)
-    // when bandwidth is constrained. Default for screen share is
-    // `maintain-resolution`, which is the wrong tradeoff if the user
-    // explicitly picked a high frame rate.
+    // Encoder hints. For screen content the right tradeoff under congestion
+    // is to keep resolution (text legibility) and let framerate dip — most
+    // screen frames are identical so dropped frames are mostly invisible,
+    // whereas dropped pixels turn text into mush. `contentHint = "detail"`
+    // tells the encoder to preserve high-frequency edges over temporal
+    // smoothness. We set this regardless of fps because a 60fps screen-share
+    // is still text editing, not video playback.
     try {
-        const hint = encodeFps >= 30 ? "motion" : "detail";
         room.localParticipant.videoTrackPublications.forEach(pub => {
             if (pub.source !== Track.Source.ScreenShare) return;
             const track = pub.track;
             if (!track?.mediaStreamTrack) return;
-            track.mediaStreamTrack.contentHint = hint;
+            track.mediaStreamTrack.contentHint = "detail";
 
-            // Reach into the underlying RTCRtpSender so we can set
-            // degradationPreference + reaffirm maxBitrate/maxFramerate.
             const sender = track.sender as RTCRtpSender | undefined;
             if (!sender) return;
             const params = sender.getParameters();
-            params.degradationPreference = "maintain-framerate";
+            params.degradationPreference = "maintain-resolution";
             for (const enc of params.encodings) {
                 enc.maxBitrate = encodingBitrate;
                 enc.maxFramerate = encodeFps;
@@ -654,7 +671,7 @@ async function publishScreenShare(
     room: Room,
     audio: boolean,
     resolution: { width: number; height: number; frameRate?: number },
-    publishOpts: { screenShareEncoding: { maxFramerate: number; maxBitrate: number }; screenShareSimulcastLayers: VideoPreset[] },
+    publishOpts: TrackPublishOptions,
 ): Promise<void> {
     try {
         await room.localParticipant.setScreenShareEnabled(true, { audio, resolution }, publishOpts);

@@ -35,7 +35,7 @@ if (process.platform === "linux") {
         return false;
       }
     },
-    readFrame: (): { width: number; height: number; data: ArrayBuffer } | null => {
+    readFrame: (): { width: number; height: number; stride: number; data: ArrayBuffer } | null => {
       if (shmFd === null) return null;
       // Header layout (from pipecap shm.rs):
       //   seq: u64 (offset 0), width: u32 (8), height: u32 (12),
@@ -47,12 +47,18 @@ if (process.platform === "linux") {
       lastSeq = seq;
       const width = headerBuf.readUInt32LE(8);
       const height = headerBuf.readUInt32LE(12);
+      const stride = headerBuf.readUInt32LE(16);
       const dataOffset = headerBuf.readUInt32LE(20);
       const dataSize = headerBuf.readUInt32LE(24);
       if (width === 0 || height === 0 || dataSize === 0) return null;
       const frameBuf = Buffer.alloc(dataSize);
       fs.readSync(shmFd, frameBuf, 0, dataSize, dataOffset);
-      return { width, height, data: frameBuf.buffer.slice(frameBuf.byteOffset, frameBuf.byteOffset + frameBuf.byteLength) };
+      return {
+        width,
+        height,
+        stride,
+        data: frameBuf.buffer.slice(frameBuf.byteOffset, frameBuf.byteOffset + frameBuf.byteLength),
+      };
     },
     close: () => {
       if (shmFd !== null) {

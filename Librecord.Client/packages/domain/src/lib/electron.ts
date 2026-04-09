@@ -68,7 +68,7 @@ export function getPipecapAPI(): PipecapAPI | undefined {
 /** Shared memory frame reader for pipecap video (Linux only). */
 export interface PipecapShmAPI {
     open: (shmPath: string) => boolean;
-    readFrame: () => { width: number; height: number; data: ArrayBuffer } | null;
+    readFrame: () => { width: number; height: number; stride: number; data: ArrayBuffer } | null;
     close: () => void;
 }
 
