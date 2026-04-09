@@ -92,6 +92,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("update-installed", handler);
     return () => { ipcRenderer.removeListener("update-installed", handler); };
   },
+  installUpdateNow: (): Promise<void> => ipcRenderer.invoke("desktop:installUpdateNow"),
 
   // Desktop settings
   getAutostart: (): Promise<boolean> => ipcRenderer.invoke("desktop:getAutostart"),

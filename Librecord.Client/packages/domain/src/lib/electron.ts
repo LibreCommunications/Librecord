@@ -17,6 +17,9 @@ export interface ElectronAPI {
     onUpdateAvailable: (callback: (version: string) => void) => () => void;
     onUpdateDownloaded: (callback: (version: string) => void) => () => void;
     onUpdateInstalled: (callback: (version: string) => void) => () => void;
+    /** Tell the main process to quit and install a previously-downloaded
+     * update. Triggered by the in-app update modal's "Restart now" button. */
+    installUpdateNow: () => Promise<void>;
     getAutostart: () => Promise<boolean>;
     setAutostart: (enabled: boolean) => Promise<boolean>;
     getMinimizeToTray: () => Promise<boolean>;

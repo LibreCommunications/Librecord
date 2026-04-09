@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ScreenShareIcon } from "./VoiceIcons";
+import { getElectronAPI } from "@librecord/domain";
 
 export interface ScreenShareOptions {
     resolution: "720p" | "1080p" | "1440p" | "source";
@@ -33,6 +34,13 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
     const [resolution, setResolution] = useState<ScreenShareOptions["resolution"]>("1080p");
     const [frameRate, setFrameRate] = useState<ScreenShareOptions["frameRate"]>(30);
     const [audio, setAudio] = useState(isDesktop);
+
+    // Windows can only deliver per-source audio for window captures (via
+    // Windows Graphics Capture). Sharing a full screen with audio would
+    // route the meeting's playback back into the share, so the main
+    // process drops audio for screen sources entirely. Surface that here
+    // so users pick a window when they want sound.
+    const isWindows = isDesktop && getElectronAPI()?.platform === "win32";
 
     if (!open) return null;
 
@@ -119,31 +127,49 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
                     </div>
 
                     {isDesktop && (
-                        <div
-                            className="flex items-center justify-between p-3 rounded-lg bg-[#2b2d31] cursor-pointer"
-                            onClick={() => setAudio(!audio)}
-                        >
-                            <div>
-                                <div className="text-sm font-medium text-[#dbdee1]">
-                                    Share Audio
-                                </div>
-                                <div className="text-xs text-[#949ba4]">
-                                    Include system audio in your stream
-                                </div>
-                            </div>
+                        <div className="space-y-2">
                             <div
-                                className={`
-                                    w-10 h-6 rounded-full relative transition-colors cursor-pointer
-                                    ${audio ? "bg-[#5865F2]" : "bg-[#4e5058]"}
-                                `}
+                                className="flex items-center justify-between p-3 rounded-lg bg-[#2b2d31] cursor-pointer"
+                                onClick={() => setAudio(!audio)}
                             >
+                                <div>
+                                    <div className="text-sm font-medium text-[#dbdee1]">
+                                        Share Audio
+                                    </div>
+                                    <div className="text-xs text-[#949ba4]">
+                                        {isWindows
+                                            ? "Only available when sharing a single window"
+                                            : "Include system audio in your stream"}
+                                    </div>
+                                </div>
                                 <div
                                     className={`
-                                        absolute top-1 w-4 h-4 rounded-full bg-white transition-transform
-                                        ${audio ? "translate-x-5" : "translate-x-1"}
+                                        w-10 h-6 rounded-full relative transition-colors cursor-pointer
+                                        ${audio ? "bg-[#5865F2]" : "bg-[#4e5058]"}
                                     `}
-                                />
+                                >
+                                    <div
+                                        className={`
+                                            absolute top-1 w-4 h-4 rounded-full bg-white transition-transform
+                                            ${audio ? "translate-x-5" : "translate-x-1"}
+                                        `}
+                                    />
+                                </div>
                             </div>
+
+                            {isWindows && audio && (
+                                <div className="flex gap-2 p-3 rounded-lg bg-[#f0b232]/10 border border-[#f0b232]/30">
+                                    <span className="text-[#f0b232] text-sm leading-5">⚠</span>
+                                    <div className="text-xs text-[#dbdee1] leading-5">
+                                        On Windows, audio capture only works when you share a{" "}
+                                        <span className="font-semibold">specific window</span>.
+                                        If you pick a full screen, audio will be silently dropped
+                                        — Windows can't capture system audio without including
+                                        the meeting itself, which would echo back to other
+                                        participants.
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

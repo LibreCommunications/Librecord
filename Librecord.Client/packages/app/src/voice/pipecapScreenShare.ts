@@ -1,23 +1,11 @@
 /**
  * Pipecap screen share integration for Linux.
  *
- * Capture pipeline (video):
- *   PipeWire → /dev/shm BGRA frames → preload fs read → VideoFrame(BGRA)
- *   → MediaStreamTrackGenerator → MediaStreamTrack → LiveKit publishTrack
- *
- * No canvas, no WebGL shader, no captureStream(). The previous pipeline
- * uploaded each frame to a GPU texture, ran a B↔R swizzle shader, drew to
- * a canvas, and pulled frames back out via captureStream — five copies and
- * a GPU roundtrip per frame at 60fps. WebCodecs `VideoFrame` accepts the
- * `BGRA` format directly so we hand the bytes straight to the encoder.
- *
- * Capture pipeline (audio):
- *   PipeWire → IPC f32 chunks → AudioWorklet ring buffer
- *   → MediaStreamAudioDestinationNode → MediaStreamTrack → publishTrack
- *
- * The previous path used `ScriptProcessorNode`, deprecated since 2014 and
- * scheduled on the audio render thread without Atomics. AudioWorklet runs
- * in a dedicated worklet thread with a real ring buffer.
+ *   Video: PipeWire → /dev/shm BGRA → preload fs read → VideoFrame(BGRA)
+ *          → MediaStreamTrackGenerator → publishTrack. No canvas/WebGL/
+ *          captureStream — VideoFrame eats BGRA directly.
+ *   Audio: pipecap IPC f32 chunks → AudioWorklet ring buffer →
+ *          MediaStreamAudioDestinationNode → publishTrack.
  */
 
 import { getPipecapAPI, getPipecapShmAPI } from "@librecord/domain";
@@ -180,10 +168,9 @@ function createVideoTrack(shm: ShmAPI, fps: number): { track: MediaStreamTrack; 
 // ── Audio track via AudioWorklet ──────────────────────────────────
 
 /**
- * Inline AudioWorkletProcessor source. Maintains its own circular buffer
- * (stereo interleaved f32) and drains it into the worklet output. Receives
- * new samples via `port.postMessage` from the renderer thread, which copies
- * incoming IPC chunks. Replaces the deprecated ScriptProcessorNode path.
+ * AudioWorkletProcessor source: stereo-interleaved f32 ring buffer fed
+ * via `port.postMessage` from the renderer, drained into the worklet
+ * output. Replaces the deprecated ScriptProcessorNode path.
  */
 const PIPECAP_AUDIO_WORKLET = `
 class PipecapAudioProcessor extends AudioWorkletProcessor {

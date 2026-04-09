@@ -19,6 +19,7 @@ if (process.platform === "linux") {
   } else {
     app.commandLine.appendSwitch("ozone-platform-hint", "auto");
   }
+
 }
 
 // Register librecord:// protocol handler
@@ -273,16 +274,20 @@ app.whenReady().then(() => {
         return;
       }
 
-      // System audio loopback — Windows only.
-      // `loopbackWithMute` captures the system audio mix with our own
-      // process's contribution removed from the captured stream (the user
-      // still hears it locally — only the share track is filtered). This
-      // is the Windows analog of pipecap's `excludePids` on Linux: it
-      // prevents the call participants' voices, played out of our speakers,
-      // from being re-captured back into the share and creating a feedback
-      // loop.
-      if (request.audioRequested && process.platform === "win32") {
-        callback({ video: selected, audio: "loopbackWithMute" });
+      // Audio capture policy on Windows:
+      //   - Window source: pass `audio: "loopback"`. On Win11 + recent
+      //     Chromium, WGC delivers per-window audio (i.e. only the
+      //     captured window's output, not the system mix), so the
+      //     meeting's audio doesn't loop back.
+      //   - Screen source: there is no per-process audio extraction at
+      //     the JS / getDisplayMedia level on Windows. `loopback` would
+      //     capture the full system mix, including the meeting we're
+      //     in, and remote participants would hear themselves echoed.
+      //     Drop audio for screen sources entirely; the renderer toasts
+      //     the user about it.
+      const isWindow = selected.id.startsWith("window:");
+      if (request.audioRequested && process.platform === "win32" && isWindow) {
+        callback({ video: selected, audio: "loopback" });
       } else {
         callback({ video: selected });
       }
@@ -293,13 +298,79 @@ app.whenReady().then(() => {
   if (process.platform === "linux") {
     try {
       const { setupPipecap } = require("@librecord/pipecap/electron/main");
-      // Inject every Electron process pid (main + all renderers + GPU/utility
-      // helpers) as `excludePids` so the host app never appears in its own
-      // audio share. The renderer doesn't need to know its own pid.
+      // Collect every Electron-owned pid for pipecap's `excludePids`.
+      // Three sources, unioned:
+      //   1. `app.getAppMetrics()` — Electron's own view (incomplete on
+      //      some versions, missing utility children like the audio service)
+      //   2. /proc/*/exe matching `process.execPath` — the reliable one;
+      //      every Chromium process re-execs the same binary, so this
+      //      catches the audio service even when the zygote re-parents it
+      //   3. Recursive ppid walk from our main pid — belt-and-suspenders
+      // ~10ms total on a typical /proc.
+      const collectExcludePids = (): number[] => {
+        const pids = new Set<number>([process.pid]);
+        for (const m of app.getAppMetrics()) pids.add(m.pid);
+        const fromMetrics = pids.size;
+
+        let exeMatches = 0;
+        try {
+          const fs = require("fs") as typeof import("fs");
+          const ourExe = fs.realpathSync(process.execPath);
+          console.log("pipecap: collectExcludePids: process.execPath =", process.execPath, "→ realpath =", ourExe);
+          const entries = fs.readdirSync("/proc").filter((n: string) => /^\d+$/.test(n));
+          const ppid = new Map<number, number>();
+
+          for (const name of entries) {
+            const pid = parseInt(name, 10);
+
+            // Source 2: any process whose exe path matches ours.
+            try {
+              const exe = fs.readlinkSync(`/proc/${pid}/exe`);
+              const real = fs.realpathSync(exe);
+              if (real === ourExe) {
+                pids.add(pid);
+                exeMatches++;
+              }
+            } catch {
+              // /proc/<pid>/exe is unreadable for processes owned by
+              // other users — that's fine, none of those are ours.
+            }
+
+            // Build ppid map for source 3.
+            try {
+              const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+              const lastParen = stat.lastIndexOf(")");
+              if (lastParen < 0) continue;
+              const fields = stat.slice(lastParen + 2).split(" ");
+              ppid.set(pid, parseInt(fields[1], 10));
+            } catch { /* process gone; ignore */ }
+          }
+
+          // Source 3: BFS from anything already known to be ours.
+          let added = true;
+          while (added) {
+            added = false;
+            for (const [pid, parent] of ppid) {
+              if (pids.has(parent) && !pids.has(pid)) {
+                pids.add(pid);
+                added = true;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("pipecap: /proc walk for excludePids failed", e);
+        }
+
+        console.log(
+          `pipecap: collectExcludePids: ${fromMetrics} from getAppMetrics, ${exeMatches} from /proc/*/exe, total=${pids.size}`,
+        );
+        return [...pids];
+      };
+
       setupPipecap(ipcMain, () => mainWindow, {
         transformStartOptions: (options: Record<string, unknown>) => ({
           ...options,
-          excludePids: app.getAppMetrics().map(m => m.pid),
+          excludePids: collectExcludePids(),
         }),
       });
 
