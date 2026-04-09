@@ -301,6 +301,22 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
         videoCaptureDefaults: {
             ...(camId && { deviceId: camId }),
         },
+        // Force consistent Opus parameters across every audio track in the
+        // room (mic + screen-share-audio). Modern WebRTC enforces RFC 8843
+        // strictly: every track in a BUNDLE group that uses Opus PT 111
+        // must declare *identical* fmtp params. By default LiveKit enables
+        // RED on mono tracks (mic) and disables it on stereo tracks
+        // (screen-share-audio). The mismatch produced
+        //   "A BUNDLE group contains a codec collision between
+        //    [111: audio/opus] and [111: audio/opus]"
+        // and an SDP renegotiation loop that stacked dozens of
+        // screen_share_audio publications. Disabling RED globally trades a
+        // tiny bit of mic resilience under packet loss for a working
+        // multi-audio-track session.
+        publishDefaults: {
+            red: false,
+            dtx: false,
+        },
     });
 
     // ── LiveKit observability ─────────────────────────────────
@@ -690,7 +706,35 @@ async function publishScreenShare(
 export async function stopScreenShare(): Promise<boolean> {
     if (!room) return false;
     pipecapScreenShare.stop();
-    await room.localParticipant.setScreenShareEnabled(false);
+
+    // Unpublish any manually-published screen-share tracks. The pipecap
+    // path uses `publishTrack()` directly (because we feed it our own
+    // MediaStreamTrack from MediaStreamTrackGenerator + AudioWorklet), and
+    // `setScreenShareEnabled(false)` only knows about tracks that were
+    // created via `setScreenShareEnabled(true)`. Without this, every
+    // share → unshare cycle leaks one video and one audio publication —
+    // visible in the panel as a growing stack of `screen_share_audio`
+    // rows, and on-wire as repeated SDP renegotiations.
+    const lp = room.localParticipant;
+    const screenPubs = [
+        ...lp.videoTrackPublications.values(),
+        ...lp.audioTrackPublications.values(),
+    ].filter(p =>
+        p.source === Track.Source.ScreenShare ||
+        p.source === Track.Source.ScreenShareAudio,
+    );
+    for (const pub of screenPubs) {
+        if (pub.track) {
+            try {
+                await lp.unpublishTrack(pub.track, true);
+            } catch (e) {
+                logger.voice.warn("Failed to unpublish screen-share track", e);
+            }
+        }
+    }
+
+    // Also call the LiveKit-managed stop for the non-pipecap path.
+    await lp.setScreenShareEnabled(false);
     return false;
 }
 
