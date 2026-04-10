@@ -79,3 +79,65 @@ export interface PipecapShmAPI {
 export function getPipecapShmAPI(): PipecapShmAPI | undefined {
     return (window as unknown as { pipecapShm?: PipecapShmAPI }).pipecapShm;
 }
+
+// ── Wincap (Windows) ──────────────────────────────────────────────
+
+export interface WincapDisplay {
+    kind: "display";
+    /** HMONITOR as string (BigInt isn't IPC-serialisable). */
+    monitorHandle: string;
+    name: string;
+    primary: boolean;
+    bounds: { x: number; y: number; width: number; height: number };
+}
+
+export interface WincapWindow {
+    kind: "window";
+    /** HWND as string. */
+    hwnd: string;
+    title: string;
+    pid: number;
+    bounds: { x: number; y: number; width: number; height: number };
+}
+
+export interface WincapCapabilities {
+    wgc: boolean;
+    wgcBorderOptional: boolean;
+    processLoopback: boolean;
+    windowsBuild: number;
+}
+
+export interface WincapEncodedFrame {
+    data: Uint8Array;
+    /** QPC nanoseconds, BigInt-as-string. */
+    timestampNs: string;
+    keyframe: boolean;
+}
+
+export interface WincapStartOptions {
+    sourceKind: "display" | "window";
+    /** HMONITOR or HWND as string. */
+    handle: string;
+    fps: number;
+    bitrateBps: number;
+    keyframeIntervalMs?: number;
+    codec?: "h264" | "hevc" | "av1";
+}
+
+/** Wincap API exposed on window.wincap (Windows only). */
+export interface WincapAPI {
+    available: () => Promise<boolean>;
+    getCapabilities: () => Promise<WincapCapabilities>;
+    listSources: () => Promise<{ displays: WincapDisplay[]; windows: WincapWindow[] }>;
+    startCapture: (options: WincapStartOptions) => Promise<boolean>;
+    stopCapture: () => Promise<void>;
+    requestKeyframe: () => Promise<void>;
+    setBitrate: (bps: number) => Promise<void>;
+    onEncoded: (callback: (frame: WincapEncodedFrame) => void) => () => void;
+    onError: (callback: (err: { component: string; hresult: number; message: string }) => void) => () => void;
+}
+
+/** Returns the wincap API if available (Windows desktop only), undefined otherwise. */
+export function getWincapAPI(): WincapAPI | undefined {
+    return (window as unknown as { wincap?: WincapAPI }).wincap;
+}

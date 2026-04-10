@@ -69,6 +69,36 @@ if (process.platform === "linux") {
   });
 }
 
+// Expose wincap API on Windows (window.wincap).
+if (process.platform === "win32") {
+  contextBridge.exposeInMainWorld("wincap", {
+    available: () => ipcRenderer.invoke("wincap:available"),
+    getCapabilities: () => ipcRenderer.invoke("wincap:getCapabilities"),
+    listSources: () => ipcRenderer.invoke("wincap:listSources"),
+    startCapture: (options: {
+      sourceKind: "display" | "window";
+      handle: string;
+      fps: number;
+      bitrateBps: number;
+      keyframeIntervalMs?: number;
+      codec?: "h264" | "hevc" | "av1";
+    }) => ipcRenderer.invoke("wincap:startCapture", options),
+    stopCapture: () => ipcRenderer.invoke("wincap:stopCapture"),
+    requestKeyframe: () => ipcRenderer.invoke("wincap:requestKeyframe"),
+    setBitrate: (bps: number) => ipcRenderer.invoke("wincap:setBitrate", bps),
+    onEncoded: (cb: (frame: { data: Buffer; timestampNs: string; keyframe: boolean }) => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, frame: { data: Buffer; timestampNs: string; keyframe: boolean }) => cb(frame);
+      ipcRenderer.on("wincap:encoded", handler);
+      return () => ipcRenderer.removeListener("wincap:encoded", handler);
+    },
+    onError: (cb: (err: { component: string; hresult: number; message: string }) => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, err: { component: string; hresult: number; message: string }) => cb(err);
+      ipcRenderer.on("wincap:error", handler);
+      return () => ipcRenderer.removeListener("wincap:error", handler);
+    },
+  });
+}
+
 contextBridge.exposeInMainWorld("electronAPI", {
   platform: process.platform,
   versions: {

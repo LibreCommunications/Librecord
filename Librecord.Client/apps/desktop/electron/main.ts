@@ -383,6 +383,112 @@ app.whenReady().then(() => {
     }
   }
 
+  // IPC: wincap (Windows screen capture via WGC + MF hardware encoder).
+  // Mirrors the pipecap pattern: lazy-load the optional native module,
+  // expose listSources/start/stop/keyframe over IPC, forward encoded
+  // H.264 NAL units to the renderer via webContents.send so the
+  // renderer can decode → MediaStreamTrackGenerator → publishTrack.
+  if (process.platform === "win32") {
+    try {
+      // wincap is an optional native dep — untyped require so the
+      // electron main TS build doesn't depend on the package being
+      // installed in the workspace at type-check time.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-explicit-any
+      const wincap: any = require("@librecord/wincap");
+
+      let session: { stop(): void; start(): void; on(ev: string, cb: (...args: unknown[]) => void): void; requestKeyframe(): void; setBitrate(bps: number): void } | null = null;
+
+      const closeSession = () => {
+        if (session) {
+          try { session.stop(); } catch { /* ignore */ }
+          session = null;
+        }
+      };
+
+      ipcMain.handle("wincap:available", () => true);
+
+      ipcMain.handle("wincap:getCapabilities", () => wincap.getCapabilities());
+
+      interface RawDisplay { monitorHandle: bigint; name: string; primary: boolean; bounds: { x: number; y: number; width: number; height: number } }
+      interface RawWindow  { hwnd: bigint; title: string; pid: number; bounds: { x: number; y: number; width: number; height: number } }
+
+      ipcMain.handle("wincap:listSources", () => ({
+        displays: (wincap.listDisplays() as RawDisplay[]).map((d) => ({
+          kind: "display" as const,
+          monitorHandle: d.monitorHandle.toString(), // BigInt → string for IPC
+          name: d.name,
+          primary: d.primary,
+          bounds: d.bounds,
+        })),
+        windows: (wincap.listWindows() as RawWindow[]).map((w) => ({
+          kind: "window" as const,
+          hwnd: w.hwnd.toString(),
+          title: w.title,
+          pid: w.pid,
+          bounds: w.bounds,
+        })),
+      }));
+
+      ipcMain.handle("wincap:startCapture", (_e, options: {
+        sourceKind: "display" | "window";
+        handle: string;             // BigInt-as-string
+        fps: number;
+        bitrateBps: number;
+        keyframeIntervalMs?: number;
+        codec?: "h264" | "hevc" | "av1";
+      }) => {
+        closeSession();
+
+        const handle = BigInt(options.handle);
+        const source = options.sourceKind === "display"
+          ? { kind: "display" as const, monitorHandle: handle }
+          : { kind: "window"  as const, hwnd: handle };
+
+        const newSession = new wincap.CaptureSession({
+          source,
+          delivery: {
+            type: "encoded",
+            codec: options.codec ?? "h264",
+            bitrateBps: options.bitrateBps,
+            fps: options.fps,
+            keyframeIntervalMs: options.keyframeIntervalMs ?? 2000,
+          },
+        });
+
+        newSession.on("encoded", (frame: { data: ArrayBuffer; timestampNs: bigint; keyframe: boolean }) => {
+          mainWindow?.webContents.send("wincap:encoded", {
+            data: Buffer.from(frame.data),
+            timestampNs: frame.timestampNs.toString(),
+            keyframe: frame.keyframe,
+          });
+        });
+        newSession.on("error", (err: { component: string; hresult: number; message: string }) => {
+          mainWindow?.webContents.send("wincap:error", err);
+        });
+
+        newSession.start();
+        session = newSession;
+        return true;
+      });
+
+      ipcMain.handle("wincap:stopCapture", () => {
+        closeSession();
+      });
+
+      ipcMain.handle("wincap:requestKeyframe", () => {
+        session?.requestKeyframe();
+      });
+
+      ipcMain.handle("wincap:setBitrate", (_e, bps: number) => {
+        session?.setBitrate(bps);
+      });
+
+      app.on("will-quit", closeSession);
+    } catch (e) {
+      console.warn("wincap: native module not available", (e as Error).message);
+    }
+  }
+
   // IPC: app version
   ipcMain.handle("desktop:getAppVersion", () => app.getVersion());
 

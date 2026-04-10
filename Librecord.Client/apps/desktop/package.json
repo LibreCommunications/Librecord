@@ -29,7 +29,8 @@
     "react-router-dom": "^7.9.6"
   },
   "optionalDependencies": {
-    "@librecord/pipecap": "file:../../../../pipecap"
+    "@librecord/pipecap": "file:../../../../pipecap",
+    "@librecord/wincap": "file:../../../../wincap"
   },
   "devDependencies": {
     "@rolldown/plugin-babel": "^0.2.2",
@@ -59,7 +60,8 @@
       "build/icons/**/*",
       "package.json",
       "node_modules/pkg-prebuilds/**/*",
-      "node_modules/@librecord/pipecap/**/*"
+      "node_modules/@librecord/pipecap/**/*",
+      "node_modules/@librecord/wincap/**/*"
     ],
     "linux": {
       "target": [

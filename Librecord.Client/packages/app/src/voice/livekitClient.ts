@@ -20,8 +20,9 @@ import {
     clearActiveProcessor,
     type LocalAudioTrackLike,
 } from "./noiseSuppression";
-import { logger, getElectronAPI, getPipecapAPI, isDesktop } from "@librecord/domain";
+import { logger, getElectronAPI, getPipecapAPI, getWincapAPI, isDesktop } from "@librecord/domain";
 import * as pipecapScreenShare from "./pipecapScreenShare";
+import * as wincapScreenShare from "./wincapScreenShare";
 import { onCustomEvent } from "../typedEvent";
 import { STORAGE } from "@librecord/domain";
 
@@ -589,8 +590,39 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
     const encodingBitrate = screenShareBitrate(resolution.width, resolution.height, encodeFps);
     const publishOpts = buildScreenSharePublishOpts(encodingBitrate, encodeFps);
 
-    const isLinuxDesktop = isDesktop && getElectronAPI()?.platform === "linux";
+    const platform = getElectronAPI()?.platform;
+    const isLinuxDesktop = isDesktop && platform === "linux";
+    const isWindowsDesktop = isDesktop && platform === "win32";
     const usePipecap = isLinuxDesktop && !!getPipecapAPI();
+    const useWincap  = isWindowsDesktop && !!getWincapAPI();
+
+    if (useWincap) {
+        // Windows: wincap delivers H.264 NAL units; the renderer decodes
+        // with WebCodecs and pipes VideoFrames into a
+        // MediaStreamTrackGenerator. No getDisplayMedia.
+        const result = await wincapScreenShare.startCapture(encodeFps, encodingBitrate);
+        if (!result) {
+            // Wincap unavailable / declined / decoder failed — fall
+            // through to getDisplayMedia for a graceful degradation.
+            logger.voice.warn("Wincap unavailable, falling back to getDisplayMedia");
+        } else {
+            try {
+                const videoTrack = new LocalVideoTrack(result.videoTrack, undefined, false);
+                await room.localParticipant.publishTrack(videoTrack, publishOpts);
+                if (result.sourceName) {
+                    showToast(`Sharing ${result.sourceName}`, "success");
+                }
+                if (options.audio) {
+                    showToast("Wincap audio capture not yet wired", "info");
+                }
+                return true;
+            } catch (e) {
+                logger.voice.warn("Wincap screen share publish failed", e);
+                wincapScreenShare.stop();
+                return false;
+            }
+        }
+    }
 
     if (usePipecap) {
         // Linux: pipecap hands us real MediaStreamTracks; publish them
@@ -712,7 +744,10 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
     return true;
 }
 
+// Always stop both wincap and pipecap on screenshare stop. Only one can
+// be active at a time, the other call is a cheap no-op.
 export async function stopScreenShare(): Promise<boolean> {
+    wincapScreenShare.stop();
     if (!room) return false;
     pipecapScreenShare.stop();
 
