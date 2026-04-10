@@ -45,6 +45,33 @@ jobs:
             --pattern "*.node" \
             --dir "${GITHUB_WORKSPACE}/../pipecap"
 
+      - name: Fetch latest wincap (windows only)
+        if: matrix.platform == 'win'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tag = gh release view --repo LibreCommunications/wincap --json tagName -q .tagName
+          Write-Host "Using wincap $tag"
+          $dest = Join-Path $env:GITHUB_WORKSPACE "..\wincap"
+          # node-gyp-build resolves wincap.node from build/Release first;
+          # the wincap publish workflow ships it as `wincap-x64.node`
+          # under the GitHub release, so we drop it in place + rename.
+          git clone --depth 1 --branch $tag https://github.com/LibreCommunications/wincap.git $dest
+          New-Item -ItemType Directory -Force -Path "$dest/build/Release" | Out-Null
+          gh release download $tag --repo LibreCommunications/wincap `
+            --pattern "wincap-x64.node" `
+            --dir "$dest/build/Release"
+          Move-Item "$dest/build/Release/wincap-x64.node" "$dest/build/Release/wincap.node" -Force
+          # The TS facade (dist/index.js) is the package's "main"; wincap
+          # ships it as a zipped artifact alongside the .node.
+          gh release download $tag --repo LibreCommunications/wincap `
+            --pattern "wincap-dist.zip" `
+            --dir $dest
+          Expand-Archive -Path "$dest/wincap-dist.zip" -DestinationPath $dest -Force
+          Remove-Item "$dest/wincap-dist.zip"
+
       - name: Install dependencies
         working-directory: Librecord.Client
         run: pnpm install --frozen-lockfile
