@@ -597,23 +597,40 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
     const useWincap  = isWindowsDesktop && !!getWincapAPI();
 
     if (useWincap) {
-        // Windows: wincap delivers H.264 NAL units; the renderer decodes
-        // with WebCodecs and pipes VideoFrames into a
-        // MediaStreamTrackGenerator. No getDisplayMedia.
-        const result = await wincapScreenShare.startCapture(encodeFps, encodingBitrate);
+        // Windows: wincap delivers encoded NAL/OBU units; the renderer
+        // decodes with WebCodecs and pipes VideoFrames into a
+        // MediaStreamTrackGenerator. Audio comes from a WASAPI loopback
+        // worklet bridge mirroring the pipecap path. No getDisplayMedia.
+        const result = await wincapScreenShare.startCapture({
+            fps: encodeFps,
+            bitrateBps: encodingBitrate,
+            audio: options.audio,
+            codec: "h264",
+        });
         if (!result) {
-            // Wincap unavailable / declined / decoder failed — fall
-            // through to getDisplayMedia for a graceful degradation.
-            logger.voice.warn("Wincap unavailable, falling back to getDisplayMedia");
+            // Cancelled, declined, or wincap failed — fall through to
+            // getDisplayMedia for a graceful degradation.
+            logger.voice.warn("Wincap returned no result, falling back to getDisplayMedia");
         } else {
             try {
                 const videoTrack = new LocalVideoTrack(result.videoTrack, undefined, false);
                 await room.localParticipant.publishTrack(videoTrack, publishOpts);
+
+                if (result.audioTrack) {
+                    const audioTrack = new LocalAudioTrack(result.audioTrack, undefined, false);
+                    await room.localParticipant.publishTrack(audioTrack, {
+                        source: Track.Source.ScreenShareAudio,
+                        red: false,
+                        dtx: false,
+                        forceStereo: true,
+                    });
+                }
+
                 if (result.sourceName) {
                     showToast(`Sharing ${result.sourceName}`, "success");
                 }
-                if (options.audio) {
-                    showToast("Wincap audio capture not yet wired", "info");
+                if (options.audio && !result.audioTrack) {
+                    showToast("Wincap audio capture failed", "info");
                 }
                 return true;
             } catch (e) {

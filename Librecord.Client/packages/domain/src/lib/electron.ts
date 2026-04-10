@@ -124,17 +124,49 @@ export interface WincapStartOptions {
     codec?: "h264" | "hevc" | "av1";
 }
 
+export interface WincapPickResult {
+    kind: "display" | "window";
+    /** HMONITOR or HWND as string. */
+    handle: string;
+    /** Display name or window title. */
+    name: string;
+}
+
+export interface WincapAudioChunk {
+    /** QPC ns as BigInt-as-string. */
+    timestampNs: string;
+    frameCount: number;
+    sampleRate: number;
+    channels: number;
+    /** Interleaved float32 samples. */
+    data: Uint8Array;
+}
+
 /** Wincap API exposed on window.wincap (Windows only). */
 export interface WincapAPI {
     available: () => Promise<boolean>;
     getCapabilities: () => Promise<WincapCapabilities>;
     listSources: () => Promise<{ displays: WincapDisplay[]; windows: WincapWindow[] }>;
+
+    /** Open the shared in-app picker UI populated with wincap sources.
+     *  Resolves to the user's selection or null on cancel. */
+    showPicker: () => Promise<WincapPickResult | null>;
+
     startCapture: (options: WincapStartOptions) => Promise<boolean>;
     stopCapture: () => Promise<void>;
     requestKeyframe: () => Promise<void>;
     setBitrate: (bps: number) => Promise<void>;
+
+    /** Start a WASAPI loopback audio capture session.
+     *  systemLoopback = whole-device mix; processLoopback = a specific
+     *  PID's output (Win11 22000+ only). */
+    startAudio: (options?: { mode?: "systemLoopback" | "processLoopback"; pid?: number }) => Promise<boolean>;
+    stopAudio: () => Promise<void>;
+
     onEncoded: (callback: (frame: WincapEncodedFrame) => void) => () => void;
     onError: (callback: (err: { component: string; hresult: number; message: string }) => void) => () => void;
+    onAudio: (callback: (chunk: WincapAudioChunk) => void) => () => void;
+    onAudioError: (callback: (err: unknown) => void) => () => void;
 }
 
 /** Returns the wincap API if available (Windows desktop only), undefined otherwise. */
