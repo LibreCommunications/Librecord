@@ -102,7 +102,21 @@ export function setupWindowsScreenCapture(
         wincap = require("@librecord/wincap");
     } catch (e) {
         console.warn("wincap: native module not available", (e as Error).message);
-        ipcMain.handle("wincap:available", () => false);
+        // Register no-op stubs for every channel the preload exposes so a
+        // misconfigured install can't crash callers with "No handler
+        // registered". The renderer is expected to call available()
+        // first and fall back to getDisplayMedia when it returns false.
+        const unavailable = async () => { throw new Error("wincap unavailable"); };
+        ipcMain.handle("wincap:available",       async () => false);
+        ipcMain.handle("wincap:getCapabilities", unavailable);
+        ipcMain.handle("wincap:listSources",     unavailable);
+        ipcMain.handle("wincap:showPicker",      async () => null);
+        ipcMain.handle("wincap:startCapture",    unavailable);
+        ipcMain.handle("wincap:stopCapture",     async () => undefined);
+        ipcMain.handle("wincap:requestKeyframe", async () => undefined);
+        ipcMain.handle("wincap:setBitrate",      async () => undefined);
+        ipcMain.handle("wincap:startAudio",      unavailable);
+        ipcMain.handle("wincap:stopAudio",       async () => undefined);
         return;
     }
 

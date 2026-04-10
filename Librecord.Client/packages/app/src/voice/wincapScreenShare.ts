@@ -62,6 +62,17 @@ export async function startCapture(options: StartOptions): Promise<WincapCapture
     const wincap = getWincapAPI();
     if (!wincap) return null;
 
+    // The preload always exposes window.wincap, but the main process
+    // may have failed to require @librecord/wincap (missing native
+    // module, wrong ABI, etc). Probe before invoking anything else so
+    // callers can fall back instead of throwing on showPicker().
+    try {
+        const ok = await wincap.available();
+        if (!ok) return null;
+    } catch {
+        return null;
+    }
+
     const codec: WincapCodec = options.codec ?? "h264";
 
     const picked = await wincap.showPicker();
