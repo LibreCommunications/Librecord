@@ -322,10 +322,32 @@ export function setupWindowsScreenCapture(
 
     ipcMain.handle("wincap:startAudio", (_e, options?: { mode?: "systemLoopback" | "processLoopback"; pid?: number }) => {
         closeAudio();
-        const mode = options?.mode ?? "systemLoopback";
-        const ctorOpts = mode === "processLoopback"
-            ? { mode: "processLoopback" as const, pid: options!.pid! }
-            : { mode: "systemLoopback" as const };
+
+        // Default behaviour: capture the system mix MINUS the Librecord
+        // process tree, so the meeting we're publishing into doesn't
+        // echo back to other participants. This requires Win11 22000+
+        // (PROCESS_LOOPBACK with EXCLUDE_TARGET_PROCESS_TREE). On older
+        // builds we fall back to whole-device systemLoopback, which is
+        // best-effort and the renderer should warn the user about.
+        let ctorOpts: unknown;
+        if (options?.mode === "processLoopback" && options.pid !== undefined) {
+            // Renderer-supplied override (e.g. share a specific app's audio).
+            ctorOpts = { mode: "processLoopback", pid: options.pid, includeTree: true };
+        } else if (options?.mode === "systemLoopback") {
+            ctorOpts = { mode: "systemLoopback" };
+        } else {
+            const caps = wincap.getCapabilities() as { processLoopback?: boolean };
+            if (caps?.processLoopback) {
+                ctorOpts = {
+                    mode: "processLoopback",
+                    pid: process.pid,
+                    includeTree: false, // EXCLUDE_TARGET_PROCESS_TREE
+                };
+            } else {
+                ctorOpts = { mode: "systemLoopback" };
+            }
+        }
+
         const session = new wincap.AudioSession(ctorOpts);
 
         session.on("chunk", (chunk) => {

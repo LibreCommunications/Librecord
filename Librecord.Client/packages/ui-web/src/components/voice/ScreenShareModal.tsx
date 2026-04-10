@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ScreenShareIcon } from "./VoiceIcons";
-import { getElectronAPI } from "@librecord/domain";
+import { getElectronAPI, getWincapAPI } from "@librecord/domain";
 
 export interface ScreenShareOptions {
     resolution: "720p" | "1080p" | "1440p" | "source";
@@ -35,12 +35,38 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
     const [frameRate, setFrameRate] = useState<ScreenShareOptions["frameRate"]>(30);
     const [audio, setAudio] = useState(isDesktop);
 
-    // Windows can only deliver per-source audio for window captures (via
-    // Windows Graphics Capture). Sharing a full screen with audio would
-    // route the meeting's playback back into the share, so the main
-    // process drops audio for screen sources entirely. Surface that here
-    // so users pick a window when they want sound.
+    // On Windows, the audio path depends on which capture engine the
+    // main process actually loaded:
+    //   - wincap + Win11 22000+ → WASAPI process loopback with
+    //     EXCLUDE_TARGET_PROCESS_TREE captures the full system mix MINUS
+    //     Librecord, so screens can publish audio without echo.
+    //   - wincap missing OR Win10 → desktopCapturer fallback, which only
+    //     gets per-window audio. Screens drop audio.
+    // Probe both at modal open so the warning only shows when the
+    // limitation actually applies.
     const isWindows = isDesktop && getElectronAPI()?.platform === "win32";
+    const [windowsAudioWarning, setWindowsAudioWarning] = useState(isWindows);
+
+    useEffect(() => {
+        if (!isWindows) return;
+        let cancelled = false;
+        (async () => {
+            const wincap = getWincapAPI();
+            if (!wincap) {
+                if (!cancelled) setWindowsAudioWarning(true);
+                return;
+            }
+            try {
+                const ok = await wincap.available();
+                if (!ok) { if (!cancelled) setWindowsAudioWarning(true); return; }
+                const caps = await wincap.getCapabilities();
+                if (!cancelled) setWindowsAudioWarning(!caps.processLoopback);
+            } catch {
+                if (!cancelled) setWindowsAudioWarning(true);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [isWindows]);
 
     if (!open) return null;
 
@@ -157,16 +183,15 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
                                 </div>
                             </div>
 
-                            {isWindows && audio && (
+                            {windowsAudioWarning && audio && (
                                 <div className="flex gap-2 p-3 rounded-lg bg-[#f0b232]/10 border border-[#f0b232]/30">
                                     <span className="text-[#f0b232] text-sm leading-5">⚠</span>
                                     <div className="text-xs text-[#dbdee1] leading-5">
-                                        On Windows, audio capture only works when you share a{" "}
-                                        <span className="font-semibold">specific window</span>.
-                                        If you pick a full screen, audio will be silently dropped
-                                        — Windows can't capture system audio without including
-                                        the meeting itself, which would echo back to other
-                                        participants.
+                                        Echo-free system audio needs Windows 11 with the wincap
+                                        native module. Without it, audio only works for{" "}
+                                        <span className="font-semibold">window captures</span> —
+                                        sharing a full screen will drop audio to avoid echoing
+                                        the meeting back to other participants.
                                     </div>
                                 </div>
                             )}
