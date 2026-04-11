@@ -55,22 +55,14 @@ jobs:
           $tag = gh release view --repo LibreCommunications/wincap --json tagName -q .tagName
           Write-Host "Using wincap $tag"
           $dest = Join-Path $env:GITHUB_WORKSPACE "..\wincap"
-          # node-gyp-build resolves wincap.node from build/Release first;
-          # the wincap publish workflow ships it as `wincap-x64.node`
-          # under the GitHub release, so we drop it in place + rename.
+          # Clone the repo (has package.json, lib.js, lib.d.ts, index.js,
+          # index.d.ts, Cargo.toml, crates/). Then download the pre-built
+          # .node binary from the GitHub release into the repo root where
+          # napi-rs's index.js loader expects it.
           git clone --depth 1 --branch $tag https://github.com/LibreCommunications/wincap.git $dest
-          New-Item -ItemType Directory -Force -Path "$dest/build/Release" | Out-Null
           gh release download $tag --repo LibreCommunications/wincap `
-            --pattern "wincap-x64.node" `
-            --dir "$dest/build/Release"
-          Move-Item "$dest/build/Release/wincap-x64.node" "$dest/build/Release/wincap.node" -Force
-          # The TS facade (dist/index.js) is the package's "main"; wincap
-          # ships it as a zipped artifact alongside the .node.
-          gh release download $tag --repo LibreCommunications/wincap `
-            --pattern "wincap-dist.zip" `
+            --pattern "*.node" `
             --dir $dest
-          Expand-Archive -Path "$dest/wincap-dist.zip" -DestinationPath $dest -Force
-          Remove-Item "$dest/wincap-dist.zip"
 
       - name: Install dependencies
         working-directory: Librecord.Client
