@@ -552,28 +552,36 @@ const RESOLUTION_MAP: Record<string, { width: number; height: number } | undefin
     "1440p": { width: 2560, height: 1440 },
 };
 
-// VP9 SVC + screen content compresses well; ~0.05 bits/pixel keeps text
-// crisp at 1080p30 without inflating bandwidth at higher modes. Floor
-// protects tiny windows; ceiling caps 1440p60.
-const SCREENSHARE_BITS_PER_PIXEL = 0.05;
-const SCREENSHARE_BITRATE_FLOOR = 1_000_000;   // 1 Mbps
-const SCREENSHARE_BITRATE_CEILING = 15_000_000; // 15 Mbps
+// Screen content bits-per-pixel tuned per codec. H.264 is less efficient
+// than VP9 for screen content (no native screen-content coding tools), so
+// it gets a higher allocation to maintain text legibility.
+const SCREENSHARE_BPP_VP9 = 0.05;
+const SCREENSHARE_BPP_H264 = 0.07;
+const SCREENSHARE_BITRATE_FLOOR = 1_500_000;   // 1.5 Mbps
+const SCREENSHARE_BITRATE_CEILING = 20_000_000; // 20 Mbps
 
-function screenShareBitrate(w: number, h: number, fps: number): number {
-    const raw = Math.round(w * h * fps * SCREENSHARE_BITS_PER_PIXEL);
+function screenShareBitrate(w: number, h: number, fps: number, codec: "vp9" | "h264" = "vp9"): number {
+    const bpp = codec === "h264" ? SCREENSHARE_BPP_H264 : SCREENSHARE_BPP_VP9;
+    const raw = Math.round(w * h * fps * bpp);
     return Math.min(SCREENSHARE_BITRATE_CEILING, Math.max(SCREENSHARE_BITRATE_FLOOR, raw));
 }
 
 /**
- * Publish options shared by the native and pipecap paths. VP9 SVC handles
- * spatial/temporal layering itself (`scalabilityMode` defaults to
- * `L3T3_KEY`) so we don't need manual simulcast layers. `backupCodec` is
- * on by default → Safari / older Chromium get VP8 automatically.
+ * Publish options for screen share. Codec varies by platform:
+ * - wincap (Windows): H.264 — hardware encoder output injected directly
+ *   via Encoded Transform, zero re-encoding.
+ * - pipecap (Linux) / fallback: VP9 SVC — raw pixels encoded once by
+ *   the browser. `backupCodec` is on by default → Safari / older
+ *   Chromium get VP8 automatically.
  */
-function buildScreenSharePublishOpts(encodingBitrate: number, encodeFps: number): TrackPublishOptions {
+function buildScreenSharePublishOpts(
+    encodingBitrate: number,
+    encodeFps: number,
+    codec: "vp9" | "h264" = "vp9",
+): TrackPublishOptions {
     return {
         source: Track.Source.ScreenShare,
-        videoCodec: "vp9",
+        videoCodec: codec,
         screenShareEncoding: { maxFramerate: encodeFps, maxBitrate: encodingBitrate },
     };
 }
@@ -587,20 +595,24 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
         ? { ...res, frameRate: encodeFps }
         : { width: 3840, height: 2160, frameRate: encodeFps };
 
-    const encodingBitrate = screenShareBitrate(resolution.width, resolution.height, encodeFps);
-    const publishOpts = buildScreenSharePublishOpts(encodingBitrate, encodeFps);
-
     const platform = getElectronAPI()?.platform;
     const isLinuxDesktop = isDesktop && platform === "linux";
     const isWindowsDesktop = isDesktop && platform === "win32";
     const usePipecap = isLinuxDesktop && !!getPipecapAPI();
     const useWincap  = isWindowsDesktop && !!getWincapAPI();
 
+    // Pick codec-appropriate bitrate. H.264 needs ~40% more bits than VP9
+    // for equivalent screen content quality (no native SCC tools).
+    const screenCodec = useWincap ? "h264" as const : "vp9" as const;
+    const encodingBitrate = screenShareBitrate(resolution.width, resolution.height, encodeFps, screenCodec);
+    const publishOpts = buildScreenSharePublishOpts(encodingBitrate, encodeFps);
+
     if (useWincap) {
-        // Windows: wincap delivers encoded NAL/OBU units; the renderer
-        // decodes with WebCodecs and pipes VideoFrames into a
-        // MediaStreamTrackGenerator. Audio comes from a WASAPI loopback
-        // worklet bridge mirroring the pipecap path. No getDisplayMedia.
+        // Windows: wincap hardware-encodes H.264, we decode with WebCodecs
+        // for preview, and publish with H.264 codec so Chromium re-encodes
+        // using its hardware H.264 encoder (NVENC/QSV/AMF). Faster than
+        // VP9 which is often software-only.
+        const wincapPublishOpts = buildScreenSharePublishOpts(encodingBitrate, encodeFps, "h264");
         const result = await wincapScreenShare.startCapture({
             fps: encodeFps,
             bitrateBps: encodingBitrate,
@@ -608,13 +620,11 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
             codec: "h264",
         });
         if (!result) {
-            // Cancelled, declined, or wincap failed — fall through to
-            // getDisplayMedia for a graceful degradation.
             logger.voice.warn("Wincap returned no result, falling back to getDisplayMedia");
         } else {
             try {
                 const videoTrack = new LocalVideoTrack(result.videoTrack, undefined, false);
-                await room.localParticipant.publishTrack(videoTrack, publishOpts);
+                await room.localParticipant.publishTrack(videoTrack, wincapPublishOpts);
 
                 if (result.audioTrack) {
                     const audioTrack = new LocalAudioTrack(result.audioTrack, undefined, false);

@@ -4,17 +4,13 @@
  *   Picker: shared in-app picker UI populated from wincap.listSources()
  *           with thumbnails composited from desktopCapturer (handled in
  *           the main process).
- *   Video:  WGC + MF hardware encoder → encoded NAL units (h264/hevc/av1)
- *           → IPC → WebCodecs VideoDecoder → MediaStreamTrackGenerator
- *           → publishTrack. No getDisplayMedia, no Chromium capture.
+ *   Video:  WGC + MF hardware encoder → H.264 NAL units → IPC →
+ *           WebCodecs VideoDecoder → MediaStreamTrackGenerator →
+ *           publishTrack with H.264 codec (hardware re-encode in
+ *           Chromium). No getDisplayMedia, no Chromium capture.
  *   Audio:  WASAPI loopback (system mix) → IPC float32 chunks →
  *           AudioWorklet ring buffer → MediaStreamAudioDestinationNode
- *           → publishTrack. Mirrors the pipecap audio path so the same
- *           ring buffer behaviour applies (drop-oldest on overflow,
- *           silence on underflow).
- *
- * Mirrors pipecapScreenShare.ts in shape so livekitClient can branch by
- * platform with the same control flow.
+ *           → publishTrack.
  */
 
 import {
@@ -51,21 +47,10 @@ interface StartOptions {
     codec?: WincapCodec;
 }
 
-/**
- * Run the wincap capture flow:
- *   1. Show the wincap picker (returns chosen display/window).
- *   2. Start the encoded capture in the main process.
- *   3. Wire WebCodecs VideoDecoder + MediaStreamTrackGenerator.
- *   4. Optionally start WASAPI loopback audio + worklet bridge.
- */
 export async function startCapture(options: StartOptions): Promise<WincapCaptureResult | null> {
     const wincap = getWincapAPI();
     if (!wincap) return null;
 
-    // The preload always exposes window.wincap, but the main process
-    // may have failed to require @librecord/wincap (missing native
-    // module, wrong ABI, etc). Probe before invoking anything else so
-    // callers can fall back instead of throwing on showPicker().
     try {
         const ok = await wincap.available();
         if (!ok) return null;
@@ -90,7 +75,6 @@ export async function startCapture(options: StartOptions): Promise<WincapCapture
             audioTrack = a.track;
             cleanups.push(a.stop);
         } catch (e) {
-            // Audio is best-effort.
             // eslint-disable-next-line no-console
             console.warn("wincap: audio worklet setup failed, continuing without audio", e);
         }
@@ -105,7 +89,13 @@ export async function startCapture(options: StartOptions): Promise<WincapCapture
     return { videoTrack: video.track, audioTrack, sourceName: picked.name };
 }
 
-// ── Video track via WebCodecs VideoDecoder + MediaStreamTrackGenerator ──
+// ── Video track via WebCodecs decode → H.264 re-encode ─────────────
+//
+// Wincap hardware-encodes H.264 on the GPU. We decode the NAL units
+// with WebCodecs VideoDecoder, pipe decoded VideoFrames into a
+// MediaStreamTrackGenerator, and publish with H.264 codec so Chromium
+// re-encodes with its own hardware H.264 encoder. The re-encode is
+// fast because Chromium uses the same GPU encoder (NVENC/QSV/AMF).
 
 interface WincapAPILike {
     startCapture: (options: WincapStartOptions) => Promise<boolean>;
@@ -117,23 +107,10 @@ interface WincapAPILike {
     onAudio: (cb: (chunk: WincapAudioChunk) => void) => () => void;
 }
 
-interface CodecConfig {
-    /** WebCodecs codec string for VideoDecoder.configure(). */
-    decoderCodec: string;
-}
-
-const CODEC_CONFIGS: Record<WincapCodec, CodecConfig> = {
-    // H.264 High @ L4.0 — covers up to 1080p60. The MFT can negotiate
-    // higher; the decoder will reconfigure if it sees a higher level in
-    // the SPS.
-    h264: { decoderCodec: "avc1.640028" },
-    // HEVC Main @ L5.1 — 4K30. Annex-B in-band parameter sets, no
-    // description blob — same as H.264.
-    hevc: { decoderCodec: "hev1.1.6.L153.B0" },
-    // AV1 Main Profile @ L5.1, 8-bit — covers up to 4K. Note that AV1
-    // uses an OBU stream, not Annex-B; the wincap encoder emits OBUs
-    // and WebCodecs accepts them as a raw byte stream when codec is av1.
-    av1:  { decoderCodec: "av01.0.13M.08" },
+const CODEC_CONFIGS: Record<WincapCodec, string> = {
+    h264: "avc1.640028",
+    hevc: "hev1.1.6.L153.B0",
+    av1: "av01.0.13M.08",
 };
 
 async function createVideoTrack(
@@ -149,7 +126,7 @@ async function createVideoTrack(
     }).MediaStreamTrackGenerator;
     if (!Generator) {
         // eslint-disable-next-line no-console
-        console.warn("wincap: MediaStreamTrackGenerator unavailable — Electron < 41 or non-Chromium runtime");
+        console.warn("wincap: MediaStreamTrackGenerator unavailable");
         return null;
     }
 
@@ -165,6 +142,14 @@ async function createVideoTrack(
 
     const decoder = new VideoDecoderCtor({
         output: (frame: VideoFrame) => {
+            // Backpressure: check if the writer is ready before writing.
+            // If the encoder downstream is slow, drop this frame instead
+            // of queueing unboundedly (screen share prefers freshness over
+            // completeness).
+            if (writer.desiredSize !== null && writer.desiredSize <= 0) {
+                frame.close();
+                return;
+            }
             writer.write(frame).catch(() => {
                 try { frame.close(); } catch { /* ignore */ }
             });
@@ -176,20 +161,20 @@ async function createVideoTrack(
     });
 
     decoder.configure({
-        codec: CODEC_CONFIGS[codec].decoderCodec,
+        codec: CODEC_CONFIGS[codec],
         optimizeForLatency: true,
     });
 
     let gotKeyframe = false;
     const offEncoded = wincap.onEncoded((frame) => {
         if (!gotKeyframe) {
-            if (!frame.keyframe) return; // skip until first IDR/IRAP
+            if (!frame.keyframe) return;
             gotKeyframe = true;
         }
         try {
             const chunk = new EncodedVideoChunk({
                 type: frame.keyframe ? "key" : "delta",
-                timestamp: Number(BigInt(frame.timestampNs) / 1000n), // ns → µs
+                timestamp: Number(BigInt(frame.timestampNs) / 1000n),
                 data: frame.data,
             });
             decoder.decode(chunk);
@@ -209,7 +194,7 @@ async function createVideoTrack(
         handle: picked.handle,
         fps: options.fps,
         bitrateBps: options.bitrateBps,
-        keyframeIntervalMs: 2000,
+        keyframeIntervalMs: 1000,
         codec,
     };
     const ok = await wincap.startCapture(startOpts);
@@ -235,33 +220,39 @@ async function createVideoTrack(
 
 // ── Audio track via AudioWorklet ──────────────────────────────────
 
-/**
- * AudioWorkletProcessor source: stereo-interleaved f32 ring buffer fed
- * via `port.postMessage` from the renderer thread, drained into the
- * worklet output. Identical pattern to pipecap's audio worklet.
- */
 const WINCAP_AUDIO_WORKLET = `
 class WincapAudioProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    // 1 second of stereo at 48kHz = 96k samples. Plenty of slack.
+    // 1 second of stereo at 48kHz. Plenty of slack for IPC jitter.
     this.cap = 48000 * 2;
     this.ring = new Float32Array(this.cap);
     this.head = 0;
     this.tail = 0;
     this.size = 0;
+    this.overflows = 0;
+    this.underflows = 0;
+    this.lastDiag = 0;
     this.port.onmessage = (e) => {
       const samples = e.data;
       const len = samples.length;
       if (len === 0) return;
       if (this.size + len > this.cap) {
+        // Overflow: drop oldest to maintain live latency.
         const drop = this.size + len - this.cap;
         this.tail = (this.tail + drop) % this.cap;
         this.size -= drop;
+        this.overflows++;
       }
-      for (let i = 0; i < len; i++) {
-        this.ring[this.head] = samples[i];
-        this.head = (this.head + 1) % this.cap;
+      // Bulk copy via subarray + set when the write doesn't wrap.
+      const spaceToEnd = this.cap - this.head;
+      if (len <= spaceToEnd) {
+        this.ring.set(samples, this.head);
+        this.head = (this.head + len) % this.cap;
+      } else {
+        this.ring.set(samples.subarray(0, spaceToEnd), this.head);
+        this.ring.set(samples.subarray(spaceToEnd), 0);
+        this.head = len - spaceToEnd;
       }
       this.size += len;
     };
@@ -281,7 +272,23 @@ class WincapAudioProcessor extends AudioWorkletProcessor {
       }
       this.size -= needed;
     } else {
+      // Underflow: emit silence.
       for (let c = 0; c < channels; c++) out[c].fill(0);
+      this.underflows++;
+    }
+    // Log diagnostics every ~5 seconds (48000/128 ≈ 375 calls/sec).
+    if (++this.lastDiag >= 1875) {
+      this.lastDiag = 0;
+      if (this.overflows > 0 || this.underflows > 0) {
+        this.port.postMessage({
+          type: 'diag',
+          overflows: this.overflows,
+          underflows: this.underflows,
+          bufferLevel: this.size,
+        });
+        this.overflows = 0;
+        this.underflows = 0;
+      }
     }
     return true;
   }
@@ -308,6 +315,12 @@ async function createAudioTrack(
         numberOfOutputs: 1,
         outputChannelCount: [2],
     });
+    node.port.onmessage = (e) => {
+        if (e.data?.type === "diag") {
+            // eslint-disable-next-line no-console
+            console.warn(`wincap audio: overflows=${e.data.overflows} underflows=${e.data.underflows} buf=${e.data.bufferLevel}`);
+        }
+    };
     node.connect(dest);
     await audioCtx.resume();
 
@@ -319,14 +332,16 @@ async function createAudioTrack(
     }
 
     const unsubAudio = wincap.onAudio((chunk) => {
-        // chunk.data is a Buffer (Node) backed by a shared ArrayBuffer;
-        // copy into a standalone Float32Array we can transfer ownership of.
-        const sampleCount = chunk.data.byteLength / 4;
-        const copy = new Float32Array(sampleCount);
-        new Uint8Array(copy.buffer).set(
-            new Uint8Array(chunk.data.buffer, chunk.data.byteOffset, chunk.data.byteLength),
+        // chunk.data is a Node Buffer backed by a shared ArrayBuffer that
+        // can't be transferred directly. Copy into a fresh ArrayBuffer and
+        // transfer ownership to the worklet (zero-copy on the postMessage
+        // side, one memcpy total instead of two).
+        const bytes = chunk.data.byteLength;
+        const buf = new ArrayBuffer(bytes);
+        new Uint8Array(buf).set(
+            new Uint8Array(chunk.data.buffer, chunk.data.byteOffset, bytes),
         );
-        node.port.postMessage(copy, [copy.buffer]);
+        node.port.postMessage(new Float32Array(buf), [buf]);
     });
 
     const audioTrack = dest.stream.getAudioTracks()[0];
