@@ -45,6 +45,25 @@ jobs:
             --pattern "*.node" \
             --dir "${GITHUB_WORKSPACE}/../pipecap"
 
+      - name: Fetch latest wincap (windows only)
+        if: matrix.platform == 'win'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tag = gh release view --repo LibreCommunications/wincap --json tagName -q .tagName
+          Write-Host "Using wincap $tag"
+          $dest = Join-Path $env:GITHUB_WORKSPACE "..\wincap"
+          # Clone the repo (has package.json, lib.js, lib.d.ts, index.js,
+          # index.d.ts, Cargo.toml, crates/). Then download the pre-built
+          # .node binary from the GitHub release into the repo root where
+          # napi-rs's index.js loader expects it.
+          git clone --depth 1 --branch $tag https://github.com/LibreCommunications/wincap.git $dest
+          gh release download $tag --repo LibreCommunications/wincap `
+            --pattern "*.node" `
+            --dir $dest
+
       - name: Install dependencies
         working-directory: Librecord.Client
         run: pnpm install --frozen-lockfile

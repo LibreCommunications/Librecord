@@ -1,24 +1,21 @@
 /**
  * Pipecap screen share integration for Linux.
  *
- * Handles PipeWire capture via pipecap's native module:
- * - Portal picker (showPicker) → native Wayland/X11 screen selection
- * - Video frames via shared memory (/dev/shm) → WebGL canvas → captureStream
- * - Audio chunks via IPC → ScriptProcessorNode → MediaStreamDestination
- *
- * Produces a standard MediaStream that LiveKit can publish.
+ *   Video: PipeWire → /dev/shm BGRA → preload fs read → VideoFrame(BGRA)
+ *          → MediaStreamTrackGenerator → publishTrack. No canvas/WebGL/
+ *          captureStream — VideoFrame eats BGRA directly.
+ *   Audio: pipecap IPC f32 chunks → AudioWorklet ring buffer →
+ *          MediaStreamAudioDestinationNode → publishTrack.
  */
 
 import { getPipecapAPI, getPipecapShmAPI } from "@librecord/domain";
 
 let activeCleanup: (() => void) | null = null;
 
-/** Whether a pipecap screen share is currently active. */
 export function isActive(): boolean {
     return activeCleanup !== null;
 }
 
-/** Stop the active pipecap capture and clean up all resources. */
 export function stop(): void {
     if (activeCleanup) {
         activeCleanup();
@@ -27,18 +24,20 @@ export function stop(): void {
 }
 
 interface PipecapCaptureResult {
-    /** MediaStream with video + optional audio tracks. */
-    stream: MediaStream;
+    /** Real MediaStreamTrack from MediaStreamTrackGenerator. */
+    videoTrack: MediaStreamTrack;
+    /** Real MediaStreamTrack from MediaStreamAudioDestinationNode. */
+    audioTrack?: MediaStreamTrack;
     /** App name auto-detected from the capture source (e.g. "firefox"). */
     detectedApp?: string;
 }
 
 /**
  * Run the full pipecap capture flow:
- * 1. Show portal picker
- * 2. Start PipeWire capture
- * 3. Open shared memory for frame reading
- * 4. Build MediaStream from frames + audio
+ *   1. Show portal picker
+ *   2. Start PipeWire capture
+ *   3. Open shared memory for frame reading
+ *   4. Build MediaStreamTracks (video via MSTG, audio via worklet)
  *
  * Returns null if the user cancelled or pipecap is unavailable.
  */
@@ -47,7 +46,6 @@ export async function startCapture(fps: number, audio: boolean): Promise<Pipecap
     const shm = getPipecapShmAPI();
     if (!pipecap || !shm) return null;
 
-    // Show native portal picker
     const pickerResult = await pipecap.showPicker(3); // 3 = monitors + windows
     if (!pickerResult || pickerResult.streams.length === 0) {
         return null;
@@ -56,7 +54,6 @@ export async function startCapture(fps: number, audio: boolean): Promise<Pipecap
     const source = pickerResult.streams[0];
     const captureInfo = await pipecap.startCapture({
         nodeId: source.nodeId,
-        pipewireFd: pickerResult.pipewireFd,
         fps,
         audio,
         sourceType: source.sourceType,
@@ -68,157 +65,208 @@ export async function startCapture(fps: number, audio: boolean): Promise<Pipecap
         return null;
     }
 
-    const stream = buildMediaStream(pipecap, shm, fps, audio);
+    const video = createVideoTrack(shm, fps);
+    const cleanups: (() => void)[] = [video.stop];
+    let audioTrack: MediaStreamTrack | undefined;
+
+    if (audio) {
+        try {
+            const a = await createAudioTrack(pipecap);
+            audioTrack = a.track;
+            cleanups.push(a.stop);
+        } catch (e) {
+            // Audio is best-effort: a worklet failure should not kill video.
+            // eslint-disable-next-line no-console
+            console.warn("pipecap: audio worklet setup failed, continuing without audio", e);
+        }
+    }
 
     activeCleanup = () => {
-        stream.cleanups.forEach(fn => fn());
-        stream.mediaStream.getTracks().forEach(t => t.stop());
+        cleanups.forEach(fn => { try { fn(); } catch { /* ignore */ } });
+        try { video.track.stop(); } catch { /* ignore */ }
+        if (audioTrack) { try { audioTrack.stop(); } catch { /* ignore */ } }
         shm.close();
         pipecap.stopCapture();
     };
 
     return {
-        stream: stream.mediaStream,
+        videoTrack: video.track,
+        audioTrack,
         detectedApp: captureInfo.detectedApp,
     };
 }
 
-// ── MediaStream construction ──────────────────────────────────────
+// ── Video track via MediaStreamTrackGenerator ─────────────────────
 
-function buildMediaStream(
-    pipecap: NonNullable<ReturnType<typeof getPipecapAPI>>,
-    shm: NonNullable<ReturnType<typeof getPipecapShmAPI>>,
-    fps: number,
-    includeAudio: boolean,
-) {
-    const cleanups: (() => void)[] = [];
-    const mediaStream = new MediaStream();
-
-    // Video track from shared memory frames
-    const video = createVideoTrack(shm, fps);
-    cleanups.push(video.stop);
-    video.stream.getVideoTracks().forEach(t => mediaStream.addTrack(t));
-
-    // Audio track from IPC chunks
-    if (includeAudio) {
-        const audio = createAudioTrack(pipecap);
-        cleanups.push(audio.stop);
-        audio.stream.getAudioTracks().forEach(t => mediaStream.addTrack(t));
-    }
-
-    return { mediaStream, cleanups };
+interface ShmAPI {
+    readFrame(): { width: number; height: number; stride: number; data: ArrayBuffer } | null;
 }
 
-function createVideoTrack(shm: NonNullable<ReturnType<typeof getPipecapShmAPI>>, fps: number) {
-    const canvas = document.createElement("canvas");
-    canvas.width = 1920;
-    canvas.height = 1080;
-    const gl = canvas.getContext("webgl2")!;
+function createVideoTrack(shm: ShmAPI, fps: number): { track: MediaStreamTrack; stop: () => void } {
+    // MediaStreamTrackGenerator is the WebCodecs/Insertable Streams way to
+    // produce a MediaStreamTrack from arbitrary VideoFrames. Available in
+    // Chromium/Electron without flags. The cast keeps TS happy without
+    // pulling in the full WICG type package.
+    const Generator = (globalThis as unknown as {
+        MediaStreamTrackGenerator: new (init: { kind: "video" | "audio" }) => MediaStreamTrack & {
+            writable: WritableStream<VideoFrame>;
+        };
+    }).MediaStreamTrackGenerator;
 
-    // Shader: PipeWire delivers BGRA, canvas needs RGBA — swap B↔R on GPU
-    const prog = createSwizzleProgram(gl);
-    gl.useProgram(prog);
+    if (!Generator) {
+        throw new Error("MediaStreamTrackGenerator unavailable — Electron < 41 or non-Chromium runtime");
+    }
 
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-    const posLoc = gl.getAttribLocation(prog, "pos");
-    gl.enableVertexAttribArray(posLoc);
-    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+    const generator = new Generator({ kind: "video" });
+    const writer = generator.writable.getWriter();
 
-    const tex = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-    let curW = 0, curH = 0;
     let running = true;
+    const startUs = performance.now() * 1000;
 
+    // We pace by setInterval at the requested fps. The MSTG output frame
+    // rate is whatever we write — pacing here is what controls the encoder
+    // input rate. setInterval is fine: callbacks are sub-millisecond and
+    // the bottleneck used to be everything we just deleted.
+    const intervalMs = Math.max(1, Math.floor(1000 / fps));
     const interval = setInterval(() => {
         if (!running) return;
         const frame = shm.readFrame();
         if (!frame) return;
-        if (frame.width !== curW || frame.height !== curH) {
-            canvas.width = frame.width;
-            canvas.height = frame.height;
-            gl.viewport(0, 0, frame.width, frame.height);
-            curW = frame.width;
-            curH = frame.height;
+        const { width, height, stride, data } = frame;
+        try {
+            const view = new Uint8Array(data);
+            const videoFrame = new VideoFrame(view, {
+                format: "BGRA",
+                codedWidth: width,
+                codedHeight: height,
+                timestamp: Math.round(performance.now() * 1000 - startUs),
+                layout: [{ offset: 0, stride }],
+            });
+            // writer.write returns a promise that resolves when the
+            // downstream encoder accepts the frame; we don't await it
+            // because we want to keep reading the next frame even if the
+            // encoder is briefly busy. VideoFrame.close() must run though.
+            writer.write(videoFrame).catch(() => {
+                try { videoFrame.close(); } catch { /* ignore */ }
+            });
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.warn("pipecap: VideoFrame construct/write failed", e);
         }
-        gl.bindTexture(gl.TEXTURE_2D, tex);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, frame.width, frame.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(frame.data));
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    }, Math.floor(1000 / fps));
+    }, intervalMs);
 
     return {
-        stream: canvas.captureStream(fps),
-        stop: () => { running = false; clearInterval(interval); },
+        track: generator,
+        stop: () => {
+            running = false;
+            clearInterval(interval);
+            writer.close().catch(() => { /* ignore */ });
+        },
     };
 }
 
-function createSwizzleProgram(gl: WebGL2RenderingContext): WebGLProgram {
-    const vs = gl.createShader(gl.VERTEX_SHADER)!;
-    gl.shaderSource(vs, `#version 300 es
-        in vec2 pos; out vec2 uv;
-        void main() { uv = pos * 0.5 + 0.5; uv.y = 1.0 - uv.y; gl_Position = vec4(pos, 0, 1); }
-    `);
-    gl.compileShader(vs);
+// ── Audio track via AudioWorklet ──────────────────────────────────
 
-    const fs = gl.createShader(gl.FRAGMENT_SHADER)!;
-    gl.shaderSource(fs, `#version 300 es
-        precision mediump float; in vec2 uv; uniform sampler2D tex; out vec4 color;
-        void main() { vec4 c = texture(tex, uv); color = vec4(c.b, c.g, c.r, 1.0); }
-    `);
-    gl.compileShader(fs);
-
-    const prog = gl.createProgram()!;
-    gl.attachShader(prog, vs);
-    gl.attachShader(prog, fs);
-    gl.linkProgram(prog);
-    return prog;
+/**
+ * AudioWorkletProcessor source: stereo-interleaved f32 ring buffer fed
+ * via `port.postMessage` from the renderer, drained into the worklet
+ * output. Replaces the deprecated ScriptProcessorNode path.
+ */
+const PIPECAP_AUDIO_WORKLET = `
+class PipecapAudioProcessor extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    // 1 second of stereo at 48kHz = 96k samples. Plenty of slack for
+    // jitter without introducing audible latency.
+    this.cap = 48000 * 2;
+    this.ring = new Float32Array(this.cap);
+    this.head = 0;
+    this.tail = 0;
+    this.size = 0;
+    this.port.onmessage = (e) => {
+      const samples = e.data;
+      const len = samples.length;
+      if (len === 0) return;
+      if (this.size + len > this.cap) {
+        // Overflow: drop oldest by advancing tail.
+        const drop = this.size + len - this.cap;
+        this.tail = (this.tail + drop) % this.cap;
+        this.size -= drop;
+      }
+      for (let i = 0; i < len; i++) {
+        this.ring[this.head] = samples[i];
+        this.head = (this.head + 1) % this.cap;
+      }
+      this.size += len;
+    };
+  }
+  process(_inputs, outputs) {
+    const out = outputs[0];
+    if (!out || out.length === 0) return true;
+    const channels = out.length;
+    const frames = out[0].length;
+    const needed = frames * channels;
+    if (this.size >= needed) {
+      for (let f = 0; f < frames; f++) {
+        for (let c = 0; c < channels; c++) {
+          out[c][f] = this.ring[this.tail];
+          this.tail = (this.tail + 1) % this.cap;
+        }
+      }
+      this.size -= needed;
+    } else {
+      // Underflow: emit silence rather than glitch.
+      for (let c = 0; c < channels; c++) out[c].fill(0);
+    }
+    return true;
+  }
 }
+registerProcessor('pipecap-audio', PipecapAudioProcessor);
+`;
 
-function createAudioTrack(pipecap: NonNullable<ReturnType<typeof getPipecapAPI>>) {
+async function createAudioTrack(
+    pipecap: NonNullable<ReturnType<typeof getPipecapAPI>>,
+): Promise<{ track: MediaStreamTrack; stop: () => void }> {
     const audioCtx = new AudioContext({ sampleRate: 48000 });
     const dest = audioCtx.createMediaStreamDestination();
-    let pendingSamples = new Float32Array(0);
 
-    const unsubAudio = pipecap.onAudio((chunk) => {
-        const f32 = new Float32Array(
-            chunk.data.buffer,
-            chunk.data.byteOffset,
-            chunk.data.byteLength / 4,
+    const blob = new Blob([PIPECAP_AUDIO_WORKLET], { type: "application/javascript" });
+    const url = URL.createObjectURL(blob);
+    try {
+        await audioCtx.audioWorklet.addModule(url);
+    } finally {
+        URL.revokeObjectURL(url);
+    }
+
+    const node = new AudioWorkletNode(audioCtx, "pipecap-audio", {
+        numberOfInputs: 0,
+        numberOfOutputs: 1,
+        outputChannelCount: [2],
+    });
+    node.connect(dest);
+    await audioCtx.resume();
+
+    const unsubAudio = pipecap.onAudio((chunk: { channels: number; sampleRate: number; data: Uint8Array }) => {
+        // Build a fresh Float32Array we can transfer ownership of so the
+        // worklet thread can take it without an extra copy on its side.
+        // chunk.data is a Buffer (Node) backed by a shared ArrayBuffer, so
+        // we can't transfer that directly — copy into a standalone f32.
+        const sampleCount = chunk.data.byteLength / 4;
+        const copy = new Float32Array(sampleCount);
+        new Uint8Array(copy.buffer).set(
+            new Uint8Array(chunk.data.buffer, chunk.data.byteOffset, chunk.data.byteLength),
         );
-        const combined = new Float32Array(pendingSamples.length + f32.length);
-        combined.set(pendingSamples);
-        combined.set(f32, pendingSamples.length);
-        pendingSamples = combined;
+        node.port.postMessage(copy, [copy.buffer]);
     });
 
-    const channels = 2;
-    const bufferSize = 4096;
-    const processor = audioCtx.createScriptProcessor(bufferSize, 0, channels);
-    processor.onaudioprocess = (e) => {
-        const needed = bufferSize * channels;
-        if (pendingSamples.length >= needed) {
-            for (let ch = 0; ch < channels; ch++) {
-                const output = e.outputBuffer.getChannelData(ch);
-                for (let i = 0; i < bufferSize; i++) {
-                    output[i] = pendingSamples[i * channels + ch] || 0;
-                }
-            }
-            pendingSamples = pendingSamples.slice(needed);
-        } else {
-            for (let ch = 0; ch < channels; ch++) {
-                e.outputBuffer.getChannelData(ch).fill(0);
-            }
-        }
-    };
-    processor.connect(dest);
-    audioCtx.resume();
+    const audioTrack = dest.stream.getAudioTracks()[0];
 
     return {
-        stream: dest.stream,
-        stop: () => { unsubAudio(); processor.disconnect(); audioCtx.close(); },
+        track: audioTrack,
+        stop: () => {
+            unsubAudio();
+            try { node.disconnect(); } catch { /* ignore */ }
+            audioCtx.close().catch(() => { /* ignore */ });
+        },
     };
 }

@@ -4,6 +4,7 @@ import * as fs from "fs";
 import { initUpdater } from "./updater";
 import { initTray, destroyTray } from "./tray";
 import { isAutostartEnabled, setAutostart } from "./autostart";
+import { setupPlatformScreenCapture } from "./platform";
 
 // Work around GPU process crashes on some Linux drivers (e.g. radv)
 app.commandLine.appendSwitch("disable-gpu-sandbox");
@@ -19,6 +20,7 @@ if (process.platform === "linux") {
   } else {
     app.commandLine.appendSwitch("ozone-platform-hint", "auto");
   }
+
 }
 
 // Register librecord:// protocol handler
@@ -141,17 +143,25 @@ app.on("certificate-error", (event, _webContents, _url, _error, _cert, callback)
 });
 
 app.on("before-quit", (e) => {
-  if (!isQuitting && mainWindow && !mainWindow.isDestroyed()) {
+  if (isQuitting) return; // Already in shutdown sequence
+  isQuitting = true;
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
     e.preventDefault();
-    isQuitting = true;
-    // Call renderer cleanup (disconnect voice), then quit
+    // Try to call renderer cleanup (disconnect voice, stop capture).
+    // If the renderer is gone or unresponsive, the safety timeout
+    // ensures we still quit within 3 seconds.
     mainWindow.webContents.executeJavaScript(
       `window.__librecordCleanup ? window.__librecordCleanup() : Promise.resolve()`
-    ).catch(() => {}).finally(() => {
+    ).catch(() => {
+      // Renderer already destroyed or errored — that's fine.
+    }).finally(() => {
       app.quit();
     });
-    // Safety timeout — don't hang forever
-    setTimeout(() => app.quit(), 3000);
+    setTimeout(() => {
+      // Safety: force quit if cleanup hangs.
+      try { app.exit(0); } catch { /* ignore */ }
+    }, 3000);
   }
 });
 
@@ -273,8 +283,19 @@ app.whenReady().then(() => {
         return;
       }
 
-      // System audio loopback — Windows only
-      if (request.audioRequested && process.platform === "win32") {
+      // Audio capture policy on Windows:
+      //   - Window source: pass `audio: "loopback"`. On Win11 + recent
+      //     Chromium, WGC delivers per-window audio (i.e. only the
+      //     captured window's output, not the system mix), so the
+      //     meeting's audio doesn't loop back.
+      //   - Screen source: there is no per-process audio extraction at
+      //     the JS / getDisplayMedia level on Windows. `loopback` would
+      //     capture the full system mix, including the meeting we're
+      //     in, and remote participants would hear themselves echoed.
+      //     Drop audio for screen sources entirely; the renderer toasts
+      //     the user about it.
+      const isWindow = selected.id.startsWith("window:");
+      if (request.audioRequested && process.platform === "win32" && isWindow) {
         callback({ video: selected, audio: "loopback" });
       } else {
         callback({ video: selected });
@@ -282,20 +303,8 @@ app.whenReady().then(() => {
     });
   }
 
-  // IPC: pipecap (Linux screen capture via PipeWire)
-  if (process.platform === "linux") {
-    try {
-      const { setupPipecap } = require("@librecord/pipecap/electron/main");
-      setupPipecap(ipcMain, () => mainWindow);
-
-      // Extra handlers not in setupPipecap: audio source switching
-      const pipecap = require("@librecord/pipecap");
-      ipcMain.handle("pipecap:listAudioApps", () => pipecap.listAudioApps());
-      ipcMain.handle("pipecap:setAudioTarget", (_e: Electron.IpcMainInvokeEvent, target: string) => pipecap.setAudioTarget(target));
-    } catch (e) {
-      console.warn("pipecap: native module not available", (e as Error).message);
-    }
-  }
+  // Per-platform native screen capture (pipecap on Linux, wincap on Windows).
+  setupPlatformScreenCapture(app, ipcMain, () => mainWindow);
 
   // IPC: app version
   ipcMain.handle("desktop:getAppVersion", () => app.getVersion());

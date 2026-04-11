@@ -18,6 +18,11 @@ public class VoiceStateRepository : IVoiceStateRepository
         return _db.VoiceStates.FirstOrDefaultAsync(v => v.UserId == userId);
     }
 
+    public Task<List<VoiceState>> GetAllAsync()
+    {
+        return _db.VoiceStates.AsNoTracking().ToListAsync();
+    }
+
     public Task<List<VoiceState>> GetByChannelIdAsync(Guid channelId)
     {
         return _db.VoiceStates

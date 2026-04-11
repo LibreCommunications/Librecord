@@ -96,8 +96,14 @@ app.MapGet("/health", async (IServiceProvider sp) =>
 
 ApplyMigrations(app);
 
-// Voice states persist in PostgreSQL so calls survive restarts.
-// Stale states are cleaned up when users reconnect or via RejoinVoiceChannel.
+// Clear orphaned voice states from previous server run. All LiveKit tokens
+// are invalidated on restart, so any surviving states are stale by definition.
+{
+    using var cleanupScope = app.Services.CreateScope();
+    var voiceRepo = cleanupScope.ServiceProvider.GetRequiredService<Librecord.Domain.Voice.IVoiceStateRepository>();
+    await voiceRepo.RemoveAllAsync();
+    app.Logger.LogInformation("Cleared stale voice states from previous run");
+}
 
 // Graceful shutdown: give SignalR connections time to close cleanly
 // so OnDisconnectedAsync fires and voice states are properly cleaned up
