@@ -97,11 +97,38 @@ export function setupWindowsScreenCapture(
         CaptureSession: new (opts: unknown) => CaptureSessionLike;
         AudioSession:   new (opts: unknown) => AudioSessionLike;
     };
+
+    // Probe the native module in a forked child process first.
+    // A native crash (segfault) in the .node binary would kill the main
+    // Electron process because try/catch can't intercept it. By requiring
+    // it in a disposable child process we detect the crash safely.
+    let probePassed = false;
     try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        wincap = require("@librecord/wincap");
-    } catch (e) {
-        console.warn("wincap: native module not available", (e as Error).message);
+        const modulePath = require.resolve("@librecord/wincap");
+        const { spawnSync } = require("child_process") as typeof import("child_process");
+        const result = spawnSync(process.execPath, [
+            "-e", `try { require(${JSON.stringify(modulePath)}); process.exit(0); } catch { process.exit(1); }`,
+        ], { timeout: 5000, stdio: "ignore", env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } });
+        probePassed = result.status === 0;
+        if (!probePassed) {
+            console.warn("wincap: native module probe crashed or failed (exit", result.status + ")");
+        }
+    } catch {
+        console.warn("wincap: module not installed");
+    }
+
+    if (probePassed) {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            wincap = require("@librecord/wincap");
+        } catch (e) {
+            probePassed = false;
+            console.warn("wincap: require failed after probe", (e as Error).message);
+        }
+    }
+
+    if (!probePassed) {
+        console.warn("wincap: native module not available — registering stubs");
         // Register no-op stubs for every channel the preload exposes so a
         // misconfigured install can't crash callers with "No handler
         // registered". The renderer is expected to call available()
@@ -144,6 +171,7 @@ export function setupWindowsScreenCapture(
         displays: wincap.listDisplays().map((d) => ({
             kind: "display" as const,
             monitorHandle: d.monitorHandle.toString(),
+            displayId: d.displayId,
             name: d.name,
             primary: d.primary,
             bounds: d.bounds,
@@ -153,6 +181,7 @@ export function setupWindowsScreenCapture(
             hwnd: w.hwnd.toString(),
             title: w.title,
             pid: w.pid,
+            processName: w.processName,
             bounds: w.bounds,
         })),
     }));
@@ -215,12 +244,13 @@ export function setupWindowsScreenCapture(
         }> = [];
 
         for (const d of displays) {
-            const t = screenThumbsByDisplayId.get(String(d.monitorHandle));
+            // Match by display_id (index) which aligns with Electron's desktopCapturer.
+            const t = screenThumbsByDisplayId.get(d.displayId);
             serialized.push({
                 id: encodeId("display", d.monitorHandle),
-                name: d.name || (d.primary ? "Primary display" : "Display"),
+                name: d.name,
                 thumbnailDataUrl: t?.thumb ?? placeholder,
-                displayId: String(d.monitorHandle),
+                displayId: d.displayId,
                 appIconDataUrl: t?.icon ?? null,
             });
         }
@@ -228,7 +258,7 @@ export function setupWindowsScreenCapture(
             const t = windowThumbsByHwnd.get(String(w.hwnd));
             serialized.push({
                 id: encodeId("window", w.hwnd),
-                name: w.title,
+                name: w.processName ? `${w.title}` : w.title,
                 thumbnailDataUrl: t?.thumb ?? placeholder,
                 displayId: "",
                 appIconDataUrl: t?.icon ?? null,
