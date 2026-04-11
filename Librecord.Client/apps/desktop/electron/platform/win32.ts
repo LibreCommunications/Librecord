@@ -151,14 +151,25 @@ export function setupWindowsScreenCapture(
     let audioSession: AudioSessionLike | null = null;
     let abortPicker: (() => void) | null = null;
 
+    // Track whether sessions are being torn down. The native wincap
+    // module may fire events on background threads after stop() is
+    // called; the flag prevents the callbacks from touching destroyed
+    // JS objects.
+    let videoStopping = false;
+    let audioStopping = false;
+
     const closeVideo = () => {
         if (videoSession) {
+            videoStopping = true;
+            try { videoSession.removeAllListeners(); } catch { /* ignore */ }
             try { videoSession.stop(); } catch { /* ignore */ }
             videoSession = null;
         }
     };
     const closeAudio = () => {
         if (audioSession) {
+            audioStopping = true;
+            try { audioSession.removeAllListeners(); } catch { /* ignore */ }
             try { audioSession.stop(); } catch { /* ignore */ }
             audioSession = null;
         }
@@ -330,15 +341,28 @@ export function setupWindowsScreenCapture(
             },
         });
 
+        videoStopping = false;
         session.on("encoded", (frame) => {
-            getMainWindow()?.webContents.send("wincap:encoded", {
-                data: Buffer.from(frame.data),
-                timestampNs: frame.timestampNs.toString(),
-                keyframe: frame.keyframe,
-            });
+            if (videoStopping) return;
+            try {
+                const win = getMainWindow();
+                if (win && !win.isDestroyed()) {
+                    win.webContents.send("wincap:encoded", {
+                        data: Buffer.from(frame.data),
+                        timestampNs: frame.timestampNs.toString(),
+                        keyframe: frame.keyframe,
+                    });
+                }
+            } catch { /* session or window destroyed during shutdown */ }
         });
         session.on("error", (err) => {
-            getMainWindow()?.webContents.send("wincap:error", err);
+            if (videoStopping) return;
+            try {
+                const win = getMainWindow();
+                if (win && !win.isDestroyed()) {
+                    win.webContents.send("wincap:error", err);
+                }
+            } catch { /* ignore */ }
         });
 
         session.start();
@@ -379,18 +403,31 @@ export function setupWindowsScreenCapture(
         }
 
         const session = new wincap.AudioSession(ctorOpts);
+        audioStopping = false;
 
         session.on("chunk", (chunk) => {
-            getMainWindow()?.webContents.send("wincap:audio", {
-                timestampNs: chunk.timestampNs.toString(),
-                frameCount: chunk.frameCount,
-                sampleRate: chunk.sampleRate,
-                channels: chunk.channels,
-                data: Buffer.from(chunk.data),
-            });
+            if (audioStopping) return;
+            try {
+                const win = getMainWindow();
+                if (win && !win.isDestroyed()) {
+                    win.webContents.send("wincap:audio", {
+                        timestampNs: chunk.timestampNs.toString(),
+                        frameCount: chunk.frameCount,
+                        sampleRate: chunk.sampleRate,
+                        channels: chunk.channels,
+                        data: Buffer.from(chunk.data),
+                    });
+                }
+            } catch { /* session or window destroyed during shutdown */ }
         });
         session.on("error", (err) => {
-            getMainWindow()?.webContents.send("wincap:audio-error", err);
+            if (audioStopping) return;
+            try {
+                const win = getMainWindow();
+                if (win && !win.isDestroyed()) {
+                    win.webContents.send("wincap:audio-error", err);
+                }
+            } catch { /* ignore */ }
         });
 
         session.start();
