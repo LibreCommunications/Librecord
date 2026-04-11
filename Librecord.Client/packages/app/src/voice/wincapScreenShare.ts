@@ -324,7 +324,10 @@ async function createAudioTrack(
     node.connect(dest);
     await audioCtx.resume();
 
-    const ok = await wincap.startAudio({ mode: "systemLoopback" });
+    // Let the main process auto-select audio mode:
+    // Win11 22000+: processLoopback excluding Librecord (no echo)
+    // Older: systemLoopback fallback
+    const ok = await wincap.startAudio();
     if (!ok) {
         try { node.disconnect(); } catch { /* ignore */ }
         await audioCtx.close().catch(() => { /* ignore */ });
