@@ -143,17 +143,25 @@ app.on("certificate-error", (event, _webContents, _url, _error, _cert, callback)
 });
 
 app.on("before-quit", (e) => {
-  if (!isQuitting && mainWindow && !mainWindow.isDestroyed()) {
+  if (isQuitting) return; // Already in shutdown sequence
+  isQuitting = true;
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
     e.preventDefault();
-    isQuitting = true;
-    // Call renderer cleanup (disconnect voice), then quit
+    // Try to call renderer cleanup (disconnect voice, stop capture).
+    // If the renderer is gone or unresponsive, the safety timeout
+    // ensures we still quit within 3 seconds.
     mainWindow.webContents.executeJavaScript(
       `window.__librecordCleanup ? window.__librecordCleanup() : Promise.resolve()`
-    ).catch(() => {}).finally(() => {
+    ).catch(() => {
+      // Renderer already destroyed or errored — that's fine.
+    }).finally(() => {
       app.quit();
     });
-    // Safety timeout — don't hang forever
-    setTimeout(() => app.quit(), 3000);
+    setTimeout(() => {
+      // Safety: force quit if cleanup hangs.
+      try { app.exit(0); } catch { /* ignore */ }
+    }, 3000);
   }
 });
 

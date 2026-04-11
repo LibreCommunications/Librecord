@@ -18,7 +18,7 @@ import { app, BrowserWindow, ipcMain } from "electron";
  * in dev, package the app once and run from `release/`.
  */
 
-const CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+const CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 export function initUpdater(getMainWindow: () => BrowserWindow | null) {
   if (!app.isPackaged) return;

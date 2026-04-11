@@ -620,7 +620,9 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
             codec: "h264",
         });
         if (!result) {
-            logger.voice.warn("Wincap returned no result, falling back to getDisplayMedia");
+            // User cancelled or wincap failed. Don't fall through to
+            // getDisplayMedia — that would open a second picker modal.
+            return false;
         } else {
             try {
                 const videoTrack = new LocalVideoTrack(result.videoTrack, undefined, false);

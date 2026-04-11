@@ -401,6 +401,8 @@ export function setupWindowsScreenCapture(
     ipcMain.handle("wincap:stopAudio", closeAudio);
 
     app.on("will-quit", () => {
+        // Abort any pending picker so it doesn't hold a dangling Promise.
+        if (abortPicker) { abortPicker(); abortPicker = null; }
         closeVideo();
         closeAudio();
     });
