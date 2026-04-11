@@ -5,6 +5,7 @@ using Librecord.Application.Realtime.DMs;
 using Librecord.Application.Realtime.Guild;
 using Librecord.Application.Realtime.Social;
 using Librecord.Application.Realtime.Voice;
+using Librecord.Api.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -32,6 +33,8 @@ public static class DependencyInjection
         services.AddScoped<IGuildRealtimeNotifier, SignalRGuildRealtimeNotifier>();
         services.AddScoped<IVoiceRealtimeNotifier, SignalRVoiceRealtimeNotifier>();
         services.AddScoped<IFriendshipRealtimeNotifier, SignalRFriendshipNotifier>();
+
+        services.AddHostedService<StaleVoiceCleanupService>();
 
         var corsOrigins = configuration.GetSection("Cors:Origins").Get<string[]>()
                           ?? ["https://localhost:5173"];
