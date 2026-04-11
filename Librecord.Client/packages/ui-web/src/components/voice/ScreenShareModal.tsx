@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ScreenShareIcon } from "./VoiceIcons";
+import { getElectronAPI, getWincapAPI } from "@librecord/domain";
 
 export interface ScreenShareOptions {
     resolution: "720p" | "1080p" | "1440p" | "source";
@@ -33,6 +34,39 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
     const [resolution, setResolution] = useState<ScreenShareOptions["resolution"]>("1080p");
     const [frameRate, setFrameRate] = useState<ScreenShareOptions["frameRate"]>(30);
     const [audio, setAudio] = useState(isDesktop);
+
+    // On Windows, the audio path depends on which capture engine the
+    // main process actually loaded:
+    //   - wincap + Win11 22000+ → WASAPI process loopback with
+    //     EXCLUDE_TARGET_PROCESS_TREE captures the full system mix MINUS
+    //     Librecord, so screens can publish audio without echo.
+    //   - wincap missing OR Win10 → desktopCapturer fallback, which only
+    //     gets per-window audio. Screens drop audio.
+    // Probe both at modal open so the warning only shows when the
+    // limitation actually applies.
+    const isWindows = isDesktop && getElectronAPI()?.platform === "win32";
+    const [windowsAudioWarning, setWindowsAudioWarning] = useState(isWindows);
+
+    useEffect(() => {
+        if (!isWindows) return;
+        let cancelled = false;
+        (async () => {
+            const wincap = getWincapAPI();
+            if (!wincap) {
+                if (!cancelled) setWindowsAudioWarning(true);
+                return;
+            }
+            try {
+                const ok = await wincap.available();
+                if (!ok) { if (!cancelled) setWindowsAudioWarning(true); return; }
+                const caps = await wincap.getCapabilities();
+                if (!cancelled) setWindowsAudioWarning(!caps.processLoopback);
+            } catch {
+                if (!cancelled) setWindowsAudioWarning(true);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [isWindows]);
 
     if (!open) return null;
 
@@ -119,31 +153,44 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
                     </div>
 
                     {isDesktop && (
-                        <div
-                            className="flex items-center justify-between p-3 rounded-lg bg-[#2b2d31] cursor-pointer"
-                            onClick={() => setAudio(!audio)}
-                        >
-                            <div>
-                                <div className="text-sm font-medium text-[#dbdee1]">
-                                    Share Audio
-                                </div>
-                                <div className="text-xs text-[#949ba4]">
-                                    Include system audio in your stream
-                                </div>
-                            </div>
+                        <div className="space-y-2">
                             <div
-                                className={`
-                                    w-10 h-6 rounded-full relative transition-colors cursor-pointer
-                                    ${audio ? "bg-[#5865F2]" : "bg-[#4e5058]"}
-                                `}
+                                className="flex items-center justify-between p-3 rounded-lg bg-[#2b2d31] cursor-pointer"
+                                onClick={() => setAudio(!audio)}
                             >
+                                <div>
+                                    <div className="text-sm font-medium text-[#dbdee1]">
+                                        Share Audio
+                                    </div>
+                                    <div className="text-xs text-[#949ba4]">
+                                        Include system audio in your stream
+                                    </div>
+                                </div>
                                 <div
                                     className={`
-                                        absolute top-1 w-4 h-4 rounded-full bg-white transition-transform
-                                        ${audio ? "translate-x-5" : "translate-x-1"}
+                                        w-10 h-6 rounded-full relative transition-colors cursor-pointer
+                                        ${audio ? "bg-[#5865F2]" : "bg-[#4e5058]"}
                                     `}
-                                />
+                                >
+                                    <div
+                                        className={`
+                                            absolute top-1 w-4 h-4 rounded-full bg-white transition-transform
+                                            ${audio ? "translate-x-5" : "translate-x-1"}
+                                        `}
+                                    />
+                                </div>
                             </div>
+
+                            {windowsAudioWarning && audio && (
+                                <div className="flex gap-2 p-3 rounded-lg bg-[#f0b232]/10 border border-[#f0b232]/30">
+                                    <span className="text-[#f0b232] text-sm leading-5">⚠</span>
+                                    <div className="text-xs text-[#dbdee1] leading-5">
+                                        Echo-free audio requires Windows 11. On older versions,
+                                        shared audio may include sounds from the call itself.
+                                        Upgrade to Windows 11 for automatic echo isolation.
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

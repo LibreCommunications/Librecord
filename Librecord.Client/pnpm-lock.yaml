@@ -97,6 +97,9 @@ importers:
       '@librecord/pipecap':
         specifier: file:../../../../pipecap
         version: file:../../pipecap
+      '@librecord/wincap':
+        specifier: file:../../../../wincap
+        version: file:../../wincap
 
   apps/mobile:
     dependencies:
@@ -588,6 +591,12 @@ packages:
   '@librecord/pipecap@file:../../pipecap':
     resolution: {directory: ../../pipecap, type: directory}
     os: [linux]
+
+  '@librecord/wincap@file:../../wincap':
+    resolution: {directory: ../../wincap, type: directory}
+    engines: {node: '>=18'}
+    cpu: [x64, arm64]
+    os: [win32]
 
   '@livekit/mutex@1.1.1':
     resolution: {integrity: sha512-EsshAucklmpuUAfkABPxJNhzj9v2sG7JuzFDL4ML1oJQSV14sqrpTYnsaOudMAw9yOaW53NU3QQTlUQoRs4czw==}
@@ -2992,6 +3001,9 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.5
 
   '@librecord/pipecap@file:../../pipecap':
+    optional: true
+
+  '@librecord/wincap@file:../../wincap':
     optional: true
 
   '@livekit/mutex@1.1.1': {}

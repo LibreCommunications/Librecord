@@ -106,36 +106,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         let cancelled = false;
 
         (async () => {
-            let res = await fetch(`${API_URL}/users/me`, { credentials: "include" });
+            try {
+                let res = await fetch(`${API_URL}/users/me`, { credentials: "include" });
 
-            if (res.status === 401) {
-                const refreshed = await refreshAccessToken();
-                if (!refreshed) {
-                    if (!cancelled) { setUser(null); setAuthLoading(false); }
-                    return;
+                if (res.status === 401) {
+                    const refreshed = await refreshAccessToken();
+                    if (!refreshed) {
+                        if (!cancelled) { setUser(null); setAuthLoading(false); }
+                        return;
+                    }
+                    res = await fetch(`${API_URL}/users/me`, { credentials: "include" });
                 }
-                res = await fetch(`${API_URL}/users/me`, { credentials: "include" });
-            }
 
-            if (!cancelled) {
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.userId) {
-                        setUser({
-                            userId: data.userId,
-                            username: data.username,
-                            displayName: data.displayName,
-                            email: data.email,
-                            avatarUrl: data.avatarUrl,
-                            guilds: data.guilds,
-                        });
+                if (!cancelled) {
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.userId) {
+                            setUser({
+                                userId: data.userId,
+                                username: data.username,
+                                displayName: data.displayName,
+                                email: data.email,
+                                avatarUrl: data.avatarUrl,
+                                guilds: data.guilds,
+                            });
+                        } else {
+                            setUser(null);
+                        }
                     } else {
                         setUser(null);
                     }
-                } else {
-                    setUser(null);
                 }
-                setAuthLoading(false);
+            } catch {
+                if (!cancelled) setUser(null);
+            } finally {
+                if (!cancelled) setAuthLoading(false);
             }
         })();
 

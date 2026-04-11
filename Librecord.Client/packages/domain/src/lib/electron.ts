@@ -17,6 +17,9 @@ export interface ElectronAPI {
     onUpdateAvailable: (callback: (version: string) => void) => () => void;
     onUpdateDownloaded: (callback: (version: string) => void) => () => void;
     onUpdateInstalled: (callback: (version: string) => void) => () => void;
+    /** Tell the main process to quit and install a previously-downloaded
+     * update. Triggered by the in-app update modal's "Restart now" button. */
+    installUpdateNow: () => Promise<void>;
     getAutostart: () => Promise<boolean>;
     setAutostart: (enabled: boolean) => Promise<boolean>;
     getMinimizeToTray: () => Promise<boolean>;
@@ -46,8 +49,13 @@ export interface AudioAppInfo {
 /** Pipecap API exposed on window.pipecap (Linux only). */
 export interface PipecapAPI {
     available: () => Promise<boolean>;
-    showPicker: (sourceTypes?: number) => Promise<{ streams: Array<{ nodeId: number; sourceType: number; width: number; height: number }>; pipewireFd: number } | null>;
-    startCapture: (options: { nodeId: number; pipewireFd: number; fps: number; audio: boolean; sourceType: number }) => Promise<{ shmPath: string; shmSize: number; headerSize: number; width: number; height: number; detectedApp?: string } | false>;
+    /** Show the native portal picker. The returned PipeWire fd is held inside
+     * the main process — the renderer never sees it. */
+    showPicker: (sourceTypes?: number) => Promise<{ streams: Array<{ nodeId: number; sourceType: number; width: number; height: number }> } | null>;
+    /** Start capture. The Electron main process automatically injects the
+     * full set of host PIDs as `excludePids` so we never hear ourselves in
+     * the share — callers do not need to set it. */
+    startCapture: (options: { nodeId: number; fps: number; audio: boolean; sourceType: number }) => Promise<{ shmPath: string; shmSize: number; headerSize: number; width: number; height: number; detectedApp?: string } | false>;
     stopCapture: () => Promise<void>;
     isCapturing: () => Promise<boolean>;
     listAudioApps: () => Promise<AudioAppInfo[]>;
@@ -63,11 +71,105 @@ export function getPipecapAPI(): PipecapAPI | undefined {
 /** Shared memory frame reader for pipecap video (Linux only). */
 export interface PipecapShmAPI {
     open: (shmPath: string) => boolean;
-    readFrame: () => { width: number; height: number; data: ArrayBuffer } | null;
+    readFrame: () => { width: number; height: number; stride: number; data: ArrayBuffer } | null;
     close: () => void;
 }
 
 /** Returns the pipecap shm reader if available (Linux desktop only). */
 export function getPipecapShmAPI(): PipecapShmAPI | undefined {
     return (window as unknown as { pipecapShm?: PipecapShmAPI }).pipecapShm;
+}
+
+// ── Wincap (Windows) ──────────────────────────────────────────────
+
+export interface WincapDisplay {
+    kind: "display";
+    /** HMONITOR as string (BigInt isn't IPC-serialisable). */
+    monitorHandle: string;
+    name: string;
+    primary: boolean;
+    bounds: { x: number; y: number; width: number; height: number };
+}
+
+export interface WincapWindow {
+    kind: "window";
+    /** HWND as string. */
+    hwnd: string;
+    title: string;
+    pid: number;
+    bounds: { x: number; y: number; width: number; height: number };
+}
+
+export interface WincapCapabilities {
+    wgc: boolean;
+    wgcBorderOptional: boolean;
+    processLoopback: boolean;
+    windowsBuild: number;
+}
+
+export interface WincapEncodedFrame {
+    data: Uint8Array;
+    /** QPC nanoseconds, BigInt-as-string. */
+    timestampNs: string;
+    keyframe: boolean;
+}
+
+export interface WincapStartOptions {
+    sourceKind: "display" | "window";
+    /** HMONITOR or HWND as string. */
+    handle: string;
+    fps: number;
+    bitrateBps: number;
+    keyframeIntervalMs?: number;
+    codec?: "h264" | "hevc" | "av1";
+}
+
+export interface WincapPickResult {
+    kind: "display" | "window";
+    /** HMONITOR or HWND as string. */
+    handle: string;
+    /** Display name or window title. */
+    name: string;
+}
+
+export interface WincapAudioChunk {
+    /** QPC ns as BigInt-as-string. */
+    timestampNs: string;
+    frameCount: number;
+    sampleRate: number;
+    channels: number;
+    /** Interleaved float32 samples. */
+    data: Uint8Array;
+}
+
+/** Wincap API exposed on window.wincap (Windows only). */
+export interface WincapAPI {
+    available: () => Promise<boolean>;
+    getCapabilities: () => Promise<WincapCapabilities>;
+    listSources: () => Promise<{ displays: WincapDisplay[]; windows: WincapWindow[] }>;
+
+    /** Open the shared in-app picker UI populated with wincap sources.
+     *  Resolves to the user's selection or null on cancel. */
+    showPicker: () => Promise<WincapPickResult | null>;
+
+    startCapture: (options: WincapStartOptions) => Promise<boolean>;
+    stopCapture: () => Promise<void>;
+    requestKeyframe: () => Promise<void>;
+    setBitrate: (bps: number) => Promise<void>;
+
+    /** Start a WASAPI loopback audio capture session.
+     *  systemLoopback = whole-device mix; processLoopback = a specific
+     *  PID's output (Win11 22000+ only). */
+    startAudio: (options?: { mode?: "systemLoopback" | "processLoopback"; pid?: number }) => Promise<boolean>;
+    stopAudio: () => Promise<void>;
+
+    onEncoded: (callback: (frame: WincapEncodedFrame) => void) => () => void;
+    onError: (callback: (err: { component: string; hresult: number; message: string }) => void) => () => void;
+    onAudio: (callback: (chunk: WincapAudioChunk) => void) => () => void;
+    onAudioError: (callback: (err: unknown) => void) => () => void;
+}
+
+/** Returns the wincap API if available (Windows desktop only), undefined otherwise. */
+export function getWincapAPI(): WincapAPI | undefined {
+    return (window as unknown as { wincap?: WincapAPI }).wincap;
 }

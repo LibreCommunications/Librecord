@@ -39,7 +39,9 @@ export function initTray(getWindow: () => BrowserWindow | null) {
     {
       label: "Quit",
       click: () => {
-        app.exit(0);
+        // Use app.quit() instead of app.exit(0) so the before-quit
+        // handler runs and cleans up voice/capture sessions gracefully.
+        app.quit();
       },
     },
   ]);

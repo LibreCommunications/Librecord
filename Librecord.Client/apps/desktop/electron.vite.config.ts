@@ -23,7 +23,7 @@ export default defineConfig({
               fileName: () => "main.cjs",
             },
             rollupOptions: {
-              external: ["electron", "electron-updater", "pkg-prebuilds", "@librecord/pipecap"],
+              external: ["electron", "electron-updater", "pkg-prebuilds", "@librecord/pipecap", "@librecord/wincap"],
             },
           },
         },

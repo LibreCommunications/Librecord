@@ -2,13 +2,15 @@ import {
     Room,
     RoomEvent,
     Track,
-    VideoPreset,
+    LocalVideoTrack,
+    LocalAudioTrack,
     ConnectionQuality,
     DisconnectReason,
     type RemoteParticipant,
     type RemoteTrackPublication,
     type LocalParticipant,
     type LocalTrackPublication,
+    type TrackPublishOptions,
 } from "livekit-client";
 import { showToast } from "../toast";
 import { getUserVolume } from "../userVolume";
@@ -18,8 +20,9 @@ import {
     clearActiveProcessor,
     type LocalAudioTrackLike,
 } from "./noiseSuppression";
-import { logger, getElectronAPI, getPipecapAPI, isDesktop } from "@librecord/domain";
+import { logger, getElectronAPI, getPipecapAPI, getWincapAPI, isDesktop } from "@librecord/domain";
 import * as pipecapScreenShare from "./pipecapScreenShare";
+import * as wincapScreenShare from "./wincapScreenShare";
 import { onCustomEvent } from "../typedEvent";
 import { STORAGE } from "@librecord/domain";
 
@@ -299,6 +302,15 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
         videoCaptureDefaults: {
             ...(camId && { deviceId: camId }),
         },
+        // Every audio track in the room must declare identical Opus fmtp
+        // params or WebRTC's BUNDLE check rejects the SDP and loops on
+        // re-negotiation, leaving zombie publications on the SFU. Force
+        // stereo + red/dtx off so the mic and screen-share-audio match.
+        publishDefaults: {
+            red: false,
+            dtx: false,
+            forceStereo: true,
+        },
     });
 
     // ── LiveKit observability ─────────────────────────────────
@@ -540,6 +552,40 @@ const RESOLUTION_MAP: Record<string, { width: number; height: number } | undefin
     "1440p": { width: 2560, height: 1440 },
 };
 
+// Screen content bits-per-pixel tuned per codec. H.264 is less efficient
+// than VP9 for screen content (no native screen-content coding tools), so
+// it gets a higher allocation to maintain text legibility.
+const SCREENSHARE_BPP_VP9 = 0.05;
+const SCREENSHARE_BPP_H264 = 0.07;
+const SCREENSHARE_BITRATE_FLOOR = 1_500_000;   // 1.5 Mbps
+const SCREENSHARE_BITRATE_CEILING = 20_000_000; // 20 Mbps
+
+function screenShareBitrate(w: number, h: number, fps: number, codec: "vp9" | "h264" = "vp9"): number {
+    const bpp = codec === "h264" ? SCREENSHARE_BPP_H264 : SCREENSHARE_BPP_VP9;
+    const raw = Math.round(w * h * fps * bpp);
+    return Math.min(SCREENSHARE_BITRATE_CEILING, Math.max(SCREENSHARE_BITRATE_FLOOR, raw));
+}
+
+/**
+ * Publish options for screen share. Codec varies by platform:
+ * - wincap (Windows): H.264 — hardware encoder output injected directly
+ *   via Encoded Transform, zero re-encoding.
+ * - pipecap (Linux) / fallback: VP9 SVC — raw pixels encoded once by
+ *   the browser. `backupCodec` is on by default → Safari / older
+ *   Chromium get VP8 automatically.
+ */
+function buildScreenSharePublishOpts(
+    encodingBitrate: number,
+    encodeFps: number,
+    codec: "vp9" | "h264" = "vp9",
+): TrackPublishOptions {
+    return {
+        source: Track.Source.ScreenShare,
+        videoCodec: codec,
+        screenShareEncoding: { maxFramerate: encodeFps, maxBitrate: encodingBitrate },
+    };
+}
+
 export async function startScreenShare(options: ScreenShareSettings): Promise<boolean> {
     if (!room) return false;
 
@@ -549,57 +595,92 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
         ? { ...res, frameRate: encodeFps }
         : { width: 3840, height: 2160, frameRate: encodeFps };
 
-    // Bitrate scales with pixels-per-second so 60 fps is actually attainable.
-    // The flat 4 Mbps ceiling we used to use was the main reason higher rates
-    // dropped to ~30 on receivers — the encoder couldn't fit the frames and
-    // (with default `maintain-resolution`) dropped framerate to compensate.
-    // ~0.08 bits/pixel is a reasonable motion screen-share target across
-    // H.264/VP9. Floor at 1 Mbps, ceiling at 25 Mbps.
-    const bitrateForPixels = (w: number, h: number, fps: number) =>
-        Math.min(25_000_000, Math.max(1_000_000, Math.round(w * h * fps * 0.08)));
-    const encodingBitrate = bitrateForPixels(resolution.width, resolution.height, encodeFps);
-
-    // Two simulcast layers. LiveKit's `adaptiveStream` (enabled in
-    // connectToRoom) auto-subscribes each receiver to the layer that
-    // matches their video element size — small grid tiles get the low
-    // layer, maximized/fullscreen tiles get the high layer. Critically
-    // both layers run at the **same** framerate so a fallback never
-    // means "stuck at 30". The previous bug was hardcoding the low
-    // layer to `Math.min(encodeFps, 30)`, which capped receivers there.
-    const lowWidth = 960;
-    const lowHeight = 540;
-    const lowBitrate = bitrateForPixels(lowWidth, lowHeight, encodeFps);
-    const publishOpts = {
-        screenShareEncoding: { maxFramerate: encodeFps, maxBitrate: encodingBitrate },
-        screenShareSimulcastLayers: [
-            new VideoPreset(lowWidth, lowHeight, lowBitrate, encodeFps),
-        ],
-    };
-
-    const isLinuxDesktop = isDesktop && getElectronAPI()?.platform === "linux";
+    const platform = getElectronAPI()?.platform;
+    const isLinuxDesktop = isDesktop && platform === "linux";
+    const isWindowsDesktop = isDesktop && platform === "win32";
     const usePipecap = isLinuxDesktop && !!getPipecapAPI();
+    const useWincap  = isWindowsDesktop && !!getWincapAPI();
 
-    // Linux: pipecap captures via PipeWire, produces a MediaStream we inject into LiveKit
+    // Pick codec-appropriate bitrate. H.264 needs ~40% more bits than VP9
+    // for equivalent screen content quality (no native SCC tools).
+    const screenCodec = useWincap ? "h264" as const : "vp9" as const;
+    const encodingBitrate = screenShareBitrate(resolution.width, resolution.height, encodeFps, screenCodec);
+    const publishOpts = buildScreenSharePublishOpts(encodingBitrate, encodeFps);
+
+    if (useWincap) {
+        // Windows: wincap hardware-encodes H.264, we decode with WebCodecs
+        // for preview, and publish with H.264 codec so Chromium re-encodes
+        // using its hardware H.264 encoder (NVENC/QSV/AMF). Faster than
+        // VP9 which is often software-only.
+        const wincapPublishOpts = buildScreenSharePublishOpts(encodingBitrate, encodeFps, "h264");
+        const result = await wincapScreenShare.startCapture({
+            fps: encodeFps,
+            bitrateBps: encodingBitrate,
+            audio: options.audio,
+            codec: "h264",
+        });
+        if (!result) {
+            // User cancelled or wincap failed. Don't fall through to
+            // getDisplayMedia — that would open a second picker modal.
+            return false;
+        } else {
+            try {
+                const videoTrack = new LocalVideoTrack(result.videoTrack, undefined, false);
+                await room.localParticipant.publishTrack(videoTrack, wincapPublishOpts);
+
+                if (result.audioTrack) {
+                    const audioTrack = new LocalAudioTrack(result.audioTrack, undefined, false);
+                    await room.localParticipant.publishTrack(audioTrack, {
+                        source: Track.Source.ScreenShareAudio,
+                        red: false,
+                        dtx: false,
+                        forceStereo: true,
+                    });
+                }
+
+                if (result.sourceName) {
+                    showToast(`Sharing ${result.sourceName}`, "success");
+                }
+                if (options.audio && !result.audioTrack) {
+                    showToast("Wincap audio capture failed", "info");
+                }
+                return true;
+            } catch (e) {
+                logger.voice.warn("Wincap screen share publish failed", e);
+                wincapScreenShare.stop();
+                return false;
+            }
+        }
+    }
+
     if (usePipecap) {
+        // Linux: pipecap hands us real MediaStreamTracks; publish them
+        // directly via publishTrack — no setScreenShareEnabled, no
+        // getDisplayMedia monkey-patching.
         const result = await pipecapScreenShare.startCapture(encodeFps, options.audio);
-        if (!result) return false; // User cancelled or pipecap unavailable
-
-        // Temporarily patch getDisplayMedia so LiveKit uses our stream
-        const originalGDM = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
-        navigator.mediaDevices.getDisplayMedia = async () => result.stream;
+        if (!result) return false;
 
         try {
-            await publishScreenShare(room, options.audio, resolution, publishOpts);
-        } catch {
+            const videoTrack = new LocalVideoTrack(result.videoTrack, undefined, false);
+            await room.localParticipant.publishTrack(videoTrack, publishOpts);
+
+            if (result.audioTrack) {
+                const audioTrack = new LocalAudioTrack(result.audioTrack, undefined, false);
+                // Explicit fmtp params matching the room defaults — see the
+                // BUNDLE comment on `publishDefaults` for why.
+                await room.localParticipant.publishTrack(audioTrack, {
+                    source: Track.Source.ScreenShareAudio,
+                    red: false,
+                    dtx: false,
+                    forceStereo: true,
+                });
+            }
+        } catch (e) {
+            logger.voice.warn("Pipecap screen share publish failed", e);
             pipecapScreenShare.stop();
-            navigator.mediaDevices.getDisplayMedia = originalGDM;
             return false;
         }
 
-        navigator.mediaDevices.getDisplayMedia = originalGDM;
-
-        // Tell the user which audio source the share started with so they
-        // know whether the auto-detection picked their app or fell back.
         if (options.audio) {
             if (result.detectedApp) {
                 showToast(`Sharing audio from ${result.detectedApp}`, "success");
@@ -608,32 +689,75 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
             }
         }
     } else {
-        // Windows/macOS: standard getDisplayMedia flow
+        // Windows/macOS/web: call getDisplayMedia ourselves and publish
+        // each track with explicit fmtp opts. We can't use LiveKit's
+        // setScreenShareEnabled here because its internal screen-share
+        // audio defaults override our room-level publishDefaults, which
+        // re-introduces the BUNDLE codec collision and kills the mic
+        // mid-share. Doing it manually mirrors the Linux pipecap path.
+        let stream: MediaStream;
         try {
-            await publishScreenShare(room, options.audio, resolution, publishOpts);
-        } catch {
+            stream = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                    width: { ideal: resolution.width },
+                    height: { ideal: resolution.height },
+                    frameRate: { ideal: encodeFps },
+                },
+                audio: options.audio,
+            });
+        } catch (e) {
+            logger.voice.warn("getDisplayMedia failed", e);
             return false;
+        }
+
+        const videoMs = stream.getVideoTracks()[0];
+        const audioMs = stream.getAudioTracks()[0];
+
+        try {
+            if (videoMs) {
+                const videoTrack = new LocalVideoTrack(videoMs, undefined, false);
+                await room.localParticipant.publishTrack(videoTrack, publishOpts);
+            }
+            if (audioMs) {
+                const audioTrack = new LocalAudioTrack(audioMs, undefined, false);
+                await room.localParticipant.publishTrack(audioTrack, {
+                    source: Track.Source.ScreenShareAudio,
+                    red: false,
+                    dtx: false,
+                    forceStereo: true,
+                });
+            }
+        } catch (e) {
+            logger.voice.warn("Screen share publish failed", e);
+            stream.getTracks().forEach((t) => t.stop());
+            return false;
+        }
+
+        // The user asked for audio but the OS / source didn't deliver one
+        // (most commonly: Windows screen-source on a system that has no
+        // per-source audio capture path, or macOS where getDisplayMedia
+        // doesn't expose system audio at all). Tell them so they don't
+        // wonder why participants can't hear them.
+        if (options.audio && !audioMs) {
+            showToast("Audio capture is unavailable for this source", "info");
         }
     }
 
-    // Set content hint + tell WebRTC to drop *resolution* (not framerate)
-    // when bandwidth is constrained. Default for screen share is
-    // `maintain-resolution`, which is the wrong tradeoff if the user
-    // explicitly picked a high frame rate.
+    // For screen content the right congestion tradeoff is "drop frames,
+    // not pixels" — text legibility matters more than smoothness.
+    // contentHint=detail + maintain-resolution is set unconditionally
+    // because even 60fps screen-shares are mostly UI, not motion video.
     try {
-        const hint = encodeFps >= 30 ? "motion" : "detail";
         room.localParticipant.videoTrackPublications.forEach(pub => {
             if (pub.source !== Track.Source.ScreenShare) return;
             const track = pub.track;
             if (!track?.mediaStreamTrack) return;
-            track.mediaStreamTrack.contentHint = hint;
+            track.mediaStreamTrack.contentHint = "detail";
 
-            // Reach into the underlying RTCRtpSender so we can set
-            // degradationPreference + reaffirm maxBitrate/maxFramerate.
             const sender = track.sender as RTCRtpSender | undefined;
             if (!sender) return;
             const params = sender.getParameters();
-            params.degradationPreference = "maintain-framerate";
+            params.degradationPreference = "maintain-resolution";
             for (const enc of params.encodings) {
                 enc.maxBitrate = encodingBitrate;
                 enc.maxFramerate = encodeFps;
@@ -649,31 +773,37 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
     return true;
 }
 
-/** Publish screen share to LiveKit with fallback to unconstrained. */
-async function publishScreenShare(
-    room: Room,
-    audio: boolean,
-    resolution: { width: number; height: number; frameRate?: number },
-    publishOpts: { screenShareEncoding: { maxFramerate: number; maxBitrate: number }; screenShareSimulcastLayers: VideoPreset[] },
-): Promise<void> {
-    try {
-        await room.localParticipant.setScreenShareEnabled(true, { audio, resolution }, publishOpts);
-    } catch (e) {
-        logger.voice.warn("Screen share failed, retrying without constraints", e);
-        try {
-            await room.localParticipant.setScreenShareEnabled(true, { audio });
-        } catch (e2) {
-            logger.voice.warn("Screen share failed entirely", e2);
-            showToast("Screen share failed", "error");
-            throw e2;
-        }
-    }
-}
-
+// Always stop both wincap and pipecap on screenshare stop. Only one can
+// be active at a time, the other call is a cheap no-op.
 export async function stopScreenShare(): Promise<boolean> {
+    wincapScreenShare.stop();
     if (!room) return false;
     pipecapScreenShare.stop();
-    await room.localParticipant.setScreenShareEnabled(false);
+
+    // setScreenShareEnabled(false) only unpublishes tracks LiveKit knows
+    // it created. The pipecap path uses publishTrack() directly, so we
+    // have to unpublish those ourselves or every share→unshare cycle
+    // leaks a publication on the SFU.
+    const lp = room.localParticipant;
+    const screenPubs = [
+        ...lp.videoTrackPublications.values(),
+        ...lp.audioTrackPublications.values(),
+    ].filter(p =>
+        p.source === Track.Source.ScreenShare ||
+        p.source === Track.Source.ScreenShareAudio,
+    );
+    for (const pub of screenPubs) {
+        if (pub.track) {
+            try {
+                await lp.unpublishTrack(pub.track, true);
+            } catch (e) {
+                logger.voice.warn("Failed to unpublish screen-share track", e);
+            }
+        }
+    }
+
+    // Also call the LiveKit-managed stop for the non-pipecap path.
+    await lp.setScreenShareEnabled(false);
     return false;
 }
 
