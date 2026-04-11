@@ -163,9 +163,7 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
                                         Share Audio
                                     </div>
                                     <div className="text-xs text-[#949ba4]">
-                                        {isWindows
-                                            ? "Only available when sharing a single window"
-                                            : "Include system audio in your stream"}
+                                        Include system audio in your stream
                                     </div>
                                 </div>
                                 <div
@@ -187,11 +185,9 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
                                 <div className="flex gap-2 p-3 rounded-lg bg-[#f0b232]/10 border border-[#f0b232]/30">
                                     <span className="text-[#f0b232] text-sm leading-5">⚠</span>
                                     <div className="text-xs text-[#dbdee1] leading-5">
-                                        Echo-free system audio needs Windows 11 with the wincap
-                                        native module. Without it, audio only works for{" "}
-                                        <span className="font-semibold">window captures</span> —
-                                        sharing a full screen will drop audio to avoid echoing
-                                        the meeting back to other participants.
+                                        Echo-free audio requires Windows 11. On older versions,
+                                        shared audio may include sounds from the call itself.
+                                        Upgrade to Windows 11 for automatic echo isolation.
                                     </div>
                                 </div>
                             )}
