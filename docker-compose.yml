@@ -8,6 +8,8 @@ x-backend: &backend-base
       condition: service_healthy
     minio:
       condition: service_started
+    postfix:
+      condition: service_started
   environment: &backend-env
     ASPNETCORE_ENVIRONMENT: Production
     ASPNETCORE_URLS: http://+:5111
