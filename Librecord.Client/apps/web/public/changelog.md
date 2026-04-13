@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.20 — 2026-04-13
+
+### Fixed
+- Desktop app: settings navigation from the sidebar avatar now correctly opens the Security tab when 2FA is disabled (previously redirected to DMs due to missing route).
+
+---
+
 ## 0.1.19 — 2026-04-13
 
 ### New
