@@ -20,9 +20,6 @@ export default function LoginPage() {
     const [useRecovery, setUseRecovery] = useState(false);
     const [recoveryCode, setRecoveryCode] = useState("");
 
-    // Email verification state
-    const [emailVerificationRequired, setEmailVerificationRequired] = useState(false);
-
     async function handleLogin() {
         setError("");
         setLoading(true);
@@ -33,12 +30,6 @@ export default function LoginPage() {
 
         if (result.requiresTwoFactor) {
             setTwoFactorSessionToken(result.twoFactorSessionToken!);
-            return;
-        }
-
-        if (result.requiresEmailVerification) {
-            setEmailVerificationRequired(true);
-            if (result.error) setError(result.error);
             return;
         }
 
@@ -68,36 +59,6 @@ export default function LoginPage() {
 
         await loadUser();
         navigate("/app");
-    }
-
-    // ─── Email verification required screen ─────────────────────────
-    if (emailVerificationRequired) {
-        return (
-            <div className="h-screen w-full flex items-center justify-center bg-[#5865F2] relative overflow-hidden">
-                <div className="absolute inset-0 overflow-hidden">
-                    <div className="absolute -top-1/4 -left-1/4 w-[600px] h-[600px] rounded-full bg-[#3b44c4]/40 blur-[120px] animate-[drift_20s_ease-in-out_infinite]" />
-                    <div className="absolute -bottom-1/4 -right-1/4 w-[500px] h-[500px] rounded-full bg-[#7983f5]/30 blur-[100px] animate-[drift_25s_ease-in-out_infinite_reverse]" />
-                </div>
-                <div className="w-[480px] bg-[#313338] p-8 rounded-2xl shadow-2xl relative z-10 text-center">
-                    <div className="flex justify-center mb-6">
-                        <img src="/librecord.svg" alt="Librecord" className="w-14 h-14" />
-                    </div>
-                    <h1 className="text-2xl font-bold text-white mb-2">Verify your email</h1>
-                    <p className="text-sm text-[#949ba4] mb-6">
-                        Please check your inbox and verify your email address before logging in.
-                    </p>
-                    <button
-                        onClick={() => {
-                            setEmailVerificationRequired(false);
-                            setError("");
-                        }}
-                        className="text-sm text-[#00a8fc] hover:underline"
-                    >
-                        Back to login
-                    </button>
-                </div>
-            </div>
-        );
     }
 
     // ─── 2FA code entry screen ──────────────────────────────────────

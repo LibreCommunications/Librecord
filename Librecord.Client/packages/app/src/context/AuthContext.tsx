@@ -16,8 +16,6 @@ export interface AuthUser {
     email: string;
     avatarUrl?: string | null;
     guilds?: GuildSummary[];
-    emailVerified?: boolean;
-    requiresEmailVerification?: boolean;
     twoFactorEnabled?: boolean;
 }
 
@@ -25,8 +23,6 @@ export interface LoginResult {
     error?: string;
     requiresTwoFactor?: boolean;
     twoFactorSessionToken?: string;
-    requiresEmailVerification?: boolean;
-    userId?: string;
 }
 
 export interface AuthContextType {
@@ -107,8 +103,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: data.email,
             avatarUrl: data.avatarUrl,
             guilds: data.guilds,
-            emailVerified: data.emailVerified,
-            requiresEmailVerification: data.requiresEmailVerification,
             twoFactorEnabled: data.twoFactorEnabled,
         });
     }, [refreshAccessToken]);
@@ -143,8 +137,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 email: data.email,
                                 avatarUrl: data.avatarUrl,
                                 guilds: data.guilds,
-                                emailVerified: data.emailVerified,
-                                requiresEmailVerification: data.requiresEmailVerification,
                                 twoFactorEnabled: data.twoFactorEnabled,
                             });
                         } else {
@@ -185,15 +177,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             };
         }
 
-        // Email verification required (post-cutoff account)
-        if (!res.ok && data.requiresEmailVerification) {
-            return {
-                requiresEmailVerification: true,
-                userId: data.userId,
-                error: data.error,
-            };
-        }
-
         if (!res.ok || !data.success) {
             return { error: data.error ?? "Login failed" };
         }
@@ -222,11 +205,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         await loadUser();
-
-        if (data.requiresEmailVerification) {
-            return { requiresEmailVerification: true };
-        }
-
         return {};
     }, [loadUser]);
 

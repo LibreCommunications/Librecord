@@ -54,8 +54,6 @@ public static class DependencyInjection
         services.AddScoped<IThreadRepository, ThreadRepository>();
 
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
-        services.Configure<EmailOptions>(config.GetSection("Email"));
-        services.AddSingleton<IEmailSender, SmtpEmailSender>();
         services.AddSingleton<IMessageEncryptionService>(
             new AesGcmMessageEncryptionService(
                 Convert.FromBase64String(

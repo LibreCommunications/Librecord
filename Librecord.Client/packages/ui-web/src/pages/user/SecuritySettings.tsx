@@ -311,57 +311,7 @@ export default function SecuritySettings() {
                 )}
             </section>
 
-            {/* ═══════ Email Verification Status ═══════ */}
-            <section className="bg-[#2b2d31] rounded-xl p-5 border border-[#1e1f22] space-y-4">
-                <h2 className="text-sm font-bold text-[#b5bac1] uppercase tracking-wide">Email Verification</h2>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <p className="text-sm text-[#dbdee1]">{user?.email}</p>
-                        <p className="text-xs text-[#949ba4] mt-0.5">
-                            {user?.emailVerified ? "Your email is verified." : "Your email is not yet verified."}
-                        </p>
-                    </div>
-                    <span className={`text-xs font-medium px-2 py-1 rounded ${
-                        user?.emailVerified
-                            ? "bg-[#248046]/20 text-[#57f287]"
-                            : "bg-[#faa61a]/20 text-[#faa61a]"
-                    }`}>
-                        {user?.emailVerified ? "Verified" : "Unverified"}
-                    </span>
-                </div>
-                {!user?.emailVerified && (
-                    <ResendButton />
-                )}
-            </section>
         </div>
     );
 }
 
-function ResendButton() {
-    const [sent, setSent] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const { toast } = useToast();
-
-    async function handleResend() {
-        setLoading(true);
-        try {
-            await auth.resendVerification();
-            setSent(true);
-            toast("Verification email sent!", "success");
-        } catch {
-            toast("Failed to send verification email.", "error");
-        }
-        setLoading(false);
-    }
-
-    return (
-        <button
-            onClick={handleResend}
-            disabled={loading || sent}
-            className="px-4 py-2 rounded bg-[#5865F2] hover:bg-[#4752c4] text-white text-sm font-medium disabled:opacity-50 transition-colors flex items-center gap-2"
-        >
-            {loading && <Spinner size="sm" />}
-            {sent ? "Email sent!" : "Resend verification email"}
-        </button>
-    );
-}

@@ -10,9 +10,8 @@ public class AuthServiceTests
 {
     private readonly Mock<IAuthRepository> _repo = new();
     private readonly Mock<IJwtTokenGenerator> _jwt = new();
-    private readonly Mock<IEmailSender> _email = new();
 
-    private AuthService CreateService() => new(_repo.Object, _jwt.Object, _email.Object, isDevelopment: true);
+    private AuthService CreateService() => new(_repo.Object, _jwt.Object);
 
     private static User MakeUser(string username = "alice", string email = "alice@test.com") => new()
     {

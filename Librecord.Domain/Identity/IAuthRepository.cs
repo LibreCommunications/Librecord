@@ -16,10 +16,6 @@ public interface IAuthRepository
 
     Task<User?> GetUserByIdAsync(Guid id);
 
-    // Email verification
-    Task<string> GenerateEmailConfirmationTokenAsync(User user);
-    Task<IdentityResult> ConfirmEmailAsync(User user, string token);
-
     // 2FA / TOTP
     Task<string> GetOrCreateAuthenticatorKeyAsync(User user);
     Task<bool> VerifyTwoFactorTokenAsync(User user, string code);

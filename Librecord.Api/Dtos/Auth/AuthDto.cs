@@ -12,8 +12,6 @@ public class AuthDto
     public string? DisplayName { get; set; }
     public string? Email { get; set; }
 
-    public bool? EmailVerified { get; set; }
-    public bool? RequiresEmailVerification { get; set; }
     public bool? RequiresTwoFactor { get; set; }
     public string? TwoFactorSessionToken { get; set; }
 
@@ -27,8 +25,6 @@ public class AuthDto
             Username = result.Username,
             DisplayName = result.DisplayName,
             Email = result.Email,
-            EmailVerified = result.EmailVerified,
-            RequiresEmailVerification = result.RequiresEmailVerification ? true : null,
             RequiresTwoFactor = result.RequiresTwoFactor ? true : null,
             TwoFactorSessionToken = result.TwoFactorSessionToken
         };

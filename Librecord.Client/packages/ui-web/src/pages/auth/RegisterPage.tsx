@@ -14,7 +14,6 @@ export default function RegisterPage() {
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
-    const [checkEmail, setCheckEmail] = useState(false);
 
     async function handleRegister() {
         setError("");
@@ -29,42 +28,7 @@ export default function RegisterPage() {
             return;
         }
 
-        if (result.requiresEmailVerification) {
-            setCheckEmail(true);
-            return;
-        }
-
         navigate("/app");
-    }
-
-    if (checkEmail) {
-        return (
-            <div className="h-screen w-full flex items-center justify-center bg-[#5865F2] relative overflow-hidden">
-                <div className="absolute inset-0 overflow-hidden">
-                    <div className="absolute -top-1/4 -left-1/4 w-[600px] h-[600px] rounded-full bg-[#3b44c4]/40 blur-[120px] animate-[drift_20s_ease-in-out_infinite]" />
-                    <div className="absolute -bottom-1/4 -right-1/4 w-[500px] h-[500px] rounded-full bg-[#7983f5]/30 blur-[100px] animate-[drift_25s_ease-in-out_infinite_reverse]" />
-                </div>
-                <div className="w-[480px] bg-[#313338] p-8 rounded-2xl shadow-2xl relative z-10 text-center">
-                    <div className="flex justify-center mb-6">
-                        <img src="/librecord.svg" alt="Librecord" className="w-14 h-14" />
-                    </div>
-                    <h1 className="text-2xl font-bold text-white mb-2">Check your email</h1>
-                    <p className="text-sm text-[#949ba4] mb-2">
-                        We sent a verification link to
-                    </p>
-                    <p className="text-white font-medium mb-6">{email}</p>
-                    <p className="text-sm text-[#949ba4] mb-6">
-                        Click the link in the email to verify your account, then come back and log in.
-                    </p>
-                    <a
-                        href="/login"
-                        className="inline-block px-6 py-2.5 rounded-[4px] font-semibold text-white bg-[#5865F2] hover:bg-[#4752c4] transition-colors"
-                    >
-                        Go to Login
-                    </a>
-                </div>
-            </div>
-        );
     }
 
     return (

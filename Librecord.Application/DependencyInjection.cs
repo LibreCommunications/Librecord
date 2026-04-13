@@ -14,16 +14,14 @@ namespace Librecord.Application;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddApplication(this IServiceCollection services, bool isDevelopment = false)
+    public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddSingleton<IPermissionRegistry, PermissionRegistry>();
         services.AddSingleton<IConnectionTracker, ConnectionTracker>();
 
         services.AddScoped<IAuthService>(sp => new AuthService(
             sp.GetRequiredService<IAuthRepository>(),
-            sp.GetRequiredService<IJwtTokenGenerator>(),
-            sp.GetRequiredService<IEmailSender>(),
-            isDevelopment));
+            sp.GetRequiredService<IJwtTokenGenerator>()));
         services.AddScoped<IPermissionService, PermissionService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IFriendshipService, FriendshipService>();

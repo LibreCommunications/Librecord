@@ -15,9 +15,6 @@ public class AuthResult
     public string? Email { get; set; }
     public string? DisplayName { get; set; }
 
-    public bool EmailVerified { get; set; }
-    public bool RequiresEmailVerification { get; set; }
-
     /// <summary>Login requires a 2FA code before tokens are issued.</summary>
     public bool RequiresTwoFactor { get; set; }
 
@@ -32,8 +29,7 @@ public class AuthResult
             UserId = user.Id,
             Email = user.Email,
             Username = user.UserName,
-            DisplayName = user.DisplayName,
-            EmailVerified = user.EmailConfirmed
+            DisplayName = user.DisplayName
         };
     }
 
@@ -52,8 +48,7 @@ public class AuthResult
             Email = user.Email,
             DisplayName = user.DisplayName,
             AccessToken = accessToken,
-            RefreshToken = refreshToken,
-            EmailVerified = user.EmailConfirmed
+            RefreshToken = refreshToken
         };
     }
 

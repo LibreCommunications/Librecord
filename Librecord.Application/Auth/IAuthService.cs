@@ -12,10 +12,6 @@ public interface IAuthService
     Task LogoutAllDevicesAsync(Guid userId);
     Task<AuthResult> MeAsync(Guid userId);
 
-    // Email verification
-    Task<AuthResult> VerifyEmailAsync(Guid userId, string token);
-    Task<AuthResult> ResendVerificationEmailAsync(Guid userId);
-
     // 2FA
     Task<TwoFactorSetupResult> SetupTwoFactorAsync(Guid userId);
     Task<TwoFactorEnableResult> EnableTwoFactorAsync(Guid userId, string code);

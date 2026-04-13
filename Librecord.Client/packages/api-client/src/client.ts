@@ -80,12 +80,6 @@ export const auth = {
     }>("/users/me"),
     logoutAll: () => request<void>("/auth/logout-all", { method: "POST" }),
 
-    // Email verification
-    verifyEmail: (userId: string, token: string) =>
-        request<{ success: boolean }>("/auth/verify-email", { method: "POST", ...json({ userId, token }) }),
-    resendVerification: () =>
-        request<{ success: boolean }>("/auth/resend-verification", { method: "POST" }),
-
     // 2FA login
     verifyTwoFactor: (sessionToken: string, code: string) =>
         fetch(`${API_URL}/auth/2fa/verify`, { method: "POST", credentials: "include", ...json({ sessionToken, code }) }),
