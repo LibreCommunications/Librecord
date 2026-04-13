@@ -54,9 +54,9 @@ set +a
 # Ensure infra services are running (may already be started by CI)
 echo "Ensuring infra services are up..."
 if [ "$ENV" = "prod" ]; then
-  docker compose -p "$PROJECT" --env-file "$REPO_DIR/.env" -f "$REPO_DIR/docker-compose.yml" --profile livekit up -d postgres minio livekit
+  docker compose -p "$PROJECT" --env-file "$REPO_DIR/.env" -f "$REPO_DIR/docker-compose.yml" --profile livekit up -d postgres minio postfix livekit
 else
-  docker compose -p "$PROJECT" --env-file "$REPO_DIR/.env" -f "$REPO_DIR/docker-compose.yml" up -d postgres minio
+  docker compose -p "$PROJECT" --env-file "$REPO_DIR/.env" -f "$REPO_DIR/docker-compose.yml" up -d postgres minio postfix
 fi
 
 # Wait for postgres to be ready before starting the backend
@@ -109,6 +109,9 @@ docker run -d \
   -e "LiveKit__Host=${LIVEKIT_HOST}" \
   -e "LiveKit__ApiKey=${LIVEKIT_API_KEY}" \
   -e "LiveKit__ApiSecret=${LIVEKIT_API_SECRET}" \
+  -e "Email__SmtpHost=postfix" \
+  -e "Email__SmtpPort=587" \
+  -e "Email__FromAddress=noreply@${DOMAIN}" \
   -e "Cors__Origins__0=https://${DOMAIN}" \
   "$IMAGE"
 

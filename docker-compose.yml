@@ -8,6 +8,8 @@ x-backend: &backend-base
       condition: service_healthy
     minio:
       condition: service_started
+    postfix:
+      condition: service_started
   environment: &backend-env
     ASPNETCORE_ENVIRONMENT: Production
     ASPNETCORE_URLS: http://+:5111
@@ -26,6 +28,9 @@ x-backend: &backend-base
     LiveKit__Host: ${LIVEKIT_HOST}
     LiveKit__ApiKey: ${LIVEKIT_API_KEY}
     LiveKit__ApiSecret: ${LIVEKIT_API_SECRET}
+    Email__SmtpHost: postfix
+    Email__SmtpPort: 587
+    Email__FromAddress: noreply@${DOMAIN}
     Cors__Origins__0: https://${DOMAIN}
 
 services:
@@ -83,6 +88,17 @@ services:
       - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - minio_data:/data
+
+  postfix:
+    image: boky/postfix
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.25
+    environment:
+      ALLOWED_SENDER_DOMAINS: ${DOMAIN}
+      RELAYHOST: ${SMTP_RELAY_HOST}
+      RELAYHOST_USERNAME: ${SMTP_RELAY_USERNAME}
+      RELAYHOST_PASSWORD: ${SMTP_RELAY_PASSWORD}
 
   livekit:
     image: docker.io/livekit/livekit-server:v1.10.0

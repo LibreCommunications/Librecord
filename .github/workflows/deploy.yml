@@ -76,6 +76,9 @@ jobs:
           LIVEKIT_API_SECRET=${{ secrets.LIVEKIT_API_SECRET }}
           BLUE_PORT=${{ steps.config.outputs.blue_port }}
           GREEN_PORT=${{ steps.config.outputs.green_port }}
+          SMTP_RELAY_HOST=${{ secrets.SMTP_RELAY_HOST }}
+          SMTP_RELAY_USERNAME=${{ secrets.SMTP_RELAY_USERNAME }}
+          SMTP_RELAY_PASSWORD=${{ secrets.SMTP_RELAY_PASSWORD }}
           EOF
           chmod 600 .env
           echo "VITE_API_URL=https://${{ secrets.DOMAIN }}/api" > Librecord.Client/.env
@@ -93,9 +96,9 @@ jobs:
           source .env
           export BLUE_PORT GREEN_PORT
           if [ "$IS_PROD" = "true" ]; then
-            docker compose -p ${{ steps.config.outputs.site }} --env-file .env -f docker-compose.yml --profile livekit up -d postgres minio livekit &
+            docker compose -p ${{ steps.config.outputs.site }} --env-file .env -f docker-compose.yml --profile livekit up -d postgres minio postfix livekit &
           else
-            docker compose -p ${{ steps.config.outputs.site }} --env-file .env -f docker-compose.yml up -d postgres minio &
+            docker compose -p ${{ steps.config.outputs.site }} --env-file .env -f docker-compose.yml up -d postgres minio postfix &
           fi
           PID_INFRA=$!
 

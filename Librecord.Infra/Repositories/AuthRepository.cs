@@ -71,6 +71,77 @@ public class AuthRepository : IAuthRepository
             token.IsRevoked = true;
     }
 
+    public async Task<string> GetOrCreateAuthenticatorKeyAsync(User user)
+    {
+        var key = await _userManager.GetAuthenticatorKeyAsync(user);
+        if (string.IsNullOrEmpty(key))
+        {
+            await _userManager.ResetAuthenticatorKeyAsync(user);
+            key = (await _userManager.GetAuthenticatorKeyAsync(user))!;
+        }
+        return key;
+    }
+
+    public async Task<bool> VerifyTwoFactorTokenAsync(User user, string code)
+    {
+        return await _userManager.VerifyTwoFactorTokenAsync(
+            user, _userManager.Options.Tokens.AuthenticatorTokenProvider, code);
+    }
+
+    public async Task SetTwoFactorEnabledAsync(User user, bool enabled)
+    {
+        await _userManager.SetTwoFactorEnabledAsync(user, enabled);
+    }
+
+    public async Task<IEnumerable<string>> GenerateRecoveryCodesAsync(User user, int count)
+    {
+        return (await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, count))!;
+    }
+
+    public async Task<bool> RedeemRecoveryCodeAsync(User user, string code)
+    {
+        var result = await _userManager.RedeemTwoFactorRecoveryCodeAsync(user, code);
+        return result.Succeeded;
+    }
+
+    public async Task ResetAuthenticatorKeyAsync(User user)
+    {
+        await _userManager.ResetAuthenticatorKeyAsync(user);
+    }
+
+    // ─── Account recovery codes ────────────────────────────────────
+
+    public async Task AddAccountRecoveryCodesAsync(IEnumerable<AccountRecoveryCode> codes)
+    {
+        await _db.AccountRecoveryCodes.AddRangeAsync(codes);
+    }
+
+    public async Task<AccountRecoveryCode?> FindUnusedAccountRecoveryCodeAsync(Guid userId, string codeHash)
+    {
+        return await _db.AccountRecoveryCodes
+            .FirstOrDefaultAsync(c => c.UserId == userId && c.CodeHash == codeHash && c.UsedAt == null);
+    }
+
+    public async Task DeleteAccountRecoveryCodesAsync(Guid userId)
+    {
+        var codes = await _db.AccountRecoveryCodes
+            .Where(c => c.UserId == userId)
+            .ToListAsync();
+        _db.AccountRecoveryCodes.RemoveRange(codes);
+    }
+
+    public async Task<int> CountUnusedAccountRecoveryCodesAsync(Guid userId)
+    {
+        return await _db.AccountRecoveryCodes
+            .CountAsync(c => c.UserId == userId && c.UsedAt == null);
+    }
+
+    public async Task ResetPasswordAsync(User user, string newPassword)
+    {
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        await _userManager.ResetPasswordAsync(user, token, newPassword);
+    }
+
     public async Task SaveChangesAsync()
     {
         await _db.SaveChangesAsync();

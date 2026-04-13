@@ -8,14 +8,17 @@
     "./src/*": "./src/*"
   },
   "dependencies": {
-    "@librecord/domain": "workspace:*",
-    "@librecord/platform": "workspace:*",
     "@librecord/api-client": "workspace:*",
     "@librecord/app": "workspace:*",
     "@librecord/design": "workspace:*",
+    "@librecord/domain": "workspace:*",
+    "@librecord/platform": "workspace:*",
+    "@tailwindcss/typography": "^0.5.19",
     "livekit-client": "^2.18.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.9.6",
     "react-virtuoso": "^4.18.3"
   },

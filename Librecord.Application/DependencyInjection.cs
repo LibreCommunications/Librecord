@@ -6,6 +6,8 @@ using Librecord.Application.Services;
 using Librecord.Application.Social;
 using Librecord.Application.Users;
 using Librecord.Application.Voice;
+using Librecord.Domain.Identity;
+using Librecord.Domain.Security;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Librecord.Application;
@@ -17,7 +19,9 @@ public static class DependencyInjection
         services.AddSingleton<IPermissionRegistry, PermissionRegistry>();
         services.AddSingleton<IConnectionTracker, ConnectionTracker>();
 
-        services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IAuthService>(sp => new AuthService(
+            sp.GetRequiredService<IAuthRepository>(),
+            sp.GetRequiredService<IJwtTokenGenerator>()));
         services.AddScoped<IPermissionService, PermissionService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IFriendshipService, FriendshipService>();

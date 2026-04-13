@@ -79,6 +79,30 @@ export const auth = {
         guilds?: { guildId: string; name: string; iconUrl: string | null }[];
     }>("/users/me"),
     logoutAll: () => request<void>("/auth/logout-all", { method: "POST" }),
+
+    // Account recovery
+    recoverAccount: (emailOrUsername: string, recoveryCode: string, newPassword: string) =>
+        fetch(`${API_URL}/auth/recover-account`, { method: "POST", credentials: "include", ...json({ emailOrUsername, recoveryCode, newPassword }) }),
+    regenerateAccountRecoveryCodes: (password: string) =>
+        request<{ recoveryCodes: string[] }>("/auth/recovery-codes/regenerate", { method: "POST", ...json({ password }) }),
+    getRecoveryCodeCount: () =>
+        request<{ count: number }>("/auth/recovery-codes/count"),
+
+    // 2FA login
+    verifyTwoFactor: (sessionToken: string, code: string) =>
+        fetch(`${API_URL}/auth/2fa/verify`, { method: "POST", credentials: "include", ...json({ sessionToken, code }) }),
+    verifyTwoFactorRecovery: (sessionToken: string, recoveryCode: string) =>
+        fetch(`${API_URL}/auth/2fa/recovery`, { method: "POST", credentials: "include", ...json({ sessionToken, recoveryCode }) }),
+
+    // 2FA management (authenticated)
+    setupTwoFactor: () =>
+        request<{ sharedKey: string; authenticatorUri: string }>("/auth/2fa/setup", { method: "POST" }),
+    enableTwoFactor: (code: string) =>
+        request<{ recoveryCodes: string[] }>("/auth/2fa/enable", { method: "POST", ...json({ code }) }),
+    disableTwoFactor: (password: string) =>
+        request<{ success: boolean }>("/auth/2fa/disable", { method: "POST", ...json({ password }) }),
+    regenerateRecoveryCodes: (password: string) =>
+        request<{ recoveryCodes: string[] }>("/auth/2fa/regenerate-recovery-codes", { method: "POST", ...json({ password }) }),
 };
 
 export const userProfiles = {
