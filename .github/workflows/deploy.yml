@@ -93,9 +93,9 @@ jobs:
           source .env
           export BLUE_PORT GREEN_PORT
           if [ "$IS_PROD" = "true" ]; then
-            docker compose -p ${{ steps.config.outputs.site }} --env-file .env -f docker-compose.yml --profile livekit up -d postgres minio livekit &
+            docker compose -p ${{ steps.config.outputs.site }} --env-file .env -f docker-compose.yml --profile livekit up -d postgres minio postfix livekit &
           else
-            docker compose -p ${{ steps.config.outputs.site }} --env-file .env -f docker-compose.yml up -d postgres minio &
+            docker compose -p ${{ steps.config.outputs.site }} --env-file .env -f docker-compose.yml up -d postgres minio postfix &
           fi
           PID_INFRA=$!
 
