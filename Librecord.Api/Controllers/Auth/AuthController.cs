@@ -51,7 +51,16 @@ public class AuthController : ControllerBase
             request.Password);
 
         if (!result.Success)
+        {
+            // Still return userId for unverified accounts so the client can resend
+            if (result.RequiresEmailVerification)
+                return Unauthorized(AuthDto.From(result));
             return Unauthorized(AuthDto.From(result));
+        }
+
+        // 2FA required — don't issue cookies yet, return session token
+        if (result.RequiresTwoFactor)
+            return Ok(AuthDto.From(result));
 
         SetAuthCookies(result.AccessToken!, result.RefreshToken!);
         return Ok(AuthDto.From(result));
@@ -109,6 +118,48 @@ public class AuthController : ControllerBase
         return Ok(new AuthDto { Success = true });
     }
 
+
+    [HttpPost("verify-email")]
+    public async Task<ActionResult<AuthDto>> VerifyEmail([FromBody] VerifyEmailRequest request)
+    {
+        var result = await _auth.VerifyEmailAsync(request.UserId, request.Token);
+        if (!result.Success)
+            return BadRequest(AuthDto.From(result));
+        return Ok(AuthDto.From(result));
+    }
+
+    [Authorize]
+    [HttpPost("resend-verification")]
+    public async Task<ActionResult<AuthDto>> ResendVerification()
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var result = await _auth.ResendVerificationEmailAsync(userId);
+        if (!result.Success)
+            return BadRequest(AuthDto.From(result));
+        return Ok(AuthDto.From(result));
+    }
+
+    [HttpPost("2fa/verify")]
+    public async Task<ActionResult<AuthDto>> VerifyTwoFactor([FromBody] TwoFactorVerifyRequest request)
+    {
+        var result = await _auth.VerifyTwoFactorLoginAsync(request.SessionToken, request.Code);
+        if (!result.Success)
+            return Unauthorized(AuthDto.From(result));
+
+        SetAuthCookies(result.AccessToken!, result.RefreshToken!);
+        return Ok(AuthDto.From(result));
+    }
+
+    [HttpPost("2fa/recovery")]
+    public async Task<ActionResult<AuthDto>> VerifyTwoFactorRecovery([FromBody] TwoFactorRecoveryRequest request)
+    {
+        var result = await _auth.VerifyTwoFactorRecoveryAsync(request.SessionToken, request.RecoveryCode);
+        if (!result.Success)
+            return Unauthorized(AuthDto.From(result));
+
+        SetAuthCookies(result.AccessToken!, result.RefreshToken!);
+        return Ok(AuthDto.From(result));
+    }
 
     private void SetAuthCookies(string accessToken, string refreshToken)
     {

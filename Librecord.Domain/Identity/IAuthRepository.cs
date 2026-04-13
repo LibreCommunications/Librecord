@@ -16,5 +16,17 @@ public interface IAuthRepository
 
     Task<User?> GetUserByIdAsync(Guid id);
 
+    // Email verification
+    Task<string> GenerateEmailConfirmationTokenAsync(User user);
+    Task<IdentityResult> ConfirmEmailAsync(User user, string token);
+
+    // 2FA / TOTP
+    Task<string> GetOrCreateAuthenticatorKeyAsync(User user);
+    Task<bool> VerifyTwoFactorTokenAsync(User user, string code);
+    Task SetTwoFactorEnabledAsync(User user, bool enabled);
+    Task<IEnumerable<string>> GenerateRecoveryCodesAsync(User user, int count);
+    Task<bool> RedeemRecoveryCodeAsync(User user, string code);
+    Task ResetAuthenticatorKeyAsync(User user);
+
     Task SaveChangesAsync();
 }

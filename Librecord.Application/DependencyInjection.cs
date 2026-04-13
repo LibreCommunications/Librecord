@@ -6,18 +6,24 @@ using Librecord.Application.Services;
 using Librecord.Application.Social;
 using Librecord.Application.Users;
 using Librecord.Application.Voice;
+using Librecord.Domain.Identity;
+using Librecord.Domain.Security;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Librecord.Application;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddApplication(this IServiceCollection services)
+    public static IServiceCollection AddApplication(this IServiceCollection services, bool isDevelopment = false)
     {
         services.AddSingleton<IPermissionRegistry, PermissionRegistry>();
         services.AddSingleton<IConnectionTracker, ConnectionTracker>();
 
-        services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IAuthService>(sp => new AuthService(
+            sp.GetRequiredService<IAuthRepository>(),
+            sp.GetRequiredService<IJwtTokenGenerator>(),
+            sp.GetRequiredService<IEmailSender>(),
+            isDevelopment));
         services.AddScoped<IPermissionService, PermissionService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IFriendshipService, FriendshipService>();

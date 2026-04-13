@@ -1,19 +1,28 @@
-﻿using Librecord.Domain.Identity;
+using Librecord.Domain.Identity;
 
 namespace Librecord.Application.Models.Results;
 
 public class AuthResult
 {
-    public bool Success { get; private set; }
-    public string? Error { get; private set; }
+    public bool Success { get; set; }
+    public string? Error { get; set; }
 
-    public string? AccessToken { get; private set; }
-    public string? RefreshToken { get; private set; }
+    public string? AccessToken { get; set; }
+    public string? RefreshToken { get; set; }
 
-    public Guid? UserId { get; private set; }
-    public string? Username { get; private set; }
-    public string? Email { get; private set; }
-    public string? DisplayName { get; private set; }
+    public Guid? UserId { get; set; }
+    public string? Username { get; set; }
+    public string? Email { get; set; }
+    public string? DisplayName { get; set; }
+
+    public bool EmailVerified { get; set; }
+    public bool RequiresEmailVerification { get; set; }
+
+    /// <summary>Login requires a 2FA code before tokens are issued.</summary>
+    public bool RequiresTwoFactor { get; set; }
+
+    /// <summary>Short-lived opaque token proving password was validated (used for 2FA step 2).</summary>
+    public string? TwoFactorSessionToken { get; set; }
 
     public static AuthResult FromUser(User user)
     {
@@ -23,7 +32,8 @@ public class AuthResult
             UserId = user.Id,
             Email = user.Email,
             Username = user.UserName,
-            DisplayName = user.DisplayName
+            DisplayName = user.DisplayName,
+            EmailVerified = user.EmailConfirmed
         };
     }
 
@@ -42,7 +52,20 @@ public class AuthResult
             Email = user.Email,
             DisplayName = user.DisplayName,
             AccessToken = accessToken,
-            RefreshToken = refreshToken
+            RefreshToken = refreshToken,
+            EmailVerified = user.EmailConfirmed
+        };
+    }
+
+    public static AuthResult TwoFactorRequired(User user, string sessionToken)
+    {
+        return new AuthResult
+        {
+            Success = true,
+            RequiresTwoFactor = true,
+            TwoFactorSessionToken = sessionToken,
+            UserId = user.Id,
+            Username = user.UserName
         };
     }
 }

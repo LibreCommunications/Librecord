@@ -12,6 +12,9 @@ public class UserInfoResult
     public string DisplayName { get; private set; } = "";
     public string Email { get; private set; } = "";
     public string? AvatarUrl { get; private set; }
+    public bool EmailVerified { get; private set; }
+    public bool RequiresEmailVerification { get; private set; }
+    public bool TwoFactorEnabled { get; private set; }
 
     public List<GuildSummary> Guilds { get; private set; } = [];
 
@@ -30,6 +33,9 @@ public class UserInfoResult
             DisplayName = user.DisplayName,
             Email = user.Email ?? "",
             AvatarUrl = user.AvatarUrl,
+            EmailVerified = user.EmailConfirmed,
+            RequiresEmailVerification = !user.EmailConfirmed,
+            TwoFactorEnabled = user.TwoFactorEnabled,
 
             Guilds = user.GuildMemberships
                 .Select(gm => new GuildSummary(

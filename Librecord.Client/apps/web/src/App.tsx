@@ -3,9 +3,11 @@ import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@librecord/app";
 import LoadingSpinner from "@librecord/ui-web/src/components/LoadingSpinner.tsx";
 import { UpdateBanner } from "@librecord/ui-web/src/components/ui/UpdateBanner.tsx";
+import { EmailVerificationBanner } from "@librecord/ui-web/src/components/ui/EmailVerificationBanner.tsx";
 
 const LoginPage = lazy(() => import("@librecord/ui-web/src/pages/auth/LoginPage.tsx"));
 const RegisterPage = lazy(() => import("@librecord/ui-web/src/pages/auth/RegisterPage.tsx"));
+const VerifyEmailPage = lazy(() => import("@librecord/ui-web/src/pages/auth/VerifyEmailPage.tsx"));
 const MainPage = lazy(() => import("@librecord/ui-web/src/pages/MainPage.tsx"));
 const FriendsPage = lazy(() => import("@librecord/ui-web/src/pages/friends/FriendsPage.tsx"));
 const DmConversationPage = lazy(() => import("@librecord/ui-web/src/pages/dm/DmConversationPage.tsx"));
@@ -16,6 +18,8 @@ const UserSettingsPage = lazy(() => import("@librecord/ui-web/src/pages/user/Use
 const ProfileSettings = lazy(() => import("@librecord/ui-web/src/pages/user/ProfileSettings.tsx"));
 const AppSettings = lazy(() => import("@librecord/ui-web/src/pages/user/AppSettings.tsx"));
 const VoiceVideoSettings = lazy(() => import("@librecord/ui-web/src/pages/user/VoiceVideoSettings.tsx"));
+const SecuritySettings = lazy(() => import("@librecord/ui-web/src/pages/user/SecuritySettings.tsx"));
+const ChangelogPage = lazy(() => import("@librecord/ui-web/src/pages/user/ChangelogPage.tsx"));
 
 function ProtectedRoute() {
     const { isAuthenticated, authLoading } = useAuth();
@@ -29,9 +33,11 @@ export default function App() {
     return (
         <Suspense fallback={<LoadingSpinner />}>
             <UpdateBanner />
+            <EmailVerificationBanner />
             <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
+                <Route path="/verify-email" element={<VerifyEmailPage />} />
 
                 <Route element={<ProtectedRoute />}>
                     <Route path="/app" element={<MainPage />}>
@@ -49,8 +55,10 @@ export default function App() {
                             <Route path="user" element={<UserSettingsPage />}>
                                 <Route index element={<Navigate to="profile" replace />} />
                                 <Route path="profile" element={<ProfileSettings />} />
+                                <Route path="security" element={<SecuritySettings />} />
                                 <Route path="app" element={<AppSettings />} />
                                 <Route path="voice" element={<VoiceVideoSettings />} />
+                                <Route path="changelog" element={<ChangelogPage />} />
                             </Route>
                         </Route>
                     </Route>

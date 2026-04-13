@@ -16,6 +16,17 @@ export interface AuthUser {
     email: string;
     avatarUrl?: string | null;
     guilds?: GuildSummary[];
+    emailVerified?: boolean;
+    requiresEmailVerification?: boolean;
+    twoFactorEnabled?: boolean;
+}
+
+export interface LoginResult {
+    error?: string;
+    requiresTwoFactor?: boolean;
+    twoFactorSessionToken?: string;
+    requiresEmailVerification?: boolean;
+    userId?: string;
 }
 
 export interface AuthContextType {
@@ -24,14 +35,14 @@ export interface AuthContextType {
     isAuthenticated: boolean;
     authLoading: boolean;
 
-    login: (emailOrUsername: string, password: string) => Promise<string | null>;
+    login: (emailOrUsername: string, password: string) => Promise<LoginResult>;
 
     register: (
         email: string,
         username: string,
         displayName: string,
         password: string
-    ) => Promise<string | null>;
+    ) => Promise<LoginResult>;
     logout: () => Promise<void>;
     loadUser: () => Promise<void>;
     refreshAccessToken: () => Promise<boolean>;
@@ -96,6 +107,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: data.email,
             avatarUrl: data.avatarUrl,
             guilds: data.guilds,
+            emailVerified: data.emailVerified,
+            requiresEmailVerification: data.requiresEmailVerification,
+            twoFactorEnabled: data.twoFactorEnabled,
         });
     }, [refreshAccessToken]);
 
@@ -129,6 +143,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 email: data.email,
                                 avatarUrl: data.avatarUrl,
                                 guilds: data.guilds,
+                                emailVerified: data.emailVerified,
+                                requiresEmailVerification: data.requiresEmailVerification,
+                                twoFactorEnabled: data.twoFactorEnabled,
                             });
                         } else {
                             setUser(null);
@@ -150,7 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const login = useCallback(async (
         emailOrUsername: string,
         password: string
-    ): Promise<string | null> => {
+    ): Promise<LoginResult> => {
         const res = await fetch(`${API_URL}/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -160,12 +177,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const data = await res.json();
 
+        // 2FA required — don't load user yet, return session token
+        if (data.requiresTwoFactor) {
+            return {
+                requiresTwoFactor: true,
+                twoFactorSessionToken: data.twoFactorSessionToken,
+            };
+        }
+
+        // Email verification required (post-cutoff account)
+        if (!res.ok && data.requiresEmailVerification) {
+            return {
+                requiresEmailVerification: true,
+                userId: data.userId,
+                error: data.error,
+            };
+        }
+
         if (!res.ok || !data.success) {
-            return data.error ?? "Login failed";
+            return { error: data.error ?? "Login failed" };
         }
 
         await loadUser();
-        return null;
+        return {};
     }, [loadUser]);
 
     const register = useCallback(async (
@@ -173,7 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         username: string,
         displayName: string,
         password: string
-    ): Promise<string | null> => {
+    ): Promise<LoginResult> => {
         const res = await fetch(`${API_URL}/auth/register`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -184,11 +218,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = await res.json();
 
         if (!res.ok || !data.success) {
-            return data.error ?? "Registration failed";
+            return { error: data.error ?? "Registration failed" };
         }
 
         await loadUser();
-        return null;
+
+        if (data.requiresEmailVerification) {
+            return { requiresEmailVerification: true };
+        }
+
+        return {};
     }, [loadUser]);
 
     const logout = useCallback(async () => {

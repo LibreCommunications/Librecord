@@ -37,7 +37,7 @@ if (string.IsNullOrWhiteSpace(builder.Configuration["Security:MessageEncryptionK
 ConfigureIdentity(builder.Services);
 ConfigureAuthentication(builder.Services, jwtOpts);
 
-builder.Services.AddApplication();
+builder.Services.AddApplication(isDevelopment: builder.Environment.IsDevelopment());
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApi(builder.Configuration);
 

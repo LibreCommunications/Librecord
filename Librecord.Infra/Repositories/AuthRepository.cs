@@ -71,6 +71,54 @@ public class AuthRepository : IAuthRepository
             token.IsRevoked = true;
     }
 
+    public async Task<string> GenerateEmailConfirmationTokenAsync(User user)
+    {
+        return await _userManager.GenerateEmailConfirmationTokenAsync(user);
+    }
+
+    public async Task<IdentityResult> ConfirmEmailAsync(User user, string token)
+    {
+        return await _userManager.ConfirmEmailAsync(user, token);
+    }
+
+    public async Task<string> GetOrCreateAuthenticatorKeyAsync(User user)
+    {
+        var key = await _userManager.GetAuthenticatorKeyAsync(user);
+        if (string.IsNullOrEmpty(key))
+        {
+            await _userManager.ResetAuthenticatorKeyAsync(user);
+            key = (await _userManager.GetAuthenticatorKeyAsync(user))!;
+        }
+        return key;
+    }
+
+    public async Task<bool> VerifyTwoFactorTokenAsync(User user, string code)
+    {
+        return await _userManager.VerifyTwoFactorTokenAsync(
+            user, _userManager.Options.Tokens.AuthenticatorTokenProvider, code);
+    }
+
+    public async Task SetTwoFactorEnabledAsync(User user, bool enabled)
+    {
+        await _userManager.SetTwoFactorEnabledAsync(user, enabled);
+    }
+
+    public async Task<IEnumerable<string>> GenerateRecoveryCodesAsync(User user, int count)
+    {
+        return (await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, count))!;
+    }
+
+    public async Task<bool> RedeemRecoveryCodeAsync(User user, string code)
+    {
+        var result = await _userManager.RedeemTwoFactorRecoveryCodeAsync(user, code);
+        return result.Succeeded;
+    }
+
+    public async Task ResetAuthenticatorKeyAsync(User user)
+    {
+        await _userManager.ResetAuthenticatorKeyAsync(user);
+    }
+
     public async Task SaveChangesAsync()
     {
         await _db.SaveChangesAsync();
