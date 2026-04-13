@@ -1,5 +1,6 @@
 using Librecord.Domain.Identity;
 using MailKit.Net.Smtp;
+using MailKit.Security;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MimeKit;
@@ -44,7 +45,7 @@ public class SmtpEmailSender : IEmailSender
         try
         {
             // No TLS — internal docker network
-            await client.ConnectAsync(_options.SmtpHost, _options.SmtpPort, false);
+            await client.ConnectAsync(_options.SmtpHost, _options.SmtpPort, SecureSocketOptions.None);
             await client.SendAsync(message);
             _logger.LogInformation("Verification email sent to {Email}", toEmail);
         }
