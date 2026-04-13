@@ -19,6 +19,11 @@ public interface IAuthService
     Task<AuthResult> VerifyTwoFactorLoginAsync(string sessionToken, string code);
     Task<AuthResult> VerifyTwoFactorRecoveryAsync(string sessionToken, string recoveryCode);
     Task<TwoFactorEnableResult> RegenerateRecoveryCodesAsync(Guid userId, string password);
+
+    // Account recovery (password reset via codes)
+    Task<AccountRecoveryResult> RecoverAccountAsync(string emailOrUsername, string recoveryCode, string newPassword);
+    Task<AccountRecoveryResult> RegenerateAccountRecoveryCodesAsync(Guid userId, string password);
+    Task<int> GetAccountRecoveryCodeCountAsync(Guid userId);
 }
 
 public class TwoFactorSetupResult
@@ -38,4 +43,13 @@ public class TwoFactorEnableResult
     public IEnumerable<string>? RecoveryCodes { get; set; }
 
     public static TwoFactorEnableResult Fail(string error) => new() { Error = error };
+}
+
+public class AccountRecoveryResult
+{
+    public bool Success { get; set; }
+    public string? Error { get; set; }
+    public IEnumerable<string>? RecoveryCodes { get; set; }
+
+    public static AccountRecoveryResult Fail(string error) => new() { Error = error };
 }

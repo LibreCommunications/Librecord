@@ -14,6 +14,7 @@ public class AuthDto
 
     public bool? RequiresTwoFactor { get; set; }
     public string? TwoFactorSessionToken { get; set; }
+    public List<string>? AccountRecoveryCodes { get; set; }
 
     public static AuthDto From(AuthResult result)
     {
@@ -26,7 +27,8 @@ public class AuthDto
             DisplayName = result.DisplayName,
             Email = result.Email,
             RequiresTwoFactor = result.RequiresTwoFactor ? true : null,
-            TwoFactorSessionToken = result.TwoFactorSessionToken
+            TwoFactorSessionToken = result.TwoFactorSessionToken,
+            AccountRecoveryCodes = result.AccountRecoveryCodes
         };
     }
 }

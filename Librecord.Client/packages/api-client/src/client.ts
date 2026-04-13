@@ -80,6 +80,14 @@ export const auth = {
     }>("/users/me"),
     logoutAll: () => request<void>("/auth/logout-all", { method: "POST" }),
 
+    // Account recovery
+    recoverAccount: (emailOrUsername: string, recoveryCode: string, newPassword: string) =>
+        fetch(`${API_URL}/auth/recover-account`, { method: "POST", credentials: "include", ...json({ emailOrUsername, recoveryCode, newPassword }) }),
+    regenerateAccountRecoveryCodes: (password: string) =>
+        request<{ recoveryCodes: string[] }>("/auth/recovery-codes/regenerate", { method: "POST", ...json({ password }) }),
+    getRecoveryCodeCount: () =>
+        request<{ count: number }>("/auth/recovery-codes/count"),
+
     // 2FA login
     verifyTwoFactor: (sessionToken: string, code: string) =>
         fetch(`${API_URL}/auth/2fa/verify`, { method: "POST", credentials: "include", ...json({ sessionToken, code }) }),

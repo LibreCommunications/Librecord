@@ -21,6 +21,9 @@ public class AuthResult
     /// <summary>Short-lived opaque token proving password was validated (used for 2FA step 2).</summary>
     public string? TwoFactorSessionToken { get; set; }
 
+    /// <summary>One-time account recovery codes (only returned at registration or regeneration).</summary>
+    public List<string>? AccountRecoveryCodes { get; set; }
+
     public static AuthResult FromUser(User user)
     {
         return new AuthResult

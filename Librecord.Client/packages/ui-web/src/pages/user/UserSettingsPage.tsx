@@ -1,6 +1,9 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { useAuth } from "@librecord/app";
 
 export default function UserSettingsPage() {
+    const { user } = useAuth();
+    const needs2FA = !user?.twoFactorEnabled;
 
     return (
         <div className="flex w-full min-h-full bg-[#2f3136] text-gray-200">
@@ -22,11 +25,16 @@ export default function UserSettingsPage() {
                     </NavLink>
 
                     <NavLink to="security" className={({ isActive }) =>
-                        `px-3 py-2 rounded transition ${
+                        `px-3 py-2 rounded transition flex items-center justify-between ${
                             isActive ? "bg-[#404249] text-white" : "hover:bg-[#3a3c43]"
                         }`
                     }>
                         Security
+                        {needs2FA && (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="#faa61a" className="shrink-0">
+                                <path d="M12 2L1 21h22L12 2zm1 15h-2v-2h2v2zm0-4h-2V9h2v4z"/>
+                            </svg>
+                        )}
                     </NavLink>
 
                     <NavLink to="app" className={({ isActive }) =>

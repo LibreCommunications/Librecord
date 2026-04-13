@@ -109,6 +109,39 @@ public class AuthRepository : IAuthRepository
         await _userManager.ResetAuthenticatorKeyAsync(user);
     }
 
+    // ─── Account recovery codes ────────────────────────────────────
+
+    public async Task AddAccountRecoveryCodesAsync(IEnumerable<AccountRecoveryCode> codes)
+    {
+        await _db.AccountRecoveryCodes.AddRangeAsync(codes);
+    }
+
+    public async Task<AccountRecoveryCode?> FindUnusedAccountRecoveryCodeAsync(Guid userId, string codeHash)
+    {
+        return await _db.AccountRecoveryCodes
+            .FirstOrDefaultAsync(c => c.UserId == userId && c.CodeHash == codeHash && c.UsedAt == null);
+    }
+
+    public async Task DeleteAccountRecoveryCodesAsync(Guid userId)
+    {
+        var codes = await _db.AccountRecoveryCodes
+            .Where(c => c.UserId == userId)
+            .ToListAsync();
+        _db.AccountRecoveryCodes.RemoveRange(codes);
+    }
+
+    public async Task<int> CountUnusedAccountRecoveryCodesAsync(Guid userId)
+    {
+        return await _db.AccountRecoveryCodes
+            .CountAsync(c => c.UserId == userId && c.UsedAt == null);
+    }
+
+    public async Task ResetPasswordAsync(User user, string newPassword)
+    {
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        await _userManager.ResetPasswordAsync(user, token, newPassword);
+    }
+
     public async Task SaveChangesAsync()
     {
         await _db.SaveChangesAsync();

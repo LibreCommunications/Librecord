@@ -429,7 +429,7 @@ export default function GlobalSidebar() {
 
                 <div className="flex-1" />
 
-                <Link to="/app/settings/user/profile" aria-label="User Settings" data-testid="user-avatar-btn">
+                <Link to={user?.twoFactorEnabled ? "/app/settings/user/profile" : "/app/settings/user/security"} aria-label="User Settings" data-testid="user-avatar-btn">
                     <div className="relative group flex items-center">
                         <img
                             src={avatarSrc}
@@ -439,8 +439,15 @@ export default function GlobalSidebar() {
                         <span className="absolute -bottom-0.5 -right-0.5">
                             <StatusDot status={myStatus} size="md" />
                         </span>
+                        {!user?.twoFactorEnabled && (
+                            <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center w-5 h-5 rounded-full bg-[#faa61a] border-2 border-[#1e1f22]">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="#1e1f22">
+                                    <path d="M12 2L1 21h22L12 2zm1 15h-2v-2h2v2zm0-4h-2V9h2v4z"/>
+                                </svg>
+                            </span>
+                        )}
                         <div className="absolute left-[60px] px-3 py-1.5 bg-[#111214] text-white text-sm font-medium rounded-md shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
-                            User Settings
+                            {user?.twoFactorEnabled ? "User Settings" : "Enable 2FA to secure your account"}
                         </div>
                     </div>
                 </Link>

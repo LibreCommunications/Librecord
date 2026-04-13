@@ -73,6 +73,8 @@ public class LibrecordContext
 
     public DbSet<VoiceState> VoiceStates => Set<VoiceState>();
 
+    public DbSet<AccountRecoveryCode> AccountRecoveryCodes => Set<AccountRecoveryCode>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

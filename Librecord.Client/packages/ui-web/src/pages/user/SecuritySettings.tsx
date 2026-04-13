@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth, useToast } from "@librecord/app";
 import { auth } from "@librecord/api-client";
 import { QRCodeSVG } from "qrcode.react";
@@ -100,7 +100,21 @@ export default function SecuritySettings() {
         <div className="max-w-3xl mx-auto space-y-6">
             <h1 className="text-2xl font-bold text-white">Security</h1>
 
-            {/* ═���═════ 2FA Section ═══════ */}
+            {!is2FAEnabled && (
+                <div className="bg-[#2d2000] border border-[#faa61a]/30 rounded-lg px-4 py-3 flex items-start gap-3">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#faa61a" className="shrink-0 mt-0.5">
+                        <path d="M12 2L1 21h22L12 2zm1 15h-2v-2h2v2zm0-4h-2V9h2v4z"/>
+                    </svg>
+                    <div>
+                        <p className="text-sm text-[#faa61a] font-medium">Two-factor authentication is not enabled</p>
+                        <p className="text-xs text-[#faa61a]/70 mt-0.5">
+                            Your account is less secure without 2FA. Enable it below to protect against unauthorized access.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* ═══════ 2FA Section ═══════ */}
             <section className="bg-[#2b2d31] rounded-xl p-5 border border-[#1e1f22] space-y-4">
                 <div className="flex items-center justify-between">
                     <div>
@@ -311,7 +325,165 @@ export default function SecuritySettings() {
                 )}
             </section>
 
+            {/* ═══════ Account Recovery Codes ═══════ */}
+            <AccountRecoverySection />
+
         </div>
+    );
+}
+
+function AccountRecoverySection() {
+    const { toast } = useToast();
+    const [codeCount, setCodeCount] = useState<number | null>(null);
+    const [showRegenerate, setShowRegenerate] = useState(false);
+    const [password, setPassword] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+    const [codes, setCodes] = useState<string[] | null>(null);
+
+    useEffect(() => {
+        auth.getRecoveryCodeCount().then(r => setCodeCount(r.count)).catch(() => {});
+    }, []);
+
+    async function handleRegenerate() {
+        setError("");
+        setLoading(true);
+        try {
+            const result = await auth.regenerateAccountRecoveryCodes(password);
+            setCodes(result.recoveryCodes);
+            setShowRegenerate(false);
+            setPassword("");
+            auth.getRecoveryCodeCount().then(r => setCodeCount(r.count)).catch(() => {});
+            toast("Recovery codes regenerated!", "success");
+        } catch {
+            setError("Invalid password.");
+        }
+        setLoading(false);
+    }
+
+    function handleDownload() {
+        if (!codes) return;
+        const text = `Librecord Account Recovery Codes\n${"=".repeat(35)}\n\nKeep these codes somewhere safe. Each code can only be used once.\nIf you lose your password and your recovery codes, your account CANNOT be recovered.\n\n${codes.join("\n")}\n`;
+        const blob = new Blob([text], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "librecord-recovery-codes.txt";
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    return (
+        <section className="bg-[#2b2d31] rounded-xl p-5 border border-[#1e1f22] space-y-4">
+            <div>
+                <h2 className="text-sm font-bold text-[#b5bac1] uppercase tracking-wide">
+                    Account Recovery Codes
+                </h2>
+                <p className="text-xs text-[#949ba4] mt-1">
+                    If you forget your password, use a recovery code to regain access to your account.
+                </p>
+            </div>
+
+            {codeCount !== null && !codes && (
+                <div className="flex items-center justify-between">
+                    <p className="text-sm text-[#dbdee1]">
+                        {codeCount > 0
+                            ? <>{codeCount} unused code{codeCount !== 1 ? "s" : ""} remaining</>
+                            : <span className="text-[#faa61a]">No recovery codes remaining — regenerate now</span>
+                        }
+                    </p>
+                </div>
+            )}
+
+            {error && (
+                <div className="px-3 py-2 rounded bg-[#f23f43]/10 border border-[#f23f43]/30 text-[#f23f43] text-sm">
+                    {error}
+                </div>
+            )}
+
+            {codes && (
+                <div className="space-y-3">
+                    <div className="bg-[#2d2000] border border-[#faa61a]/30 rounded-lg px-4 py-3">
+                        <p className="text-sm text-[#faa61a] font-medium flex items-center gap-2">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="shrink-0">
+                                <path d="M12 2L1 21h22L12 2zm1 15h-2v-2h2v2zm0-4h-2V9h2v4z"/>
+                            </svg>
+                            Save these codes — they won't be shown again
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        {codes.map((code) => (
+                            <code key={code} className="px-3 py-2 rounded bg-[#1e1f22] text-[#dbdee1] text-sm font-mono text-center">
+                                {code}
+                            </code>
+                        ))}
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleDownload}
+                            className="px-4 py-2 rounded bg-[#5865F2] hover:bg-[#4752c4] text-white text-sm font-medium transition-colors"
+                        >
+                            Download .txt
+                        </button>
+                        <button
+                            onClick={() => {
+                                navigator.clipboard.writeText(codes.join("\n"));
+                                toast("Recovery codes copied!", "success");
+                            }}
+                            className="px-4 py-2 rounded bg-[#72767d] hover:bg-[#5d6169] text-white text-sm font-medium transition-colors"
+                        >
+                            Copy All
+                        </button>
+                        <button
+                            onClick={() => setCodes(null)}
+                            className="px-4 py-2 rounded bg-[#248046] hover:bg-[#1a6334] text-white text-sm font-medium transition-colors"
+                        >
+                            Done
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {!codes && !showRegenerate && (
+                <button
+                    onClick={() => { setShowRegenerate(true); setError(""); }}
+                    className="px-4 py-2 rounded bg-[#72767d] hover:bg-[#5d6169] text-white text-sm font-medium transition-colors"
+                >
+                    Regenerate Recovery Codes
+                </button>
+            )}
+
+            {showRegenerate && (
+                <div className="space-y-3">
+                    <p className="text-sm text-[#dbdee1]">Enter your password to generate new recovery codes. This will invalidate all existing codes.</p>
+                    <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        onKeyDown={e => e.key === "Enter" && handleRegenerate()}
+                        placeholder="Password"
+                        autoFocus
+                        className="w-full px-3 py-2 rounded bg-[#1e1f22] text-white outline-none border border-[#3f4147] focus:border-[#5865F2]"
+                    />
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleRegenerate}
+                            disabled={loading || !password}
+                            className="px-4 py-2 rounded bg-[#5865F2] hover:bg-[#4752c4] text-white text-sm font-medium disabled:opacity-50 transition-colors flex items-center gap-2"
+                        >
+                            {loading && <Spinner size="sm" />}
+                            Regenerate
+                        </button>
+                        <button
+                            onClick={() => { setShowRegenerate(false); setError(""); setPassword(""); }}
+                            className="px-4 py-2 rounded text-sm text-[#949ba4] hover:text-white transition-colors"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
+        </section>
     );
 }
 

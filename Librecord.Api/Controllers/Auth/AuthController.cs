@@ -114,6 +114,35 @@ public class AuthController : ControllerBase
     }
 
 
+    [HttpPost("recover-account")]
+    public async Task<IActionResult> RecoverAccount([FromBody] RecoverAccountRequest request)
+    {
+        var result = await _auth.RecoverAccountAsync(request.EmailOrUsername, request.RecoveryCode, request.NewPassword);
+        if (!result.Success)
+            return BadRequest(new { result.Success, result.Error });
+        return Ok(new { result.Success });
+    }
+
+    [Authorize]
+    [HttpPost("recovery-codes/regenerate")]
+    public async Task<IActionResult> RegenerateAccountRecoveryCodes([FromBody] PasswordConfirmRequest request)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var result = await _auth.RegenerateAccountRecoveryCodesAsync(userId, request.Password);
+        if (!result.Success)
+            return BadRequest(new { result.Success, result.Error });
+        return Ok(new { result.Success, result.RecoveryCodes });
+    }
+
+    [Authorize]
+    [HttpGet("recovery-codes/count")]
+    public async Task<IActionResult> GetRecoveryCodeCount()
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var count = await _auth.GetAccountRecoveryCodeCountAsync(userId);
+        return Ok(new { count });
+    }
+
     [HttpPost("2fa/verify")]
     public async Task<ActionResult<AuthDto>> VerifyTwoFactor([FromBody] TwoFactorVerifyRequest request)
     {

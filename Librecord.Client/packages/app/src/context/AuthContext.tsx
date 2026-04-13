@@ -23,6 +23,7 @@ export interface LoginResult {
     error?: string;
     requiresTwoFactor?: boolean;
     twoFactorSessionToken?: string;
+    accountRecoveryCodes?: string[];
 }
 
 export interface AuthContextType {
@@ -205,7 +206,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         await loadUser();
-        return {};
+        return { accountRecoveryCodes: data.accountRecoveryCodes };
     }, [loadUser]);
 
     const logout = useCallback(async () => {
