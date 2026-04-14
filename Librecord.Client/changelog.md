@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.21 — 2026-04-13
+
+### Fixed
+- Desktop app: changelog page now displays correctly (was blank due to file:// fetch failure).
+- Windows installer: auto-updates now install silently to a fixed per-user path, so pinned shortcuts from Start Menu and Desktop survive updates.
+
+---
+
 ## 0.1.20 — 2026-04-13
 
 ### Fixed

@@ -1,25 +1,7 @@
-import { useEffect, useState } from "react";
 import Markdown from "react-markdown";
+import changelog from "../../../../../changelog.md?raw";
 
 export default function ChangelogPage() {
-    const [content, setContent] = useState("");
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        fetch("/changelog.md", { cache: "no-store" })
-            .then(res => res.text())
-            .then(text => { setContent(text); setLoading(false); })
-            .catch(() => { setContent("Failed to load changelog."); setLoading(false); });
-    }, []);
-
-    if (loading) {
-        return (
-            <div className="max-w-3xl mx-auto py-4">
-                <div className="text-[#949ba4] text-sm">Loading changelog...</div>
-            </div>
-        );
-    }
-
     return (
         <div className="max-w-3xl mx-auto">
             <div className="prose prose-invert prose-sm max-w-none
@@ -35,7 +17,7 @@ export default function ChangelogPage() {
                 prose-a:text-[#00a8fc] hover:prose-a:underline
                 prose-code:text-[#57f287] prose-code:bg-[#1e1f22] prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-xs
             ">
-                <Markdown>{content}</Markdown>
+                <Markdown>{changelog}</Markdown>
             </div>
         </div>
     );
