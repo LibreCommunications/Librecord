@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.22 — 2026-04-13
+
+### Fixed
+- Desktop app: Librecord logo now displays on the login and register pages (was broken on file:// protocol).
+
+---
+
 ## 0.1.21 — 2026-04-13
 
 ### Fixed

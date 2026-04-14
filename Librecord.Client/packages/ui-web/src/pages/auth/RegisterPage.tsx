@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@librecord/app";
 import { useNavigate } from "react-router-dom";
 import { Spinner } from "../../components/ui/Spinner";
+import logoUrl from "../../assets/librecord.svg";
 
 export default function RegisterPage() {
     const { register } = useAuth();
@@ -60,7 +61,7 @@ export default function RegisterPage() {
                 </div>
                 <div className="w-[520px] bg-[#313338] p-8 rounded-2xl shadow-2xl relative z-10">
                     <div className="flex justify-center mb-4">
-                        <img src="/librecord.svg" alt="Librecord" className="w-14 h-14" />
+                        <img src={logoUrl} alt="Librecord" className="w-14 h-14" />
                     </div>
                     <h1 className="text-2xl font-bold text-white mb-2 text-center">
                         Save your recovery codes
@@ -124,7 +125,7 @@ export default function RegisterPage() {
             </div>
             <div className="w-[480px] bg-[#313338] p-8 rounded-2xl shadow-2xl animate-[scaleIn_0.2s_ease-out] relative z-10" data-testid="register-form">
                 <div className="flex justify-center mb-6">
-                    <img src="/librecord.svg" alt="Librecord" className="w-14 h-14" />
+                    <img src={logoUrl} alt="Librecord" className="w-14 h-14" />
                 </div>
                 <h1 className="text-2xl font-bold text-white mb-1 text-center">
                     Create an account
