@@ -7,3 +7,13 @@ interface ImportMetaEnv {
 interface ImportMeta {
     readonly env: ImportMetaEnv;
 }
+
+declare module "*.md?raw" {
+    const content: string;
+    export default content;
+}
+
+declare module "*.svg" {
+    const src: string;
+    export default src;
+}

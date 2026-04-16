@@ -3,6 +3,7 @@ import { useAuth } from "@librecord/app";
 import { useNavigate } from "react-router-dom";
 import { auth as authApi } from "@librecord/api-client";
 import { Spinner } from "../../components/ui/Spinner";
+import logoUrl from "../../assets/librecord.svg";
 
 export default function LoginPage() {
     const { login, loadUser } = useAuth();
@@ -134,7 +135,7 @@ export default function LoginPage() {
                     </div>
                     <div className="w-[480px] bg-[#313338] p-8 rounded-2xl shadow-2xl relative z-10 text-center">
                         <div className="flex justify-center mb-6">
-                            <img src="/librecord.svg" alt="Librecord" className="w-14 h-14" />
+                            <img src={logoUrl} alt="Librecord" className="w-14 h-14" />
                         </div>
                         <h1 className="text-2xl font-bold text-white mb-2">Password reset!</h1>
                         <p className="text-sm text-[#949ba4] mb-6">
@@ -159,7 +160,7 @@ export default function LoginPage() {
                 </div>
                 <div className="w-[480px] bg-[#313338] p-8 rounded-2xl shadow-2xl relative z-10">
                     <div className="flex justify-center mb-6">
-                        <img src="/librecord.svg" alt="Librecord" className="w-14 h-14" />
+                        <img src={logoUrl} alt="Librecord" className="w-14 h-14" />
                     </div>
                     <h1 className="text-2xl font-bold text-white mb-1 text-center">
                         Reset your password
@@ -254,7 +255,7 @@ export default function LoginPage() {
                 </div>
                 <div className="w-[480px] bg-[#313338] p-8 rounded-2xl shadow-2xl relative z-10">
                     <div className="flex justify-center mb-6">
-                        <img src="/librecord.svg" alt="Librecord" className="w-14 h-14" />
+                        <img src={logoUrl} alt="Librecord" className="w-14 h-14" />
                     </div>
                     <h1 className="text-2xl font-bold text-white mb-1 text-center">
                         Two-Factor Authentication
@@ -357,7 +358,7 @@ export default function LoginPage() {
             <div className="w-[480px] bg-[#313338] p-8 rounded-2xl shadow-2xl animate-[scaleIn_0.2s_ease-out] relative z-10" data-testid="login-form">
                 {/* Logo */}
                 <div className="flex justify-center mb-6">
-                    <img src="/librecord.svg" alt="Librecord" className="w-14 h-14" />
+                    <img src={logoUrl} alt="Librecord" className="w-14 h-14" />
                 </div>
 
                 <h1 className="text-2xl font-bold text-white mb-1 text-center">
