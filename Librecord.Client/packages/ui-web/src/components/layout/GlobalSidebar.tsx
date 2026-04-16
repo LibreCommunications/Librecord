@@ -243,7 +243,7 @@ export default function GlobalSidebar() {
                 id="global-sidebar"
                 aria-label="Server navigation"
                 role="navigation"
-                className="w-[72px] bg-[#1e1f22] flex flex-col items-center py-3 gap-2 overflow-y-auto no-scrollbar"
+                className="w-[72px] shrink-0 bg-[#1e1f22] flex flex-col items-center py-3 gap-2 overflow-hidden"
                 onDragOver={e => e.preventDefault()}
                 onDrop={e => {
                     const draggedId = e.dataTransfer.getData("guildId");
