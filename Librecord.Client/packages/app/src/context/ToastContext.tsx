@@ -1,5 +1,4 @@
 import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 
 export type ToastType = "success" | "error" | "info";
 
@@ -81,34 +80,28 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         return () => window.removeEventListener("app:toast", handler);
     }, [toast]);
 
-    // Render toasts in a portal so they don't participate in React's tree
-    // reconciliation of the main app — prevents insertBefore DOM errors.
-    const toastContainer = (
-        <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
-            {toasts.map(t => (
-                <div
-                    key={t.id}
-                    style={{ animation: t.exiting ? `toastOut ${EXIT_DURATION}ms ease-in forwards` : `toastIn 0.25s cubic-bezier(0.16,1,0.3,1)` }}
-                    className={`
-                        pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-lg shadow-lg text-sm font-medium cursor-pointer
-                        backdrop-blur-sm border border-white/5
-                        ${t.type === "success" ? "bg-[#248046]/95 text-white" : ""}
-                        ${t.type === "error" ? "bg-[#da373c]/95 text-white" : ""}
-                        ${t.type === "info" ? "bg-[#5865F2]/95 text-white" : ""}
-                    `}
-                    onClick={() => dismiss(t.id)}
-                >
-                    <span className="shrink-0 opacity-90">{icons[t.type]}</span>
-                    {t.message}
-                </div>
-            ))}
-        </div>
-    );
-
     return (
         <ToastContext.Provider value={{ toast }}>
             {children}
-            {createPortal(toastContainer, document.body)}
+            <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
+                {toasts.map(t => (
+                    <div
+                        key={t.id}
+                        style={{ animation: t.exiting ? `toastOut ${EXIT_DURATION}ms ease-in forwards` : `toastIn 0.25s cubic-bezier(0.16,1,0.3,1)` }}
+                        className={`
+                            pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-lg shadow-lg text-sm font-medium cursor-pointer
+                            backdrop-blur-sm border border-white/5
+                            ${t.type === "success" ? "bg-[#248046]/95 text-white" : ""}
+                            ${t.type === "error" ? "bg-[#da373c]/95 text-white" : ""}
+                            ${t.type === "info" ? "bg-[#5865F2]/95 text-white" : ""}
+                        `}
+                        onClick={() => dismiss(t.id)}
+                    >
+                        <span className="shrink-0 opacity-90">{icons[t.type]}</span>
+                        {t.message}
+                    </div>
+                ))}
+            </div>
         </ToastContext.Provider>
     );
 }

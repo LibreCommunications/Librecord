@@ -229,12 +229,13 @@ async function createVideoTrack(
         return null;
     }
 
-    const VideoDecoderCtor = (globalThis as unknown as { VideoDecoder?: typeof VideoDecoder }).VideoDecoder;
-    if (!VideoDecoderCtor) {
+    const VideoDecoderMaybe = (globalThis as unknown as { VideoDecoder?: typeof VideoDecoder }).VideoDecoder;
+    if (!VideoDecoderMaybe) {
         // eslint-disable-next-line no-console
         console.warn("wincap: VideoDecoder unavailable");
         return null;
     }
+    const VideoDecoderCtor: typeof VideoDecoder = VideoDecoderMaybe;
 
     const generator = new Generator({ kind: "video" });
     const writer = generator.writable.getWriter();
