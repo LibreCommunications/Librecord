@@ -65,14 +65,13 @@ export function initUpdater(getMainWindow: () => BrowserWindow | null) {
         console.error("[updater] error:", err.message);
       });
 
-      // Renderer-triggered "Restart now". `quitAndInstall(true, true)`
-      // closes every window, runs the installer, then re-launches the
-      // app on success. The first arg is `isSilent` (no installer UI on
-      // Windows), the second is `isForceRunAfter` (re-launch even if the
-      // app would normally close-not-restart).
+      // Renderer-triggered "Restart now". With the assisted NSIS installer
+      // (oneClick: false), isSilent must be false so the installer can
+      // upgrade an existing install in place. isForceRunAfter re-launches
+      // the app after a successful install.
       ipcMain.handle("desktop:installUpdateNow", () => {
         console.log("[updater] installing update via renderer request");
-        autoUpdater.quitAndInstall(true, true);
+        autoUpdater.quitAndInstall(false, true);
       });
 
       // First check immediately so users see updates as soon as the app
