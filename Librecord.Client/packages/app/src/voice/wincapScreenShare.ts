@@ -5,9 +5,11 @@
  *           with thumbnails composited from desktopCapturer (handled in
  *           the main process).
  *   Video:  WGC + MF hardware encoder → H.264 NAL units → IPC →
- *           WebCodecs VideoDecoder → MediaStreamTrackGenerator →
- *           publishTrack with H.264 codec (hardware re-encode in
- *           Chromium). No getDisplayMedia, no Chromium capture.
+ *           WebCodecs VideoDecoder → MediaStreamTrackGenerator for
+ *           local preview. An RTCRtpScriptTransform replaces Chromium's
+ *           re-encoded output with wincap's original H.264 NALs,
+ *           eliminating the double-encode quality loss. Falls back to
+ *           Chromium re-encode if Encoded Transforms are unavailable.
  *   Audio:  WASAPI loopback (system mix) → IPC float32 chunks →
  *           AudioWorklet ring buffer → MediaStreamAudioDestinationNode
  *           → publishTrack.
@@ -36,6 +38,10 @@ export interface WincapCaptureResult {
     videoTrack: MediaStreamTrack;
     audioTrack?: MediaStreamTrack;
     sourceName?: string;
+    /** Attach an RTCRtpScriptTransform to the sender to bypass Chromium's
+     *  re-encode and inject wincap's H.264 NALs directly. Returns false
+     *  if Encoded Transforms are unavailable (falls back to re-encode). */
+    attachEncodedTransform?: (sender: RTCRtpSender) => boolean;
 }
 
 export type WincapCodec = "h264" | "hevc" | "av1";
@@ -86,20 +92,28 @@ export async function startCapture(options: StartOptions): Promise<WincapCapture
         if (options.audio) wincap.stopAudio().catch(() => { /* ignore */ });
     };
 
-    return { videoTrack: video.track, audioTrack, sourceName: picked.name };
+    return {
+        videoTrack: video.track,
+        audioTrack,
+        sourceName: picked.name,
+        attachEncodedTransform: video.attachEncodedTransform,
+    };
 }
 
-// ── Video track via WebCodecs decode → H.264 re-encode ─────────────
+// ── Video track via WebCodecs decode (preview) + Encoded Transform ──
 //
 // Wincap hardware-encodes H.264 on the GPU. We decode the NAL units
-// with WebCodecs VideoDecoder, pipe decoded VideoFrames into a
-// MediaStreamTrackGenerator, and publish with H.264 codec so Chromium
-// re-encodes with its own hardware H.264 encoder. The re-encode is
-// fast because Chromium uses the same GPU encoder (NVENC/QSV/AMF).
+// with WebCodecs VideoDecoder and pipe decoded VideoFrames into a
+// MediaStreamTrackGenerator for local preview. After LiveKit publishes
+// the track, an RTCRtpScriptTransform replaces Chromium's re-encoded
+// output with wincap's original H.264 NALs — eliminating the double-
+// encode and its quality loss. If Encoded Transforms are unavailable,
+// Chromium's re-encode is used as a fallback.
 
 interface WincapAPILike {
     startCapture: (options: WincapStartOptions) => Promise<boolean>;
     stopCapture: () => Promise<void>;
+    requestKeyframe: () => Promise<void>;
     onEncoded: (cb: (frame: { data: Uint8Array; timestampNs: string; keyframe: boolean }) => void) => () => void;
     onError: (cb: (err: { component: string; hresult: number; message: string }) => void) => () => void;
     startAudio: (options?: { mode?: "systemLoopback" | "processLoopback"; pid?: number }) => Promise<boolean>;
@@ -113,12 +127,97 @@ const CODEC_CONFIGS: Record<WincapCodec, string> = {
     av1: "av01.0.13M.08",
 };
 
+// ── Encoded Transform worker ────────────────────────────────────
+//
+// Runs inside an RTCRtpScriptTransform. Receives wincap H.264 NALs
+// from the main thread and injects them into the WebRTC sender,
+// replacing Chromium's re-encoded output.
+
+const ENCODED_TRANSFORM_WORKER = `
+"use strict";
+// Ring buffer of pending wincap NAL units (max 4 to handle jitter).
+const MAX_PENDING = 4;
+const pending = [];
+
+self.onmessage = (e) => {
+    if (e.data.type === "nal") {
+        // Keep only the latest MAX_PENDING NALs.
+        if (pending.length >= MAX_PENDING) pending.shift();
+        pending.push({ data: e.data.data, keyframe: e.data.keyframe });
+    }
+};
+
+self.onrtctransform = (event) => {
+    const transformer = event.transformer;
+    transformer.readable.pipeThrough(new TransformStream({
+        transform(frame, controller) {
+            const nal = pending.shift();
+            if (nal) {
+                // Replace Chromium's encoded data with wincap's NAL unit.
+                frame.data = nal.data;
+            }
+            // If no pending NAL, pass through Chromium's encoded frame
+            // (fallback — shouldn't happen often when wincap is producing).
+            controller.enqueue(frame);
+        }
+    })).pipeTo(transformer.writable);
+};
+`;
+
+/** Feature-detect RTCRtpScriptTransform support. */
+function hasEncodedTransform(): boolean {
+    return typeof (globalThis as unknown as { RTCRtpScriptTransform?: unknown }).RTCRtpScriptTransform === "function";
+}
+
+/** Create an encoded transform worker and return a NAL feeder + attach function. */
+function createEncodedTransform(): {
+    feedNal: (data: Uint8Array, keyframe: boolean) => void;
+    attach: (sender: RTCRtpSender) => boolean;
+    stop: () => void;
+} | null {
+    if (!hasEncodedTransform()) return null;
+
+    const blob = new Blob([ENCODED_TRANSFORM_WORKER], { type: "application/javascript" });
+    const url = URL.createObjectURL(blob);
+    const worker = new Worker(url);
+    URL.revokeObjectURL(url);
+
+    const RTCRtpScriptTransformCtor = (globalThis as unknown as {
+        RTCRtpScriptTransform: new (worker: Worker) => unknown;
+    }).RTCRtpScriptTransform;
+
+    return {
+        feedNal(data: Uint8Array, keyframe: boolean) {
+            // Copy into a transferable ArrayBuffer to avoid IPC overhead.
+            const buf = new ArrayBuffer(data.byteLength);
+            new Uint8Array(buf).set(data);
+            worker.postMessage({ type: "nal", data: buf, keyframe }, [buf]);
+        },
+        attach(sender: RTCRtpSender): boolean {
+            try {
+                (sender as unknown as { transform: unknown }).transform =
+                    new RTCRtpScriptTransformCtor(worker);
+                // eslint-disable-next-line no-console
+                console.info("wincap: encoded transform attached — bypassing Chromium re-encode");
+                return true;
+            } catch (e) {
+                // eslint-disable-next-line no-console
+                console.warn("wincap: failed to attach encoded transform, falling back to re-encode", e);
+                return false;
+            }
+        },
+        stop() {
+            worker.terminate();
+        },
+    };
+}
+
 async function createVideoTrack(
     wincap: WincapAPILike,
     picked: { kind: "display" | "window"; handle: string },
     options: StartOptions,
     codec: WincapCodec,
-): Promise<{ track: MediaStreamTrack; stop: () => void } | null> {
+): Promise<{ track: MediaStreamTrack; stop: () => void; attachEncodedTransform?: (sender: RTCRtpSender) => boolean } | null> {
     const Generator = (globalThis as unknown as {
         MediaStreamTrackGenerator?: new (init: { kind: "video" | "audio" }) => MediaStreamTrack & {
             writable: WritableStream<VideoFrame>;
@@ -140,33 +239,78 @@ async function createVideoTrack(
     const generator = new Generator({ kind: "video" });
     const writer = generator.writable.getWriter();
 
-    const decoder = new VideoDecoderCtor({
-        output: (frame: VideoFrame) => {
-            // Backpressure: check if the writer is ready before writing.
-            // If the encoder downstream is slow, drop this frame instead
-            // of queueing unboundedly (screen share prefers freshness over
-            // completeness).
-            if (writer.desiredSize !== null && writer.desiredSize <= 0) {
-                frame.close();
-                return;
-            }
-            writer.write(frame).catch(() => {
-                try { frame.close(); } catch { /* ignore */ }
-            });
-        },
-        error: (e) => {
-            // eslint-disable-next-line no-console
-            console.warn("wincap: VideoDecoder error", e);
-        },
-    });
-
-    decoder.configure({
+    const codecConfig: VideoDecoderConfig = {
         codec: CODEC_CONFIGS[codec],
         optimizeForLatency: true,
-    });
+    };
+
+    let droppedFrames = 0;
+    let lastDropLog = 0;
+    const outputHandler = (frame: VideoFrame) => {
+        // Backpressure: check if the writer is ready before writing.
+        // If the encoder downstream is slow, drop this frame instead
+        // of queueing unboundedly (screen share prefers freshness over
+        // completeness).
+        if (writer.desiredSize !== null && writer.desiredSize <= 0) {
+            frame.close();
+            droppedFrames++;
+            const now = Date.now();
+            if (now - lastDropLog > 2000) {
+                // eslint-disable-next-line no-console
+                console.warn(`wincap: dropped ${droppedFrames} frames (backpressure)`);
+                droppedFrames = 0;
+                lastDropLog = now;
+            }
+            return;
+        }
+        writer.write(frame).catch(() => {
+            try { frame.close(); } catch { /* ignore */ }
+        });
+    };
+
+    function createDecoder(): InstanceType<typeof VideoDecoder> {
+        return new VideoDecoderCtor({
+            output: outputHandler,
+            error: (e) => {
+                // eslint-disable-next-line no-console
+                console.warn("wincap: VideoDecoder error", e);
+                // Codec reclaimed due to inactivity — recreate the decoder
+                // and request a fresh keyframe to resume decoding.
+                if (e.name === "QuotaExceededError" || decoder.state === "closed") {
+                    try {
+                        decoder = createDecoder();
+                        decoder.configure(codecConfig);
+                        gotKeyframe = false;
+                        wincap.requestKeyframe().catch(() => { /* ignore */ });
+                    } catch {
+                        // eslint-disable-next-line no-console
+                        console.warn("wincap: failed to recreate VideoDecoder");
+                    }
+                }
+            },
+        });
+    }
+
+    let decoder = createDecoder();
+    decoder.configure(codecConfig);
+
+    // Create encoded transform for bypassing Chromium re-encode.
+    // If the browser doesn't support RTCRtpScriptTransform, this
+    // returns null and we fall back to the decode → re-encode path.
+    const transform = createEncodedTransform();
 
     let gotKeyframe = false;
     const offEncoded = wincap.onEncoded((frame) => {
+        // Feed raw NALs to the encoded transform worker (if active).
+        // This runs regardless of decoder state so the transform always
+        // has fresh data to inject.
+        if (transform) {
+            transform.feedNal(frame.data, frame.keyframe);
+        }
+
+        // Decode path: feeds the MediaStreamTrackGenerator for preview
+        // and provides timing/resolution info for WebRTC SDP negotiation.
+        if (decoder.state === "closed") return;
         if (!gotKeyframe) {
             if (!frame.keyframe) return;
             gotKeyframe = true;
@@ -194,13 +338,14 @@ async function createVideoTrack(
         handle: picked.handle,
         fps: options.fps,
         bitrateBps: options.bitrateBps,
-        keyframeIntervalMs: 1000,
+        keyframeIntervalMs: 500,
         codec,
     };
     const ok = await wincap.startCapture(startOpts);
     if (!ok) {
         offEncoded();
         offError();
+        transform?.stop();
         try { decoder.close(); } catch { /* ignore */ }
         try { writer.close(); } catch { /* ignore */ }
         return null;
@@ -208,9 +353,13 @@ async function createVideoTrack(
 
     return {
         track: generator,
+        attachEncodedTransform: transform
+            ? (sender: RTCRtpSender) => transform.attach(sender)
+            : undefined,
         stop: () => {
             offEncoded();
             offError();
+            transform?.stop();
             try { decoder.close(); } catch { /* ignore */ }
             try { writer.close(); } catch { /* ignore */ }
             try { generator.stop(); } catch { /* ignore */ }

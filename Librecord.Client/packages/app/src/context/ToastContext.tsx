@@ -1,4 +1,5 @@
-import { createContext, useCallback, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 export type ToastType = "success" | "error" | "info";
 
@@ -44,16 +45,31 @@ const icons: Record<ToastType, React.ReactNode> = {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
     const [toasts, setToasts] = useState<Toast[]>([]);
+    const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
+
+    const dismiss = useCallback((id: number) => {
+        // Clear any pending timer for this toast.
+        const t = timers.current.get(id);
+        if (t) { clearTimeout(t); timers.current.delete(id); }
+        setToasts(prev => prev.map(x => x.id === id ? { ...x, exiting: true } : x));
+        const t2 = setTimeout(() => {
+            setToasts(prev => prev.filter(x => x.id !== id));
+            timers.current.delete(id);
+        }, EXIT_DURATION);
+        timers.current.set(id, t2);
+    }, []);
 
     const toast = useCallback((message: string, type: ToastType = "info") => {
         const id = nextId++;
         setToasts(prev => [...prev, { id, message, type }]);
-        setTimeout(() => {
-            setToasts(prev => prev.map(t => t.id === id ? { ...t, exiting: true } : t));
-            setTimeout(() => {
-                setToasts(prev => prev.filter(t => t.id !== id));
-            }, EXIT_DURATION);
-        }, TOAST_DURATION);
+        const t = setTimeout(() => dismiss(id), TOAST_DURATION);
+        timers.current.set(id, t);
+    }, [dismiss]);
+
+    // Clean up all timers on unmount.
+    useEffect(() => {
+        const map = timers.current;
+        return () => { map.forEach(clearTimeout); map.clear(); };
     }, []);
 
     useEffect(() => {
@@ -65,31 +81,34 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         return () => window.removeEventListener("app:toast", handler);
     }, [toast]);
 
+    // Render toasts in a portal so they don't participate in React's tree
+    // reconciliation of the main app — prevents insertBefore DOM errors.
+    const toastContainer = (
+        <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
+            {toasts.map(t => (
+                <div
+                    key={t.id}
+                    style={{ animation: t.exiting ? `toastOut ${EXIT_DURATION}ms ease-in forwards` : `toastIn 0.25s cubic-bezier(0.16,1,0.3,1)` }}
+                    className={`
+                        pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-lg shadow-lg text-sm font-medium cursor-pointer
+                        backdrop-blur-sm border border-white/5
+                        ${t.type === "success" ? "bg-[#248046]/95 text-white" : ""}
+                        ${t.type === "error" ? "bg-[#da373c]/95 text-white" : ""}
+                        ${t.type === "info" ? "bg-[#5865F2]/95 text-white" : ""}
+                    `}
+                    onClick={() => dismiss(t.id)}
+                >
+                    <span className="shrink-0 opacity-90">{icons[t.type]}</span>
+                    {t.message}
+                </div>
+            ))}
+        </div>
+    );
+
     return (
         <ToastContext.Provider value={{ toast }}>
             {children}
-            <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
-                {toasts.map(t => (
-                    <div
-                        key={t.id}
-                        style={{ animation: t.exiting ? `toastOut ${EXIT_DURATION}ms ease-in forwards` : `toastIn 0.25s cubic-bezier(0.16,1,0.3,1)` }}
-                        className={`
-                            pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-lg shadow-lg text-sm font-medium cursor-pointer
-                            backdrop-blur-sm border border-white/5
-                            ${t.type === "success" ? "bg-[#248046]/95 text-white" : ""}
-                            ${t.type === "error" ? "bg-[#da373c]/95 text-white" : ""}
-                            ${t.type === "info" ? "bg-[#5865F2]/95 text-white" : ""}
-                        `}
-                        onClick={() => {
-                            setToasts(prev => prev.map(x => x.id === t.id ? { ...x, exiting: true } : x));
-                            setTimeout(() => setToasts(prev => prev.filter(x => x.id !== t.id)), EXIT_DURATION);
-                        }}
-                    >
-                        <span className="shrink-0 opacity-90">{icons[t.type]}</span>
-                        {t.message}
-                    </div>
-                ))}
-            </div>
+            {createPortal(toastContainer, document.body)}
         </ToastContext.Provider>
     );
 }

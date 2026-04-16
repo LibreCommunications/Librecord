@@ -72,6 +72,7 @@ export function registerListeners() {
     appConnection.off("channel:reaction:removed");
     appConnection.off("dm:call:incoming");
     appConnection.off("dm:call:declined");
+    appConnection.off("dm:call:answered");
     appConnection.off("guild:thread:message:new");
 
     appConnection.on(
@@ -410,6 +411,14 @@ export function registerListeners() {
         "dm:call:declined",
         (payload: AppEventMap["dm:call:declined"]) => {
             dispatchAppEvent("dm:call:declined", payload);
+        }
+    );
+
+    // Call answered or declined on another device — dismiss ringing here
+    appConnection.on(
+        "dm:call:answered",
+        (payload: AppEventMap["dm:call:answered"]) => {
+            dispatchAppEvent("dm:call:answered", payload);
         }
     );
 

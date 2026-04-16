@@ -276,6 +276,16 @@ function bindRemoteAudioTrack(participant: RemoteParticipant) {
     });
 }
 
+/** Unsubscribe any screen share tracks for a remote participant.
+ *  Viewers must opt in via the Watch button in ScreenShareTile. */
+function unsubscribeScreenShareTracks(p: RemoteParticipant) {
+    for (const pub of p.trackPublications.values()) {
+        if (pub.source === Track.Source.ScreenShare || pub.source === Track.Source.ScreenShareAudio) {
+            pub.setSubscribed(false);
+        }
+    }
+}
+
 export async function connectToVoice(token: string, wsUrl: string, initialMuted = false, initialDeafened = false) {
     if (room) await disconnect();
 
@@ -350,12 +360,23 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
         logger.voice.info("Participant connected", p.identity);
         // Bind any tracks that are already subscribed at join time
         bindRemoteAudioTrack(p);
+        // Unsubscribe screen share tracks — viewer must opt in via Watch button
+        unsubscribeScreenShareTracks(p);
     });
 
     room.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
         stopAnalysingTrack(p.identity);
         detachAudioTrack(p.identity);
         detachAudioTrack(`${p.identity}:screen`);
+    });
+
+    // Screen share tracks require explicit opt-in via the Watch button.
+    // Unsubscribe immediately when published to prevent audio leaking
+    // before the viewer clicks Watch.
+    room.on(RoomEvent.TrackPublished, (publication: RemoteTrackPublication, _p: RemoteParticipant) => {
+        if (publication.source === Track.Source.ScreenShare || publication.source === Track.Source.ScreenShareAudio) {
+            publication.setSubscribed(false);
+        }
     });
 
     room.on(RoomEvent.TrackSubscribed, (track, _pub: RemoteTrackPublication, p: RemoteParticipant) => {
@@ -458,6 +479,8 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
     room.remoteParticipants.forEach((p) => {
         logger.voice.info("Binding existing participant", p.identity, "tracks:", p.audioTrackPublications.size);
         bindRemoteAudioTrack(p);
+        // Unsubscribe screen share tracks — viewer must opt in via Watch button
+        unsubscribeScreenShareTracks(p);
     });
     // Local track speaking detection + noise suppression are handled
     // by the LocalTrackPublished event handler above.
@@ -556,7 +579,7 @@ const RESOLUTION_MAP: Record<string, { width: number; height: number } | undefin
 // than VP9 for screen content (no native screen-content coding tools), so
 // it gets a higher allocation to maintain text legibility.
 const SCREENSHARE_BPP_VP9 = 0.05;
-const SCREENSHARE_BPP_H264 = 0.07;
+const SCREENSHARE_BPP_H264 = 0.15;
 const SCREENSHARE_BITRATE_FLOOR = 1_500_000;   // 1.5 Mbps
 const SCREENSHARE_BITRATE_CEILING = 20_000_000; // 20 Mbps
 
@@ -608,10 +631,11 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
     const publishOpts = buildScreenSharePublishOpts(encodingBitrate, encodeFps);
 
     if (useWincap) {
-        // Windows: wincap hardware-encodes H.264, we decode with WebCodecs
-        // for preview, and publish with H.264 codec so Chromium re-encodes
-        // using its hardware H.264 encoder (NVENC/QSV/AMF). Faster than
-        // VP9 which is often software-only.
+        // Windows: wincap hardware-encodes H.264. Decoded frames feed the
+        // MediaStreamTrackGenerator for local preview. After publication,
+        // an RTCRtpScriptTransform replaces Chromium's re-encode output
+        // with wincap's original H.264 NALs (single encode, no quality
+        // loss). Falls back to Chromium re-encode if unavailable.
         const wincapPublishOpts = buildScreenSharePublishOpts(encodingBitrate, encodeFps, "h264");
         const result = await wincapScreenShare.startCapture({
             fps: encodeFps,
@@ -627,6 +651,15 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
             try {
                 const videoTrack = new LocalVideoTrack(result.videoTrack, undefined, false);
                 await room.localParticipant.publishTrack(videoTrack, wincapPublishOpts);
+
+                // Attach the encoded transform to bypass Chromium's re-encode.
+                // Must happen after publishTrack so the RTCRtpSender exists.
+                if (result.attachEncodedTransform) {
+                    const sender = videoTrack.sender as RTCRtpSender | undefined;
+                    if (sender) {
+                        result.attachEncodedTransform(sender);
+                    }
+                }
 
                 if (result.audioTrack) {
                     const audioTrack = new LocalAudioTrack(result.audioTrack, undefined, false);

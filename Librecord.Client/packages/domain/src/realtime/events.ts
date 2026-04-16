@@ -247,6 +247,10 @@ export interface AppEventMap {
         userId: string;
     };
 
+    "dm:call:answered": {
+        channelId: string;
+    };
+
     "guild:thread:message:new": {
         channelId: string;
         threadId: string;

@@ -75,9 +75,31 @@ jobs:
         working-directory: Librecord.Client/apps/desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          # Provide GH_TOKEN so electron-builder generates latest*.yml
+          # metadata files needed by electron-updater for auto-updates.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pnpm build
           pnpm package:${{ matrix.platform }} --publish never
+
+      # electron-builder --publish never skips generating latest*.yml on
+      # some platforms. Generate latest-linux.yml manually for AppImage
+      # auto-updates via electron-updater.
+      - name: Generate latest-linux.yml (linux only)
+        if: matrix.platform == 'linux'
+        working-directory: Librecord.Client/apps/desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          APPIMAGE=$(ls release/*.AppImage | head -1)
+          SHA512=$(sha512sum "$APPIMAGE" | awk '{print $1}')
+          SIZE=$(stat --printf='%s' "$APPIMAGE")
+          FILENAME=$(basename "$APPIMAGE")
+          DATE=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
+          printf 'version: %s\nfiles:\n  - url: %s\n    sha512: %s\n    size: %s\npath: %s\nsha512: %s\nreleaseDate: %s\n' \
+            "$VERSION" "$FILENAME" "$SHA512" "$SIZE" "$FILENAME" "$SHA512" "$DATE" \
+            > release/latest-linux.yml
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

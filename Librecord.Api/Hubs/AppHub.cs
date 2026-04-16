@@ -319,7 +319,17 @@ public class AppHub : Hub
         if (!await _channels.IsMemberAsync(dmChannelId, UserId))
             throw new HubException("Not a member of this DM channel.");
 
-        return await _voice.JoinDmVoiceCallAsync(dmChannelId, UserId);
+        var result = await _voice.JoinDmVoiceCallAsync(dmChannelId, UserId);
+
+        // Dismiss the incoming call modal on ALL of this user's other
+        // connections (Desktop + Web). Without this, the other device
+        // keeps ringing and accepting/declining there conflicts.
+        await Clients.User(UserId.ToString()).SendAsync("dm:call:answered", new
+        {
+            channelId = dmChannelId,
+        });
+
+        return result;
     }
 
     public async Task DeclineDmCall(Guid dmChannelId)
@@ -328,10 +338,18 @@ public class AppHub : Hub
             "[APP HUB] DeclineDmCall | UserId={UserId} | DmChannelId={DmChannelId}",
             UserId, dmChannelId);
 
+        // Notify the DM members that this user declined.
         await Clients.OthersInGroup(DmGroup(dmChannelId)).SendAsync("dm:call:declined", new
         {
             channelId = dmChannelId,
             userId = UserId,
+        });
+
+        // Dismiss the incoming call modal on ALL of this user's other
+        // connections so they stop ringing too.
+        await Clients.User(UserId.ToString()).SendAsync("dm:call:answered", new
+        {
+            channelId = dmChannelId,
         });
     }
 

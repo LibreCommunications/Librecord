@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@librecord/app";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Spinner } from "../../components/ui/Spinner";
 
 export default function RegisterPage() {
@@ -195,13 +195,15 @@ export default function RegisterPage() {
                     <input
                         type="password"
                         required
-                        minLength={6}
+                        minLength={8}
+                        maxLength={128}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && handleRegister()}
                         data-testid="register-password"
                         className="input-field mt-2"
                     />
+                    <p className="text-xs text-[#949ba4] mt-1.5">Must be between 8 and 128 characters</p>
                 </label>
 
                 <button
@@ -216,9 +218,9 @@ export default function RegisterPage() {
 
                 <p className="mt-3 text-sm text-[#949ba4]">
                     Already have an account?{" "}
-                    <a href="/login" className="text-[#00a8fc] hover:underline">
+                    <Link to="/login" className="text-[#00a8fc] hover:underline">
                         Log In
-                    </a>
+                    </Link>
                 </p>
             </div>
         </div>

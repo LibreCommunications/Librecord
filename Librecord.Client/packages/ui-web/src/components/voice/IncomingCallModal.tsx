@@ -97,6 +97,19 @@ export function IncomingCallModal() {
         );
     }, [call]);
 
+    // Dismiss if the call was answered/declined on another device
+    useEffect(() => {
+        if (!call) return;
+        return onCustomEvent<AppEventMap["dm:call:answered"]>(
+            "dm:call:answered",
+            (detail) => {
+                if (detail.channelId === call.channelId) {
+                    dismiss();
+                }
+            },
+        );
+    }, [call]);
+
     // Cleanup ringtone on unmount
     useEffect(() => () => stopRingtone(), []);
 
