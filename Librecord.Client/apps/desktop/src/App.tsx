@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@librecord/app";
 import LoadingSpinner from "@librecord/ui-web/src/components/LoadingSpinner.tsx";
 import { UpdateModal } from "@librecord/ui-web/src/components/UpdateModal.tsx";
+import { AuthRevocationHandler } from "@librecord/ui-web/src/components/AuthRevocationHandler.tsx";
 import { DeepLinkHandler } from "./DeepLinkHandler.tsx";
 
 const LoginPage = lazy(() => import("@librecord/ui-web/src/pages/auth/LoginPage.tsx"));
@@ -33,6 +34,7 @@ export default function App() {
         <Suspense fallback={<LoadingSpinner />}>
             <DeepLinkHandler />
             <UpdateModal />
+            <AuthRevocationHandler />
             <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />

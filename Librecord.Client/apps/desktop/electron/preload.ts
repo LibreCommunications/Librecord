@@ -1,8 +1,8 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { exposePlatformBridges } from "./preload-platform";
 
-// Per-platform native bridges (window.pipecap on Linux, window.wincap on
-// Windows, etc). Kept in their own modules so the dispatcher and the
+// Per-platform native bridges (window.pipecap on Linux, window.winaudio
+// on Windows, etc). Kept in their own modules so the dispatcher and the
 // shared electronAPI surface below stay readable.
 exposePlatformBridges();
 
@@ -30,6 +30,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => { ipcRenderer.removeListener("update-installed", handler); };
   },
   installUpdateNow: (): Promise<void> => ipcRenderer.invoke("desktop:installUpdateNow"),
+  getPendingUpdate: (): Promise<string | null> => ipcRenderer.invoke("desktop:getPendingUpdate"),
+  getUpdateError: (): Promise<string | null> => ipcRenderer.invoke("desktop:getUpdateError"),
+  checkForUpdate: (): Promise<{ ok: boolean; hasUpdate?: boolean; version?: string; downloaded?: boolean; reason?: string }> =>
+    ipcRenderer.invoke("desktop:checkForUpdate"),
 
   // Desktop settings
   getAutostart: (): Promise<boolean> => ipcRenderer.invoke("desktop:getAutostart"),
@@ -54,7 +58,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   // Screen share source picker (#122) — shared event channel; both the
-  // desktopCapturer fallback (main.ts) and the wincap picker (win32.ts)
+  // desktopCapturer (main.ts) — Chromium's native picker pipeline
   // emit `screen-share-pick` and listen on `screen-share-selected`.
   onScreenSharePick: (callback: (sources: Array<{
     id: string;

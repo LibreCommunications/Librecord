@@ -296,6 +296,27 @@ static void ConfigureRateLimiting(IServiceCollection services)
                     QueueLimit = 0,
                 });
         });
+
+        // Private-CDN reads are auth-check + presigned-URL-issuance then
+        // a redirect — zero DB writes, constant cost. A single channel
+        // view can easily fire 100+ attachment fetches at once (chat
+        // scrollback + video metadata preloads). Use a very generous
+        // per-minute budget here so scrolling a rich channel doesn't
+        // get throttled into 429s.
+        options.AddPolicy("cdn", ctx =>
+        {
+            var clientIp = GetClientIp(ctx);
+            if (clientIp == "loopback")
+                return RateLimitPartition.GetNoLimiter("loopback");
+            return RateLimitPartition.GetFixedWindowLimiter(
+                clientIp,
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 1200,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                });
+        });
     });
 }
 

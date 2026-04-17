@@ -20,9 +20,9 @@ import {
     clearActiveProcessor,
     type LocalAudioTrackLike,
 } from "./noiseSuppression";
-import { logger, getElectronAPI, getPipecapAPI, getWincapAPI, isDesktop } from "@librecord/domain";
+import { logger, getElectronAPI, getPipecapAPI, getWinAudioAPI, isDesktop } from "@librecord/domain";
 import * as pipecapScreenShare from "./pipecapScreenShare";
-import * as wincapScreenShare from "./wincapScreenShare";
+import * as winaudio from "./winaudio";
 import { onCustomEvent } from "../typedEvent";
 import { STORAGE } from "@librecord/domain";
 
@@ -331,11 +331,38 @@ export async function connectToVoice(token: string, wsUrl: string, initialMuted 
     room.on(RoomEvent.Reconnecting, () => {
         logger.voice.info("Reconnecting to voice server...");
         showToast("Reconnecting to voice...", "info");
+        // Drop any active noise-suppression processor NOW. LiveKit is
+        // about to tear down the publisher PeerConnection and rebuild it;
+        // the RTCRtpSender our rnnoise/threshold processor was attached
+        // to will be dead after the rebuild. If we don't clear the module
+        // state, the next LocalTrackPublished will try to `replaceTrack`
+        // on a stale sender with a stale raw track, silently leaving the
+        // new sender with no audio going to remote participants.
+        clearActiveProcessor();
     });
 
-    room.on(RoomEvent.Reconnected, () => {
+    room.on(RoomEvent.Reconnected, async () => {
         logger.voice.info("Reconnected to voice server");
         showToast("Voice reconnected", "success");
+        // Re-apply noise suppression on the freshly-republished mic
+        // track. LocalTrackPublished doesn't always fire on reconnect
+        // (LiveKit may reuse the existing publication), so do it here
+        // explicitly. If NS mode is "off" this is a cheap no-op.
+        if (getNoiseSuppressionSettings().mode !== "off") {
+            const localAudioTrack = getLocalAudioTrack();
+            if (localAudioTrack) {
+                try {
+                    const processedTrack = await applyNoiseSuppressionToTrack(
+                        localAudioTrack as unknown as LocalAudioTrackLike,
+                    );
+                    if (processedTrack && room) {
+                        startAnalysingTrack(room.localParticipant.identity, processedTrack);
+                    }
+                } catch (err) {
+                    logger.voice.warn("Failed to re-apply noise suppression after reconnect", err);
+                }
+            }
+        }
     });
 
     room.on(RoomEvent.SignalReconnecting, () => {
@@ -591,8 +618,7 @@ function screenShareBitrate(w: number, h: number, fps: number, codec: "vp9" | "h
 
 /**
  * Publish options for screen share. Codec varies by platform:
- * - wincap (Windows): H.264 — hardware encoder output injected directly
- *   via Encoded Transform, zero re-encoding.
+ * - Windows: H.264 (Chromium's native getDisplayMedia, hardware-encoded).
  * - pipecap (Linux) / fallback: VP9 SVC — raw pixels encoded once by
  *   the browser. `backupCodec` is on by default → Safari / older
  *   Chromium get VP8 automatically.
@@ -622,67 +648,27 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
     const isLinuxDesktop = isDesktop && platform === "linux";
     const isWindowsDesktop = isDesktop && platform === "win32";
     const usePipecap = isLinuxDesktop && !!getPipecapAPI();
-    const useWincap  = isWindowsDesktop && !!getWincapAPI();
+    const useWinAudio = isWindowsDesktop && !!getWinAudioAPI();
 
-    // Pick codec-appropriate bitrate. H.264 needs ~40% more bits than VP9
-    // for equivalent screen content quality (no native SCC tools).
-    const screenCodec = useWincap ? "h264" as const : "vp9" as const;
+    // Prefer H.264 for screen content on Windows (hardware-accelerated
+    // in Chromium via D3D11VA and broadly supported by receivers).
+    // Elsewhere, VP9 is the robust default.
+    const screenCodec = useWinAudio ? "h264" as const : "vp9" as const;
     const encodingBitrate = screenShareBitrate(resolution.width, resolution.height, encodeFps, screenCodec);
     const publishOpts = buildScreenSharePublishOpts(encodingBitrate, encodeFps);
 
-    if (useWincap) {
-        // Windows: wincap hardware-encodes H.264. Decoded frames feed the
-        // MediaStreamTrackGenerator for local preview. After publication,
-        // an RTCRtpScriptTransform replaces Chromium's re-encode output
-        // with wincap's original H.264 NALs (single encode, no quality
-        // loss). Falls back to Chromium re-encode if unavailable.
-        const wincapPublishOpts = buildScreenSharePublishOpts(encodingBitrate, encodeFps, "h264");
-        const result = await wincapScreenShare.startCapture({
-            fps: encodeFps,
-            bitrateBps: encodingBitrate,
-            audio: options.audio,
-            codec: "h264",
-        });
-        if (!result) {
-            // User cancelled or wincap failed. Don't fall through to
-            // getDisplayMedia — that would open a second picker modal.
-            return false;
+    // Windows: video comes from Chromium's native getDisplayMedia (single
+    // hardware encode, zero IPC). Audio comes from @librecord/winaudio —
+    // Chromium's getDisplayMedia can't capture per-process loopback on
+    // Windows, and the system mix loops the Librecord voice call back to
+    // remote participants as echo.
+    let winAudioTrack: MediaStreamTrack | undefined;
+    if (useWinAudio && options.audio) {
+        const audioResult = await winaudio.startAudioOnly();
+        if (audioResult) {
+            winAudioTrack = audioResult.audioTrack;
         } else {
-            try {
-                const videoTrack = new LocalVideoTrack(result.videoTrack, undefined, false);
-                await room.localParticipant.publishTrack(videoTrack, wincapPublishOpts);
-
-                // Attach the encoded transform to bypass Chromium's re-encode.
-                // Must happen after publishTrack so the RTCRtpSender exists.
-                if (result.attachEncodedTransform) {
-                    const sender = videoTrack.sender as RTCRtpSender | undefined;
-                    if (sender) {
-                        result.attachEncodedTransform(sender);
-                    }
-                }
-
-                if (result.audioTrack) {
-                    const audioTrack = new LocalAudioTrack(result.audioTrack, undefined, false);
-                    await room.localParticipant.publishTrack(audioTrack, {
-                        source: Track.Source.ScreenShareAudio,
-                        red: false,
-                        dtx: false,
-                        forceStereo: true,
-                    });
-                }
-
-                if (result.sourceName) {
-                    showToast(`Sharing ${result.sourceName}`, "success");
-                }
-                if (options.audio && !result.audioTrack) {
-                    showToast("Wincap audio capture failed", "info");
-                }
-                return true;
-            } catch (e) {
-                logger.voice.warn("Wincap screen share publish failed", e);
-                wincapScreenShare.stop();
-                return false;
-            }
+            showToast("Audio capture failed", "info");
         }
     }
 
@@ -696,6 +682,17 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
         try {
             const videoTrack = new LocalVideoTrack(result.videoTrack, undefined, false);
             await room.localParticipant.publishTrack(videoTrack, publishOpts);
+
+            // Tear the whole share down if the captured source ends (user
+            // revoked the portal token, the window was closed, pipecap
+            // process died, etc.). See the Windows branch for rationale.
+            const onEnded = () => {
+                result.videoTrack.removeEventListener("ended", onEnded);
+                logger.voice.info("Screen share source ended — stopping share");
+                stopScreenShare().catch(e =>
+                    logger.voice.warn("stopScreenShare after source ended failed", e));
+            };
+            result.videoTrack.addEventListener("ended", onEnded);
 
             if (result.audioTrack) {
                 const audioTrack = new LocalAudioTrack(result.audioTrack, undefined, false);
@@ -728,6 +725,10 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
         // audio defaults override our room-level publishDefaults, which
         // re-introduces the BUNDLE codec collision and kills the mic
         // mid-share. Doing it manually mirrors the Linux pipecap path.
+        //
+        // On Windows with winaudio available, audio is captured separately
+        // via WASAPI process-loopback; we request video only here.
+        const requestAudio = options.audio && !useWinAudio;
         let stream: MediaStream;
         try {
             stream = await navigator.mediaDevices.getDisplayMedia({
@@ -736,10 +737,12 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
                     height: { ideal: resolution.height },
                     frameRate: { ideal: encodeFps },
                 },
-                audio: options.audio,
+                audio: requestAudio,
             });
         } catch (e) {
             logger.voice.warn("getDisplayMedia failed", e);
+            // Clean up winaudio if we started it — it's useless without video.
+            if (winAudioTrack) winaudio.stop();
             return false;
         }
 
@@ -750,9 +753,34 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
             if (videoMs) {
                 const videoTrack = new LocalVideoTrack(videoMs, undefined, false);
                 await room.localParticipant.publishTrack(videoTrack, publishOpts);
+
+                // Fires when the user closes the shared app/window, clicks
+                // Chromium's "Stop sharing" toolbar, or the captured source
+                // otherwise disappears. Tear the whole share down (video +
+                // winaudio) in that case — keeping winaudio alive alone
+                // would keep sending system audio to remote participants
+                // with no visible screen and no way to stop it from the UI.
+                const onEnded = () => {
+                    videoMs.removeEventListener("ended", onEnded);
+                    logger.voice.info("Screen share source ended — stopping share");
+                    stopScreenShare().catch(e =>
+                        logger.voice.warn("stopScreenShare after source ended failed", e));
+                };
+                videoMs.addEventListener("ended", onEnded);
             }
+            // getDisplayMedia audio (non-Windows platforms).
             if (audioMs) {
                 const audioTrack = new LocalAudioTrack(audioMs, undefined, false);
+                await room.localParticipant.publishTrack(audioTrack, {
+                    source: Track.Source.ScreenShareAudio,
+                    red: false,
+                    dtx: false,
+                    forceStereo: true,
+                });
+            }
+            // WinAudio (Windows hybrid path).
+            if (winAudioTrack) {
+                const audioTrack = new LocalAudioTrack(winAudioTrack, undefined, false);
                 await room.localParticipant.publishTrack(audioTrack, {
                     source: Track.Source.ScreenShareAudio,
                     red: false,
@@ -763,6 +791,7 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
         } catch (e) {
             logger.voice.warn("Screen share publish failed", e);
             stream.getTracks().forEach((t) => t.stop());
+            if (winAudioTrack) winaudio.stop();
             return false;
         }
 
@@ -771,26 +800,34 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
         // per-source audio capture path, or macOS where getDisplayMedia
         // doesn't expose system audio at all). Tell them so they don't
         // wonder why participants can't hear them.
-        if (options.audio && !audioMs) {
+        if (options.audio && !audioMs && !winAudioTrack) {
             showToast("Audio capture is unavailable for this source", "info");
         }
     }
 
-    // For screen content the right congestion tradeoff is "drop frames,
-    // not pixels" — text legibility matters more than smoothness.
-    // contentHint=detail + maintain-resolution is set unconditionally
-    // because even 60fps screen-shares are mostly UI, not motion video.
+    // For a screenshare that's mostly games / high-motion, keeping the
+    // framerate steady matters more than keeping every pixel. If WebRTC
+    // has to degrade under bandwidth pressure we'd rather lose a bit of
+    // resolution than stutter (which is what users perceive most). That
+    // means:
+    //   contentHint = "motion"            — tell the encoder this is
+    //                                       video-like content, not text
+    //   degradationPreference = "maintain-framerate"
+    //                                     — drop pixels, not frames
+    // If we ever want the old "text-legibility-first" behavior back we
+    // should make it an explicit user choice in the picker, not the
+    // default.
     try {
         room.localParticipant.videoTrackPublications.forEach(pub => {
             if (pub.source !== Track.Source.ScreenShare) return;
             const track = pub.track;
             if (!track?.mediaStreamTrack) return;
-            track.mediaStreamTrack.contentHint = "detail";
+            track.mediaStreamTrack.contentHint = "motion";
 
             const sender = track.sender as RTCRtpSender | undefined;
             if (!sender) return;
             const params = sender.getParameters();
-            params.degradationPreference = "maintain-resolution";
+            params.degradationPreference = "maintain-framerate";
             for (const enc of params.encodings) {
                 enc.maxBitrate = encodingBitrate;
                 enc.maxFramerate = encodeFps;
@@ -806,10 +843,10 @@ export async function startScreenShare(options: ScreenShareSettings): Promise<bo
     return true;
 }
 
-// Always stop both wincap and pipecap on screenshare stop. Only one can
-// be active at a time, the other call is a cheap no-op.
+// Always stop both winaudio and pipecap on screenshare stop. Only one
+// can be active at a time, the other call is a cheap no-op.
 export async function stopScreenShare(): Promise<boolean> {
-    wincapScreenShare.stop();
+    winaudio.stop();
     if (!room) return false;
     pipecapScreenShare.stop();
 

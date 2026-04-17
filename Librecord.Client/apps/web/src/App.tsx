@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@librecord/app";
 import LoadingSpinner from "@librecord/ui-web/src/components/LoadingSpinner.tsx";
 import { UpdateBanner } from "@librecord/ui-web/src/components/ui/UpdateBanner.tsx";
+import { AuthRevocationHandler } from "@librecord/ui-web/src/components/AuthRevocationHandler.tsx";
 
 const LoginPage = lazy(() => import("@librecord/ui-web/src/pages/auth/LoginPage.tsx"));
 const RegisterPage = lazy(() => import("@librecord/ui-web/src/pages/auth/RegisterPage.tsx"));
@@ -31,6 +32,7 @@ export default function App() {
     return (
         <Suspense fallback={<LoadingSpinner />}>
             <UpdateBanner />
+            <AuthRevocationHandler />
             <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />

@@ -452,7 +452,12 @@ export function registerListeners() {
                 resetVoiceState();
             }
             appConnection.stop();
-            window.location.href = "/login";
+            // Use a custom event instead of window.location.href — the
+            // latter navigates to file:///login in the packaged Electron
+            // app (no HTTP server), triggering a "Not allowed to load
+            // local resource" error. A small router-aware listener in
+            // App.tsx handles this via react-router's navigate().
+            window.dispatchEvent(new CustomEvent("app:auth:revoked"));
         }
     );
 }

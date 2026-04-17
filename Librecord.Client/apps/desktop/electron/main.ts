@@ -303,7 +303,7 @@ app.whenReady().then(() => {
     });
   }
 
-  // Per-platform native screen capture (pipecap on Linux, wincap on Windows).
+  // Per-platform native audio/capture bridge (pipecap on Linux, winaudio on Windows).
   setupPlatformScreenCapture(app, ipcMain, () => mainWindow);
 
   // IPC: app version

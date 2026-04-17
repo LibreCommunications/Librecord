@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useAuth } from "@librecord/app";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { auth as authApi } from "@librecord/api-client";
 import { Spinner } from "../../components/ui/Spinner";
 import logoUrl from "../../assets/librecord.svg";
@@ -422,9 +422,9 @@ export default function LoginPage() {
                 <div className="mt-3 flex justify-between text-sm text-[#949ba4]">
                     <span>
                         Need an account?{" "}
-                        <a href="/register" className="text-[#00a8fc] hover:underline">
+                        <Link to="/register" className="text-[#00a8fc] hover:underline">
                             Register
-                        </a>
+                        </Link>
                     </span>
                     <button
                         onClick={() => { setShowRecovery(true); setError(""); }}

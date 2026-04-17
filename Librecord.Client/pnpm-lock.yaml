@@ -97,7 +97,7 @@ importers:
       '@librecord/pipecap':
         specifier: file:../../../../pipecap
         version: file:../../pipecap
-      '@librecord/wincap':
+      '@librecord/winaudio':
         specifier: file:../../../../wincap
         version: file:../../wincap
 
@@ -604,7 +604,7 @@ packages:
     resolution: {directory: ../../pipecap, type: directory}
     os: [linux]
 
-  '@librecord/wincap@file:../../wincap':
+  '@librecord/winaudio@file:../../wincap':
     resolution: {directory: ../../wincap, type: directory}
     engines: {node: '>=18'}
     cpu: [x64, arm64]
@@ -3270,7 +3270,7 @@ snapshots:
   '@librecord/pipecap@file:../../pipecap':
     optional: true
 
-  '@librecord/wincap@file:../../wincap':
+  '@librecord/winaudio@file:../../wincap':
     optional: true
 
   '@livekit/mutex@1.1.1': {}

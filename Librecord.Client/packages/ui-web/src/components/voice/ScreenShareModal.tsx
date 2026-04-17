@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ScreenShareIcon } from "./VoiceIcons";
-import { getElectronAPI, getWincapAPI } from "@librecord/domain";
+import { getElectronAPI, getWinAudioAPI } from "@librecord/domain";
 
 export interface ScreenShareOptions {
     resolution: "720p" | "1080p" | "1440p" | "source";
@@ -35,15 +35,15 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
     const [frameRate, setFrameRate] = useState<ScreenShareOptions["frameRate"]>(30);
     const [audio, setAudio] = useState(isDesktop);
 
-    // On Windows, the audio path depends on which capture engine the
-    // main process actually loaded:
-    //   - wincap + Win11 22000+ → WASAPI process loopback with
-    //     EXCLUDE_TARGET_PROCESS_TREE captures the full system mix MINUS
+    // On Windows, the audio path depends on whether the winaudio native
+    // module is loaded AND the host is Win11 22000+:
+    //   - winaudio available + Win11 22000+ → WASAPI process loopback with
+    //     EXCLUDE_TARGET_PROCESS_TREE captures the system mix MINUS
     //     Librecord, so screens can publish audio without echo.
-    //   - wincap missing OR Win10 → desktopCapturer fallback, which only
-    //     gets per-window audio. Screens drop audio.
-    // Probe both at modal open so the warning only shows when the
-    // limitation actually applies.
+    //   - winaudio missing OR Win10 → Chromium getDisplayMedia fallback,
+    //     which only gets per-window audio. Screens drop audio.
+    // Probe at modal open so the warning only shows when the limitation
+    // actually applies.
     const isWindows = isDesktop && getElectronAPI()?.platform === "win32";
     const [windowsAudioWarning, setWindowsAudioWarning] = useState(isWindows);
 
@@ -51,15 +51,15 @@ export function ScreenShareModal({ open, onStart, onCancel }: Props) {
         if (!isWindows) return;
         let cancelled = false;
         (async () => {
-            const wincap = getWincapAPI();
-            if (!wincap) {
+            const winaudio = getWinAudioAPI();
+            if (!winaudio) {
                 if (!cancelled) setWindowsAudioWarning(true);
                 return;
             }
             try {
-                const ok = await wincap.available();
+                const ok = await winaudio.available();
                 if (!ok) { if (!cancelled) setWindowsAudioWarning(true); return; }
-                const caps = await wincap.getCapabilities();
+                const caps = await winaudio.getCapabilities();
                 if (!cancelled) setWindowsAudioWarning(!caps.processLoopback);
             } catch {
                 if (!cancelled) setWindowsAudioWarning(true);

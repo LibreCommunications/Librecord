@@ -1,10 +1,46 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CloseIcon, ExternalLinkIcon } from "./Icons";
+import { isDesktop } from "@librecord/domain";
+import { CloseIcon, ExternalLinkIcon, DownloadIcon } from "./Icons";
 
 interface Props {
     src: string;
     alt?: string;
     onClose: () => void;
+}
+
+/** Fetch the image with the session's cookies and trigger a save dialog.
+ *  Plain `<a href download>` doesn't carry cookies when the browser
+ *  fetches the URL, so self-hosted attachments behind auth return 401.
+ *  Blob-based download avoids the cross-origin / unauthenticated-browser
+ *  problem entirely (and works on both web and Electron). */
+async function downloadLightboxImage(src: string, fileName: string): Promise<void> {
+    const res = await fetch(src, { credentials: "include" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    try {
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = fileName;
+        a.rel = "noopener";
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    } finally {
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    }
+}
+
+function inferFileName(src: string, alt?: string): string {
+    if (alt && alt.trim()) return alt;
+    try {
+        const path = new URL(src, window.location.href).pathname;
+        const last = path.split("/").filter(Boolean).pop();
+        return last ? decodeURIComponent(last) : "image";
+    } catch {
+        return "image";
+    }
 }
 
 export function ImageLightbox({ src, alt, onClose }: Props) {
@@ -112,16 +148,44 @@ export function ImageLightbox({ src, alt, onClose }: Props) {
                 </div>
             )}
 
-            <a
-                href={src}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={e => e.stopPropagation()}
-                className="fixed bottom-4 right-4 px-3 py-1.5 rounded bg-black/60 hover:bg-black/80 text-white text-sm flex items-center gap-1.5 transition-colors"
-            >
-                Open Original
-                <ExternalLinkIcon size={14} />
-            </a>
+            <div className="fixed bottom-4 right-4 flex items-center gap-2">
+                <button
+                    type="button"
+                    onClick={async e => {
+                        e.stopPropagation();
+                        try {
+                            await downloadLightboxImage(src, inferFileName(src, alt));
+                        } catch (err) {
+                            // eslint-disable-next-line no-console
+                            console.error("Lightbox download failed:", err);
+                            window.dispatchEvent(new CustomEvent("app:toast", {
+                                detail: { message: "Download failed", type: "error" },
+                            }));
+                        }
+                    }}
+                    className="px-3 py-1.5 rounded bg-black/60 hover:bg-black/80 text-white text-sm flex items-center gap-1.5 transition-colors"
+                >
+                    Download
+                    <DownloadIcon size={14} />
+                </button>
+
+                {/* "Open Original" opens the URL in the default browser via
+                    shell.openExternal on desktop — the browser has no session
+                    cookies and the API returns 401. Hide in desktop builds;
+                    keep it on the web where it works fine. */}
+                {!isDesktop && (
+                    <a
+                        href={src}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        className="px-3 py-1.5 rounded bg-black/60 hover:bg-black/80 text-white text-sm flex items-center gap-1.5 transition-colors"
+                    >
+                        Open Original
+                        <ExternalLinkIcon size={14} />
+                    </a>
+                )}
+            </div>
         </div>
     );
 }

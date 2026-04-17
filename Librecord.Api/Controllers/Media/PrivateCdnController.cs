@@ -2,12 +2,14 @@ using Librecord.Domain.Messaging.Common;
 using Librecord.Domain.Storage;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Librecord.Api.Controllers.Media;
 
 [ApiController]
 [Authorize]
 [Route("cdn/private")]
+[EnableRateLimiting("cdn")]
 public class PrivateCdnController : AuthenticatedController
 {
     private readonly IAttachmentStorageService _storage;

@@ -30,7 +30,7 @@
   },
   "optionalDependencies": {
     "@librecord/pipecap": "file:../../../../pipecap",
-    "@librecord/wincap": "file:../../../../wincap"
+    "@librecord/winaudio": "file:../../../../wincap"
   },
   "devDependencies": {
     "@rolldown/plugin-babel": "^0.2.2",
@@ -61,7 +61,7 @@
       "package.json",
       "node_modules/pkg-prebuilds/**/*",
       "node_modules/@librecord/pipecap/**/*",
-      "node_modules/@librecord/wincap/**/*"
+      "node_modules/@librecord/winaudio/**/*"
     ],
     "linux": {
       "target": [
