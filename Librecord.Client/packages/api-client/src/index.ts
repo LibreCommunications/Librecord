@@ -17,6 +17,7 @@ export {
 export {
     dispatchAppEvent,
     setEventBus,
+    getEventBus,
 } from "./eventHelpers.ts";
 
 export {

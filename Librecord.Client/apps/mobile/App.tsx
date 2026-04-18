@@ -17,7 +17,7 @@ import {
 // rnnoise-wasm, both browser-only. The /context subpath only pulls the React
 // providers, no voice or realtime code.
 import { AuthProvider } from '@librecord/app/context';
-import { RootNavigator } from '@librecord/ui-native';
+import { MobileRealtimeRoot, RootNavigator } from '@librecord/ui-native';
 
 // TODO: move to a config surface once we have multiple environments.
 const DEFAULT_API_URL = 'https://librecord.gros-sans-dessein.com/api';
@@ -34,6 +34,7 @@ function App() {
   return (
     <NativePlatformProvider>
       <AuthProvider>
+        <MobileRealtimeRoot />
         <SafeAreaProvider>
           <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
           <NavigationContainer>

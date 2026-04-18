@@ -8,13 +8,11 @@ import {
     TextInput,
     View,
 } from "react-native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AuthContext } from "@librecord/app/context";
 import type { RootStackParamList } from "../navigation/types.ts";
 
-type Props = {
-    navigation: NativeStackNavigationProp<RootStackParamList, "Login">;
-};
+type Props = NativeStackScreenProps<RootStackParamList, "Login">;
 
 export function LoginScreen({ navigation }: Props) {
     const { login } = useContext(AuthContext);
@@ -39,7 +37,8 @@ export function LoginScreen({ navigation }: Props) {
                 navigation.replace("TwoFactor", { sessionToken: result.twoFactorSessionToken });
                 return;
             }
-            navigation.replace("Home");
+            // No navigate() needed — RootNavigator swaps to the app stack when
+            // AuthContext.user becomes non-null.
         } catch (err) {
             setError(err instanceof Error ? err.message : "Login failed");
         } finally {

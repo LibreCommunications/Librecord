@@ -43,9 +43,9 @@ export function TwoFactorScreen({ navigation, route }: Props) {
                 setValue("");
                 return;
             }
-            // Cookies are set by the verify endpoint; populate AuthContext.
+            // Cookies are set by the verify endpoint; populate AuthContext —
+            // RootNavigator swaps to the app stack when user becomes non-null.
             await loadUser();
-            navigation.replace("Home");
         } catch (err) {
             setError(err instanceof Error ? err.message : "Verification failed");
         } finally {

@@ -1,7 +1,12 @@
 type LogLevel = "debug" | "info" | "warn" | "error";
 
 const LEVEL_ORDER: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
-const MIN_LEVEL: LogLevel = import.meta.env.DEV ? "debug" : "warn";
+// Works on both Vite (NODE_ENV replaced at build) and Metro (__DEV__ global).
+declare const __DEV__: boolean | undefined;
+const IS_DEV =
+    (typeof __DEV__ !== "undefined" && __DEV__) ||
+    (typeof process !== "undefined" && process.env?.NODE_ENV !== "production");
+const MIN_LEVEL: LogLevel = IS_DEV ? "debug" : "warn";
 
 const COLORS: Record<string, string> = {
     Voice: "#4ade80",
@@ -16,13 +21,21 @@ function shouldLog(level: LogLevel): boolean {
     return LEVEL_ORDER[level] >= LEVEL_ORDER[MIN_LEVEL];
 }
 
+// Browsers understand `%c` CSS formatting; React Native's console does not and
+// prints the style string as literal text, so only use %c where it works.
+const IS_BROWSER_CONSOLE =
+    typeof navigator === "undefined" || navigator.product !== "ReactNative";
+
 function log(level: LogLevel, category: string, msg: string, ...args: unknown[]) {
     if (!shouldLog(level)) return;
-    const color = COLORS[category] ?? "#9ca3af";
-    const prefix = `%c[${category}]`;
-    const style = `color:${color};font-weight:bold`;
     const fn = level === "error" ? console.error : level === "warn" ? console.warn : console.log;
-    fn(prefix, style, msg, ...args);
+
+    if (IS_BROWSER_CONSOLE) {
+        const color = COLORS[category] ?? "#9ca3af";
+        fn(`%c[${category}]`, `color:${color};font-weight:bold`, msg, ...args);
+    } else {
+        fn(`[${category}]`, msg, ...args);
+    }
 }
 
 function createCategoryLogger(category: string) {
