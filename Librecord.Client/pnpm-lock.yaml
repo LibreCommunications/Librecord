@@ -111,16 +111,16 @@ importers:
         version: link:../../packages/ui-native
       '@react-native/new-app-screen':
         specifier: 0.85.1
-        version: 0.85.1(@types/react@19.2.14)(react-native@0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
+        version: 0.85.1(@types/react@19.2.14)(react-native@0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.4))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.4))(react@19.2.4)
       react:
-        specifier: 19.2.3
-        version: 19.2.3
+        specifier: ^19.2.3
+        version: 19.2.4
       react-native:
         specifier: 0.85.1
-        version: 0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3)
+        version: 0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.4))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.4)
       react-native-safe-area-context:
         specifier: ^5.5.2
-        version: 5.7.0(react-native@0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
+        version: 5.7.0(react-native@0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.4))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.4))(react@19.2.4)
     devDependencies:
       '@babel/core':
         specifier: ^7.25.2
@@ -148,7 +148,7 @@ importers:
         version: 0.85.1
       '@react-native/jest-preset':
         specifier: 0.85.1
-        version: 0.85.1(@babel/core@7.29.0)(react@19.2.3)
+        version: 0.85.1(@babel/core@7.29.0)(react@19.2.4)
       '@react-native/metro-config':
         specifier: 0.85.1
         version: 0.85.1(@babel/core@7.29.0)
@@ -175,7 +175,7 @@ importers:
         version: 2.8.8
       react-test-renderer:
         specifier: 19.2.3
-        version: 19.2.3(react@19.2.3)
+        version: 19.2.3(react@19.2.4)
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
@@ -4710,10 +4710,6 @@ packages:
       react: '>=16 || >=17 || >= 18 || >= 19'
       react-dom: '>=16 || >=17 || >= 18 || >=19'
 
-  react@19.2.3:
-    resolution: {integrity: sha512-Ku/hhYbVjOQnXDZFv2+RibmLFGwFdeeKHFcOTlrt7xplBnya5OGn/hIRDsqDiSUcfORsDC7MPxwork8jBwsIWA==}
-    engines: {node: '>=0.10.0'}
-
   react@19.2.4:
     resolution: {integrity: sha512-9nfp2hYpCwOjAN+8TZFGhtWEwgvWHXqESH8qT89AT/lWklpLON22Lc8pEtnpsZz7VmawabSU0gCjnj8aC0euHQ==}
     engines: {node: '>=0.10.0'}
@@ -7200,13 +7196,13 @@ snapshots:
 
   '@react-native/gradle-plugin@0.85.1': {}
 
-  '@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.3)':
+  '@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.4)':
     dependencies:
       '@jest/create-cache-key-function': 29.7.0
       '@react-native/js-polyfills': 0.85.1
       babel-jest: 29.7.0(@babel/core@7.29.0)
       jest-environment-node: 29.7.0
-      react: 19.2.3
+      react: 19.2.4
       regenerator-runtime: 0.13.11
     transitivePeerDependencies:
       - '@babel/core'
@@ -7235,10 +7231,10 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@react-native/new-app-screen@0.85.1(@types/react@19.2.14)(react-native@0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)':
+  '@react-native/new-app-screen@0.85.1(@types/react@19.2.14)(react-native@0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.4))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.4))(react@19.2.4)':
     dependencies:
-      react: 19.2.3
-      react-native: 0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3)
+      react: 19.2.4
+      react-native: 0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.4))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.4)
     optionalDependencies:
       '@types/react': 19.2.14
 
@@ -7246,12 +7242,12 @@ snapshots:
 
   '@react-native/typescript-config@0.85.1': {}
 
-  '@react-native/virtualized-lists@0.85.1(@types/react@19.2.14)(react-native@0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)':
+  '@react-native/virtualized-lists@0.85.1(@types/react@19.2.14)(react-native@0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.4))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.4))(react@19.2.4)':
     dependencies:
       invariant: 2.2.4
       nullthrows: 1.1.1
-      react: 19.2.3
-      react-native: 0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3)
+      react: 19.2.4
+      react-native: 0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.4))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.4)
     optionalDependencies:
       '@types/react': 19.2.14
 
@@ -11105,12 +11101,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  react-native-safe-area-context@5.7.0(react-native@0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3):
+  react-native-safe-area-context@5.7.0(react-native@0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.4))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.4))(react@19.2.4):
     dependencies:
-      react: 19.2.3
-      react-native: 0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3)
+      react: 19.2.4
+      react-native: 0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.4))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.4)
 
-  react-native@0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3):
+  react-native@0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.4))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.4):
     dependencies:
       '@react-native/assets-registry': 0.85.1
       '@react-native/codegen': 0.85.1(@babel/core@7.29.0)
@@ -11118,7 +11114,7 @@ snapshots:
       '@react-native/gradle-plugin': 0.85.1
       '@react-native/js-polyfills': 0.85.1
       '@react-native/normalize-colors': 0.85.1
-      '@react-native/virtualized-lists': 0.85.1(@types/react@19.2.14)(react-native@0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
+      '@react-native/virtualized-lists': 0.85.1(@types/react@19.2.14)(react-native@0.85.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/jest-preset@0.85.1(@babel/core@7.29.0)(react@19.2.4))(@react-native/metro-config@0.85.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.4))(react@19.2.4)
       abort-controller: 3.0.0
       anser: 1.4.10
       ansi-regex: 5.0.1
@@ -11134,7 +11130,7 @@ snapshots:
       nullthrows: 1.1.1
       pretty-format: 29.7.0
       promise: 8.3.0
-      react: 19.2.3
+      react: 19.2.4
       react-devtools-core: 6.1.5
       react-refresh: 0.14.2
       regenerator-runtime: 0.13.11
@@ -11146,7 +11142,7 @@ snapshots:
       ws: 7.5.10
       yargs: 17.7.2
     optionalDependencies:
-      '@react-native/jest-preset': 0.85.1(@babel/core@7.29.0)(react@19.2.3)
+      '@react-native/jest-preset': 0.85.1(@babel/core@7.29.0)(react@19.2.4)
       '@types/react': 19.2.14
     transitivePeerDependencies:
       - '@babel/core'
@@ -11172,9 +11168,9 @@ snapshots:
     optionalDependencies:
       react-dom: 19.2.4(react@19.2.4)
 
-  react-test-renderer@19.2.3(react@19.2.3):
+  react-test-renderer@19.2.3(react@19.2.4):
     dependencies:
-      react: 19.2.3
+      react: 19.2.4
       react-is: 19.2.5
       scheduler: 0.27.0
 
@@ -11182,8 +11178,6 @@ snapshots:
     dependencies:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
-
-  react@19.2.3: {}
 
   react@19.2.4: {}
 
