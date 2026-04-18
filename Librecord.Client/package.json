@@ -13,6 +13,8 @@
     "dev:desktop": "turbo dev --filter=@librecord/desktop",
     "build:desktop": "turbo build --filter=@librecord/desktop",
     "package:desktop": "pnpm --filter @librecord/desktop package",
+    "start:mobile": "pnpm --filter @librecord/mobile start",
+    "android:mobile": "pnpm --filter @librecord/mobile android",
     "test:e2e": "npx playwright test",
     "test:e2e:headed": "npx playwright test --headed",
     "test:e2e:debug": "npx playwright test --debug"
