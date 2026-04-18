@@ -1,9 +1,13 @@
 import { fetchWithAuth } from "./fetchWithAuth.ts";
 import { logger, cached, invalidate } from "@librecord/domain";
 
-export const API_URL: string =
-    (typeof localStorage !== "undefined" && localStorage.getItem("lr:api-url")) ||
-    import.meta.env.VITE_API_URL;
+// Set via setApiUrl() at app startup. `export let` gives consumers a live ES
+// module binding so they always read the current value without passing it around.
+export let API_URL: string = "";
+
+export function setApiUrl(url: string): void {
+    API_URL = url;
+}
 
 export class ApiError extends Error {
     status: number;

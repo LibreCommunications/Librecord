@@ -1,10 +1,7 @@
 import * as signalR from "@microsoft/signalr";
 import { logger } from "@librecord/domain";
 import type { EventBus } from "@librecord/platform";
-
-const API_URL: string =
-    (typeof localStorage !== "undefined" && localStorage.getItem("lr:api-url")) ||
-    import.meta.env.VITE_API_URL;
+import { API_URL } from "./client.ts";
 
 export type ConnectionState = "disconnected" | "connecting" | "connected" | "reconnecting";
 
@@ -53,60 +50,82 @@ const reconnectPolicy: signalR.IRetryPolicy = {
     },
 };
 
-export const appConnection = new signalR.HubConnectionBuilder()
-    .withUrl(`${API_URL}/hubs/app`, { withCredentials: true })
-    .withAutomaticReconnect(reconnectPolicy)
-    .build();
+// Built lazily on first access via the Proxy below so the connection URL uses
+// the API_URL that was configured by setApiUrl() at app startup, not the empty
+// string that existed when this module was first loaded.
+let _built: signalR.HubConnection | null = null;
 
-appConnection.keepAliveIntervalInMilliseconds = 10_000;
-appConnection.serverTimeoutInMilliseconds = 60_000;
+function build(): signalR.HubConnection {
+    const conn = new signalR.HubConnectionBuilder()
+        .withUrl(`${API_URL}/hubs/app`, { withCredentials: true })
+        .withAutomaticReconnect(reconnectPolicy)
+        .build();
 
-appConnection.onreconnected(async () => {
-    _onRegisterListeners?.();
-    setConnectionState("connected");
+    conn.keepAliveIntervalInMilliseconds = 10_000;
+    conn.serverTimeoutInMilliseconds = 60_000;
 
-    if (_onReconnected) {
-        try { await _onReconnected(); }
-        catch (e) { logger.realtime.warn("Reconnect hook failed", e); }
-    }
-
-    _eventBus?.dispatchPlain("realtime:reconnected");
-});
-
-appConnection.onreconnecting(err => {
-    logger.realtime.warn("Reconnecting...", err?.message);
-    setConnectionState("reconnecting");
-});
-
-appConnection.onclose(async (err) => {
-    logger.realtime.warn("Connection closed", err?.message);
-
-    const shouldRetry = _shouldRetryOnClose?.() ?? false;
-
-    if (shouldRetry) {
-        logger.realtime.info("Was in voice call — attempting fresh connection...");
-        setConnectionState("reconnecting");
-        try {
-            await appConnection.start();
-            _onRegisterListeners?.();
-            setConnectionState("connected");
-
-            if (_onReconnected) {
-                try { await _onReconnected(); }
-                catch (e) { logger.realtime.warn("Reconnect hook failed", e); }
-            }
-
-            _eventBus?.dispatchPlain("realtime:reconnected");
-            return;
-        } catch (e) {
-            logger.realtime.warn("Fresh connection failed", e);
+    conn.onreconnected(async () => {
+        _onRegisterListeners?.();
+        setConnectionState("connected");
+        if (_onReconnected) {
+            try { await _onReconnected(); }
+            catch (e) { logger.realtime.warn("Reconnect hook failed", e); }
         }
-    }
+        _eventBus?.dispatchPlain("realtime:reconnected");
+    });
 
-    setConnectionState("disconnected");
+    conn.onreconnecting(err => {
+        logger.realtime.warn("Reconnecting...", err?.message);
+        setConnectionState("reconnecting");
+    });
 
-    if (_onDisconnected) {
-        try { await _onDisconnected(); }
-        catch (e) { logger.realtime.warn("Disconnect hook failed", e); }
-    }
+    conn.onclose(async (err) => {
+        logger.realtime.warn("Connection closed", err?.message);
+        const shouldRetry = _shouldRetryOnClose?.() ?? false;
+
+        if (shouldRetry) {
+            logger.realtime.info("Was in voice call — attempting fresh connection...");
+            setConnectionState("reconnecting");
+            try {
+                await conn.start();
+                _onRegisterListeners?.();
+                setConnectionState("connected");
+                if (_onReconnected) {
+                    try { await _onReconnected(); }
+                    catch (e) { logger.realtime.warn("Reconnect hook failed", e); }
+                }
+                _eventBus?.dispatchPlain("realtime:reconnected");
+                return;
+            } catch (e) {
+                logger.realtime.warn("Fresh connection failed", e);
+            }
+        }
+
+        setConnectionState("disconnected");
+
+        if (_onDisconnected) {
+            try { await _onDisconnected(); }
+            catch (e) { logger.realtime.warn("Disconnect hook failed", e); }
+        }
+    });
+
+    return conn;
+}
+
+function ensure(): signalR.HubConnection {
+    if (!_built) _built = build();
+    return _built;
+}
+
+export const appConnection = new Proxy({} as signalR.HubConnection, {
+    get(_t, prop) {
+        const c = ensure();
+        const value = (c as unknown as Record<string | symbol, unknown>)[prop];
+        return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(c) : value;
+    },
+    set(_t, prop, value) {
+        const c = ensure();
+        (c as unknown as Record<string | symbol, unknown>)[prop] = value;
+        return true;
+    },
 });

@@ -7,12 +7,21 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@librecord/api-client": "workspace:*",
+    "@librecord/app": "workspace:*",
+    "@librecord/design": "workspace:*",
     "@librecord/domain": "workspace:*",
     "@librecord/platform": "workspace:*",
-    "@librecord/app": "workspace:*",
-    "@librecord/design": "workspace:*"
+    "@librecord/platform-native": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.2.0",
+    "react-native": "*",
+    "@react-navigation/native": "*",
+    "@react-navigation/native-stack": "*"
   },
   "devDependencies": {
+    "@types/react": "^19.2.5",
     "typescript": "~5.9.3"
   }
 }

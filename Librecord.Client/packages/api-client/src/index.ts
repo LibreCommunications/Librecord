@@ -21,6 +21,7 @@ export {
 
 export {
     API_URL,
+    setApiUrl,
     ApiError,
     auth,
     userProfiles,

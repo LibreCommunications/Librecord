@@ -1,7 +1,5 @@
 import { createContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { setRefreshFunction } from "@librecord/api-client";
-
-const API_URL = import.meta.env.VITE_API_URL;
+import { setRefreshFunction, API_URL } from "@librecord/api-client";
 
 export interface GuildSummary {
     guildId: string;

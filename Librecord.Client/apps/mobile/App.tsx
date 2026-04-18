@@ -1,45 +1,48 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
-
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
+import { StatusBar, useColorScheme } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { NavigationContainer } from '@react-navigation/native';
+import { NativePlatformProvider } from '@librecord/platform-native';
 import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+  nativeHttpClient,
+  nativeEventBus,
+  nativeStorage,
+} from '@librecord/platform-native';
+import {
+  setApiUrl,
+  setHttpClient,
+  setEventBus,
+  setConnectionEventBus,
+} from '@librecord/api-client';
+// Subpath import — the `@librecord/app` barrel eagerly loads livekit-client and
+// rnnoise-wasm, both browser-only. The /context subpath only pulls the React
+// providers, no voice or realtime code.
+import { AuthProvider } from '@librecord/app/context';
+import { RootNavigator } from '@librecord/ui-native';
+
+// TODO: move to a config surface once we have multiple environments.
+const DEFAULT_API_URL = 'https://librecord.gros-sans-dessein.com/api';
+
+// Wire api-client against the native adapters before anything renders.
+setApiUrl(nativeStorage.get('lr:api-url') ?? DEFAULT_API_URL);
+setHttpClient(nativeHttpClient);
+setEventBus(nativeEventBus);
+setConnectionEventBus(nativeEventBus);
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
 
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
-    </SafeAreaProvider>
+    <NativePlatformProvider>
+      <AuthProvider>
+        <SafeAreaProvider>
+          <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+          <NavigationContainer>
+            <RootNavigator />
+          </NavigationContainer>
+        </SafeAreaProvider>
+      </AuthProvider>
+    </NativePlatformProvider>
   );
 }
-
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-
-  return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
 
 export default App;
