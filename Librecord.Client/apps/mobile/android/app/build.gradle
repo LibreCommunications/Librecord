@@ -113,4 +113,10 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // Opt-in Fresco modules so RN's <Image> renders animated GIFs and WebP.
+    // Without these, GIFs/WebP render as static first-frame images.
+    implementation("com.facebook.fresco:animated-gif:3.4.0")
+    implementation("com.facebook.fresco:animated-webp:3.4.0")
+    implementation("com.facebook.fresco:webpsupport:3.4.0")
 }

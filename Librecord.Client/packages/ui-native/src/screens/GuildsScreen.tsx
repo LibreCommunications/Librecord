@@ -14,8 +14,16 @@ import { API_URL, guilds as guildsApi } from "@librecord/api-client";
 import { AuthContext } from "@librecord/app/context";
 import type { GuildSummary, AppEventMap } from "@librecord/domain";
 import { onCustomEvent, onEvent } from "@librecord/app/typedEvent";
-export function ServersScreen() {
-    const { user, logout } = useContext(AuthContext);
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { MobileHeader } from "../components/MobileHeader.tsx";
+import type { RootStackParamList } from "../navigation/types.ts";
+
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+
+export function GuildsScreen() {
+    const { user } = useContext(AuthContext);
+    const navigation = useNavigation<Nav>();
     const [servers, setServers] = useState<GuildSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -32,7 +40,6 @@ export function ServersScreen() {
 
     useEffect(() => { load(); }, [load]);
 
-    // Live updates — replicate the subscriptions from web's GlobalSidebar.
     useEffect(() => {
         return onCustomEvent<AppEventMap["guild:updated"]>("guild:updated", (d) => {
             setServers((prev) =>
@@ -68,60 +75,48 @@ export function ServersScreen() {
         return onEvent("realtime:reconnected", () => { load(); });
     }, [load]);
 
-    async function onLogout() {
-        await logout();
-        // RootNavigator swaps back to the auth stack when user goes null.
-    }
-
-    if (loading) {
-        return (
-            <SafeAreaView style={styles.root}>
-                <View style={[styles.inner, styles.centered]}>
+    return (
+        <SafeAreaView style={styles.root} edges={["top", "left", "right"]}>
+            <MobileHeader title="Guilds" />
+            {loading ? (
+                <View style={styles.centered}>
                     <ActivityIndicator color="#5865f2" />
                 </View>
-            </SafeAreaView>
-        );
-    }
-
-    return (
-        <SafeAreaView style={styles.root}>
-            <View style={styles.header}>
-                <Text style={styles.title}>Servers</Text>
-                <Text style={styles.subtitle}>
-                    {user?.displayName ?? user?.username} · {servers.length}
-                </Text>
-            </View>
-            <FlatList
-                data={servers}
-                keyExtractor={(g) => g.id}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        tintColor="#5865f2"
-                        onRefresh={() => { setRefreshing(true); load(); }}
-                    />
-                }
-                ItemSeparatorComponent={() => <View style={styles.sep} />}
-                ListEmptyComponent={
-                    <View style={styles.empty}>
-                        <Text style={styles.emptyText}>You're not in any servers yet.</Text>
-                    </View>
-                }
-                renderItem={({ item }) => <GuildRow guild={item} />}
-                contentContainerStyle={servers.length === 0 ? { flexGrow: 1 } : undefined}
-            />
-            <Pressable onPress={onLogout} style={styles.logout}>
-                <Text style={styles.logoutText}>Sign out</Text>
-            </Pressable>
+            ) : (
+                <FlatList
+                    data={servers}
+                    keyExtractor={(g) => g.id}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            tintColor="#5865f2"
+                            onRefresh={() => { setRefreshing(true); load(); }}
+                        />
+                    }
+                    ItemSeparatorComponent={() => <View style={styles.sep} />}
+                    ListEmptyComponent={
+                        <View style={styles.empty}>
+                            <Text style={styles.emptyText}>You're not in any guilds yet.</Text>
+                        </View>
+                    }
+                    renderItem={({ item }) => (
+                        <GuildRow
+                            guild={item}
+                            onPress={() => navigation.navigate("Guild", { guildId: item.id, guildName: item.name })}
+                        />
+                    )}
+                    contentContainerStyle={servers.length === 0 ? { flexGrow: 1 } : undefined}
+                />
+            )}
         </SafeAreaView>
     );
 }
 
-function GuildRow({ guild }: { guild: GuildSummary }) {
+function GuildRow({ guild, onPress }: { guild: GuildSummary; onPress: () => void }) {
     const iconSrc = guild.iconUrl ? `${API_URL}${guild.iconUrl}` : null;
     const initial = (guild.name ?? "?").charAt(0).toUpperCase();
     return (
-        <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+        <Pressable onPress={onPress} style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
             <View style={styles.avatar}>
                 {iconSrc
                     ? <Image source={{ uri: iconSrc }} style={styles.avatarImg} />
@@ -135,11 +130,7 @@ function GuildRow({ guild }: { guild: GuildSummary }) {
 
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: "#0b0b0f" },
-    inner: { flex: 1, padding: 24 },
-    centered: { justifyContent: "center", alignItems: "center" },
-    header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
-    title: { color: "#fff", fontSize: 24, fontWeight: "600" },
-    subtitle: { color: "#8a8fa7", fontSize: 13, marginTop: 2 },
+    centered: { flex: 1, justifyContent: "center", alignItems: "center" },
     row: {
         flexDirection: "row",
         alignItems: "center",
@@ -163,13 +154,4 @@ const styles = StyleSheet.create({
     sep: { height: 1, backgroundColor: "#16171c", marginLeft: 78 },
     empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
     emptyText: { color: "#666", fontSize: 14 },
-    logout: {
-        marginHorizontal: 20,
-        marginVertical: 14,
-        paddingVertical: 12,
-        borderRadius: 8,
-        backgroundColor: "#2a2b33",
-        alignItems: "center",
-    },
-    logoutText: { color: "#fff", fontSize: 15, fontWeight: "500" },
 });

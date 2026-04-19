@@ -1,6 +1,15 @@
 export { RootNavigator } from "./navigation/RootNavigator.tsx";
-export type { RootStackParamList } from "./navigation/types.ts";
+export { MainTabs } from "./navigation/MainTabs.tsx";
+export type { RootStackParamList, MainTabParamList } from "./navigation/types.ts";
 export { LoginScreen } from "./screens/LoginScreen.tsx";
 export { TwoFactorScreen } from "./screens/TwoFactorScreen.tsx";
-export { ServersScreen } from "./screens/ServersScreen.tsx";
+export { GuildsScreen } from "./screens/GuildsScreen.tsx";
+export { DmsScreen } from "./screens/DmsScreen.tsx";
+export { FriendsScreen } from "./screens/FriendsScreen.tsx";
+export { GuildScreen } from "./screens/GuildScreen.tsx";
+export { ChannelScreen } from "./screens/ChannelScreen.tsx";
+export { DmChannelScreen } from "./screens/DmChannelScreen.tsx";
+export { SettingsScreen } from "./screens/SettingsScreen.tsx";
+export { MediaScreen } from "./screens/MediaScreen.tsx";
+export { MobileHeader } from "./components/MobileHeader.tsx";
 export { MobileRealtimeRoot } from "./realtime/MobileRealtimeRoot.tsx";
